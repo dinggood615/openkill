@@ -56,13 +56,15 @@ install_dependencies(){
   log "Installing OpenKill runtime dependencies"
   if [ "$PM" = opkg ]; then
     opkg update >/dev/null 2>&1 || log "Package index update failed; using existing indexes"
-    deps="bash curl ca-bundle ip-full ruby ruby-yaml lua kmod-tun unzip dnsmasq-full luci-compat kmod-inet-diag kmod-nft-tproxy"
+    # 与原 OpenClash 安装器及其运行时诊断清单保持一致；不存在的内核
+    # 模块会跳过，由当前固件的防火墙后端决定实际需要哪一组。
+    deps="bash curl ca-bundle ip-full ruby ruby-yaml ruby-base64 ruby-psych ruby-pstore lua kmod-tun unzip dnsmasq-full luci-compat kmod-inet-diag kmod-nft-tproxy kmod-ipt-tproxy kmod-ipt-extra kmod-ipt-nat iptables-mod-tproxy iptables-mod-extra ipset"
     for dep in $deps; do
       opkg install "$dep" >/dev/null 2>&1 || log "Dependency unavailable or already provided by firmware: $dep"
     done
   else
     apk update >/dev/null 2>&1 || log "Package index update failed; using existing indexes"
-    deps="bash curl ca-certificates iproute2 ruby lua unzip dnsmasq-full"
+    deps="bash curl ca-certificates iproute2 ruby ruby-yaml lua unzip dnsmasq-full nftables ipset"
     for dep in $deps; do
       apk add --no-cache "$dep" >/dev/null 2>&1 || log "Dependency unavailable or already provided by firmware: $dep"
     done

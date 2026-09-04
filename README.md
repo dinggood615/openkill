@@ -5,7 +5,7 @@
 
 OpenKill 是基于 OpenClash 源码的 OpenWrt 客户端项目。
 
-当前版本：`2026-1010`。
+当前版本：`2026-1011`。
 
 许可：本项目遵循 [MIT License](LICENSE)，并保留上游 OpenClash 及相关组件的版权声明。
 
@@ -27,4 +27,4 @@ curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/scripts
 安装器会对 GitHub Raw、jsDelivr 和 Fastly 三个源进行快速可达性与响应时间检测，优先使用最快源；下载失败时自动切换到其他源，不需要手动改地址。
 安装前会自动刷新软件包索引并尝试补齐 Bash、Curl、CA 证书、Ruby/YAML、Lua、DNS、防火墙、TUN、IPv6 和解压工具等运行依赖；固件已内置或仓库不存在的组件会安全跳过，由软件包依赖继续校验。
 
-2026-1010：一键安装时自动更新软件源并补齐 OpenKill 运行依赖，兼容 opkg/apk 固件。
+2026-1011：按原 OpenClash 运行时清单补齐 Ruby、YAML、TUN、iptables/nftables、ipset 和 DNS 依赖。
