@@ -239,6 +239,8 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           # IPK 是发布产物，仓库通用 .gitignore 会忽略 *.ipk，需强制加入。
+          # 记录清理旧 IPK 的删除动作，避免 package 分支残留多个版本。
+          git add -u ./${{ github.ref_name }}/
           git add ./${{ github.ref_name }}/version
           git add -f ./${{ github.ref_name }}/luci-app-openkill_*.ipk
           if git diff --staged --quiet; then
