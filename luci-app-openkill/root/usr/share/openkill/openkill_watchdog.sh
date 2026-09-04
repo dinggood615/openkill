@@ -14,6 +14,11 @@ UPNP_INTERVAL=30
 STREAM_AUTO_SELECT=0
 FIREWALL_RELOAD=0
 MAX_FIREWALL_RELOAD=3
+# Expensive address discovery is only needed periodically.  Keeping the
+# watchdog loop at one minute preserves recovery speed while avoiding a full
+# interface scan on every tick.
+LOCALNETWORK_INT=1
+LOCALNETWORK_INTERVAL=5
 FW4=$(command -v fw4)
 
 ## Skip Proxies Address
@@ -250,7 +255,8 @@ fi
       fi
    fi
 
-## Localnetwork 刷新
+## Localnetwork 刷新 (periodic; phase-2 CPU/network overhead reduction)
+if [ "$LOCALNETWORK_INT" -eq 1 ] || [ "$(expr "$LOCALNETWORK_INT" % "$LOCALNETWORK_INTERVAL")" -eq 0 ]; then
    wan_ip4s=$(/usr/share/openkill/openkill_get_network.lua "wanip" 2>/dev/null)
    wan_ip6s=$(ifconfig | grep 'inet6 addr' | awk '{print $3}' 2>/dev/null)
    lan_ip4s=$(/usr/share/openkill/openkill_get_network.lua "lan_cidr" 2>/dev/null)
@@ -303,6 +309,9 @@ fi
          fi
       fi
    fi
+   LOCALNETWORK_INT=0
+fi
+LOCALNETWORK_INT=$(expr "$LOCALNETWORK_INT" + 1)
 
 ## UPNP
    if [ "$UPNP_INT" -eq 1 ] || [ "$(expr "$UPNP_INT" % "$UPNP_INTERVAL")" -eq 0 ]; then
