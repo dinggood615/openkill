@@ -13,6 +13,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: openkill-package-release
+  cancel-in-progress: true
+
 jobs:
   Get-Version:
     runs-on: ubuntu-latest
@@ -28,7 +32,12 @@ jobs:
       - name: New Version
         id: version
         run: |
-          echo "version=$(grep 'PKG_VERSION:=' ./luci-app-openkill/Makefile |awk -F '=' '{print $2}')" >> $GITHUB_OUTPUT
+          version=$(grep 'PKG_VERSION:=' ./luci-app-openkill/Makefile | awk -F ':=' '{print $2}' | tr -d '[:space:]')
+          project=$(grep '^PROJECT_VERSION=' ./scripts/install-openkill.sh | sed -E 's/.*="([^"]+)"/\1/' | tr -d '[:space:]')
+          [ -n "$version" ] || { echo 'PKG_VERSION is empty'; exit 1; }
+          [ "$version" = "$project" ] || { echo "Version mismatch: Makefile=$version installer=$project"; exit 1; }
+          case "$version" in *[!0-9-]*) echo "Invalid version: $version"; exit 1;; esac
+          echo "version=$version" >> $GITHUB_OUTPUT
 
       - name: Clone Repository
         uses: actions/checkout@v6
@@ -38,7 +47,14 @@ jobs:
       - name: Current Version
         id: current_version
         run: |
-          echo "version=$(sed -n 1p ./${{ github.ref_name }}/version |awk -F 'v' '{print $2}')" >> $GITHUB_OUTPUT
+          current=$(sed -n 1p ./${{ github.ref_name }}/version | sed 's/^v//' | tr -d '[:space:]')
+          echo "version=$current" >> $GITHUB_OUTPUT
+
+      - name: Require Version Bump
+        if: ${{ steps.version.outputs.version == steps.current_version.outputs.version && github.event_name != 'workflow_dispatch' }}
+        run: |
+          echo "::error::Source changes require a version bump. Update PKG_VERSION and PROJECT_VERSION before publishing."
+          exit 1
 
   Compile:
     runs-on: ubuntu-latest
