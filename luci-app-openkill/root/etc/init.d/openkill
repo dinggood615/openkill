@@ -567,13 +567,8 @@ do_run_file()
 
    ln -s "$meta_core_path" /etc/openkill/clash
 
-   if [ -n "$OIX_TOKEN" ]; then
-      core_type="Oix"
-   elif [ "$smart_enable" -eq 1 ] || [ "$core_type" == "Smart" ]; then
-      core_type="Smart"
-   else
-      core_type="Meta"
-   fi
+   # OpenKill uses the official stable Mihomo/Meta core only.
+   core_type="Meta"
 
    if [ -f "$CLASH" ] && [ ! -x "$CLASH" ]; then
       chmod 4755 "$CLASH"

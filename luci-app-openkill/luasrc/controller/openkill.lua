@@ -271,7 +271,7 @@ function release_branch()
 end
 
 local function smart_enable()
-	return fs.uci_get_config("config", "smart_enable") or "0"
+	return "0"
 end
 
 -- Third-party oixCloud integration is intentionally disabled.

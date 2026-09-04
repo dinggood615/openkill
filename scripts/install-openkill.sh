@@ -13,7 +13,7 @@ die(){ printf 'Error: %s\n' "$*" >&2; exit 1; }
 usage(){ cat <<'EOF'
 OpenKill installer
   --install       Install or repair OpenKill
-  --update        Update OpenKill and its official Smart/Mihomo core
+  --update        Update OpenKill and its official stable Mihomo/Meta core
   --uninstall     Remove OpenKill and its data
   --package-file  Install a local IPK/APK file
 EOF
@@ -45,8 +45,8 @@ download(){
 install_core(){
   core=/usr/share/openkill/openkill_core.sh
   [ -x "$core" ] || die "OpenKill core installer is missing"
-  log "Installing the latest official Smart/Mihomo core"
-  "$core" Smart || die "Official Smart/Mihomo core installation failed"
+  log "Installing the latest official stable Mihomo/Meta core"
+  "$core" Meta || die "Official Mihomo/Meta core installation failed"
 }
 
 resolve_package(){
@@ -96,6 +96,15 @@ if command -v uci >/dev/null 2>&1; then
 fi
 rm -f /tmp/oix_checkin /tmp/oix_info /tmp/openkill_oix_version.json
 rm -f "/etc/openkill/config/oixCloud - smart.yaml"
+# Remove obsolete Smart/LGBM state so the installation remains Meta-only.
+rm -f /etc/openkill/Model.bin /tmp/etc/openkill/Model.bin
+rm -rf /etc/openkill/cache/smart /tmp/etc/openkill/cache/smart
+if command -v uci >/dev/null 2>&1; then
+  for opt in smart_enable auto_smart_switch smart_policy_priority smart_prefer_asn smart_tolerance smart_enable_lgbm smart_collect smart_collect_size smart_collect_rate lgbm_auto_update lgbm_update_interval lgbm_custom_url; do
+    uci -q delete "openkill.config.$opt" || true
+  done
+  uci -q commit openkill || true
+fi
 rm -f /tmp/luci-indexcache /tmp/luci-modulecache/*openkill* 2>/dev/null || true
 rm -f "$PACKAGE_FILE"
 printf 'OpenKill %s installation/update complete.\n' "$PROJECT_VERSION"

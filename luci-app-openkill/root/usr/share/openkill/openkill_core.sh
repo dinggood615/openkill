@@ -42,29 +42,19 @@ if [ -z "$DIRECT_CORE_URL" ]; then
       github_address_mod=0
    fi
 fi
-CORE_TYPE="$1"
+CORE_TYPE="Meta"
 C_CORE_TYPE=$(uci_get_config "core_type")
-SMART_ENABLE=$(uci_get_config "smart_enable" || echo 0)
+SMART_ENABLE=0
 OIX_TOKEN=$(uci_get_config "oix_token")
 # OpenKill does not use the third-party oixCloud service.
 OIX_TOKEN=""
-[ "$SMART_ENABLE" -eq 1 ] && CORE_TYPE="Smart"
-[ -n "$OIX_TOKEN" ] && CORE_TYPE="Oix"
-[ -z "$CORE_TYPE" ] && CORE_TYPE="Meta"
-[ "$CORE_TYPE" = "Oix" ] && CORE_TYPE="Meta"
 small_flash_memory=$(uci_get_config "small_flash_memory")
 CPU_MODEL=$(uci_get_config "core_version")
 RELEASE_BRANCH=$(uci_get_config "release_branch" || echo "master")
 
 if [ -z "$DIRECT_CORE_URL" ]; then
    lua /usr/share/openkill/openkill_version.lua "$github_address_mod" 2>/dev/null
-   if [ "$CORE_TYPE" = "Oix" ]; then
-      CORE_LV=$(jsonfilter -i /tmp/openkill_version_history.json -e "@.oix.ver" 2>/dev/null)
-   elif [ "$CORE_TYPE" = "Smart" ]; then
-      CORE_LV=$(jsonfilter -i /tmp/openkill_version_history.json -e "@.${RELEASE_BRANCH}.latest.core_smart" 2>/dev/null)
-   else
-      CORE_LV=$(jsonfilter -i /tmp/openkill_version_history.json -e "@.${RELEASE_BRANCH}.latest.core_meta" 2>/dev/null)
-   fi
+   CORE_LV=$(jsonfilter -i /tmp/openkill_version_history.json -e "@.${RELEASE_BRANCH}.latest.core_meta" 2>/dev/null)
    if [ -z "$CORE_LV" ]; then
       LOG_ERROR "【"$CORE_TYPE"】Core Version Check Error, Please Try Again Later..."
       del_lock
@@ -84,16 +74,8 @@ TARGET_CORE_PATH="$meta_core_path"
 CORE_CV=$($TARGET_CORE_PATH -v 2>/dev/null |awk -F ' ' '{print $3}' |head -1)
 TMP_FILE="${TARGET_CORE_PATH}.new.$$"
 
-if [ "$CORE_TYPE" = "Oix" ]; then
-   CORE_URL_PATH=""
-   DOWNLOAD_FILE="/tmp/clash_meta.gz"
-elif [ "$CORE_TYPE" = "Smart" ]; then
-   CORE_URL_PATH="$RELEASE_BRANCH/smart"
-   DOWNLOAD_FILE="/tmp/clash_meta.tar.gz"
-else
-   CORE_URL_PATH="$RELEASE_BRANCH/meta"
-   DOWNLOAD_FILE="/tmp/clash_meta.tar.gz"
-fi
+CORE_URL_PATH="$RELEASE_BRANCH/meta"
+DOWNLOAD_FILE="/tmp/clash_meta.tar.gz"
 
 [ "$C_CORE_TYPE" != "$CORE_TYPE" ] || [ -z "$C_CORE_TYPE" ] && restart=1
 

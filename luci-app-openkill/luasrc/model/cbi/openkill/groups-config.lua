@@ -50,7 +50,6 @@ o = s:option(ListValue, "type", translate("Group Type"))
 o.rmempty = false
 o.description = translate("Choose The Operation Mode")
 o:value("select", translate("Manual-Select"))
-o:value("smart", translate("Smart-Select"))
 o:value("url-test", translate("URL-Test"))
 o:value("fallback", translate("Fallback"))
 o:value("load-balance", translate("Load-Balance"))
@@ -73,7 +72,6 @@ o.rmempty = true
 o:depends("type", "url-test")
 o:depends("type", "fallback")
 o:depends("type", "load-balance")
-o:depends("type", "smart")
 
 o = s:option(Value, "test_interval", translate("Test Interval(s)"))
 o.default = "300"
@@ -81,7 +79,6 @@ o.rmempty = true
 o:depends("type", "url-test")
 o:depends("type", "fallback")
 o:depends("type", "load-balance")
-o:depends("type", "smart")
 
 o = s:option(ListValue, "strategy", translate("Strategy Type"))
 o.rmempty = true
@@ -90,29 +87,6 @@ o:value("round-robin", translate("Round-robin"))
 o:value("consistent-hashing", translate("Consistent-hashing"))
 o:value("sticky-sessions", translate("Sticky-sessions"))
 o:depends("type", "load-balance")
-
-o = s:option(ListValue, "uselightgbm", translate("Uselightgbm"))
-o.description = translate("Use LightGBM Model For Smart Group Weight Prediction")
-o:value("false", translate("Disable"))
-o:value("true", translate("Enable"))
-o.default = "false"
-o.rmempty = true
-o:depends("type", "smart")
-
-o = s:option(ListValue, "collectdata", translate("Collectdata"))
-o.description = translate("Collect Datas For Smart Group Model Training")
-o:value("false", translate("Disable"))
-o:value("true", translate("Enable"))
-o.default = "false"
-o.rmempty = true
-o:depends("type", "smart")
-
-o = s:option(Value, "policy_priority", translate("Policy Priority"))
-o.description = translate("The Priority Of The Nodes, The Higher Than 1, The More Likely It Is To Be Selected, The Default Is 1, Support Regex")
-o.rmempty = true
-o.placeholder = "Premium:0.9;SG:1.3"
-o.rmempty = true
-o:depends("type", "smart")
 
 o = s:option(Value, "tolerance", translate("Tolerance(ms)"))
 o.default = "150"
