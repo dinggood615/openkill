@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1003"
+PROJECT_VERSION="2026-1004"
 ACTION=install
 PACKAGE_FILE=""
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
@@ -97,7 +97,7 @@ resolve_package(){
   [ -s "$version" ] || die "Could not retrieve OpenKill package version"
   ver=$(sed -n '1{s/^v//;s/[[:space:]]//g;p;}' "$version"); rm -f "$version"
   case "$ver" in ''|*[!0-9.\-]*) die "Invalid package version";; esac
-  if [ "$EXT" = ipk ]; then name="luci-app-openkill_${ver}_all.ipk"; else name="luci-app-openkill-${ver}.apk"; fi
+  if [ "$EXT" = ipk ]; then name="luci-app-openkill_${ver}_all.ipk"; else name="luci-app-openkill_${ver}_all.apk"; fi
   for base in \
     "https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF" \
     "https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF" \

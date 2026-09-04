@@ -5,7 +5,7 @@
 
 OpenKill 是基于 OpenClash 源码的 OpenWrt 客户端项目。
 
-当前版本：`2026-1003`。
+当前版本：`2026-1004`。
 
 许可：本项目遵循 [MIT License](LICENSE)，并保留上游 OpenClash 及相关组件的版权声明。
 

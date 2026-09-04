@@ -67,6 +67,8 @@ jobs:
         target:
           # 当前目标固件使用 opkg，仅构建兼容性更好的 IPK。
           - { name: ipk, sdk_url: "https://mirrors.pku.edu.cn/openwrt/releases/22.03.0/targets/x86/64/openwrt-sdk-22.03.0-x86-64_gcc-11.2.0_musl.Linux-x86_64.tar.xz", sdk_tar: "SDK.tar.xz", sdk_backup_tar: "SDK.tar.bz2", sdk_dir: "SDK", artifact_pattern: "luci-app-openkill_*.ipk" }
+          # APK 使用 OpenWrt snapshot SDK，供 apk 包管理器固件使用。
+          - { name: apk, sdk_url: "https://downloads.openwrt.org/snapshots/targets/x86/64/", sdk_tar: "SNAPSDK.tar.zst", sdk_backup_tar: "SNAPSDK.tar.zst", sdk_dir: "SDK", artifact_pattern: "luci-app-openkill_*.apk" }
     steps:
       - name: Checkout OpenKill Source
         uses: actions/checkout@v6
@@ -103,7 +105,7 @@ jobs:
               curl -SLfk --connect-timeout 30 --retry 2 "$BASE_URL2/$SDK_NAME" -o "./tmp/${{ matrix.target.sdk_tar }}"
             fi
             cd tmp
-            zstd -d ${{ matrix.target.sdk_tar }}
+            zstd -d ${{ matrix.target.sdk_tar }} -o SNAPSDK.tar
             tar xf SNAPSDK.tar
             SDK_DIR=$(tar tf SNAPSDK.tar | head -n 1 | cut -d/ -f1)
             mv "$SDK_DIR" "${{ matrix.target.sdk_dir }}"
@@ -239,6 +241,12 @@ jobs:
         with:
           name: openkill-ipk
           path: ./
+      - name: Download APK Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: openkill-apk
+          path: ./
+        continue-on-error: true
       - name: Commit and Push New Version
         env:
           GH_TOKEN: ${{ github.token }}
@@ -257,6 +265,11 @@ jobs:
           [ -n "$IPK_FILE" ] || { echo 'IPK artifact not found'; exit 1; }
           NEW_IPK="/tmp/$(basename "$IPK_FILE")"
           cp "$IPK_FILE" "$NEW_IPK"
+          APK_FILE=$(find . -maxdepth 1 -type f -name 'luci-app-openkill_*.apk' | head -n 1 || true)
+          if [ -n "$APK_FILE" ]; then
+            NEW_APK="/tmp/$(basename "$APK_FILE")"
+            cp "$APK_FILE" "$NEW_APK"
+          fi
           # Start from the latest remote package branch so stale local state
           # cannot make the publication step fail.
           git fetch origin package
@@ -268,6 +281,11 @@ jobs:
           TARGET_IPK="./${{ github.ref_name }}/$(basename "$NEW_IPK")"
           cp "$NEW_IPK" "$TARGET_IPK"
           rm -f "$IPK_FILE" "$NEW_IPK"
+          if [ -n "${NEW_APK:-}" ]; then
+            TARGET_APK="./${{ github.ref_name }}/$(basename "$NEW_APK")"
+            cp "$NEW_APK" "$TARGET_APK"
+            rm -f "$APK_FILE" "$NEW_APK"
+          fi
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           # IPK 是发布产物，仓库通用 .gitignore 会忽略 *.ipk，需强制加入。
