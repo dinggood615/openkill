@@ -243,3 +243,4 @@ jobs:
             git commit -m "Auto Release: v${{ needs.Get-Version.outputs.version }}"
             git push
           fi
+# package channel build trigger
