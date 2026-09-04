@@ -5,7 +5,7 @@
 
 OpenKill 是基于 OpenClash 源码的 OpenWrt 客户端项目。
 
-当前版本：`2026-1008`。
+当前版本：`2026-1009`。
 
 许可：本项目遵循 [MIT License](LICENSE)，并保留上游 OpenClash 及相关组件的版权声明。
 
@@ -26,4 +26,4 @@ curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/scripts
 
 安装器会对 GitHub Raw、jsDelivr 和 Fastly 三个源进行快速可达性与响应时间检测，优先使用最快源；下载失败时自动切换到其他源，不需要手动改地址。
 
-2026-1008：更新新版透明背景猫咪纸飞机图标。
+2026-1009：更新为真正透明背景的猫咪纸飞机 PNG 图标。
