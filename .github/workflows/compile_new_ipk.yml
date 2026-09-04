@@ -228,6 +228,8 @@ jobs:
           find . -maxdepth 2 -type f \( -name '*.ipk' -o -name '*.apk' \) -print
           IPK_FILE=$(find . -maxdepth 2 -type f -name 'luci-app-openkill_*.ipk' | head -n 1)
           [ -n "$IPK_FILE" ] || { echo 'IPK artifact not found'; exit 1; }
+          git fetch origin package
+          git rebase origin/package
           mkdir -p "./${{ github.ref_name }}"
           rm -rf ./${{ github.ref_name }}/luci-app-openkill*
           echo "v${{ needs.Get-Version.outputs.version }}" > ./${{ github.ref_name }}/version
@@ -236,8 +238,6 @@ jobs:
           rm -f "$IPK_FILE"
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git fetch origin package
-          git rebase origin/package
           git add .
           if git diff --staged --quiet; then
             echo "No changes to commit, skipping."
