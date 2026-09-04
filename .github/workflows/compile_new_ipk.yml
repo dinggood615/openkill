@@ -3,9 +3,11 @@ name: Compile The New Version OpenKill
 on: 
   push:
     branches:
-      - dev
+      - master
     paths:
-      - 'luci-app-openkill/Makefile'
+      - 'luci-app-openkill/**'
+      - 'scripts/**'
+      - '.github/workflows/compile_new_ipk.yml'
   workflow_dispatch:
 
 jobs:
