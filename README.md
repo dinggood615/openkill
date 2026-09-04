@@ -5,7 +5,7 @@
 
 OpenKill 是基于 OpenClash 源码的 OpenWrt 客户端项目。
 
-当前版本：`2026-1004`。
+当前版本：`2026-1005`。
 
 许可：本项目遵循 [MIT License](LICENSE)，并保留上游 OpenClash 及相关组件的版权声明。
 
@@ -22,9 +22,11 @@ curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/scripts
 curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/scripts/install-openkill.sh | sh -s -- --uninstall
 
 # 安装本地 IPK/APK 软件包
-sh install-openkill.sh --package-file /tmp/luci-app-openkill_2026-1003_all.ipk
+sh install-openkill.sh --package-file /tmp/luci-app-openkill_2026-1005_all.ipk
 ```
 
 更新统一使用 `--update`，会更新 OpenKill 软件包并安装/更新官方稳定 Meta（Mihomo）内核。
 
-2026-1003：默认启用 Mihomo TCP 并发连接与统一延迟测量，改善双栈测速和首连速度；watchdog 网络地址扫描按周期执行，降低后台开销。
+安装器会对 GitHub Raw、jsDelivr 和 Fastly 三个源进行快速可达性与响应时间检测，优先使用最快源；下载失败时自动切换到其他源，不需要手动改地址。
+
+2026-1005：合并安装/更新下载流程，加入多源测速与自动故障切换，并保留 IPK/APK 自动识别。

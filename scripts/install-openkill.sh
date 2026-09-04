@@ -4,10 +4,11 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1004"
+PROJECT_VERSION="2026-1005"
 ACTION=install
 PACKAGE_FILE=""
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
+SOURCE_ROOT=""
 
 log(){ printf '\n==> %s\n' "$*"; }
 die(){ printf 'Error: %s\n' "$*" >&2; exit 1; }
@@ -41,6 +42,33 @@ download(){
   if command -v curl >/dev/null 2>&1; then curl -fL --retry 2 --connect-timeout 12 --max-time 180 "$1" -o "$2"
   elif command -v uclient-fetch >/dev/null 2>&1; then uclient-fetch -q -T 180 -O "$2" "$1"
   else wget -T 180 -O "$2" "$1"; fi
+}
+
+# Pick the quickest reachable distribution mirror once per run.  This keeps
+# package, version and future resource downloads on the same healthy source;
+# every download still has a fallback loop for transient failures.
+select_source(){
+  rel="$1"
+  candidates="https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF https://fastly.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF"
+  if ! command -v curl >/dev/null 2>&1; then
+    for base in $candidates; do
+      if download "$base/$rel" /tmp/openkill-source-probe.$$ >/dev/null 2>&1; then
+        rm -f /tmp/openkill-source-probe.$$
+        SOURCE_ROOT="$base"
+        return 0
+      fi
+    done
+    return 1
+  fi
+  scores=/tmp/openkill-source-scores.$$
+  : > "$scores"
+  for base in $candidates; do
+    score=$(curl -fsSL -o /dev/null -w '%{time_total}' --connect-timeout 8 --max-time 15 "$base/$rel" 2>/dev/null || true)
+    [ -n "$score" ] && printf '%s %s\n' "$score" "$base" >> "$scores"
+  done
+  SOURCE_ROOT=$(sort -n "$scores" 2>/dev/null | awk 'NR==1{print $2}')
+  rm -f "$scores"
+  [ -n "$SOURCE_ROOT" ]
 }
 
 install_core(){
@@ -87,21 +115,19 @@ validate_install(){
 }
 
 resolve_package(){
-  version=/tmp/openkill-version.$$
-  for base in \
-    "https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF" \
-    "https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF" \
-    "https://fastly.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF"; do
+  version=/tmp/openkill-version.$$ 
+  select_source version || true
+  candidates="$SOURCE_ROOT https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF https://fastly.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF"
+  for base in $candidates; do
+    [ -n "$base" ] || continue
     download "$base/version" "$version" >/dev/null 2>&1 && break || true
   done
   [ -s "$version" ] || die "Could not retrieve OpenKill package version"
   ver=$(sed -n '1{s/^v//;s/[[:space:]]//g;p;}' "$version"); rm -f "$version"
   case "$ver" in ''|*[!0-9.\-]*) die "Invalid package version";; esac
   if [ "$EXT" = ipk ]; then name="luci-app-openkill_${ver}_all.ipk"; else name="luci-app-openkill_${ver}_all.apk"; fi
-  for base in \
-    "https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF" \
-    "https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF" \
-    "https://fastly.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF"; do
+  for base in $candidates; do
+    [ -n "$base" ] || continue
     PACKAGE_FILE="/tmp/openkill-package.$EXT"
     download "$base/$name" "$PACKAGE_FILE" >/dev/null 2>&1 && return 0 || true
   done
