@@ -121,8 +121,6 @@ define Package/$(PKG_NAME)/postrm
 	rm -rf /tmp/etc/openkill >/dev/null 2>&1
 	rm -rf /tmp/openkill_announcement >/dev/null 2>&1
 	rm -rf /www/luci-static/resources/openkill >/dev/null 2>&1
-	rm -rf /tmp/oix* >/dev/null 2>&1
-	rm -rf /tmp/openkill_oix_version.json >/dev/null 2>&1
 	rm -rf /tmp/openkill_version_history_* >/dev/null 2>&1
 	rm -rf /tmp/openkill_cdn_info_* >/dev/null 2>&1
 	sed -i '/OpenKill Append/,/OpenKill Append End/d' "/usr/lib/lua/luci/model/network.lua" >/dev/null 2>&1

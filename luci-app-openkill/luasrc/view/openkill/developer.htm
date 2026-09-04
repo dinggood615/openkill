@@ -13,7 +13,6 @@
                 <span id="lmc999"><%:Collecting data...%></span>
                 <span id="immortalwrt"><%:Collecting data...%></span>
                 <span id="MetaCubeX"><%:Collecting data...%></span>
-                <span id="oixcloud"><%:Collecting data...%></span>
                 <span id="more"><%:Collecting data...%></span>
             </div>
         </div>
@@ -32,7 +31,6 @@
     var immortalwrt = document.getElementById('immortalwrt');
     var lmc999 = document.getElementById('lmc999');
     var MetaCubeX = document.getElementById('MetaCubeX');
-    var oixcloud = document.getElementById('oixcloud');
     var more = document.getElementById('more');
 
     function getAvatarSize() {
@@ -73,7 +71,6 @@
         immortalwrt.innerHTML = createAvatarHTML('https://avatars.githubusercontent.com/u/82308430?v=4', 'immortalwrt', 'immortalwrt', 'immortalwrt_rediret');
         lmc999.innerHTML = createAvatarHTML('https://avatars.githubusercontent.com/u/39726914?v=4', 'lmc999', 'lmc999', 'lmc999_rediret');
         MetaCubeX.innerHTML = createAvatarHTML('https://avatars.githubusercontent.com/u/84378451?v=4', 'MetaCubeX', 'MetaCubeX', 'MetaCubeX_rediret');
-        oixcloud.innerHTML = createAvatarHTML('/luci-static/resources/openkill/img/oixcloud.png', 'oixCloud', 'oixcloud', 'oixcloud_rediret');
         more.innerHTML = createMoreAvatarHTML('<%:More%>', 'more_rediret');
     }
 
@@ -115,9 +112,6 @@
     }
     function MetaCubeX_rediret() {
         window.open('https://github.com/MetaCubeX');
-    }
-    function oixcloud_rediret() {
-        window.open('http://bit.ly/oixcloud-register');
     }
     function more_rediret() {
         window.open('https://github.com/vernesong/OpenClash/graphs/contributors');

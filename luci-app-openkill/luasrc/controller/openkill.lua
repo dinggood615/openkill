@@ -107,13 +107,6 @@ function index()
 	entry({"admin", "services", "openkill", "delete_overwrite_file"}, call("delete_overwrite_file"))
 	entry({"admin", "services", "openkill", "get_subscribe_data"}, call("action_get_subscribe_data"))
 	entry({"admin", "services", "openkill", "get_subscribe_info_data"}, call("action_get_subscribe_info_data"))
-	entry({"admin", "services", "openkill", "oix_info"}, call("oix_info"))
-	entry({"admin", "services", "openkill", "oix_checkin"}, call("oix_checkin"))
-	entry({"admin", "services", "openkill", "oix_logout"}, call("oix_logout"))
-	entry({"admin", "services", "openkill", "oix_login"}, call("oix_login"))
-	entry({"admin", "services", "openkill", "oix_login_info_save"}, call("oix_login_info_save"))
-	entry({"admin", "services", "openkill", "oix_params_sync"}, call("oix_params_sync"))
-	entry({"admin", "services", "openkill", "oix_params_get"}, call("oix_params_get"))
 end
 
 local SYS = require "luci.sys"
@@ -281,9 +274,9 @@ local function smart_enable()
 	return fs.uci_get_config("config", "smart_enable") or "0"
 end
 
+-- Third-party oixCloud integration is intentionally disabled.
 local function is_oix()
-	local token = fs.uci_get_config("config", "oix_token")
-	return token ~= nil and token ~= ""
+	return false
 end
 
 local function corever()

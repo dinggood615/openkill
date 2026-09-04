@@ -559,7 +559,7 @@
                 if (st.corever && st.corever != '0') core_version.value = st.corever; else core_version.value = '0';
                 if (st.release_branch) release_branch.value = st.release_branch; else release_branch.value = 'master';
                 if (st.smart_enable) smart_enable.value = st.smart_enable; else smart_enable.value = '0';
-                _isOix = !!(st.oix_core);
+                _isOix = false;
                 _pkgType = st.pkg_type || 'opkg';
                 document.getElementById('installed-plugin').textContent = (st.opcv && st.opcv != '0') ? st.opcv : '--';
                 document.getElementById('installed-core').textContent = (st.coremetacv && st.coremetacv != '0') ? st.coremetacv : '--';

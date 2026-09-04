@@ -13,9 +13,6 @@ m.reset = false
 m.submit = false
 
 m:section(SimpleSection).template = "openkill/status"
-if fs.uci_get_config("config", "oix_token") and fs.uci_get_config("config", "oix_show_info_page") == "1" then
-	m:append(Template("openkill/oixcloud"))
-end
 m:append(Template("openkill/myip"))
 m:append(Template("openkill/update"))
 m:append(Template("openkill/config_edit"))

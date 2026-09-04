@@ -58,11 +58,7 @@ begin
                      end
                   else
                      if file_is_age_encrypted
-                        if name == 'oixCloud'
-                           YAML.LOG('Set Proxies Address Skip: Bypass【oixCloud】')
-                        else
-                           YAML.LOG_WARN('Set Proxies Address Skip: Failed【' + path + '】File is AGE encrypted but no secret key provided')
-                        end
+                        YAML.LOG_WARN('Set Proxies Address Skip: Failed【' + path + '】File is AGE encrypted but no secret key provided')
                         next
                      end
                      provider_config = YAML.load_file(path)
@@ -391,9 +387,6 @@ fi
          /etc/init.d/dnsmasq restart >/dev/null 2>&1
       fi
    fi
-
-##Dler Cloud Checkin
-   /usr/share/openkill/openkill_oix_checkin.lua >/dev/null 2>&1
 
 ## 配置文件循环更新
    if [ "$cfg_update" -eq 1 ] && [ "$cfg_update_mode" -eq 1 ]; then

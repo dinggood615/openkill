@@ -87,6 +87,15 @@ log "Installing OpenKill $PROJECT_VERSION"
 if [ "$PM" = opkg ]; then opkg install "$PACKAGE_FILE"; else apk add --allow-untrusted "$PACKAGE_FILE"; fi
 [ -x /etc/init.d/openkill ] || die "OpenKill service was not installed"
 install_core
+# Remove credentials and generated files left by older oixCloud-based builds.
+if command -v uci >/dev/null 2>&1; then
+  for opt in oix_token oix_email oix_passwd oix_checkin oix_checkin_interval oix_checkin_multiple oix_params oix_default_params oix_show_info_page; do
+    uci -q delete "openkill.config.$opt" || true
+  done
+  uci -q commit openkill || true
+fi
+rm -f /tmp/oix_checkin /tmp/oix_info /tmp/openkill_oix_version.json
+rm -f "/etc/openkill/config/oixCloud - smart.yaml"
 rm -f /tmp/luci-indexcache /tmp/luci-modulecache/*openkill* 2>/dev/null || true
 rm -f "$PACKAGE_FILE"
 printf 'OpenKill %s installation/update complete.\n' "$PROJECT_VERSION"

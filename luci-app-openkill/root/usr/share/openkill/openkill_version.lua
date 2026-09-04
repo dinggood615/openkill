@@ -24,8 +24,7 @@ function M.is_valid_version(s)
 end
 
 function M.is_oix_mode()
-	local oix_token = fs.uci_get_config("config", "oix_token") or ""
-	return oix_token ~= ""
+	return false
 end
 
 function try_read(fd, maxlen)
