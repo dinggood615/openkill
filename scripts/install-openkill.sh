@@ -7,6 +7,7 @@ PACKAGE_REF="master"
 PROJECT_VERSION="2026-1000"
 ACTION=install
 PACKAGE_FILE=""
+BACKUP_DIR="/tmp/openkill-install-backup-$$"
 
 log(){ printf '\n==> %s\n' "$*"; }
 die(){ printf 'Error: %s\n' "$*" >&2; exit 1; }
@@ -69,6 +70,22 @@ install_core(){
   "$core" Meta || die "Official Mihomo/Meta core installation failed"
 }
 
+backup_config(){
+  if [ -f /etc/config/openkill ] || [ -d /etc/openkill ]; then
+    mkdir -p "$BACKUP_DIR"
+    tar -czf "$BACKUP_DIR/config.tar.gz" /etc/config/openkill /etc/openkill 2>/dev/null || true
+    log "Configuration backup: $BACKUP_DIR/config.tar.gz"
+  fi
+}
+
+validate_install(){
+  [ -f /etc/config/openkill ] || die "OpenKill configuration was not installed"
+  [ -x /etc/init.d/openkill ] || die "OpenKill service was not installed"
+  uci -q show openkill >/dev/null 2>&1 || die "OpenKill UCI configuration is invalid"
+  sh -n /etc/init.d/openkill || die "OpenKill service script validation failed"
+  sh -n /usr/share/openkill/openkill_watchdog.sh || die "OpenKill watchdog validation failed"
+}
+
 resolve_package(){
   version=/tmp/openkill-version.$$
   for base in \
@@ -103,9 +120,10 @@ uninstall(){
 [ "$ACTION" = uninstall ] && { uninstall; exit 0; }
 [ -n "$PACKAGE_FILE" ] || resolve_package
 [ -f "$PACKAGE_FILE" ] || die "Package file not found"
+backup_config
 log "Installing OpenKill $PROJECT_VERSION"
 if [ "$PM" = opkg ]; then opkg install "$PACKAGE_FILE"; else apk add --allow-untrusted "$PACKAGE_FILE"; fi
-[ -x /etc/init.d/openkill ] || die "OpenKill service was not installed"
+validate_install
 install_core
 # Remove credentials and generated files left by older oixCloud-based builds.
 if command -v uci >/dev/null 2>&1; then

@@ -3780,6 +3780,9 @@ start_watchdog()
 {
    procd_open_instance "openkill-watchdog"
    procd_set_param command "/usr/share/openkill/openkill_watchdog.sh"
+   # Limit watchdog respawns to prevent a crash loop from repeatedly
+   # reloading firewall/DNS state (3 attempts within 10 minutes).
+   procd_set_param respawn 600 5 3
    procd_close_instance
 }
 
