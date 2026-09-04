@@ -10,6 +10,9 @@ on:
       - '.github/workflows/compile_new_ipk.yml'
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   Get-Version:
     runs-on: ubuntu-latest
@@ -227,20 +230,29 @@ jobs:
 
       - name: Commit and Push New Version
         run: |
+          set -euo pipefail
+          echo "Downloaded artifacts:"
+          find . -maxdepth 2 -type f \( -name '*.ipk' -o -name '*.apk' \) -print
+          IPK_FILE=$(find . -maxdepth 2 -type f -name 'luci-app-openkill_*.ipk' | head -n 1)
+          APK_FILE=$(find . -maxdepth 2 -type f -name 'luci-app-openkill-*.apk' | head -n 1)
+          [ -n "$IPK_FILE" ] || { echo 'IPK artifact not found'; exit 1; }
+          [ -n "$APK_FILE" ] || { echo 'APK artifact not found'; exit 1; }
+          mkdir -p "./${{ github.ref_name }}"
           rm -rf ./${{ github.ref_name }}/luci-app-openkill*
           echo "v${{ needs.Get-Version.outputs.version }}" > ./${{ github.ref_name }}/version
           echo "https://img.shields.io/badge/New Release-v${{ needs.Get-Version.outputs.version }}-orange.svg" >> ./${{ github.ref_name }}/version
-          cp ./luci-app-openkill_*.ipk "./${{ github.ref_name }}/"
-          cp ./luci-app-openkill-*.apk "./${{ github.ref_name }}/"
-          rm -f ./luci-app-openkill_*.ipk
-          rm -f ./luci-app-openkill-*.apk
+          cp "$IPK_FILE" "./${{ github.ref_name }}/"
+          cp "$APK_FILE" "./${{ github.ref_name }}/"
+          rm -f "$IPK_FILE" "$APK_FILE"
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git fetch origin package
+          git rebase origin/package
           git add .
           if git diff --staged --quiet; then
             echo "No changes to commit, skipping."
           else
             git commit -m "Auto Release: v${{ needs.Get-Version.outputs.version }}"
-            git push
+            git push origin HEAD:package
           fi
 # package channel build trigger
