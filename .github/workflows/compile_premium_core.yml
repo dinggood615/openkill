@@ -20,7 +20,7 @@ jobs:
           sudo apt-get update
           sudo apt-get -y install curl git gzip
 
-      - name: Clone OpenClash Repository
+      - name: Clone OpenKill Repository
         uses: actions/checkout@v4
         with:
           ref: core
@@ -62,7 +62,7 @@ jobs:
           tar xf upx-3.95-amd64_linux.tar.xz
           echo "upx=../upx-3.95-amd64_linux/upx" >> $GITHUB_ENV
 
-      - name: Clone OpenClash Repository
+      - name: Clone OpenKill Repository
         uses: actions/checkout@v4
         with:
           ref: core
@@ -72,7 +72,7 @@ jobs:
           cd ..
           mkdir tmp
           mkdir tmp/bin
-          cp ./OpenClash/.github/makefile/tun.sh ./tmp/tun.sh
+          cp ./OpenKill/.github/makefile/tun.sh ./tmp/tun.sh
       
       - name: Compile Premium Clash
         run: |

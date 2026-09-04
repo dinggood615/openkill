@@ -20,7 +20,7 @@ jobs:
           sudo apt-get update
           sudo apt-get -y install git
 
-      - name: Clone OpenClash Repository
+      - name: Clone OpenKill Repository
         uses: actions/checkout@v4
         with:
           ref: core
@@ -63,7 +63,7 @@ jobs:
           tar xf upx-3.95-amd64_linux.tar.xz
           echo "upx=../upx-3.95-amd64_linux/upx" >> $GITHUB_ENV
 
-      - name: Clone OpenClash Repository
+      - name: Clone OpenKill Repository
         uses: actions/checkout@v4
         with:
           ref: core
@@ -73,7 +73,7 @@ jobs:
           cd ..
           mkdir tmp
           mkdir tmp/bin
-          cp ./OpenClash/.github/makefile/dev ./tmp/Makefile
+          cp ./OpenKill/.github/makefile/dev ./tmp/Makefile
 
       - name: Setup Go
         uses: actions/setup-go@v3
@@ -97,7 +97,7 @@ jobs:
         run: |
           cp -rf "./bin/." "../tmp/bin/"
 
-      - name: Clone OpenClash Repository
+      - name: Clone OpenKill Repository
         uses: actions/checkout@v4
         with:
           ref: core

@@ -31,12 +31,12 @@ Desktop.ini
 *.zip
 
 # Compiled po2lmo tool
-luci-app-openclash/tools/po2lmo/po2lmo
-luci-app-openclash/tools/po2lmo/src/*.o
+luci-app-openkill/tools/po2lmo/po2lmo
+luci-app-openkill/tools/po2lmo/src/*.o
 
 # Node.js (codemirror)
-luci-app-openclash/tools/codemirror/node_modules/
-luci-app-openclash/tools/codemirror/package-lock.json
+luci-app-openkill/tools/codemirror/node_modules/
+luci-app-openkill/tools/codemirror/package-lock.json
 
 # Python
 __pycache__/

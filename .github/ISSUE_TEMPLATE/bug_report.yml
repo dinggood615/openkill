@@ -13,25 +13,25 @@ body:
       options:
         - label: Tracker 我已经在 [Issue Tracker](……/) 中找过我要提出的问题
           required: true
-        - label: Branch 我知道 OpenClash 的 Dev 分支切换开关位于插件设置-版本更新中，或者我会手动下载并安装 Dev 分支的 OpenClash
+        - label: Branch 我知道 OpenKill 的 Dev 分支切换开关位于插件设置-版本更新中，或者我会手动下载并安装 Dev 分支的 OpenKill
           required: true
         - label: Latest 我已经**使用最新 Dev 版本**测试过，问题依旧存在
           required: true
-        - label: Relevant 我知道 OpenClash 与 内核(Core)、控制面板(Dashboard)、在线订阅转换(Subconverter)等项目之间**无直接关系**，仅相互调用
+        - label: Relevant 我知道 OpenKill 与 内核(Core)、控制面板(Dashboard)、在线订阅转换(Subconverter)等项目之间**无直接关系**，仅相互调用
           required: true
-        - label: Definite 这确实是 OpenClash 出现的问题
+        - label: Definite 这确实是 OpenKill 出现的问题
           required: true
-        - label: Contributors 我有能力协助 OpenClash 开发并解决此问题
+        - label: Contributors 我有能力协助 OpenKill 开发并解决此问题
           required: false
         - label: Meaningless 我提交的**是无意义的**催促更新或修复请求
           required: false
 
   - type: input
-    id: openclash_version
+    id: openkill_version
     attributes:
-      label: OpenClash Version
+      label: OpenKill Version
       description: |
-        OpenClash 版本号
+        OpenKill 版本号
       placeholder: "v0.0.0-beta"
     validations:
       required: true
@@ -110,11 +110,11 @@ body:
       required: true
 
   - type: textarea
-    id: openclash_log
+    id: openkill_log
     attributes:
-      label: OpenClash Log
+      label: OpenKill Log
       description: |
-        在下方附上 OpenClash 调试日志 / OpenClash Debug Log
+        在下方附上 OpenKill 调试日志 / OpenKill Debug Log
         调试日志在插件设置-调试日志中生成，**并非只有运行日志**，如调试日志过长，可作为附件在最下方上传
         **隐私提示: 上传此日志前请注意检查、屏蔽公网IP、节点、密码等相关敏感信息**
       placeholder: "我已知晓缺失日志可能会导致开发者无法了解我的情况并降低本issue的处理优先级"
@@ -123,9 +123,9 @@ body:
       required: true
 
   - type: textarea
-    id: openclash_config
+    id: openkill_config
     attributes:
-      label: OpenClash Config
+      label: OpenKill Config
       description: |
         在下方附上与 Bug 相关的系统配置、防火墙规则或环境变量 / System config
         非 Clash Yaml 文件

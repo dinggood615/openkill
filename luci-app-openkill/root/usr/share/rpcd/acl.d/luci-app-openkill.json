@@ -1,0 +1,11 @@
+{
+	"luci-app-openkill": {
+		"description": "Grant UCI access for luci-app-openkill",
+		"read": {
+			"uci": [ "openkill" ]
+		},
+		"write": {
+			"uci": [ "openkill" ]
+		}
+	}
+}
