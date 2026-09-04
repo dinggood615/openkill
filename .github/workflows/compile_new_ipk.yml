@@ -238,7 +238,9 @@ jobs:
           rm -f "$IPK_FILE"
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add .
+          # IPK 是发布产物，仓库通用 .gitignore 会忽略 *.ipk，需强制加入。
+          git add ./${{ github.ref_name }}/version
+          git add -f ./${{ github.ref_name }}/luci-app-openkill_*.ipk
           if git diff --staged --quiet; then
             echo "No changes to commit, skipping."
           else
