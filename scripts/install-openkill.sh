@@ -1,5 +1,5 @@
 #!/bin/sh
-# OpenKill installer (pre-release baseline; first published version will be 2026-1000)
+# OpenKill installer
 set -eu
 
 REPO="dinggood615/openkill"
