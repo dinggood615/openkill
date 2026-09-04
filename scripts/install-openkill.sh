@@ -45,6 +45,26 @@ download(){
 install_core(){
   core=/usr/share/openkill/openkill_core.sh
   [ -x "$core" ] || die "OpenKill core installer is missing"
+  # Fresh installs may not have an architecture selected yet. Set a safe
+  # Meta-compatible default so the first install can download the stable core.
+  if command -v uci >/dev/null 2>&1; then
+    arch=$(uci -q get openkill.config.core_version || true)
+    if [ -z "$arch" ] || [ "$arch" = "0" ]; then
+      case "$(uname -m)" in
+        x86_64|amd64) arch=linux-amd64-v1 ;;
+        aarch64|arm64) arch=linux-arm64 ;;
+        armv7l|armv7*) arch=linux-armv7 ;;
+        armv6l|armv6*) arch=linux-armv6 ;;
+        mips64el) arch=linux-mips64le ;;
+        mipsel) arch=linux-mipsle-hardfloat ;;
+        mips) arch=linux-mips-hardfloat ;;
+        *) arch=linux-amd64-v1 ;;
+      esac
+      uci -q set openkill.config.core_version="$arch" || true
+      uci -q commit openkill || true
+      log "Detected core architecture: $arch"
+    fi
+  fi
   log "Installing the latest official stable Mihomo/Meta core"
   "$core" Meta || die "Official Mihomo/Meta core installation failed"
 }
