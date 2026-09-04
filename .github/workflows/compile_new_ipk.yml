@@ -221,7 +221,6 @@ jobs:
         with:
           name: openkill-ipk
           path: ./
-`r`n
       - name: Commit and Push New Version
         run: |
           set -euo pipefail
