@@ -9,4 +9,4 @@ OpenKill 是基于 OpenClash 源码的 OpenWrt 客户端项目。
 
 许可：本项目遵循 [MIT License](LICENSE)，并保留上游 OpenClash 及相关组件的版权声明。
 
-更新参数说明：`--update` 和 `--upgrade` 当前执行完全相同，都会更新 OpenKill 软件包并安装/更新官方 Smart/Mihomo 内核；`--upgrade` 只是兼容不同使用习惯的别名。
+更新统一使用 `--update`，会更新 OpenKill 软件包并安装/更新官方 Smart/Mihomo 内核。

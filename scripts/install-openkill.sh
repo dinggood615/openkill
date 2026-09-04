@@ -14,7 +14,6 @@ usage(){ cat <<'EOF'
 OpenKill installer
   --install       Install or repair OpenKill
   --update        Update OpenKill and its official Smart/Mihomo core
-  --upgrade       Alias for --update (same behavior; no extra operation)
   --uninstall     Remove OpenKill and its data
   --package-file  Install a local IPK/APK file
 EOF
@@ -23,7 +22,7 @@ EOF
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --install) ACTION=install; shift;;
-    --update|--upgrade) ACTION=update; shift;;
+    --update) ACTION=update; shift;;
     --uninstall) ACTION=uninstall; shift;;
     --package-file) PACKAGE_FILE="${2:-}"; shift 2;;
     -h|--help) usage; exit 0;;
