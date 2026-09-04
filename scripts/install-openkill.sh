@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1010"
+PROJECT_VERSION="2026-1012"
 ACTION=install
 PACKAGE_FILE=""
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
@@ -55,7 +55,18 @@ else die "Neither opkg nor apk is available"; fi
 install_dependencies(){
   log "Installing OpenKill runtime dependencies"
   if [ "$PM" = opkg ]; then
-    opkg update >/dev/null 2>&1 || log "Package index update failed; using existing indexes"
+    refresh=0
+    opkg update >/dev/null 2>&1 && refresh=1 || true
+    if [ "$refresh" -eq 0 ] && [ -f /etc/opkg/distfeeds.conf ]; then
+      # Try public mirrors without changing the user's persistent feed file.
+      for mirror in "https://mirrors.pku.edu.cn/openwrt" "https://mirrors.tuna.tsinghua.edu.cn/openwrt"; do
+        tmpfeeds="/tmp/openkill-distfeeds.$$"
+        sed -E "s#https://downloads\\.openwrt\\.org#${mirror}#g" /etc/opkg/distfeeds.conf > "$tmpfeeds"
+        if opkg -f "$tmpfeeds" update >/dev/null 2>&1; then refresh=1; rm -f "$tmpfeeds"; break; fi
+        rm -f "$tmpfeeds"
+      done
+    fi
+    [ "$refresh" -eq 1 ] || log "Package index update failed; using existing indexes"
     # 与原 OpenClash 安装器及其运行时诊断清单保持一致；不存在的内核
     # 模块会跳过，由当前固件的防火墙后端决定实际需要哪一组。
     deps="bash curl ca-bundle ip-full ruby ruby-yaml ruby-base64 ruby-psych ruby-pstore lua kmod-tun unzip dnsmasq-full luci-compat kmod-inet-diag kmod-nft-tproxy kmod-ipt-tproxy kmod-ipt-extra kmod-ipt-nat iptables-mod-tproxy iptables-mod-extra ipset"
@@ -63,7 +74,17 @@ install_dependencies(){
       opkg install "$dep" >/dev/null 2>&1 || log "Dependency unavailable or already provided by firmware: $dep"
     done
   else
-    apk update >/dev/null 2>&1 || log "Package index update failed; using existing indexes"
+    refresh=0
+    apk update >/dev/null 2>&1 && refresh=1 || true
+    if [ "$refresh" -eq 0 ] && [ -f /etc/apk/repositories ]; then
+      for mirror in "https://mirrors.pku.edu.cn/openwrt" "https://mirrors.tuna.tsinghua.edu.cn/openwrt"; do
+        tmprepos="/tmp/openkill-repositories.$$"
+        sed -E "s#https://downloads\\.openwrt\\.org#${mirror}#g" /etc/apk/repositories > "$tmprepos"
+        if apk --repositories-file "$tmprepos" update >/dev/null 2>&1; then refresh=1; rm -f "$tmprepos"; break; fi
+        rm -f "$tmprepos"
+      done
+    fi
+    [ "$refresh" -eq 1 ] || log "Package index update failed; using existing indexes"
     deps="bash curl ca-certificates iproute2 ruby ruby-yaml lua unzip dnsmasq-full nftables ipset"
     for dep in $deps; do
       apk add --no-cache "$dep" >/dev/null 2>&1 || log "Dependency unavailable or already provided by firmware: $dep"
