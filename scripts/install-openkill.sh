@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1009"
+PROJECT_VERSION="2026-1010"
 ACTION=install
 PACKAGE_FILE=""
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
@@ -51,6 +51,23 @@ fi
 if command -v opkg >/dev/null 2>&1; then PM=opkg; EXT=ipk
 elif command -v apk >/dev/null 2>&1; then PM=apk; EXT=apk
 else die "Neither opkg nor apk is available"; fi
+
+install_dependencies(){
+  log "Installing OpenKill runtime dependencies"
+  if [ "$PM" = opkg ]; then
+    opkg update >/dev/null 2>&1 || log "Package index update failed; using existing indexes"
+    deps="bash curl ca-bundle ip-full ruby ruby-yaml lua kmod-tun unzip dnsmasq-full luci-compat kmod-inet-diag kmod-nft-tproxy"
+    for dep in $deps; do
+      opkg install "$dep" >/dev/null 2>&1 || log "Dependency unavailable or already provided by firmware: $dep"
+    done
+  else
+    apk update >/dev/null 2>&1 || log "Package index update failed; using existing indexes"
+    deps="bash curl ca-certificates iproute2 ruby lua unzip dnsmasq-full"
+    for dep in $deps; do
+      apk add --no-cache "$dep" >/dev/null 2>&1 || log "Dependency unavailable or already provided by firmware: $dep"
+    done
+  fi
+}
 
 download(){
   case "$1" in https://*) ;; *) die "HTTPS URL required";; esac
@@ -159,6 +176,7 @@ uninstall(){
 }
 
 [ "$ACTION" = uninstall ] && { uninstall; exit 0; }
+install_dependencies
 [ -n "$PACKAGE_FILE" ] || resolve_package
 [ -f "$PACKAGE_FILE" ] || die "Package file not found"
 backup_config
