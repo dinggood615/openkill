@@ -254,7 +254,8 @@ jobs:
           rm -rf ./${{ github.ref_name }}/luci-app-openkill*
           echo "v${{ needs.Get-Version.outputs.version }}" > ./${{ github.ref_name }}/version
           echo "https://img.shields.io/badge/New Release-v${{ needs.Get-Version.outputs.version }}-orange.svg" >> ./${{ github.ref_name }}/version
-          cp "$IPK_FILE" "./${{ github.ref_name }}/"
+          TARGET_IPK="./${{ github.ref_name }}/$(basename "$IPK_FILE")"
+          cp "$IPK_FILE" "$TARGET_IPK"
           rm -f "$IPK_FILE"
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
@@ -262,7 +263,7 @@ jobs:
           # 记录清理旧 IPK 的删除动作，避免 package 分支残留多个版本。
           git add -u ./${{ github.ref_name }}/
           git add ./${{ github.ref_name }}/version
-          git add -f ./${{ github.ref_name }}/luci-app-openkill_*.ipk
+          git add -f "$TARGET_IPK"
           if git diff --staged --quiet; then
             echo "No changes to commit, skipping."
           else
