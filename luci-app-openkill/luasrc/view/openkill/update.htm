@@ -311,21 +311,6 @@
         var isJsDelivr = classifyAddr(addr) === 'jsdelivr';
         var filename, pathPrefix;
 
-        if (type === 'core' && _isOix) {
-            if (!version) return '';
-            filename = 'mihomo-' + arch + '-' + version + '.gz';
-            var oixURL = 'https://github.com/vernesong/mihomo-oix/releases/download/Pre-Alpha/' + filename;
-            var proxyURL = 'https://dl.dler.io/mihomo-oix/' + filename + '?tag=Pre-Alpha';
-            var ctype = classifyAddr(addr);
-            if (ctype === 'dler') {
-                return proxyURL;
-            }
-            if (addr && addr !== '' && ctype !== 'raw' && ctype !== 'jsdelivr') {
-                return addr + oixURL;
-            }
-            return proxyURL;
-        }
-
         if (type === 'plugin') {
             var verNoV = version.replace(/^v/, '');
             if (_pkgType === 'apk') {
