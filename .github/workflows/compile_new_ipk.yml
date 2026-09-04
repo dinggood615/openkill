@@ -268,9 +268,9 @@ jobs:
             echo "No changes to commit, skipping."
           else
             git commit -m "Auto Release: v${{ needs.Get-Version.outputs.version }}"
-            # package is a CI-owned artifact branch; publish the exact
-            # validated tree even if another cache job touched the ref.
-            git push --force origin HEAD:package
+            # Publish after resetting to the latest package branch. This is a
+            # fast-forward push and remains compatible with protected branches.
+            git push origin HEAD:package
           fi
 # package channel build trigger
 # IPK-only publication retry
