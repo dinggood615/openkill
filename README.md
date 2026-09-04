@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="https://raw.githubusercontent.com/dinggood615/openkill/master/img/logo.png" alt="OpenKill" width="200">
+  <img src="https://raw.githubusercontent.com/dinggood615/openkill/master/img/logo.jpg" alt="OpenKill" width="200">
   <br>OpenKill<br>
 </h1>
 
