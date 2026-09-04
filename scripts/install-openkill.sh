@@ -14,7 +14,7 @@ usage(){ cat <<'EOF'
 OpenKill installer
   --install       Install or repair OpenKill
   --update        Update OpenKill and its official Smart/Mihomo core
-  --upgrade       Alias for --update
+  --upgrade       Alias for --update (same behavior; no extra operation)
   --uninstall     Remove OpenKill and its data
   --package-file  Install a local IPK/APK file
 EOF
