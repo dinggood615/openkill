@@ -47,8 +47,8 @@ jobs:
     strategy:
       matrix:
         target:
+          # 当前目标固件使用 opkg，仅构建兼容性更好的 IPK。
           - { name: ipk, sdk_url: "https://mirrors.pku.edu.cn/openwrt/releases/22.03.0/targets/x86/64/openwrt-sdk-22.03.0-x86-64_gcc-11.2.0_musl.Linux-x86_64.tar.xz", sdk_tar: "SDK.tar.xz", sdk_backup_tar: "SDK.tar.bz2", sdk_dir: "SDK", artifact_pattern: "luci-app-openkill_*.ipk" }
-          - { name: apk, sdk_url: "snapshot", sdk_tar: "SNAPSDK.tar.zst", sdk_backup_tar: "SNAPSDK.tar.zst", sdk_dir: "SNAPSDK", artifact_pattern: "luci-app-openkill-*.apk" }
     steps:
       - name: Checkout OpenKill Source
         uses: actions/checkout@v6
@@ -221,29 +221,20 @@ jobs:
         with:
           name: openkill-ipk
           path: ./
-
-      - name: Download APK Artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: openkill-apk
-          path: ./
-
+`r`n
       - name: Commit and Push New Version
         run: |
           set -euo pipefail
           echo "Downloaded artifacts:"
           find . -maxdepth 2 -type f \( -name '*.ipk' -o -name '*.apk' \) -print
           IPK_FILE=$(find . -maxdepth 2 -type f -name 'luci-app-openkill_*.ipk' | head -n 1)
-          APK_FILE=$(find . -maxdepth 2 -type f -name 'luci-app-openkill-*.apk' | head -n 1)
           [ -n "$IPK_FILE" ] || { echo 'IPK artifact not found'; exit 1; }
-          [ -n "$APK_FILE" ] || { echo 'APK artifact not found'; exit 1; }
           mkdir -p "./${{ github.ref_name }}"
           rm -rf ./${{ github.ref_name }}/luci-app-openkill*
           echo "v${{ needs.Get-Version.outputs.version }}" > ./${{ github.ref_name }}/version
           echo "https://img.shields.io/badge/New Release-v${{ needs.Get-Version.outputs.version }}-orange.svg" >> ./${{ github.ref_name }}/version
           cp "$IPK_FILE" "./${{ github.ref_name }}/"
-          cp "$APK_FILE" "./${{ github.ref_name }}/"
-          rm -f "$IPK_FILE" "$APK_FILE"
+          rm -f "$IPK_FILE"
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git fetch origin package
