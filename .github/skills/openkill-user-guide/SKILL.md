@@ -1124,9 +1124,9 @@ fi
 | 错误关键字 | 问题位置 | 原因 | 排查方法 | 来源 |
 |-----------|---------|------|----------|------|
 | `/tmp/openkill_last_version` 下载失败 | 「运行日志」/ 启动流程 | ① curl SSL 证书验证失败（`BADCERT_CN_MISMATCH` / `self signed certificate`）；② GitHub Raw 域名被 DNS 污染或不可达；③ curl 超时（`Operation timed out`）；④ 缺少 `libmbedtls` 库 | ①「覆写设置→常规」设置 **Github 地址修改 (github_address_mod)** 为 CDN（推荐 `https://fastly.jsdelivr.net/` 或 `https://testingcf.jsdelivr.net/`）；②「系统→软件包」确认 `ca-bundle` 已安装；③ Fake-IP 模式在「覆写设置→DNS」的 fake-ip-filter 中排除 `raw.githubusercontent.com`；④ 修改 `/usr/share/openkill/openkill_core.sh` 中 curl 的超时参数 `-m 60` 改为 `-m 300`；⑤ 终端执行 `opkg install libmbedtls` 修复 curl 库依赖 | [#2791](https://github.com/vernesong/OpenClash/issues/2791) |
-| **更新内核 (Update Core)** 点击后重启失败 | 「运行状态」页面 | v0.47.052 重启流程中 stop→start 间隔不足，旧核心进程未完全退出即启动新核心，触发「内核启动失败」 | ① 更新到 v0.47.054+（已在 Developer 分支修复）；② 临时解决：编辑 `/etc/init.d/openkill`，在 restart 函数的 stop 和 start 之间加 `sleep 5`；③ 如更新后仍失败，检查内存是否不足（小型设备建议增加 swap） | [#4969](https://github.com/vernesong/OpenClash/issues/4969) |
+| **更新内核 (Update Core)** 点击后重启失败 | 「运行状态」页面 | 旧版重启流程中 stop→start 间隔不足，旧核心进程未完全退出即启动新核心，触发「内核启动失败」 | ① 更新到当前稳定版本；② 临时解决：编辑 `/etc/init.d/openkill`，在 restart 函数的 stop 和 start 之间加 `sleep 5`；③ 如更新后仍失败，检查内存是否不足（小型设备建议增加 swap） | [#4969](https://github.com/vernesong/OpenClash/issues/4969) |
 | 升级后依赖检查异常，无法启动 | 「运行日志」启动流程 | 更新后 `check_mod()` 或依赖检测逻辑误报 | ①「运行日志」生成调试日志检查依赖段；②「系统→软件包」确认 `kmod-nft-tproxy`/`kmod-ipt-tproxy` 已安装；③ 切换 Dev 分支获取最新修复；④ 重装 `luci-app-openkill` | [#4807](https://github.com/vernesong/OpenClash/issues/4807) |
-| v0.47.052/055 无法开机自启 | 「运行状态」启动流程 | 启动时序竞争条件，procd respawn 在某些固件上触发过快 | ① 更新到最新 Dev 版本；②「插件设置→模式设置」设置 `delay_start` (启动延迟) 30-60 秒；③ 确保路由器有足够内存供启动时使用 | [#4973](https://github.com/vernesong/OpenClash/issues/4973) |
+| 旧版 无法开机自启 | 「运行状态」启动流程 | 启动时序竞争条件，procd respawn 在某些固件上触发过快 | ① 更新到最新 Dev 版本；②「插件设置→模式设置」设置 `delay_start` (启动延迟) 30-60 秒；③ 确保路由器有足够内存供启动时使用 | [#4973](https://github.com/vernesong/OpenClash/issues/4973) |
 
 ### 十四、功能异常类
 
@@ -1150,7 +1150,7 @@ fi
 | 错误关键字 | 问题位置 | 原因 | 排查方法 | 来源 |
 |-----------|---------|------|----------|------|
 | **节点正常，突然无法访问外网** | 「运行状态」一切正常但客户端无网络 | DNS 劫持失效（dnsmasq 被其他插件修改）、防火墙规则乱序、TUN 路由表丢失 | ①「运行状态」确认核心和 DNS 端口正常；② 在「运行日志」中检查最近的错误；③「运行状态」点击「Reload Firewall (重置防火墙)」重建规则；④ 检查是否同时运行其他代理/DNS 插件（如 AdGuard Home、PassWall、SSR-Plus 等），OpenKill 不能与这些插件共存 | [#3516](https://github.com/vernesong/OpenClash/issues/3516) |
-| **防火墙 DNS 劫持规则不停被还原** | 「运行日志」反复出现防火墙重载记录 | 看门狗检测到规则异常后自动重载，形成循环（v0.46.001-beta 已知问题） | ① 更新到最新版本（已在后续版本修复）；② 临时关闭看门狗自动修复（编辑 `openkill_watchdog.sh` 注释掉防火墙重载部分）；③ 检查是否有其他程序在修改防火墙规则（如 Docker、UPnP 服务） | [#3765](https://github.com/vernesong/OpenClash/issues/3765) |
+| **防火墙 DNS 劫持规则不停被还原** | 「运行日志」反复出现防火墙重载记录 | 看门狗检测到规则异常后自动重载，形成循环（旧版已知问题） | ① 更新到最新版本（已在后续版本修复）；② 临时关闭看门狗自动修复（编辑 `openkill_watchdog.sh` 注释掉防火墙重载部分）；③ 检查是否有其他程序在修改防火墙规则（如 Docker、UPnP 服务） | [#3765](https://github.com/vernesong/OpenClash/issues/3765) |
 
 ### 十六、旁路由 / 特定设备异常
 

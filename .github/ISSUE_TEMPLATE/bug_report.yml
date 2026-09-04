@@ -32,7 +32,7 @@ body:
       label: OpenKill Version
       description: |
         OpenKill 版本号
-      placeholder: "v0.0.0-beta"
+      placeholder: "2026-1000"
     validations:
       required: true
 
