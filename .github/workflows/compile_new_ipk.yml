@@ -240,11 +240,17 @@ jobs:
           name: openkill-ipk
           path: ./
       - name: Commit and Push New Version
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          # Use an explicit write-authenticated remote.  The checkout token is
+          # otherwise not guaranteed to be retained when switching to the
+          # package branch in all runner configurations.
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           echo "Downloaded artifacts:"
-          find . -maxdepth 2 -type f \( -name '*.ipk' -o -name '*.apk' \) -print
-          IPK_FILE=$(find . -maxdepth 2 -type f -name 'luci-app-openkill_*.ipk' | head -n 1)
+          find . -type f \( -name '*.ipk' -o -name '*.apk' \) -print
+          IPK_FILE=$(find . -type f -name 'luci-app-openkill_*.ipk' | head -n 1)
           [ -n "$IPK_FILE" ] || { echo 'IPK artifact not found'; exit 1; }
           # Start from the latest remote package branch so stale local state
           # cannot make the publication step fail.
@@ -270,7 +276,7 @@ jobs:
             git commit -m "Auto Release: v${{ needs.Get-Version.outputs.version }}"
             # Publish after resetting to the latest package branch. This is a
             # fast-forward push and remains compatible with protected branches.
-            git push origin HEAD:package
+            git push origin HEAD:refs/heads/package
           fi
 # package channel build trigger
 # IPK-only publication retry
