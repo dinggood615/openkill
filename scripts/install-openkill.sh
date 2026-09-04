@@ -4,10 +4,11 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1005"
+PROJECT_VERSION="2026-1006"
 ACTION=install
 PACKAGE_FILE=""
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
+ORIGINAL_ARGS="$#"
 SOURCE_ROOT=""
 
 log(){ printf '\n==> %s\n' "$*"; }
@@ -31,6 +32,20 @@ while [ "$#" -gt 0 ]; do
     *) die "Unknown option: $1";;
   esac
 done
+if [ "$ORIGINAL_ARGS" -eq 0 ]; then
+  if [ -r /dev/tty ]; then
+    printf '%s\n' 'OpenKill 一键操作' '  1) 安装或修复' '  2) 更新软件包和内核' '  3) 卸载并清理数据'
+    printf '请选择 [1-3，默认1]: '
+    read -r choice < /dev/tty || choice=1
+    case "$choice" in
+      2) ACTION=update;;
+      3) ACTION=uninstall;;
+      *) ACTION=install;;
+    esac
+  else
+    ACTION=install
+  fi
+fi
 [ "$(id -u)" -eq 0 ] || die "Run as root"
 
 if command -v opkg >/dev/null 2>&1; then PM=opkg; EXT=ipk
