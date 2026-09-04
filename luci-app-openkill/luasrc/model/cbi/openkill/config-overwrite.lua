@@ -45,8 +45,7 @@ if not op_mode then op_mode = "redir-host" end
 local lan_ip = fs.lanip()
 m = Map("openkill", translate("Overwrite Settings"))
 m.pageaction = false
-m.description = translate("Note: To restore the default configuration, try accessing:").." <a href='javascript:void(0)' onclick='javascript:restore_config(this)'>http://"..lan_ip.."/cgi-bin/luci/admin/services/openkill/restore</a>"..
-"<br/>"..font_green..translate("For More Useful Meta Core Functions Go Wiki")..": "..font_off.."<a href='javascript:void(0)' onclick='javascript:return winOpen(\"https://wiki.metacubex.one/\")'>"..translate("https://wiki.metacubex.one/").."</a>"
+m.description = nil
 
 s = m:section(TypedSection, "openkill")
 s.anonymous = true

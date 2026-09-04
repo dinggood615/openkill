@@ -8,7 +8,7 @@ local fs = require "luci.openkill"
 local uci = require("luci.model.uci").cursor()
 
 m = SimpleForm("openkill",translate("OpenKill"))
-m.description = translate("A Mihomo(Clash) Client For OpenWrt")
+m.description = nil
 m.reset = false
 m.submit = false
 
@@ -17,10 +17,8 @@ if fs.uci_get_config("config", "oix_token") and fs.uci_get_config("config", "oix
 	m:append(Template("openkill/oixcloud"))
 end
 m:append(Template("openkill/myip"))
-m:append(Template("openkill/developer"))
 m:append(Template("openkill/update"))
 m:append(Template("openkill/config_edit"))
 m:append(Template("openkill/config_upload"))
 
 return m
-

@@ -201,6 +201,23 @@
     font-family: "Microsoft Yahei", "sans-serif", "Helvetica Neue", "Helvetica", "Hiragino Sans GB", 'Twemoji Mozilla';
 }
 
+/* Compact dashboard: announcements and floating usage help are intentionally
+ * hidden in the OpenKill UI worklog design. */
+.oc .announcement-card,
+.oc .oc-usage-help-float,
+.oc #usage-help-overlay {
+    display: none !important;
+}
+.oc .main-cards-container {
+    gap: 8px;
+    margin-top: 0;
+}
+.oc .main-card,
+.oc .sub-card {
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
 html[data-darkmode="true"] .oc {
     /* ── Background & Text ── */
     --bg-white: #1f2937;
