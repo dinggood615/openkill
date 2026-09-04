@@ -20,8 +20,6 @@ curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/scripts
 curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/scripts/install-openkill.sh | sh -s -- --update    # 更新软件包和内核
 curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/scripts/install-openkill.sh | sh -s -- --uninstall  # 卸载并清理
 
-# 安装本地 IPK/APK 软件包
-sh install-openkill.sh --package-file /tmp/luci-app-openkill_2026-1006_all.ipk
 ```
 
 更新统一使用 `--update`，会更新 OpenKill 软件包并安装/更新官方稳定 Meta（Mihomo）内核。
