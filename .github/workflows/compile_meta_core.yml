@@ -1,0 +1,333 @@
+name: Compile The New Clash Core
+
+on:
+  schedule:
+    - cron: "0 20 * * 1,3,5,6"
+  workflow_dispatch:
+  
+jobs:
+  Get-Commit-id:
+    runs-on: ubuntu-latest
+    outputs:
+      current_id: ${{ steps.current_id.outputs.current_id }}
+      current_smart_id: ${{ steps.current_id.outputs.current_smart_id }}
+      upstream_id: ${{ steps.upstream_id.outputs.upstream_id }}
+      upstream_smart_id: ${{ steps.upstream_id.outputs.upstream_smart_id }}
+    steps:
+      - name: Apt Update
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install git
+
+      - name: Clone OpenClash Repository
+        uses: actions/checkout@v6
+        with:
+          ref: core
+      
+      - name: Get Current Version
+        id: current_id
+        run: |
+          current_meta_ver=$(sed -n '1p' ./dev/core_version 2>/dev/null || echo "null")
+          echo "current_id=$current_meta_ver" >> $GITHUB_OUTPUT
+          echo "current_id: $current_meta_ver"
+
+          current_smart_ver=$(sed -n '2p' ./dev/core_version 2>/dev/null || echo "null")
+          echo "current_smart_id=$current_smart_ver" >> $GITHUB_OUTPUT
+          echo "current_smart_id: $current_smart_ver"
+      
+      - name: Get Upstream Version
+        id: upstream_id
+        run: |
+          # MetaCubeX/mihomo
+          git clone --depth=1 --branch=Alpha https://github.com/MetaCubeX/mihomo.git metacubex_mihomo
+          cd metacubex_mihomo
+          echo "upstream_id=alpha-g$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "upstream_id: alpha-g$(git rev-parse --short HEAD)"
+          cd ..
+          # vernesong/mihomo
+          git clone --depth=1 --branch=Alpha https://github.com/vernesong/mihomo.git vernesong_mihomo
+          cd vernesong_mihomo
+          echo "upstream_smart_id=alpha-smart-g$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "upstream_smart_id: alpha-smart-g$(git rev-parse --short HEAD)"
+
+  Compile_Core:
+    runs-on: ubuntu-latest
+    needs: Get-Commit-id
+    if: ${{ needs.Get-Commit-id.outputs.current_id != needs.Get-Commit-id.outputs.upstream_id || needs.Get-Commit-id.outputs.current_smart_id != needs.Get-Commit-id.outputs.upstream_smart_id }}
+    strategy:
+      matrix:
+        core:
+          - { type: meta,  repo: MetaCubeX/mihomo, src: metacubex_src, version_prefix: alpha-g,       artifact: meta-core,  goversion: '1.26' }
+          - { type: smart, repo: vernesong/mihomo,  src: vernesong_src, version_prefix: alpha-smart-g, artifact: smart-core, goversion: '1.26' }
+        jobs:
+          - { goos: linux, goarch: '386',      output: '386',                   upxflag: '--lzma --best' }
+          - { goos: linux, goarch: amd64, goamd64: v1, output: amd64-compatible, upxflag: '--lzma --best' }
+          - { goos: linux, goarch: amd64, goamd64: v3, output: amd64,            upxflag: '--lzma --best' }
+          - { goos: linux, goarch: amd64, goamd64: v1, output: amd64-v1,         upxflag: '--lzma --best' }
+          - { goos: linux, goarch: amd64, goamd64: v2, output: amd64-v2,         upxflag: '--lzma --best' }
+          - { goos: linux, goarch: amd64, goamd64: v3, output: amd64-v3,         upxflag: '--lzma --best' }
+          - { goos: linux, goarch: arm,   goarm: '5',  output: armv5,            upxflag: '--lzma --best' }
+          - { goos: linux, goarch: arm,   goarm: '6',  output: armv6,            upxflag: '--lzma --best' }
+          - { goos: linux, goarch: arm,   goarm: '7',  output: armv7,            upxflag: '--lzma --best' }
+          - { goos: linux, goarch: arm64,              output: arm64,            upxflag: '--lzma --best' }
+          - { goos: linux, goarch: mips,   gomips: softfloat, output: mips-softfloat,   upxflag: '--lzma --best' }
+          - { goos: linux, goarch: mips,   gomips: hardfloat, output: mips-hardfloat,   upxflag: '--lzma --best' }
+          - { goos: linux, goarch: mipsle, gomips: softfloat, output: mipsle-softfloat, upxflag: '--best' }
+          - { goos: linux, goarch: mipsle, gomips: hardfloat, output: mipsle-hardfloat, upxflag: '--best' }
+          - { goos: linux, goarch: mips64,             output: mips64,           upxflag: '--lzma --best' }
+          - { goos: linux, goarch: mips64le,           output: mips64le,         upxflag: '--lzma --best' }
+          - { goos: linux, goarch: riscv64,            output: riscv64,          upxflag: '--lzma --best' }
+          - { goos: linux, goarch: s390x,              output: s390x,            upxflag: '--lzma --best' }
+          - { goos: linux, goarch: loong64,            output: loong64-abi2,     upxflag: '--lzma --best' }
+          - { goos: linux, goarch: loong64, abi: '1',  output: loong64-abi1,     upxflag: '--lzma --best' }
+    steps:
+      - name: Check if build needed
+        id: check_skip
+        run: |
+          if [ "${{ matrix.core.type }}" = "meta" ] && [ "${{ needs.Get-Commit-id.outputs.current_id }}" = "${{ needs.Get-Commit-id.outputs.upstream_id }}" ]; then
+            echo "Meta is up to date, skipping build"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          elif [ "${{ matrix.core.type }}" = "smart" ] && [ "${{ needs.Get-Commit-id.outputs.current_smart_id }}" = "${{ needs.Get-Commit-id.outputs.upstream_smart_id }}" ]; then
+            echo "Smart is up to date, skipping build"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Apt Update
+        if: ${{ steps.check_skip.outputs.skip != 'true' }}
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install wget git tar
+
+      - name: Setup UPX
+        if: ${{ steps.check_skip.outputs.skip != 'true' }}
+        run: |
+          wget https://github.com/upx/upx/releases/download/v3.95/upx-3.95-amd64_linux.tar.xz
+          tar xf upx-3.95-amd64_linux.tar.xz
+          echo "upx=${{ github.workspace }}/upx-3.95-amd64_linux/upx" >> $GITHUB_ENV
+
+      - name: Setup Go
+        if: ${{ steps.check_skip.outputs.skip != 'true' && !(matrix.jobs.goarch == 'loong64' && matrix.jobs.abi == '1') }}
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ matrix.core.goversion }}
+          check-latest: true
+          cache: false
+
+      - name: Cache Go loongarch abi1 tarball
+        id: cache_go_abi1
+        if: ${{ steps.check_skip.outputs.skip != 'true' && matrix.jobs.goarch == 'loong64' && matrix.jobs.abi == '1' }}
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/go-archives/go1.26.0.linux-amd64-abi1.tar.gz
+          key: go-loongarch-abi1-1.26.0
+
+      - name: Setup Go for loongarch abi1
+        if: ${{ steps.check_skip.outputs.skip != 'true' && matrix.jobs.goarch == 'loong64' && matrix.jobs.abi == '1' }}
+        run: |
+          GO_TAR_FILE="go1.26.0.linux-amd64-abi1.tar.gz"
+          GO_ARCHIVE_DIR="${{ runner.temp }}/go-archives"
+          mkdir -p "$GO_ARCHIVE_DIR"
+          if [[ "${{ steps.cache_go_abi1.outputs.cache-hit }}" != 'true' ]]; then
+            echo "Downloading $GO_TAR_FILE..."
+            wget -q "https://github.com/MetaCubeX/loongarch64-golang/releases/download/1.26.0/$GO_TAR_FILE" \
+              -O "$GO_ARCHIVE_DIR/$GO_TAR_FILE"
+          else
+            echo "Restored $GO_TAR_FILE from cache."
+          fi
+          sudo rm -rf /usr/local/go
+          sudo tar zxf "$GO_ARCHIVE_DIR/$GO_TAR_FILE" -C /usr/local
+          echo "/usr/local/go/bin" >> $GITHUB_PATH
+
+      - name: Clone source (${{ matrix.core.type }})
+        if: ${{ steps.check_skip.outputs.skip != 'true' }}
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ matrix.core.repo }}
+          ref: Alpha
+          path: ./${{ matrix.core.src }}
+
+      - name: Update CA
+        if: ${{ steps.check_skip.outputs.skip != 'true' }}
+        run: |
+          sudo apt-get update && sudo apt-get install ca-certificates
+          sudo update-ca-certificates
+          cp -f /etc/ssl/certs/ca-certificates.crt ./${{ matrix.core.src }}/component/ca/ca-certificates.crt
+
+      - name: Build Core (${{ matrix.core.type }}-${{ matrix.jobs.output }})
+        id: build
+        if: ${{ steps.check_skip.outputs.skip != 'true' }}
+        env:
+          GOOS: ${{ matrix.jobs.goos }}
+          GOARCH: ${{ matrix.jobs.goarch }}
+          GOAMD64: ${{ matrix.jobs.goamd64 }}
+          GOARM: ${{ matrix.jobs.goarm }}
+          GOMIPS: ${{ matrix.jobs.gomips }}
+          CGO_ENABLED: 0
+        run: |
+          if [ "${{ matrix.core.type }}" = "meta" ] && [ "${{ needs.Get-Commit-id.outputs.current_id }}" = "${{ needs.Get-Commit-id.outputs.upstream_id }}" ]; then
+            echo "Meta is up to date, skipping build"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          if [ "${{ matrix.core.type }}" = "smart" ] && [ "${{ needs.Get-Commit-id.outputs.current_smart_id }}" = "${{ needs.Get-Commit-id.outputs.upstream_smart_id }}" ]; then
+            echo "Smart is up to date, skipping build"
+            echo "skip=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          set -e
+          cd ./${{ matrix.core.src }}
+          VERSION="${{ matrix.core.version_prefix }}$(git rev-parse --short HEAD)"
+          BUILDTIME="$(date -u)"
+          mkdir -p ./bin
+          go build -tags with_gvisor -trimpath \
+            -ldflags "-X 'github.com/metacubex/mihomo/constant.Version=${VERSION}' -X 'github.com/metacubex/mihomo/constant.BuildTime=${BUILDTIME}' -w -s -buildid=" \
+            -o ./bin/clash
+          chmod +x ./bin/clash
+          ${upx} ${{ matrix.jobs.upxflag }} ./bin/clash || true
+          mkdir -p ../build_output
+          tar -zcvf ../build_output/clash-linux-${{ matrix.jobs.output }}.tar.gz -C ./bin clash
+
+      - name: Upload Core Artifact (${{ matrix.core.type }}-${{ matrix.jobs.output }})
+        if: ${{ steps.check_skip.outputs.skip != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.core.artifact }}-${{ matrix.jobs.output }}
+          path: build_output/clash-linux-${{ matrix.jobs.output }}.tar.gz
+
+  Publish:
+    runs-on: ubuntu-latest
+    needs: [Get-Commit-id, Compile_Core]
+    if: always() && (needs.Get-Commit-id.outputs.current_id != needs.Get-Commit-id.outputs.upstream_id || needs.Get-Commit-id.outputs.current_smart_id != needs.Get-Commit-id.outputs.upstream_smart_id)
+    steps:
+      - name: Checkout OpenClash Repository
+        uses: actions/checkout@v6
+        with:
+          ref: core
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./downloaded-artifacts
+
+      - name: Organize Artifacts, Update Version, and Prepare Commit Data
+        id: organize_commit_data
+        run: |
+          commit_description=""
+          changes_made_to_dev_meta=false
+          changes_made_to_dev_smart=false
+          core_version_updated=false
+
+          mkdir -p ./dev/meta
+          mkdir -p ./dev/smart
+
+          if [ "${{ needs.Get-Commit-id.outputs.current_id }}" != "${{ needs.Get-Commit-id.outputs.upstream_id }}" ]; then
+            echo "Organizing MetaCubeX compiled files..."
+            if [ "${{ needs.Compile_Core.result }}" == "success" ]; then
+              rm -rf ./dev/meta/*
+              for artifact_dir in ./downloaded-artifacts/meta-core-*/; do
+                if [ -d "$artifact_dir" ] && [ -n "$(ls -A "$artifact_dir")" ]; then
+                  echo "Copying $artifact_dir files..."
+                  cp -rf "$artifact_dir". ./dev/meta/
+                  changes_made_to_dev_meta=true
+                fi
+              done
+              if [ "$changes_made_to_dev_meta" = true ]; then
+                git add ./dev/meta
+                commit_description="Meta to ${{ needs.Get-Commit-id.outputs.upstream_id }}"
+              fi
+            else
+              echo "Compile_Core job failed, skipping meta..."
+            fi
+          fi
+
+          if [ "${{ needs.Get-Commit-id.outputs.current_smart_id }}" != "${{ needs.Get-Commit-id.outputs.upstream_smart_id }}" ]; then
+            echo "Organizing vernesong compiled files..."
+            if [ "${{ needs.Compile_Core.result }}" == "success" ]; then
+              rm -rf ./dev/smart/*
+              for artifact_dir in ./downloaded-artifacts/smart-core-*/; do
+                if [ -d "$artifact_dir" ] && [ -n "$(ls -A "$artifact_dir")" ]; then
+                  echo "Copying $artifact_dir files..."
+                  cp -rf "$artifact_dir". ./dev/smart/
+                  changes_made_to_dev_smart=true
+                fi
+              done
+              if [ "$changes_made_to_dev_smart" = true ]; then
+                git add ./dev/smart
+                if [ -n "$commit_description" ]; then
+                  commit_description="$commit_description, "
+                fi
+                commit_description="${commit_description}Smart to ${{ needs.Get-Commit-id.outputs.upstream_smart_id }}"
+              fi
+            else
+              echo "Compile_Core job failed, skipping smart..."
+            fi
+          fi
+
+          final_meta_id="${{ needs.Get-Commit-id.outputs.current_id }}"
+          if [ "${{ needs.Get-Commit-id.outputs.current_id }}" != "${{ needs.Get-Commit-id.outputs.upstream_id }}" ] && [ "$changes_made_to_dev_meta" = true ]; then
+            final_meta_id="${{ needs.Get-Commit-id.outputs.upstream_id }}"
+          fi
+
+          final_smart_id="${{ needs.Get-Commit-id.outputs.current_smart_id }}"
+          if [ "${{ needs.Get-Commit-id.outputs.current_smart_id }}" != "${{ needs.Get-Commit-id.outputs.upstream_smart_id }}" ] && [ "$changes_made_to_dev_smart" = true ]; then
+            final_smart_id="${{ needs.Get-Commit-id.outputs.upstream_smart_id }}"
+          fi
+          
+          echo "Updating ./dev/core_version with:"
+          echo "Meta: $final_meta_id"
+          echo "Smart: $final_smart_id"
+
+          current_core_version_content=$(cat ./dev/core_version 2>/dev/null || printf "null\nnull")
+          new_core_version_content=$(printf "%s\n%s" "$final_meta_id" "$final_smart_id")
+
+          if [ "$current_core_version_content" != "$new_core_version_content" ]; then
+            echo "$final_meta_id" > ./dev/core_version
+            echo "$final_smart_id" >> ./dev/core_version
+            git add ./dev/core_version
+            core_version_updated=true
+            echo "./dev/core_version updated."
+          else
+            echo "./dev/core_version is already up to date."
+          fi
+          echo "Content of ./dev/core_version after potential update:"
+          cat ./dev/core_version
+
+          overall_changes_exist=false
+          if [ "$changes_made_to_dev_meta" = true ] || [ "$changes_made_to_dev_smart" = true ] || [ "$core_version_updated" = true ]; then
+            overall_changes_exist=true
+          fi
+
+          echo "commit_description_output=$commit_description" >> $GITHUB_OUTPUT
+          echo "overall_changes_exist_output=$overall_changes_exist" >> $GITHUB_OUTPUT
+
+      - name: Commit and push
+        env:
+          COMMIT_DESCRIPTION: ${{ steps.organize_commit_data.outputs.commit_description_output }}
+          OVERALL_CHANGES_EXIST: ${{ steps.organize_commit_data.outputs.overall_changes_exist_output }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          echo "Commit description from output: $COMMIT_DESCRIPTION"
+          echo "Overall changes exist from output: $OVERALL_CHANGES_EXIST"
+
+          if ! git diff --staged --quiet || [ "$OVERALL_CHANGES_EXIST" = "true" ]; then
+            final_commit_message="Auto update"
+            if [ -n "$COMMIT_DESCRIPTION" ]; then
+              final_commit_message="$final_commit_message: $COMMIT_DESCRIPTION"
+            elif [ "$OVERALL_CHANGES_EXIST" = "true" ]; then
+              final_commit_message="$final_commit_message: Update core versions"
+            fi
+            
+            echo "Committing with message: $final_commit_message"
+            git commit -m "$final_commit_message"
+            git push
+          else
+            echo "No changes to commit."
+          fi
