@@ -34,8 +34,10 @@ jobs:
         run: |
           version=$(grep 'PKG_VERSION:=' ./luci-app-openkill/Makefile | awk -F ':=' '{print $2}' | tr -d '[:space:]')
           project=$(grep '^PROJECT_VERSION=' ./scripts/install-openkill.sh | sed -E 's/.*="([^"]+)"/\1/' | tr -d '[:space:]')
+          readme=$(grep -oE '当前版本：`[^`]+`' README.md | sed -E 's/.*`([^`]+)`.*/\1/' | head -n 1)
           [ -n "$version" ] || { echo 'PKG_VERSION is empty'; exit 1; }
           [ "$version" = "$project" ] || { echo "Version mismatch: Makefile=$version installer=$project"; exit 1; }
+          [ "$version" = "$readme" ] || { echo "Version mismatch: Makefile=$version README=$readme"; exit 1; }
           case "$version" in *[!0-9-]*) echo "Invalid version: $version"; exit 1;; esac
           echo "version=$version" >> $GITHUB_OUTPUT
 
