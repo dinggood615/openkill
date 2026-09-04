@@ -63,20 +63,8 @@
                             </select>
                         </div>
                     </div>
-                    <div class="config-item">
-                        <div class="oc-option-title">
-                            <span class="oc-option-text"><%:Smart Core%></span>
-                            <a href="javascript:void(0);" onclick="window.open('https://github.com/vernesong/mihomo/releases', '_blank');" class="help-link" title="<%:View core infos that support smart group%>">
-                                <svg width="12" height="12"><use href="#oc-icon-help"/></svg>
-                            </a>
-                        </div>
-                        <div class="form-select-wrapper">
-                            <select class="select-class" id="SMART_ENABLE" onchange="onSmartChange()">
-                                <option value="0"><%:Disabled%></option>
-                                <option value="1"><%:Enabled%></option>
-                            </select>
-                        </div>
-                    </div>
+                    <!-- Smart 内核已移除；保留隐藏状态字段以兼容旧版前端逻辑，始终使用 Meta。 -->
+                    <input type="hidden" id="SMART_ENABLE" value="0">
                 </div>
                 <div class="version-card">
                     <div class="version-row">
