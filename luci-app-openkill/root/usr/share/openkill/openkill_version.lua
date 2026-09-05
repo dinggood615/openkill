@@ -11,7 +11,9 @@ local M = {}
 -- update selector from displaying unrelated upstream OpenClash versions.
 local OPENKILL_REPO = "dinggood615/openkill"
 
-local VERSION_CACHE_FILE = "/tmp/openkill_version_history.json"
+-- Use a product-specific cache name so installations upgraded from the old
+-- OpenClash-derived build cannot reuse its version list.
+local VERSION_CACHE_FILE = "/tmp/openkill_version_history_openkill.json"
 local CDN_CACHE_FILE = "/tmp/openkill_cdn_info.json"
 
 local function trim(s)
