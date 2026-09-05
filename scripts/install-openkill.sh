@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1031"
+PROJECT_VERSION="2026-1032"
 ACTION=install
 PACKAGE_FILE=""
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
@@ -65,17 +65,48 @@ pm_run(){
 }
 prepare_feeds(){
   original="$WORK_DIR/feeds-original"
-  : > "$original"
+  raw_original="$WORK_DIR/feeds-original.raw"
+  refresh_feeds=1
+  [ "${1:-}" = no-update ] && refresh_feeds=0
+  : > "$raw_original"
   if [ "$PM" = opkg ]; then
     for file in /etc/opkg.conf /etc/opkg/*.conf; do
-      [ ! -f "$file" ] || cat "$file" >> "$original"
+      [ ! -f "$file" ] || cat "$file" >> "$raw_original"
     done
   else
     for file in /etc/apk/repositories /etc/apk/repositories.d/*.list; do
-      [ ! -f "$file" ] || cat "$file" >> "$original"
+      [ ! -f "$file" ] || cat "$file" >> "$raw_original"
     done
   fi
+  # Firmware images often keep the same feed in both /etc/opkg.conf and a
+  # generated *.conf file.  Deduplicate source lines before passing the
+  # temporary configuration to opkg/apk; otherwise even a local package
+  # install emits duplicate-src warnings and may refresh the same index twice.
+  awk -v package_manager="$PM" '
+    package_manager != "apk" && /^[[:space:]]*src([[:space:]]|\/)/ {
+      key=$0
+      sub(/#.*/, "", key)
+      gsub(/[[:space:]]+/, " ", key)
+      sub(/^ /, "", key)
+      sub(/ $/, "", key)
+      if (seen[key]++) next
+    }
+    package_manager == "apk" && /^[[:space:]]*[^#[:space:]]/ {
+      key=$0
+      sub(/#.*/, "", key)
+      gsub(/[[:space:]]+/, " ", key)
+      sub(/^ /, "", key)
+      sub(/ $/, "", key)
+      if (seen[key]++) next
+    }
+    { print }
+  ' "$raw_original" > "$original"
+  rm -f "$raw_original"
   FEED_CANDIDATES="$original"
+  if [ "$refresh_feeds" -eq 0 ]; then
+    FEED_CONFIG="$original"
+    return 0
+  fi
   # Change only the official host; preserve firmware paths, ABI and custom feeds.
   for mirror in https://mirrors.pku.edu.cn/openwrt https://mirrors.tuna.tsinghua.edu.cn/openwrt; do
     candidate="$WORK_DIR/feeds-$(echo "$mirror" | tr '/:' '__')"
@@ -118,7 +149,6 @@ install_dependency(){
 }
 install_dependencies(){
   log "Installing OpenKill runtime dependencies"
-  prepare_feeds
   if [ "$PM" = opkg ]; then
     required="bash curl ca-bundle ip-full ruby ruby-yaml lua kmod-tun unzip dnsmasq-full luci-compat"
     optional="ruby-json ruby-base64 ruby-psych ruby-pstore kmod-inet-diag"
@@ -127,20 +157,58 @@ install_dependencies(){
   else
     required="bash curl ca-certificates ip-full ruby ruby-yaml lua kmod-tun unzip dnsmasq-full luci-compat"
     optional="ruby-json ruby-base64 ruby-psych ruby-pstore kmod-inet-diag"
-    if command -v fw4 >/dev/null 2>&1; then required="$required kmod-nft-tproxy"
-    else required="$required ipset iptables-mod-tproxy"; fi
+      if command -v fw4 >/dev/null 2>&1; then required="$required kmod-nft-tproxy"
+      else required="$required ipset iptables-mod-tproxy"; fi
+  fi
+
+  # Repairs and updates normally run on a router that already has the
+  # runtime.  Avoid refreshing every feed in that case; a blocked mirror can
+  # otherwise add minutes before the actual package download starts.
+  need_feed=0
+  for dep in $required; do
+    if [ "$PM" = opkg ]; then
+      opkg status "$dep" 2>/dev/null | grep -q '^Status:.* installed$' || { need_feed=1; break; }
+    else
+      apk info -e "$dep" >/dev/null 2>&1 || { need_feed=1; break; }
+    fi
+  done
+  if [ "$need_feed" -eq 1 ]; then
+    prepare_feeds
+  else
+    FEED_CONFIG=""
+    log "Required dependencies already installed; feed refresh skipped"
   fi
   for dep in $required; do install_dependency "$dep" || die "Required dependency could not be installed: $dep"; done
-  for dep in $optional; do install_dependency "$dep" || log "Optional dependency unavailable: $dep"; done
-  # YAML and JSON are required for configuration and the release manifest.
+  # Split Ruby modules are optional when the interpreter already provides the
+  # feature.  Only query their package names when a required dependency made
+  # a feed refresh necessary.
+ if [ "$need_feed" -eq 1 ]; then
+   for dep in $optional; do install_dependency "$dep" || log "Optional dependency unavailable: $dep"; done
+ fi
+ # YAML and JSON are required for configuration and the release manifest.
+  if ! ruby -ryaml -rjson -e 'exit 0' >/dev/null 2>&1; then
+    # Some firmware splits JSON/Base64/Psych/PStore into optional packages.
+    # Retry those packages only when the interpreter really lacks a module;
+    # this keeps the common already-installed path network-free.
+    [ "$need_feed" -eq 1 ] || prepare_feeds
+    for dep in $optional; do install_dependency "$dep" || log "Optional dependency unavailable: $dep"; done
+  fi
   ruby -ryaml -rjson -e 'exit 0' || die "Ruby YAML/JSON runtime is incomplete"
 }
 
 download(){
   case "$1" in https://*) ;; *) die "HTTPS URL required";; esac
-  if command -v curl >/dev/null 2>&1; then curl -fL --retry 2 --connect-timeout 12 --max-time 180 "$1" -o "$2"
-  elif command -v uclient-fetch >/dev/null 2>&1; then uclient-fetch -q -T 180 -O "$2" "$1"
-  else wget -T 180 -O "$2" "$1"; fi
+  # Metadata is passed a short timeout by callers; archives get a larger
+  # bounded window.  The speed limit terminates a dead TLS stream promptly.
+  timeout="${3:-120}"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fL -sS --retry 1 --connect-timeout 8 --max-time "$timeout" \
+      --speed-time 20 --speed-limit 256 "$1" -o "$2"
+  elif command -v uclient-fetch >/dev/null 2>&1; then
+    uclient-fetch -q -T "$timeout" -O "$2" "$1"
+  else
+    wget -q -T "$timeout" -O "$2" "$1"
+  fi
 }
 
 # Pick the quickest reachable distribution mirror once per run.  This keeps
@@ -151,7 +219,7 @@ select_source(){
   candidates="https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF https://fastly.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF"
   if ! command -v curl >/dev/null 2>&1; then
     for base in $candidates; do
-      if download "$base/$rel" /tmp/openkill-source-probe.$$ >/dev/null 2>&1; then
+      if download "$base/$rel" /tmp/openkill-source-probe.$$ 20 >/dev/null 2>&1; then
         rm -f /tmp/openkill-source-probe.$$
         SOURCE_ROOT="$base"
         return 0
@@ -162,7 +230,7 @@ select_source(){
   scores=/tmp/openkill-source-scores.$$
   : > "$scores"
   for base in $candidates; do
-    if score=$(curl -fsSL -o /dev/null -w '%{time_total}' --connect-timeout 8 --max-time 15 "$base/$rel" 2>/dev/null); then
+    if score=$(curl -fsSL -o /dev/null -w '%{time_total}' --connect-timeout 8 --max-time 15 --speed-time 8 --speed-limit 64 "$base/$rel" 2>/dev/null); then
       printf '%s %s\n' "$score" "$base" >> "$scores"
     fi
   done
@@ -234,7 +302,7 @@ resolve_package(){
   # Authoritative origin first; cached mirrors are only a connectivity fallback.
   for base in "$manifest_source" "https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF" "https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF" "https://fastly.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF"; do
     [ -n "$base" ] || continue
-    if download "$base/latest-$EXT.json" "$manifest" >/dev/null 2>&1 &&
+    if download "$base/latest-$EXT.json" "$manifest" 30 >/dev/null 2>&1 &&
        ruby -rjson -e '
          d=JSON.parse(File.read(ARGV[0]))
          abort unless d["format"]==ARGV[1] && d["architecture"]=="all"
@@ -243,8 +311,11 @@ resolve_package(){
          expected="luci-app-openkill_#{package_version}_all.#{ARGV[1]}"
          abort unless d["filename"]==expected
          abort unless d["url"]=="https://github.com/"+ARGV[2]+"/releases/download/v"+d["version"]+"-"+ARGV[1]+"/"+expected
-         puts [d["version"],d["filename"],d["sha256"],d["url"]]
-       ' "$manifest" "$EXT" "$REPO" > "$WORK_DIR/metadata"; then break; fi
+        puts [d["version"],d["filename"],d["sha256"],d["url"]]
+       ' "$manifest" "$EXT" "$REPO" > "$WORK_DIR/metadata"; then
+      manifest_source="$base"
+      break
+    fi
     : > "$WORK_DIR/metadata"
   done
   # Older package channels may not contain a manifest yet.  Query the release
@@ -252,7 +323,7 @@ resolve_package(){
   if [ ! -s "$WORK_DIR/metadata" ]; then
     release_json="$WORK_DIR/releases.json"
     for api in "https://api.github.com/repos/$REPO/releases?per_page=30" "https://ghfast.top/https://api.github.com/repos/$REPO/releases?per_page=30"; do
-      if download "$api" "$release_json" >/dev/null 2>&1; then
+      if download "$api" "$release_json" 30 >/dev/null 2>&1; then
         if ruby -rjson -e '
           begin
             releases=JSON.parse(File.read(ARGV[0]))
@@ -288,10 +359,19 @@ resolve_package(){
   checksum=$(sed -n '3p' "$WORK_DIR/metadata")
   release_url=$(sed -n '4p' "$WORK_DIR/metadata")
   PACKAGE_FILE="$WORK_DIR/$name"
-  for url in "$release_url" "${manifest_source:+$manifest_source/$name}" "https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF/$name" "https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF/$name" "https://fastly.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF/$name"; do
+  # Prefer the source that returned a valid manifest.  The release asset is
+  # kept as a fallback, while mirrors are attempted with a bounded timeout.
+  package_urls="$release_url https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF/$name https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF/$name https://fastly.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF/$name"
+  if [ -n "$manifest_source" ]; then
+    package_urls="$manifest_source/$name $package_urls"
+  fi
+  seen_urls=""
+  for url in $package_urls; do
     [ -n "$url" ] || continue
-    if download "$url" "$PACKAGE_FILE" &&
-       [ "$(sha256sum "$PACKAGE_FILE" | awk '{print $1}')" = "$checksum" ]; then
+    case " $seen_urls " in *" $url "*) continue;; esac
+    seen_urls="$seen_urls $url"
+    if download "$url" "$PACKAGE_FILE" 120 &&
+      [ "$(sha256sum "$PACKAGE_FILE" | awk '{print $1}')" = "$checksum" ]; then
       log "Verified published $EXT version: $ver"
       return 0
     fi
@@ -312,6 +392,10 @@ uninstall(){
 install_dependencies
 [ -n "$PACKAGE_FILE" ] || resolve_package
 [ -f "$PACKAGE_FILE" ] || die "Package file not found"
+# Even when dependencies were already present, install the local package
+# through a deduplicated temporary config so stale system feeds cannot emit
+# duplicate-src warnings during the package transaction.
+[ -n "$FEED_CONFIG" ] || prepare_feeds no-update
 backup_config
 log "Installing OpenKill ${ver:-local package}"
 if [ "$PM" = opkg ]; then pm_run install "$PACKAGE_FILE"; else pm_run add --allow-untrusted "$PACKAGE_FILE"; fi

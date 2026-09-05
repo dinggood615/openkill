@@ -30,7 +30,8 @@ for file in \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_update.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_watchdog.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_watchdog_stream.sh" \
-  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_validate.sh"; do
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_validate.sh" \
+  "$ROOT_DIR/luci-app-openkill/root/etc/uci-defaults/luci-openkill"; do
   sh -n "$file" || fail "shell syntax error: ${file#$ROOT_DIR/}"
 done
 

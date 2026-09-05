@@ -116,8 +116,10 @@ fetch_release() {
    esac
    api_urls="$api_urls $META_API https://ghfast.top/$META_API https://github.dpik.top/$META_API https://gh-proxy.com/$META_API"
    for api in $api_urls; do
-      rm -f "$RELEASE_JSON"
-      if curl -fsSL --connect-timeout 10 --max-time 30 --retry 2 \
+     rm -f "$RELEASE_JSON"
+      # Keep each API fallback bounded; a filtered endpoint must not delay
+      # the remaining official/mirror endpoints for several minutes.
+      if curl -fsSL --connect-timeout 6 --max-time 20 --speed-time 8 --speed-limit 128 --retry 1 \
          -H 'Accept: application/vnd.github+json' -H 'User-Agent: OpenKill-installer' \
          "$api" -o "$RELEASE_JSON" 2>/dev/null; then
          CORE_LV=$(json_value tag_name)
@@ -133,9 +135,14 @@ fetch_release() {
 }
 
 download_core() {
-   local url="$1"
-   rm -f "$DOWNLOAD_FILE" "$TMP_FILE"
-   SHOW_DOWNLOAD_PROGRESS=1 DOWNLOAD_FILE_CURL "$url" "$DOWNLOAD_FILE" "$TARGET_CORE_PATH"
+  local url="$1"
+  rm -f "$DOWNLOAD_FILE" "$TMP_FILE"
+   # Core archives are large, but a stalled endpoint should fail fast and
+   # let the next mirror take over.  A normal WAN link remains unaffected.
+   OPENKILL_CURL_CONNECT_TIMEOUT=8 OPENKILL_CURL_MAX_TIME=90 \
+   OPENKILL_CURL_SPEED_TIME=15 OPENKILL_CURL_SPEED_LIMIT=1024 \
+   OPENKILL_CURL_RETRIES=0 SHOW_DOWNLOAD_PROGRESS=1 \
+   DOWNLOAD_FILE_CURL "$url" "$DOWNLOAD_FILE" "$TARGET_CORE_PATH"
    [ "$?" -eq 0 ] || return 1
    gzip -t "$DOWNLOAD_FILE" >/dev/null 2>&1 || return 1
    gzip -dc "$DOWNLOAD_FILE" > "$TMP_FILE" 2>/dev/null || return 1
@@ -169,8 +176,11 @@ else
       *) DOWNLOAD_URLS="$github_address_mod$ASSET_URL $DOWNLOAD_URLS" ;;
    esac
    DOWNLOAD_URLS="$DOWNLOAD_URLS https://ghfast.top/$ASSET_URL https://github.dpik.top/$ASSET_URL https://gh-proxy.com/$ASSET_URL"
-   downloaded=0
-   for url in $DOWNLOAD_URLS; do
+  downloaded=0
+   seen_urls=""
+  for url in $DOWNLOAD_URLS; do
+      case " $seen_urls " in *" $url "*) continue;; esac
+      seen_urls="$seen_urls $url"
       if download_core "$url"; then downloaded=1; break; fi
    done
    if [ "$downloaded" -ne 1 ]; then

@@ -29,9 +29,38 @@ EOF
 
 #Set Chnroute Format
 FW4=$(command -v fw4)
+ensure_route_file() {
+	path="$1"
+	family="$2"
+	[ -f "$path" ] && return 0
+	if [ -n "$FW4" ]; then
+		if [ "$family" = "inet6" ]; then
+			printf '%s\n' \
+				'define china_ip6_route = {' \
+				'}' \
+				'add set inet fw4 china_ip6_route { type ipv6_addr; flags interval; auto-merge; }' \
+				'add element inet fw4 china_ip6_route $china_ip6_route' > "$path"
+		else
+			printf '%s\n' \
+				'define china_ip_route = {' \
+				'}' \
+				'add set inet fw4 china_ip_route { type ipv4_addr; flags interval; auto-merge; }' \
+				'add element inet fw4 china_ip_route $china_ip_route' > "$path"
+		fi
+	elif [ "$family" = "inet6" ]; then
+		printf 'create china_ip6_route hash:net family inet6 hashsize 1024 maxelem 1000000\n' > "$path"
+	else
+		printf 'create china_ip_route hash:net family inet hashsize 1024 maxelem 1000000\n' > "$path"
+	fi
+}
+# A stale upgrade backup may predate the route files.  Create an empty but
+# valid set definition so first boot never aborts on a missing file.
+ensure_route_file "/etc/openkill/china_ip_route.ipset" inet
+ensure_route_file "/etc/openkill/china_ip6_route.ipset" inet6
+rm -f /tmp/china_ip_route.list /tmp/china_ip6_route.list
 if [ -n "$FW4" ]; then
 	#v4
-	if [ -z "$(cat "/etc/openkill/china_ip_route.ipset" |grep "define china_ip_route")" ]; then
+	if ! grep -q "define china_ip_route" "/etc/openkill/china_ip_route.ipset"; then
 		echo "define china_ip_route = {" >/tmp/china_ip_route.list
 		awk '!/^$/&&!/^#/{printf("    %s,'" "'\n",$0)}' /etc/openkill/china_ip_route.ipset >>/tmp/china_ip_route.list
 		echo "}" >>/tmp/china_ip_route.list
@@ -39,7 +68,7 @@ if [ -n "$FW4" ]; then
 		echo 'add element inet fw4 china_ip_route $china_ip_route' >>/tmp/china_ip_route.list
 	fi
 	#v6
-	if [ -z "$(cat "/etc/openkill/china_ip6_route.ipset" |grep "define china_ip6_route")" ]; then
+	if ! grep -q "define china_ip6_route" "/etc/openkill/china_ip6_route.ipset"; then
 		echo "define china_ip6_route = {" >/tmp/china_ip6_route.list
 		awk '!/^$/&&!/^#/{printf("    %s,'" "'\n",$0)}' /etc/openkill/china_ip6_route.ipset >>/tmp/china_ip6_route.list
 		echo "}" >>/tmp/china_ip6_route.list
@@ -48,18 +77,18 @@ if [ -n "$FW4" ]; then
 	fi
 else
 	#v4
-	if [ -z "$(cat "/etc/openkill/china_ip_route.ipset" |grep "create china_ip_route")" ]; then
+	if ! grep -q "create china_ip_route" "/etc/openkill/china_ip_route.ipset"; then
 		echo "create china_ip_route hash:net family inet hashsize 1024 maxelem 1000000" >/tmp/china_ip_route.list
 		awk '!/^$/&&!/^#/{printf("add china_ip_route %s'" "'\n",$0)}' /etc/openkill/china_ip_route.ipset >>/tmp/china_ip_route.list
 	fi
 	#v6
-	if [ -z "$(cat "/etc/openkill/china_ip6_route.ipset" |grep "create china_ip6_route")" ]; then
+	if ! grep -q "create china_ip6_route" "/etc/openkill/china_ip6_route.ipset"; then
 		echo "create china_ip6_route hash:net family inet6 hashsize 1024 maxelem 1000000" >/tmp/china_ip6_route.list
 		awk '!/^$/&&!/^#/{printf("add china_ip6_route %s'" "'\n",$0)}' /etc/openkill/china_ip6_route.ipset >>/tmp/china_ip6_route.list
 	fi
 fi
-mv -f /tmp/china_ip_route.list /etc/openkill/china_ip_route.ipset >/dev/null 2>&1
-mv -f /tmp/china_ip6_route.list /etc/openkill/china_ip6_route.ipset >/dev/null 2>&1
+[ ! -f /tmp/china_ip_route.list ] || mv -f /tmp/china_ip_route.list /etc/openkill/china_ip_route.ipset >/dev/null 2>&1
+[ ! -f /tmp/china_ip6_route.list ] || mv -f /tmp/china_ip6_route.list /etc/openkill/china_ip6_route.ipset >/dev/null 2>&1
 
 #Set Dashboard Secret
 if [ -z "$(uci_get_config "dashboard_password")" ]; then
@@ -169,12 +198,12 @@ if [ -f "/tmp/openkill.bak" ]; then
 	fi
 	#delete error china_ip_route first
 	if [ -n "$FW4" ]; then
-		if [ -z "$(cat "/tmp/openkill/china_ip_route.ipset" |grep "define china_ip_route")" ]; then
+		if [ -f "/tmp/openkill/china_ip_route.ipset" ] && ! grep -q "define china_ip_route" "/tmp/openkill/china_ip_route.ipset"; then
 			rm -f "/tmp/openkill/china_ip_route.ipset" >/dev/null 2>&1
 			rm -f "/tmp/openkill/china_ip6_route.ipset" >/dev/null 2>&1
 		fi
 	else
-		if [ -z "$(cat "/tmp/openkill/china_ip_route.ipset" |grep "create china_ip_route")" ]; then
+		if [ -f "/tmp/openkill/china_ip_route.ipset" ] && ! grep -q "create china_ip_route" "/tmp/openkill/china_ip_route.ipset"; then
 			rm -f "/tmp/openkill/china_ip_route.ipset" >/dev/null 2>&1
 			rm -f "/tmp/openkill/china_ip6_route.ipset" >/dev/null 2>&1
 		fi

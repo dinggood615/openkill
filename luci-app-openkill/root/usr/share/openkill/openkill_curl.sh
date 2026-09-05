@@ -27,6 +27,12 @@ DOWNLOAD_FILE_CURL() {
     SECRET_KEY=$5
     CUSTOM_HEADERS=$6
     [ -z "$DOWNLOAD_UA" ] && DOWNLOAD_UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+    # Bound stalled TLS connections so a failed mirror can fall through quickly.
+    CURL_CONNECT_TIMEOUT="${OPENKILL_CURL_CONNECT_TIMEOUT:-12}"
+    CURL_MAX_TIME="${OPENKILL_CURL_MAX_TIME:-120}"
+    CURL_SPEED_TIME="${OPENKILL_CURL_SPEED_TIME:-20}"
+    CURL_SPEED_LIMIT="${OPENKILL_CURL_SPEED_LIMIT:-256}"
+    CURL_RETRIES="${OPENKILL_CURL_RETRIES:-1}"
     HEADER_TMP="/tmp/openkill_curl_header_$$"
     DOWNLOAD_TMP="${DOWNLOAD_PATH}.download.$$"
     CACHED_ETAG=$(GET_ETAG_BY_PATH "$FILE_PATH")
@@ -58,7 +64,7 @@ EOF
 
         (
             if [ -n "$SECRET_KEY" ] && [ -n "$ETAG_HEADER" ]; then
-                curl -# -L --connect-timeout 30 -m 180 --speed-time 30 --speed-limit 1 --retry 2 \
+                curl -# -L --connect-timeout "$CURL_CONNECT_TIMEOUT" -m "$CURL_MAX_TIME" --speed-time "$CURL_SPEED_TIME" --speed-limit "$CURL_SPEED_LIMIT" --retry "$CURL_RETRIES" \
                     -D "$HEADER_TMP" \
                     -H "User-Agent: ${DOWNLOAD_UA}" \
                     -H "X-Age-Public-Key: ${SECRET_KEY}" \
@@ -66,21 +72,21 @@ EOF
                     "$@" \
                     "$DOWNLOAD_URL" -o "$DOWNLOAD_TMP" 2>"$TEMP_LOG"
             elif [ -n "$SECRET_KEY" ]; then
-                curl -# -L --connect-timeout 30 -m 180 --speed-time 30 --speed-limit 1 --retry 2 \
+                curl -# -L --connect-timeout "$CURL_CONNECT_TIMEOUT" -m "$CURL_MAX_TIME" --speed-time "$CURL_SPEED_TIME" --speed-limit "$CURL_SPEED_LIMIT" --retry "$CURL_RETRIES" \
                     -D "$HEADER_TMP" \
                     -H "User-Agent: ${DOWNLOAD_UA}" \
                     -H "X-Age-Public-Key: ${SECRET_KEY}" \
                     "$@" \
                     "$DOWNLOAD_URL" -o "$DOWNLOAD_TMP" 2>"$TEMP_LOG"
             elif [ -n "$ETAG_HEADER" ]; then
-                curl -# -L --connect-timeout 30 -m 180 --speed-time 30 --speed-limit 1 --retry 2 \
+                curl -# -L --connect-timeout "$CURL_CONNECT_TIMEOUT" -m "$CURL_MAX_TIME" --speed-time "$CURL_SPEED_TIME" --speed-limit "$CURL_SPEED_LIMIT" --retry "$CURL_RETRIES" \
                     -D "$HEADER_TMP" \
                     -H "User-Agent: ${DOWNLOAD_UA}" \
                     -H "$ETAG_HEADER" \
                     "$@" \
                     "$DOWNLOAD_URL" -o "$DOWNLOAD_TMP" 2>"$TEMP_LOG"
             else
-                curl -# -L --connect-timeout 30 -m 180 --speed-time 30 --speed-limit 1 --retry 2 \
+                curl -# -L --connect-timeout "$CURL_CONNECT_TIMEOUT" -m "$CURL_MAX_TIME" --speed-time "$CURL_SPEED_TIME" --speed-limit "$CURL_SPEED_LIMIT" --retry "$CURL_RETRIES" \
                     -D "$HEADER_TMP" \
                     -H "User-Agent: ${DOWNLOAD_UA}" \
                     "$@" \
@@ -136,12 +142,12 @@ EOF
         fi
     else
         DOWNLOAD_TRY=0
-        MAX_DOWNLOAD_RETRIES=3
+        MAX_DOWNLOAD_RETRIES="${OPENKILL_DOWNLOAD_RETRIES:-2}"
         while [ "$DOWNLOAD_TRY" -lt "$MAX_DOWNLOAD_RETRIES" ]; do
             DOWNLOAD_TRY=$((DOWNLOAD_TRY + 1))
             rm -f "$HEADER_TMP" "$DOWNLOAD_TMP"
             if [ -n "$SECRET_KEY" ] && [ -n "$ETAG_HEADER" ]; then
-                CURL_OUTPUT=$(curl -w "\n%{http_code}" -SsL --connect-timeout 30 -m 180 --speed-time 30 --speed-limit 1 --retry 2 \
+                CURL_OUTPUT=$(curl -w "\n%{http_code}" -SsL --connect-timeout "$CURL_CONNECT_TIMEOUT" -m "$CURL_MAX_TIME" --speed-time "$CURL_SPEED_TIME" --speed-limit "$CURL_SPEED_LIMIT" --retry "$CURL_RETRIES" \
                     -D "$HEADER_TMP" \
                     -H "User-Agent: ${DOWNLOAD_UA}" \
                     -H "X-Age-Public-Key: ${SECRET_KEY}" \
@@ -149,21 +155,21 @@ EOF
                     "$@" \
                     "$DOWNLOAD_URL" -o "$DOWNLOAD_TMP" 2>&1)
             elif [ -n "$SECRET_KEY" ]; then
-                CURL_OUTPUT=$(curl -w "\n%{http_code}" -SsL --connect-timeout 30 -m 180 --speed-time 30 --speed-limit 1 --retry 2 \
+                CURL_OUTPUT=$(curl -w "\n%{http_code}" -SsL --connect-timeout "$CURL_CONNECT_TIMEOUT" -m "$CURL_MAX_TIME" --speed-time "$CURL_SPEED_TIME" --speed-limit "$CURL_SPEED_LIMIT" --retry "$CURL_RETRIES" \
                     -D "$HEADER_TMP" \
                     -H "User-Agent: ${DOWNLOAD_UA}" \
                     -H "X-Age-Public-Key: ${SECRET_KEY}" \
                     "$@" \
                     "$DOWNLOAD_URL" -o "$DOWNLOAD_TMP" 2>&1)
             elif [ -n "$ETAG_HEADER" ]; then
-                CURL_OUTPUT=$(curl -w "\n%{http_code}" -SsL --connect-timeout 30 -m 180 --speed-time 30 --speed-limit 1 --retry 2 \
+                CURL_OUTPUT=$(curl -w "\n%{http_code}" -SsL --connect-timeout "$CURL_CONNECT_TIMEOUT" -m "$CURL_MAX_TIME" --speed-time "$CURL_SPEED_TIME" --speed-limit "$CURL_SPEED_LIMIT" --retry "$CURL_RETRIES" \
                     -D "$HEADER_TMP" \
                     -H "User-Agent: ${DOWNLOAD_UA}" \
                     -H "$ETAG_HEADER" \
                     "$@" \
                     "$DOWNLOAD_URL" -o "$DOWNLOAD_TMP" 2>&1)
             else
-                CURL_OUTPUT=$(curl -w "\n%{http_code}" -SsL --connect-timeout 30 -m 180 --speed-time 30 --speed-limit 1 --retry 2 \
+                CURL_OUTPUT=$(curl -w "\n%{http_code}" -SsL --connect-timeout "$CURL_CONNECT_TIMEOUT" -m "$CURL_MAX_TIME" --speed-time "$CURL_SPEED_TIME" --speed-limit "$CURL_SPEED_LIMIT" --retry "$CURL_RETRIES" \
                     -D "$HEADER_TMP" \
                     -H "User-Agent: ${DOWNLOAD_UA}" \
                     "$@" \
