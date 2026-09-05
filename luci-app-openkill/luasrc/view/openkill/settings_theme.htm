@@ -1,0 +1,22 @@
+<%
+    local fs = require "luci.openkill"
+    local plugin_version = fs.oc_version()
+%>
+<link rel="stylesheet" href="/luci-static/resources/openkill/css/oc.css?v=<%=plugin_version%>">
+<script type="text/javascript">
+(function() {
+    function initOpenKillSettingsTheme() {
+        var map = document.getElementById('cbi-openkill');
+        if (!map) return;
+        map.classList.add('openkill-settings');
+        document.body.classList.add('openkill-settings-page');
+        var tabs = map.querySelector('.cbi-section-tabbed');
+        if (tabs) tabs.classList.add('openkill-settings-tabs');
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initOpenKillSettingsTheme);
+    } else {
+        initOpenKillSettingsTheme();
+    }
+})();
+</script>

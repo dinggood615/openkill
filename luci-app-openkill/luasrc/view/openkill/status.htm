@@ -7,11 +7,7 @@
 <script src="/luci-static/resources/openkill/js/common.js?v=<%=plugin_version%>"></script>
 <link rel="stylesheet" href="/luci-static/resources/openkill/css/oc.css?v=<%=plugin_version%>">
 </head>
-<fieldset class="cbi-section">
-    <table width="100%">
-    <tr>
-        <td colspan="4">
-            <div class="oc">
+<div class="oc openkill-status-page" role="region" aria-label="<%:OpenKill runtime status%>">
                 <div class="main-cards-container">
                     <div class="main-card">
                         <!-- Row 1: Running Status -->
@@ -290,11 +286,26 @@
                     </div>
                 </div>
 
-            </div>
-        </td>
-    </tr>
-</table>
-</fieldset>
+                </div>
+
+<script type="text/javascript">
+// The status view is rendered inside LuCI's SimpleSection.  Mark that
+// generated wrapper so the shared OpenKill shell can remove the default CBI
+// fieldset padding without changing any runtime controls.
+(function() {
+    function markStatusSection() {
+        var page = document.querySelector('.openkill-status-page');
+        if (!page) return;
+        var section = page.closest('.cbi-section');
+        if (section) section.classList.add('openkill-status-section');
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', markStatusSection);
+    } else {
+        markStatusSection();
+    }
+})();
+</script>
 
 <script src="/luci-static/resources/openkill/js/oc-icons.js?v=<%=plugin_version%>"></script>
 <script type="text/javascript">//<![CDATA[

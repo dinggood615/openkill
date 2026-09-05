@@ -1596,5 +1596,6 @@ end
 
 m:append(Template("openkill/toolbar_show"))
 m:append(Template("openkill/config_editor"))
+m:append(Template("openkill/settings_theme"))
 
 return m

@@ -217,6 +217,238 @@
     padding-bottom: 8px;
 }
 
+/* ==========================================================================
+ * Shared LuCI shell — status and settings pages
+ *
+ * The runtime dashboard uses the custom `.oc` cards while CBI settings use
+ * LuCI's native markup.  Keep the two implementations independent, but make
+ * their spacing, surfaces, controls and navigation share the same visual
+ * tokens.  This avoids changing CBI field names or submit behaviour.
+ * ========================================================================== */
+#cbi-openkill.openkill-settings {
+    --ok-surface: #ffffff;
+    --ok-surface-muted: #f1f5f9;
+    --ok-text: #374151;
+    --ok-muted: #64748b;
+    --ok-border: #e2e8f0;
+    --ok-primary: #3b82f6;
+    --ok-primary-soft: rgba(59, 130, 246, 0.1);
+    --ok-radius: 8px;
+    --ok-gap: 12px;
+    --ok-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    --ok-transition: 0.15s ease;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    color: var(--ok-text);
+    font-family: "Microsoft Yahei", "sans-serif", "Helvetica Neue", "Helvetica", "Hiragino Sans GB";
+}
+
+html[data-darkmode="true"] #cbi-openkill.openkill-settings {
+    --ok-surface: #1f2937;
+    --ok-surface-muted: #374151;
+    --ok-text: #e5e7eb;
+    --ok-muted: #cbd5e1;
+    --ok-border: #4b5563;
+    --ok-primary: #60a5fa;
+    --ok-primary-soft: rgba(96, 165, 250, 0.16);
+    --ok-shadow: 0 1px 2px rgba(0, 0, 0, 0.24);
+    --ok-transition: 0.15s ease;
+}
+
+#cbi-openkill.openkill-settings > .cbi-section {
+    margin: 0 0 var(--ok-gap);
+    padding: 14px;
+    border: 1px solid var(--ok-border);
+    border-radius: var(--ok-radius);
+    background: var(--ok-surface);
+    box-shadow: var(--ok-shadow);
+}
+
+#cbi-openkill.openkill-settings > .cbi-section:last-child {
+    margin-bottom: 0;
+}
+
+#cbi-openkill.openkill-settings > .cbi-section-tabbed {
+    padding: 0;
+    overflow: hidden;
+}
+
+#cbi-openkill.openkill-settings .cbi-section > h3,
+#cbi-openkill.openkill-settings .cbi-section > .cbi-section-descr {
+    color: var(--ok-text);
+}
+
+#cbi-openkill.openkill-settings .cbi-section > h3 {
+    margin: 0 0 10px;
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+#cbi-openkill.openkill-settings .cbi-section-descr,
+#cbi-openkill.openkill-settings .cbi-value-description {
+    color: var(--ok-muted);
+    line-height: 1.55;
+}
+
+/* CBI tab bar: a compact pill navigation matching dashboard controls. */
+#cbi-openkill.openkill-settings .cbi-tabmenu,
+#cbi-openkill.openkill-settings ul.cbi-tabmenu {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 0;
+    padding: 10px 12px;
+    list-style: none;
+    border-bottom: 1px solid var(--ok-border);
+    background: var(--ok-surface-muted);
+}
+
+#cbi-openkill.openkill-settings .cbi-tabmenu li {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+#cbi-openkill.openkill-settings .cbi-tabmenu li a {
+    display: block;
+    min-height: 32px;
+    padding: 7px 12px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    color: var(--ok-muted);
+    font-size: 13px;
+    line-height: 1.35;
+    text-decoration: none;
+    transition: color var(--ok-transition), background var(--ok-transition), border-color var(--ok-transition);
+}
+
+#cbi-openkill.openkill-settings .cbi-tabmenu li a:hover,
+#cbi-openkill.openkill-settings .cbi-tabmenu li a:focus {
+    color: var(--ok-primary);
+    border-color: var(--ok-primary-soft);
+    background: var(--ok-primary-soft);
+}
+
+#cbi-openkill.openkill-settings .cbi-tabmenu li.cbi-tabmenu-tab-active a,
+#cbi-openkill.openkill-settings .cbi-tabmenu li.active a {
+    color: #ffffff;
+    border-color: var(--ok-primary);
+    background: var(--ok-primary);
+    font-weight: 600;
+    box-shadow: var(--ok-shadow);
+}
+
+#cbi-openkill.openkill-settings .cbi-section-tabbed > .cbi-section-node,
+#cbi-openkill.openkill-settings .cbi-section-tabbed > .cbi-tabcontainer {
+    padding: 6px 14px 12px;
+}
+
+#cbi-openkill.openkill-settings .cbi-value {
+    min-height: 42px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--ok-border);
+}
+
+#cbi-openkill.openkill-settings .cbi-value:last-child {
+    border-bottom: 0;
+}
+
+#cbi-openkill.openkill-settings .cbi-value-title {
+    color: var(--ok-text);
+    font-weight: 500;
+}
+
+#cbi-openkill.openkill-settings input[type="text"],
+#cbi-openkill.openkill-settings input[type="number"],
+#cbi-openkill.openkill-settings input[type="password"],
+#cbi-openkill.openkill-settings select,
+#cbi-openkill.openkill-settings textarea {
+    min-height: 32px;
+    border: 1px solid var(--ok-border);
+    border-radius: 6px;
+    background: var(--ok-surface);
+    color: var(--ok-text);
+    box-shadow: none;
+    transition: border-color var(--ok-transition), box-shadow var(--ok-transition);
+}
+
+#cbi-openkill.openkill-settings input[type="text"]:focus,
+#cbi-openkill.openkill-settings input[type="number"]:focus,
+#cbi-openkill.openkill-settings input[type="password"]:focus,
+#cbi-openkill.openkill-settings select:focus,
+#cbi-openkill.openkill-settings textarea:focus {
+    border-color: var(--ok-primary);
+    box-shadow: 0 0 0 2px var(--ok-primary-soft);
+    outline: none;
+}
+
+#cbi-openkill.openkill-settings .cbi-button {
+    min-height: 32px;
+    border-radius: 6px;
+    border-color: var(--ok-border);
+    transition: color var(--ok-transition), background var(--ok-transition), border-color var(--ok-transition);
+}
+
+#cbi-openkill.openkill-settings .cbi-button:hover,
+#cbi-openkill.openkill-settings .cbi-button:focus {
+    border-color: var(--ok-primary);
+    color: var(--ok-primary);
+}
+
+/* Remove the generated SimpleSection frame around the custom runtime page. */
+.cbi-section.openkill-status-section {
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+.cbi-section.openkill-status-section > .cbi-section-node {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+.oc.openkill-status-page {
+    width: 100%;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0;
+    border-radius: var(--radius-lg);
+    background: transparent;
+}
+
+.oc.openkill-status-page .main-cards-container {
+    margin: 0;
+    gap: var(--content-gap);
+}
+
+@media (max-width: 768px) {
+    #cbi-openkill.openkill-settings {
+        max-width: 100%;
+    }
+
+    #cbi-openkill.openkill-settings .cbi-tabmenu,
+    #cbi-openkill.openkill-settings ul.cbi-tabmenu {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: thin;
+    }
+
+    #cbi-openkill.openkill-settings .cbi-tabmenu li a {
+        white-space: nowrap;
+    }
+
+    #cbi-openkill.openkill-settings .cbi-section-tabbed > .cbi-section-node,
+    #cbi-openkill.openkill-settings .cbi-section-tabbed > .cbi-tabcontainer {
+        padding-right: 10px;
+        padding-left: 10px;
+    }
+}
+
 html[data-darkmode="true"] .oc {
     /* ── Background & Text ── */
     --bg-white: #1f2937;
