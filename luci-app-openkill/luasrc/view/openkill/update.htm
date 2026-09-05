@@ -316,18 +316,18 @@
         if (sha) {
             var refPath = (type === 'plugin') ? branch : branch + '/' + coreSubPath;
             if (isJsDelivr)
-                return addr + 'gh/vernesong/OpenKill@' + sha + '/' + refPath + '/' + filename;
+                return addr + 'gh/dinggood615/openkill@' + sha + '/' + refPath + '/' + filename;
             else if (classifyAddr(addr) === 'raw')
-                return 'https://raw.githubusercontent.com/vernesong/OpenClash/' + sha + '/' + refPath + '/' + filename;
+                return 'https://raw.githubusercontent.com/dinggood615/openkill/' + sha + '/' + refPath + '/' + filename;
             else
-                return addr + 'https://raw.githubusercontent.com/vernesong/OpenClash/' + sha + '/' + refPath + '/' + filename;
+                return addr + 'https://raw.githubusercontent.com/dinggood615/openkill/' + sha + '/' + refPath + '/' + filename;
         } else {
             if (isJsDelivr)
-                return addr + 'gh/vernesong/OpenKill@' + pathPrefix + '/' + filename;
+                return addr + 'gh/dinggood615/openkill@' + pathPrefix + '/' + filename;
             else if (classifyAddr(addr) === 'raw')
-                return 'https://raw.githubusercontent.com/vernesong/OpenClash/' + pathPrefix + '/' + filename;
+                return 'https://raw.githubusercontent.com/dinggood615/openkill/' + pathPrefix + '/' + filename;
             else
-                return addr + 'https://raw.githubusercontent.com/vernesong/OpenClash/' + pathPrefix + '/' + filename;
+                return addr + 'https://raw.githubusercontent.com/dinggood615/openkill/' + pathPrefix + '/' + filename;
         }
     }
 

@@ -7,6 +7,10 @@ local json = require "luci.jsonc"
 
 local M = {}
 
+-- Version metadata is published by OpenKill itself.  This prevents the
+-- update selector from displaying unrelated upstream OpenClash versions.
+local OPENKILL_REPO = "dinggood615/openkill"
+
 local VERSION_CACHE_FILE = "/tmp/openkill_version_history.json"
 local CDN_CACHE_FILE = "/tmp/openkill_cdn_info.json"
 
@@ -82,7 +86,7 @@ local function cdn_list()
 end
 
 local function raw_url(path)
-	return "https://raw.githubusercontent.com/vernesong/OpenClash/" .. path
+	return "https://raw.githubusercontent.com/" .. OPENKILL_REPO .. "/" .. path
 end
 
 local function build_fetch_urls(mod, path)
@@ -94,7 +98,7 @@ local function build_fetch_urls(mod, path)
 		return urls
 	end
 	if mod == "https://cdn.jsdelivr.net/" or mod == "https://fastly.jsdelivr.net/" or mod == "https://testingcf.jsdelivr.net/" then
-		return { mod .. "gh/vernesong/OpenKill@" .. path }
+		return { mod .. "gh/" .. OPENKILL_REPO .. "@" .. path }
 	end
 	return { mod .. raw_url(path) }
 end
@@ -420,7 +424,7 @@ local function html_unescape(s)
 end
 
 local function build_feed_urls(mod, path)
-	local feed = "https://github.com/vernesong/OpenClash/commits/" .. path .. ".atom"
+	local feed = "https://github.com/" .. OPENKILL_REPO .. "/commits/" .. path .. ".atom"
 	if mod == "0" or mod == "" then
 		local urls = { feed }
 		for _, cdn in ipairs(cdn_list()) do
