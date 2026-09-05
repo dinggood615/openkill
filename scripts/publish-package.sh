@@ -2,7 +2,7 @@
 set -euo pipefail
 : "${RELEASE_VERSION:?}" "${PACKAGE_FORMAT:?}" "${GITHUB_REPOSITORY:?}" "${GITHUB_SHA:?}"
 case "$PACKAGE_FORMAT" in ipk|apk) ;; *) exit 1;; esac
-mapfile -t packages < <(find tmp/SDK/bin -type f -name "luci-app-openkill_*.$PACKAGE_FORMAT")
+mapfile -t packages < <(find tmp/SDK/bin -type f -name "luci-app-openkill*.$PACKAGE_FORMAT")
 [ "${#packages[@]}" -eq 1 ] || { echo "Expected exactly one package"; exit 1; }
 asset="luci-app-openkill_${RELEASE_VERSION}_all.$PACKAGE_FORMAT"
 stage=$(mktemp -d)

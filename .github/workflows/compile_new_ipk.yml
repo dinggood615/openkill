@@ -70,7 +70,7 @@ jobs:
           # 当前目标固件使用 opkg，仅构建兼容性更好的 IPK。
           - { name: ipk, sdk_url: "https://mirrors.pku.edu.cn/openwrt/releases/22.03.0/targets/x86/64/openwrt-sdk-22.03.0-x86-64_gcc-11.2.0_musl.Linux-x86_64.tar.xz", sdk_tar: "SDK.tar.xz", sdk_backup_tar: "SDK.tar.bz2", sdk_dir: "SDK", artifact_pattern: "luci-app-openkill_*.ipk" }
           # APK 使用 OpenWrt snapshot SDK，供 apk 包管理器固件使用。
-          - { name: apk, sdk_url: "https://downloads.openwrt.org/snapshots/targets/x86/64/", sdk_tar: "SNAPSDK.tar.zst", sdk_backup_tar: "SNAPSDK.tar.zst", sdk_dir: "SDK", artifact_pattern: "luci-app-openkill_*.apk" }
+          - { name: apk, sdk_url: "https://downloads.openwrt.org/snapshots/targets/x86/64/", sdk_tar: "SNAPSDK.tar.zst", sdk_backup_tar: "SNAPSDK.tar.zst", sdk_dir: "SDK", artifact_pattern: "luci-app-openkill*.apk" }
     steps:
       - name: Checkout OpenKill Source
         uses: actions/checkout@v6
@@ -118,6 +118,8 @@ jobs:
           mkdir -p tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill
           cp -rf ./luci-app-openkill/. tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/
           if [ "${{ matrix.target.name }}" = "apk" ]; then
+            # apk accepts dotted numeric versions, not the project's date-counter separator.
+            sed -i 's/^PKG_VERSION:=2026-/PKG_VERSION:=2026./' tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/Makefile
             find tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill -type f -name "Makefile" -exec sed -i 's/DEPENDS:=+dnsmasq-full/DEPENDS:=+dnsmasq-full +luci-compat/g' {} \;
           fi
 
