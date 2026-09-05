@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1012"
+PROJECT_VERSION="2026-1013"
 ACTION=install
 PACKAGE_FILE=""
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
@@ -52,44 +52,83 @@ if command -v opkg >/dev/null 2>&1; then PM=opkg; EXT=ipk
 elif command -v apk >/dev/null 2>&1; then PM=apk; EXT=apk
 else die "Neither opkg nor apk is available"; fi
 
-install_dependencies(){
-  log "Installing OpenKill runtime dependencies"
+# Keep the selected repository configuration for update AND install.
+WORK_DIR=$(mktemp -d /tmp/openkill-install.XXXXXX)
+trap 'rm -rf "$WORK_DIR"' EXIT
+FEED_CONFIG=""
+pm_run(){
   if [ "$PM" = opkg ]; then
-    refresh=0
-    opkg update >/dev/null 2>&1 && refresh=1 || true
-    if [ "$refresh" -eq 0 ] && [ -f /etc/opkg/distfeeds.conf ]; then
-      # Try public mirrors without changing the user's persistent feed file.
-      for mirror in "https://mirrors.pku.edu.cn/openwrt" "https://mirrors.tuna.tsinghua.edu.cn/openwrt"; do
-        tmpfeeds="/tmp/openkill-distfeeds.$$"
-        sed -E "s#https://downloads\\.openwrt\\.org#${mirror}#g" /etc/opkg/distfeeds.conf > "$tmpfeeds"
-        if opkg -f "$tmpfeeds" update >/dev/null 2>&1; then refresh=1; rm -f "$tmpfeeds"; break; fi
-        rm -f "$tmpfeeds"
-      done
-    fi
-    [ "$refresh" -eq 1 ] || log "Package index update failed; using existing indexes"
-    # 与原 OpenClash 安装器及其运行时诊断清单保持一致；不存在的内核
-    # 模块会跳过，由当前固件的防火墙后端决定实际需要哪一组。
-    deps="bash curl ca-bundle ip-full ruby ruby-yaml ruby-base64 ruby-psych ruby-pstore lua kmod-tun unzip dnsmasq-full luci-compat kmod-inet-diag kmod-nft-tproxy kmod-ipt-tproxy kmod-ipt-extra kmod-ipt-nat iptables-mod-tproxy iptables-mod-extra ipset"
-    for dep in $deps; do
-      opkg install "$dep" >/dev/null 2>&1 || log "Dependency unavailable or already provided by firmware: $dep"
+    if [ -n "$FEED_CONFIG" ]; then opkg -f "$FEED_CONFIG" "$@"; else opkg "$@"; fi
+  else
+    if [ -n "$FEED_CONFIG" ]; then apk --repositories-file "$FEED_CONFIG" "$@"; else apk "$@"; fi
+  fi
+}
+prepare_feeds(){
+  original="$WORK_DIR/feeds-original"
+  : > "$original"
+  if [ "$PM" = opkg ]; then
+    for file in /etc/opkg.conf /etc/opkg/*.conf; do
+      [ ! -f "$file" ] || cat "$file" >> "$original"
     done
   else
-    refresh=0
-    apk update >/dev/null 2>&1 && refresh=1 || true
-    if [ "$refresh" -eq 0 ] && [ -f /etc/apk/repositories ]; then
-      for mirror in "https://mirrors.pku.edu.cn/openwrt" "https://mirrors.tuna.tsinghua.edu.cn/openwrt"; do
-        tmprepos="/tmp/openkill-repositories.$$"
-        sed -E "s#https://downloads\\.openwrt\\.org#${mirror}#g" /etc/apk/repositories > "$tmprepos"
-        if apk --repositories-file "$tmprepos" update >/dev/null 2>&1; then refresh=1; rm -f "$tmprepos"; break; fi
-        rm -f "$tmprepos"
-      done
-    fi
-    [ "$refresh" -eq 1 ] || log "Package index update failed; using existing indexes"
-    deps="bash curl ca-certificates iproute2 ruby ruby-yaml lua unzip dnsmasq-full nftables ipset"
-    for dep in $deps; do
-      apk add --no-cache "$dep" >/dev/null 2>&1 || log "Dependency unavailable or already provided by firmware: $dep"
+    for file in /etc/apk/repositories /etc/apk/repositories.d/*.list; do
+      [ ! -f "$file" ] || cat "$file" >> "$original"
     done
   fi
+  FEED_CANDIDATES="$original"
+  # Change only the official host; preserve firmware paths, ABI and custom feeds.
+  for mirror in https://mirrors.pku.edu.cn/openwrt https://mirrors.tuna.tsinghua.edu.cn/openwrt; do
+    candidate="$WORK_DIR/feeds-$(echo "$mirror" | tr '/:' '__')"
+    sed "s#https://downloads.openwrt.org/#$mirror/#g" "$original" > "$candidate"
+    cmp -s "$original" "$candidate" || FEED_CANDIDATES="$FEED_CANDIDATES $candidate"
+  done
+  for candidate in $FEED_CANDIDATES; do
+    FEED_CONFIG="$candidate"
+    if pm_run update > "$WORK_DIR/feeds.log" 2>&1; then
+      log "Dependency repository selected: $candidate"
+      return 0
+    fi
+  done
+  cat "$WORK_DIR/feeds.log" >&2
+  die "All compatible dependency repositories failed"
+}
+install_dependency(){
+  dep="$1"
+  if [ "$PM" = opkg ]; then
+    opkg status "$dep" 2>/dev/null | grep -q '^Status:.* installed$' && return 0
+    operation=install
+  else
+    apk info -e "$dep" >/dev/null 2>&1 && return 0
+    operation=add
+  fi
+  if pm_run "$operation" "$dep" > "$WORK_DIR/dependency.log" 2>&1; then return 0; fi
+  # A working index does not guarantee that package downloads work.
+  for candidate in $FEED_CANDIDATES; do
+    [ "$candidate" != "$FEED_CONFIG" ] || continue
+    FEED_CONFIG="$candidate"
+    if pm_run update >> "$WORK_DIR/dependency.log" 2>&1 &&
+       pm_run "$operation" "$dep" >> "$WORK_DIR/dependency.log" 2>&1; then return 0; fi
+  done
+  cat "$WORK_DIR/dependency.log" >&2
+  return 1
+}
+install_dependencies(){
+  log "Installing OpenKill runtime dependencies"
+  prepare_feeds
+  if [ "$PM" = opkg ]; then
+    required="bash curl ca-bundle ip-full ruby ruby-yaml lua kmod-tun unzip dnsmasq-full luci-compat"
+    optional="ruby-base64 ruby-psych ruby-pstore kmod-inet-diag"
+    if command -v fw4 >/dev/null 2>&1; then required="$required kmod-nft-tproxy"
+    else required="$required kmod-ipt-tproxy iptables-mod-tproxy ipset"; optional="$optional kmod-ipt-extra kmod-ipt-nat iptables-mod-extra"; fi
+  else
+    required="bash curl ca-certificates ip-full ruby ruby-yaml lua kmod-tun unzip dnsmasq-full luci-compat"
+    optional="ruby-base64 ruby-psych ruby-pstore kmod-inet-diag"
+    if command -v fw4 >/dev/null 2>&1; then required="$required kmod-nft-tproxy"
+    else required="$required ipset iptables-mod-tproxy"; fi
+  fi
+  for dep in $required; do install_dependency "$dep" || die "Required dependency could not be installed: $dep"; done
+  for dep in $optional; do install_dependency "$dep" || log "Optional dependency unavailable: $dep"; done
+  ruby -ryaml -rbase64 -rpsych -rpstore -e 'exit 0' || die "Ruby runtime libraries are incomplete"
 }
 
 download(){
@@ -118,8 +157,9 @@ select_source(){
   scores=/tmp/openkill-source-scores.$$
   : > "$scores"
   for base in $candidates; do
-    score=$(curl -fsSL -o /dev/null -w '%{time_total}' --connect-timeout 8 --max-time 15 "$base/$rel" 2>/dev/null || true)
-    [ -n "$score" ] && printf '%s %s\n' "$score" "$base" >> "$scores"
+    if score=$(curl -fsSL -o /dev/null -w '%{time_total}' --connect-timeout 8 --max-time 15 "$base/$rel" 2>/dev/null); then
+      printf '%s %s\n' "$score" "$base" >> "$scores"
+    fi
   done
   SOURCE_ROOT=$(sort -n "$scores" 2>/dev/null | awk 'NR==1{print $2}')
   rm -f "$scores"
@@ -170,23 +210,35 @@ validate_install(){
 }
 
 resolve_package(){
-  version=/tmp/openkill-version.$$ 
-  select_source version || true
-  candidates="$SOURCE_ROOT https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF https://fastly.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF"
-  for base in $candidates; do
-    [ -n "$base" ] || continue
-    download "$base/version" "$version" >/dev/null 2>&1 && break || true
+  manifest="$WORK_DIR/latest.json"
+  # Authoritative origin first; cached mirrors are only a connectivity fallback.
+  for base in "https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF" "https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF" "https://fastly.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF"; do
+    if download "$base/latest-$EXT.json" "$manifest" >/dev/null 2>&1 &&
+       ruby -rjson -e '
+         d=JSON.parse(File.read(ARGV[0]))
+         abort unless d["format"]==ARGV[1] && d["architecture"]=="all"
+         abort unless d["version"].match?(/\A2026-[0-9]+\z/) && d["sha256"].match?(/\A[0-9a-f]{64}\z/)
+         expected="luci-app-openkill_#{d["version"]}_all.#{ARGV[1]}"
+         abort unless d["filename"]==expected
+         abort unless d["url"]=="https://github.com/"+ARGV[2]+"/releases/download/v"+d["version"]+"-"+ARGV[1]+"/"+expected
+         puts [d["version"],d["filename"],d["sha256"],d["url"]]
+       ' "$manifest" "$EXT" "$REPO" > "$WORK_DIR/metadata"; then break; fi
+    : > "$WORK_DIR/metadata"
   done
-  [ -s "$version" ] || die "Could not retrieve OpenKill package version"
-  ver=$(sed -n '1{s/^v//;s/[[:space:]]//g;p;}' "$version"); rm -f "$version"
-  case "$ver" in ''|*[!0-9.\-]*) die "Invalid package version";; esac
-  if [ "$EXT" = ipk ]; then name="luci-app-openkill_${ver}_all.ipk"; else name="luci-app-openkill_${ver}_all.apk"; fi
-  for base in $candidates; do
-    [ -n "$base" ] || continue
-    PACKAGE_FILE="/tmp/openkill-package.$EXT"
-    download "$base/$name" "$PACKAGE_FILE" >/dev/null 2>&1 && return 0 || true
+  [ -s "$WORK_DIR/metadata" ] || die "No valid published $EXT release manifest is available"
+  ver=$(sed -n '1p' "$WORK_DIR/metadata")
+  name=$(sed -n '2p' "$WORK_DIR/metadata")
+  checksum=$(sed -n '3p' "$WORK_DIR/metadata")
+  release_url=$(sed -n '4p' "$WORK_DIR/metadata")
+  PACKAGE_FILE="$WORK_DIR/$name"
+  for url in "$release_url" "https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF/$name" "https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF/$name" "https://fastly.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF/$name"; do
+    if download "$url" "$PACKAGE_FILE" &&
+       [ "$(sha256sum "$PACKAGE_FILE" | awk '{print $1}')" = "$checksum" ]; then
+      log "Verified published $EXT version: $ver"
+      return 0
+    fi
   done
-  die "Could not retrieve $name"
+  die "Package download or SHA256 verification failed"
 }
 
 uninstall(){
@@ -203,8 +255,8 @@ install_dependencies
 [ -n "$PACKAGE_FILE" ] || resolve_package
 [ -f "$PACKAGE_FILE" ] || die "Package file not found"
 backup_config
-log "Installing OpenKill $PROJECT_VERSION"
-if [ "$PM" = opkg ]; then opkg install "$PACKAGE_FILE"; else apk add --allow-untrusted "$PACKAGE_FILE"; fi
+log "Installing OpenKill ${ver:-local package}"
+if [ "$PM" = opkg ]; then pm_run install "$PACKAGE_FILE"; else pm_run add --allow-untrusted "$PACKAGE_FILE"; fi
 validate_install
 install_core
 # Remove credentials and generated files left by older oixCloud-based builds.
@@ -227,4 +279,4 @@ if command -v uci >/dev/null 2>&1; then
 fi
 rm -f /tmp/luci-indexcache /tmp/luci-modulecache/*openkill* 2>/dev/null || true
 rm -f "$PACKAGE_FILE"
-printf 'OpenKill %s installation/update complete.\n' "$PROJECT_VERSION"
+printf 'OpenKill %s installation/update complete.\n' "${ver:-local package}"
