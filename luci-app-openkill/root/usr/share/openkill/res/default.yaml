@@ -9,10 +9,12 @@ mixed-port: 10801 # HTTP(S) 和 SOCKS 代理混合端口
 # Transparent proxy server port for Linux (TProxy TCP and TProxy UDP)
 # tproxy-port: 7893
 
-allow-lan: true # 允许局域网连接
-bind-address: "*" # 绑定 IP 地址，仅作用于 allow-lan 为 true，'*'表示所有地址
-authentication: # http,socks 入口的验证用户名，密码
-  - "username:password"
+# OpenKill replaces these values from UCI at start.  The template stays safe
+# when it is inspected or validated on its own: no wildcard listener, sample
+# credentials, or unauthenticated external controller is enabled by default.
+allow-lan: false # 允许局域网连接（由 dashboard_bind_address 控制）
+bind-address: 127.0.0.1 # 仅监听本机；LAN 访问由 UCI 显式启用
+# authentication: # 在 LuCI 中配置真实凭据后才会写入
 skip-auth-prefixes: # 设置跳过验证的 IP 段
   - 127.0.0.1/8
   - ::1/128
@@ -59,14 +61,15 @@ ipv6: true # 开启 IPv6 总开关，关闭阻断所有 IPv6 链接和屏蔽 DNS
 #   certificate: /etc/openkill/tls/server.crt
 #   private-key: /etc/openkill/tls/server.key
 
-external-controller: 0.0.0.0:9093 # RESTful API 监听地址
+external-controller: 127.0.0.1:9093 # RESTful API 监听地址
  # external-controller-tls: 0.0.0.0:9443 # HTTPS API (requires a real tls block)
 # secret: "123456" # `Authorization:Bearer ${secret}`
 
 # RESTful API CORS标头配置
 external-controller-cors:
   allow-origins:
-    - "*"
+    - "http://127.0.0.1"
+    - "http://127.0.0.1:9093"
   allow-private-network: true
 
 # RESTful API Unix socket 监听地址（ windows版本大于17063也可以使用，即大于等于1803/RS4版本即可使用 ）
@@ -76,7 +79,7 @@ external-controller-cors:
 
 # RESTful API Windows namedpipe 监听地址
 # ！！！注意： 从Windows namedpipe访问api接口不会验证secret， 如果开启请自行保证安全问题 ！！！
-external-controller-pipe: \\.\pipe\mihomo
+# external-controller-pipe: \\.\pipe\mihomo
 
 # 为 external-controller 和 external-controller-tls 的监听socket设置routing-mark（仅支持linux）
 external-controller-routing-mark: 0
@@ -84,10 +87,10 @@ external-controller-routing-mark: 0
 tcp-concurrent: true # TCP 并发连接所有 IP, 将使用最快握手的 TCP
 
 # 配置 WEB UI 目录，使用 http://{{external-controller}}/ui 访问
-external-ui: /path/to/ui/folder/
+# external-ui: /usr/share/openkill/ui
 external-ui-name: xd
 # 目前支持下载zip,tgz格式的压缩包
-external-ui-url: "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip"
+# external-ui-url: "https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip"
 
 # 在RESTful API端口上开启DOH服务器
 # ！！！该URL不会验证secret， 如果开启请自行保证安全问题 ！！！
@@ -1436,11 +1439,14 @@ proxy-groups:
     proxies:
       - ss1
       - ss2
-      - vmess1
+      - vmess
     # tolerance: 150
-    # lazy: true
-    # expected-status: 204 # 当健康检查返回状态码与期望值不符时，认为节点不可用
-    url: "https://cp.cloudflare.com/generate_204"
+    tolerance: 50
+    lazy: true
+    timeout: 5000
+    max-failed-times: 3
+    expected-status: 204 # 当健康检查返回状态码与期望值不符时，认为节点不可用
+    url: "https://www.gstatic.com/generate_204"
     interval: 300
 
   # fallback 将按照 url 测试结果按照节点顺序选择
@@ -1449,8 +1455,12 @@ proxy-groups:
     proxies:
       - ss1
       - ss2
-      - vmess1
-    url: "https://cp.cloudflare.com/generate_204"
+      - vmess
+    lazy: true
+    timeout: 5000
+    max-failed-times: 3
+    expected-status: 204
+    url: "https://www.gstatic.com/generate_204"
     interval: 300
 
   # load-balance 将按照算法随机选择节点
@@ -1459,8 +1469,12 @@ proxy-groups:
     proxies:
       - ss1
       - ss2
-      - vmess1
-    url: "https://cp.cloudflare.com/generate_204"
+      - vmess
+    lazy: true
+    timeout: 5000
+    max-failed-times: 3
+    expected-status: 204
+    url: "https://www.gstatic.com/generate_204"
     interval: 300
   # strategy: consistent-hashing # 可选 round-robin 和 sticky-sessions
 
@@ -1471,7 +1485,7 @@ proxy-groups:
     proxies:
       - ss1
       - ss2
-      - vmess1
+      - vmess
       - auto
     # default-selected: ss1 # 默认选择的节点（该项为空或者设置的节点名不存在时，默认选择组中第一个节点）
 

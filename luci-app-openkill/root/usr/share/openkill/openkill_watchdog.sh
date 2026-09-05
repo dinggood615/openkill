@@ -26,9 +26,13 @@ MAX_FIREWALL_RELOAD=3
 LOCALNETWORK_INT=1
 LOCALNETWORK_INTERVAL=10
 HISTORY_INT=1
-HISTORY_INTERVAL=5
+HISTORY_INTERVAL=10
 FIREWALL_INT=1
-FIREWALL_INTERVAL=2
+FIREWALL_INTERVAL=5
+STREAM_INT=1
+STREAM_INTERVAL=5
+DNS_RELOAD_LAST=0
+DNS_RELOAD_COOLDOWN=300
 FW4=$(command -v fw4)
 
 # Values are expressed in watchdog cycles.  Keeping the defaults conservative
@@ -44,11 +48,11 @@ valid_bool() {
    [ "${1:-}" = "1" ] && echo 1 || echo 0
 }
 WATCHDOG_SLEEP=$(valid_cycles "$(uci_get_config "watchdog_interval" || echo 60)" 60)
-LOCALNETWORK_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_network_cycles" || echo 10)" 10)
-HISTORY_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_history_cycles" || echo 5)" 5)
-FIREWALL_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_firewall_cycles" || echo 2)" 2)
-UPNP_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_upnp_cycles" || echo 30)" 30)
-SKIP_PROXY_ADDRESS_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_proxy_cycles" || echo 30)" 30)
+LOCALNETWORK_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_network_cycles" || echo 30)" 30)
+HISTORY_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_history_cycles" || echo 10)" 10)
+FIREWALL_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_firewall_cycles" || echo 5)" 5)
+UPNP_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_upnp_cycles" || echo 60)" 60)
+SKIP_PROXY_ADDRESS_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_proxy_cycles" || echo 60)" 60)
 CORE_FAILURES=0
 
 ## Skip Proxies Address
@@ -425,16 +429,20 @@ LOCALNETWORK_INT=$(expr "$LOCALNETWORK_INT" + 1)
 ## DNS转发劫持
    if [ "$enable_redirect_dns" = "1" ]; then
       if [ -z "$(uci -q get dhcp.@dnsmasq[0].server |grep "$dns_port")" ] || [ ! -z "$(uci -q get dhcp.@dnsmasq[0].server |awk -F ' ' '{print $2}')" ]; then
-         LOG_WATCHDOG "Force Reset DNS Hijack..."
-         uci -q del dhcp.@dnsmasq[-1].server
-         uci -q add_list dhcp.@dnsmasq[0].server=127.0.0.1#"$dns_port"
-         uci -q delete dhcp.@dnsmasq[0].resolvfile
-         uci -q set dhcp.@dnsmasq[0].noresolv=1
-         [ "$disable_masq_cache" -eq 1 ] && {
-         	uci -q set dhcp.@dnsmasq[0].cachesize=0
-         }
-         uci -q commit dhcp
-         /etc/init.d/dnsmasq restart >/dev/null 2>&1
+         dns_now=$(date +%s 2>/dev/null || echo 0)
+         if [ "$DNS_RELOAD_LAST" -eq 0 ] || [ "$dns_now" -ge $((DNS_RELOAD_LAST + DNS_RELOAD_COOLDOWN)) ]; then
+            LOG_WATCHDOG "Force Reset DNS Hijack..."
+            uci -q del dhcp.@dnsmasq[-1].server
+            uci -q add_list dhcp.@dnsmasq[0].server=127.0.0.1#"$dns_port"
+            uci -q delete dhcp.@dnsmasq[0].resolvfile
+            uci -q set dhcp.@dnsmasq[0].noresolv=1
+            [ "$disable_masq_cache" -eq 1 ] && {
+              uci -q set dhcp.@dnsmasq[0].cachesize=0
+            }
+            uci -q commit dhcp
+            /etc/init.d/dnsmasq restart >/dev/null 2>&1
+            DNS_RELOAD_LAST="$dns_now"
+         fi
       fi
    fi
 
@@ -447,7 +455,10 @@ LOCALNETWORK_INT=$(expr "$LOCALNETWORK_INT" + 1)
    fi
 
 ##STREAMING_UNLOCK_CHECK (isolated from the health loop)
-   /usr/share/openkill/openkill_watchdog_stream.sh &
+   if [ "$STREAM_INT" -eq 1 ] || [ "$(expr "$STREAM_INT" % "$STREAM_INTERVAL")" -eq 0 ]; then
+      /usr/share/openkill/openkill_watchdog_stream.sh &
+   fi
+   STREAM_INT=$(expr "$STREAM_INT" + 1)
 
     sleep "$WATCHDOG_SLEEP"
 done 2>/dev/null

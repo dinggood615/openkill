@@ -130,6 +130,42 @@ o:value("gvisor", translate("gVisor"))
 o:value("mixed", translate("Mixed"))
 o.default = "mixed"
 
+o = s:taboption("op_mode", ListValue, "tun_auto_route", translate("TUN Auto Route"))
+o.description = translate("Auto keeps route ownership with OpenKill firewall; enable only when Mihomo should install routes itself.")
+o:value("auto", translate("Automatic (OpenKill firewall)"))
+o:value("0", translate("Off"))
+o:value("1", translate("Mihomo manages routes"))
+o.default = "auto"
+o.rmempty = false
+for _, mode in ipairs({"redir-host-tun", "fake-ip-tun", "redir-host-mix", "fake-ip-mix"}) do o:depends("en_mode", mode) end
+
+o = s:taboption("op_mode", ListValue, "tun_auto_redirect", translate("TUN Auto Redirect"))
+o.description = translate("Leave automatic to avoid duplicate firewall redirects on older or vendor firmware.")
+o:value("auto", translate("Automatic (OpenKill firewall)"))
+o:value("0", translate("Off"))
+o:value("1", translate("Mihomo manages redirect"))
+o.default = "auto"
+o.rmempty = false
+for _, mode in ipairs({"redir-host-tun", "fake-ip-tun", "redir-host-mix", "fake-ip-mix"}) do o:depends("en_mode", mode) end
+
+o = s:taboption("op_mode", Flag, "tun_auto_detect_interface", translate("TUN Auto Detect Interface"))
+o.description = translate("Let Mihomo select the active uplink interface; recommended for multi-WAN and IPv6 networks.")
+o.default = 1
+o.rmempty = false
+for _, mode in ipairs({"redir-host-tun", "fake-ip-tun", "redir-host-mix", "fake-ip-mix"}) do o:depends("en_mode", mode) end
+
+o = s:taboption("op_mode", Flag, "tun_strict_route", translate("TUN Strict Route"))
+o.description = translate("Drop traffic that cannot be resolved through the TUN route. Keep disabled for maximum compatibility.")
+o.default = 0
+o.rmempty = false
+for _, mode in ipairs({"redir-host-tun", "fake-ip-tun", "redir-host-mix", "fake-ip-mix"}) do o:depends("en_mode", mode) end
+
+o = s:taboption("op_mode", Flag, "tun_endpoint_independent_nat", translate("TUN Endpoint-Independent NAT"))
+o.description = translate("Adds NAT mapping work; enable only when a UDP application requires endpoint-independent mapping.")
+o.default = 0
+o.rmempty = false
+for _, mode in ipairs({"redir-host-tun", "fake-ip-tun", "redir-host-mix", "fake-ip-mix"}) do o:depends("en_mode", mode) end
+
 o = s:taboption("op_mode", ListValue, "proxy_mode", translate("Proxy Mode"))
 o.description = translate("Select Proxy Mode")
 o:value("rule", translate("Rule Proxy Mode"))
@@ -145,6 +181,21 @@ o.datatype = "uinteger"
 o = s:taboption("op_mode", Value, "log_size", translate("Log Size (KB)"))
 o.description = translate("Set Log File Size (KB)")
 o.default = "1024"
+
+o = s:taboption("op_mode", ListValue, "dashboard_bind_address", translate("Controller Listen Scope"))
+o.description = translate("LAN binds to the router LAN address; loopback keeps the API local. Avoid exposing the controller on WAN.")
+o:value("lan", translate("LAN address (recommended)"))
+o:value("127.0.0.1", translate("Local device only"))
+o:value("0.0.0.0", translate("All interfaces (advanced)"))
+o.default = "lan"
+o.rmempty = false
+
+o = s:taboption("dns", ListValue, "dns_listen_address", translate("DNS Listen Address"))
+o.description = translate("Keep the Mihomo DNS listener on loopback when dnsmasq redirects local queries.")
+o:value("127.0.0.1", translate("Local device only (recommended)"))
+o:value("0.0.0.0", translate("All LAN interfaces (advanced)"))
+o.default = "127.0.0.1"
+o.rmempty = false
 
 o = s:taboption("op_mode", Flag, "bypass_gateway_compatible", translate("Bypass Gateway Compatible"))
 o.description = translate("If The Network Cannot be Connected in Bypass Gateway Mode, Please Try to Enable.")..font_red..bold_on..translate("Suggestion: If The Device Does Not Have WLAN, Please Disable The Lan Interface's Bridge Option")..bold_off..font_off
@@ -1273,33 +1324,33 @@ o.default = "60"
 o.rmempty = false
 
 o = s:taboption("health", Value, "watchdog_network_cycles", translate("Network Scan Interval (cycles)"))
-o.description = translate("Run local-network and IPv6 route maintenance on the first cycle and then at this interval.")
+o.description = translate("Run local-network and IPv6 route maintenance on the first cycle and then at this interval; a larger value lowers background load.")
 o.datatype = "range(1,120)"
-o.default = "10"
+o.default = "30"
 o.rmempty = false
 
 o = s:taboption("health", Value, "watchdog_history_cycles", translate("History Scan Interval (cycles)"))
 o.description = translate("Refresh connection history less often to avoid repeated process and file scans.")
 o.datatype = "range(1,120)"
-o.default = "5"
+o.default = "10"
 o.rmempty = false
 
 o = s:taboption("health", Value, "watchdog_firewall_cycles", translate("Firewall Check Interval (cycles)"))
 o.description = translate("Check firewall state at this watchdog cadence; lower values react faster but use more CPU.")
 o.datatype = "range(1,60)"
-o.default = "2"
+o.default = "5"
 o.rmempty = false
 
 o = s:taboption("health", Value, "watchdog_upnp_cycles", translate("UPnP Check Interval (cycles)"))
 o.description = translate("Check UPnP state at a low frequency; set a larger value when UPnP is not used.")
 o.datatype = "range(1,240)"
-o.default = "30"
+o.default = "60"
 o.rmempty = false
 
 o = s:taboption("health", Value, "watchdog_proxy_cycles", translate("Proxy Address Scan Interval (cycles)"))
 o.description = translate("Refresh proxy-address metadata only periodically; this avoids a full Ruby scan on every watchdog cycle.")
 o.datatype = "range(1,240)"
-o.default = "30"
+o.default = "60"
 o.rmempty = false
 
 ---- Mihomo optional features

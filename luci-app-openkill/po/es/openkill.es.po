@@ -621,8 +621,8 @@ msgstr "<Disponible>"
 msgid "Update Core File"
 msgstr "Actualizar núcleo"
 
-msgid "Download Form https://github.com/vernesong/OpenClash/releases/tag/Clash If Fail"
-msgstr "Si falla la descarga, puedes obtenerlo manualmente en https://github.com/vernesong/OpenClash/releases/tag/Clash"
+msgid "Download From https://github.com/MetaCubeX/mihomo/releases If Fail"
+msgstr "Si falla la descarga, puedes obtenerlo manualmente en https://github.com/MetaCubeX/mihomo/releases"
 
 msgid "Last OpenKill Version"
 msgstr "Última versión de OpenKill"

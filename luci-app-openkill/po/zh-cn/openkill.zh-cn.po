@@ -653,9 +653,9 @@ msgstr "<可更新>"
 msgid "Update Core File"
 msgstr "更新内核"
 
-msgid "Download Form https://github.com/vernesong/OpenClash/releases/tag/Clash If Fail"
+msgid "Download From https://github.com/MetaCubeX/mihomo/releases If Fail"
 msgstr ""
-"如下载失败可前往 https://github.com/vernesong/OpenClash/releases/tag/Clash 手动下载并上传"
+"如下载失败可前往 https://github.com/MetaCubeX/mihomo/releases 手动下载并上传"
 
 msgid "Last OpenKill Version"
 msgstr "最新客户端版本"

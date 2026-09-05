@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1055"
+PROJECT_VERSION="2026-1060"
 ACTION=install
 PACKAGE_FILE=""
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
@@ -364,6 +364,8 @@ validate_install(){
   sh -n /usr/share/openkill/openkill_core.sh || die "OpenKill core installer validation failed"
   sh -n /usr/share/openkill/openkill_update.sh || die "OpenKill updater validation failed"
   sh -n /usr/share/openkill/openkill_watchdog.sh || die "OpenKill watchdog validation failed"
+  [ -x /usr/share/openkill/openkill_semantic_check.sh ] || die "OpenKill semantic validator is missing"
+  sh -n /usr/share/openkill/openkill_semantic_check.sh || die "OpenKill semantic validator syntax check failed"
   ruby -ryaml -rjson -e 'exit 0' || die "Ruby YAML/JSON runtime is incomplete"
 }
 

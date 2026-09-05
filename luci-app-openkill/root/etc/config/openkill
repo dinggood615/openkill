@@ -12,6 +12,12 @@ config openkill 'config'
 	option auto_update '0'
 	option auto_update_time '0'
 	option cn_port '9090'
+	# Bind the Mihomo controller to the LAN address instead of every interface.
+	# Set to 127.0.0.1 for local-only access or 0.0.0.0 when WAN/API access is
+	# explicitly required.  The generated CORS allow-list is never wildcarded.
+	option dashboard_bind_address 'lan'
+	# DNS remains local because dnsmasq redirects queries to this listener.
+	option dns_listen_address '127.0.0.1'
 	option dashboard_forward_ssl '0'
 	option enable_custom_dns '0'
 	option ipv6_enable '0'
@@ -57,11 +63,19 @@ config openkill 'config'
 	# Watchdog maintenance cadence (seconds/cycles).  The health observer never
 	# starts a duplicate core; procd remains the sole restart owner.
 	option watchdog_interval '60'
-	option watchdog_network_cycles '10'
-	option watchdog_history_cycles '5'
-	option watchdog_firewall_cycles '2'
-	option watchdog_upnp_cycles '30'
-	option watchdog_proxy_cycles '30'
+	option watchdog_network_cycles '30'
+	option watchdog_history_cycles '10'
+	option watchdog_firewall_cycles '5'
+	option watchdog_upnp_cycles '60'
+	option watchdog_proxy_cycles '60'
+	# TUN routing is owned by OpenKill's firewall integration by default.  Set
+	# auto-route/auto-redirect to 1 only when the firmware delegates both jobs
+	# to Mihomo.  "auto" deliberately resolves to the safe OpenKill path.
+	option tun_auto_route 'auto'
+	option tun_auto_redirect 'auto'
+	option tun_auto_detect_interface '1'
+	option tun_strict_route '0'
+	option tun_endpoint_independent_nat '0'
 	option bypass_gateway_compatible '0'
 	option github_address_mod '0'
 	option urltest_address_mod '0'

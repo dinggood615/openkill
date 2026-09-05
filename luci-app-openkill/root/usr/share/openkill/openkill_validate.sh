@@ -5,6 +5,7 @@
 
 CONFIG_FILE="${1:-}"
 CORE="${2:-/etc/openkill/clash}"
+SEMANTIC_CHECK="/usr/share/openkill/openkill_semantic_check.sh"
 
 [ -n "$CONFIG_FILE" ] || {
    echo "configuration path is required" >&2
@@ -23,6 +24,9 @@ if command -v ruby >/dev/null 2>&1; then
       echo "YAML parse failed: $CONFIG_FILE" >&2
       exit 3
    }
+   if [ -x "$SEMANTIC_CHECK" ]; then
+      "$SEMANTIC_CHECK" "$CONFIG_FILE" || exit 3
+   fi
 fi
 
 # Mihomo's -t performs the official config validation without opening the

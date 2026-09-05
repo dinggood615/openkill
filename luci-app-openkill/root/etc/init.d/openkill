@@ -455,8 +455,16 @@ fi
 
 validate_generated_config()
 {
-   [ "$QUICK_START" = "true" ] && return 0
    [ -f "$TMP_CONFIG_FILE" ] || return 1
+   # Quick-start may skip the expensive core probe, but never skips the cheap
+   # semantic checks.  This keeps recovery fast while preventing an invalid
+   # generated mapping from replacing the last-good configuration.
+   if [ "$QUICK_START" = "true" ]; then
+      if [ -x /usr/share/openkill/openkill_semantic_check.sh ]; then
+         /usr/share/openkill/openkill_semantic_check.sh "$TMP_CONFIG_FILE" >> "$LOG_FILE" 2>&1 || return 1
+      fi
+      return 0
+   fi
    if ! /usr/share/openkill/openkill_validate.sh "$TMP_CONFIG_FILE" "$CLASH" >> "$LOG_FILE" 2>&1; then
       LOG_ERROR "Generated configuration failed Mihomo validation; the active configuration was kept."
       return 1
@@ -529,6 +537,42 @@ do_run_mode()
 do_run_file()
 {
 
+   # Route-set files are optional on a fresh install and may be absent in an
+   # upgrade backup.  Always create a valid empty definition before moving or
+   # validating them so a missing file cannot abort startup with a noisy cat
+   # error (or leave a half-upgraded runtime tree behind).
+   ensure_route_file() {
+      local path="$1" family="$2"
+      [ -f "$path" ] && return 0
+      mkdir -p "$(dirname "$path")"
+      if [ -n "$FW4" ]; then
+         if [ "$family" = inet6 ]; then
+            printf '%s\n' 'define china_ip6_route = {' '}' \
+               'add set inet fw4 china_ip6_route { type ipv6_addr; flags interval; auto-merge; }' \
+               'add element inet fw4 china_ip6_route $china_ip6_route' > "$path"
+         else
+            printf '%s\n' 'define china_ip_route = {' '}' \
+               'add set inet fw4 china_ip_route { type ipv4_addr; flags interval; auto-merge; }' \
+               'add element inet fw4 china_ip_route $china_ip_route' > "$path"
+         fi
+      elif [ "$family" = inet6 ]; then
+         printf '%s\n' 'create china_ip6_route hash:net family inet6 hashsize 1024 maxelem 1000000' > "$path"
+      else
+         printf '%s\n' 'create china_ip_route hash:net family inet hashsize 1024 maxelem 1000000' > "$path"
+      fi
+   }
+   mkdir -p /tmp/etc/openkill/core /etc/openkill
+   if [ "$small_flash_memory" = "1" ]; then
+      # Small-flash devices keep mutable route and Geo data in tmpfs; do not
+      # create a second staging copy in /etc or it would be moved over the
+      # current route set on every start.
+      ensure_route_file /tmp/etc/openkill/china_ip_route.ipset inet
+      ensure_route_file /tmp/etc/openkill/china_ip6_route.ipset inet6
+   else
+      ensure_route_file /etc/openkill/china_ip_route.ipset inet
+      ensure_route_file /etc/openkill/china_ip6_route.ipset inet6
+   fi
+
    #Some MIPS devices file system cound not use db
    source "/etc/openwrt_release"
    [ "$small_flash_memory" == "1" ] || [ -n "$(echo $core_version |grep mips)" ] || [ -n "$(echo $DISTRIB_ARCH |grep mips)" ] || [ -n "$(opkg status libc 2>/dev/null |grep 'Architecture' |awk -F ': ' '{print $2}' |grep mips)" ] || [ -n "$(apk list libc 2>/dev/null |grep mips)" ] && mkdir -p /tmp/etc/openkill && CACHE_PATH="/tmp/etc/openkill/cache.db"
@@ -549,13 +593,13 @@ do_run_file()
       geosite_path="/etc/openkill/GeoSite.dat"
       geoip_path="/etc/openkill/GeoIP.dat"
       asn_path="/etc/openkill/ASN.mmdb"
-      mv "/tmp/etc/openkill/Country.mmdb" "$ipdb_path"
-      mv "/tmp/etc/openkill/china_ip_route.ipset" "$chnr_path"
-      mv "/tmp/etc/openkill/china_ip6_route.ipset" "$chnr6_path"
-      mv "/tmp/etc/openkill/GeoSite.dat" "$geosite_path"
-      mv "/tmp/etc/openkill/GeoIP.dat" "$geoip_path"
-      mv "/tmp/etc/openkill/ASN.mmdb" "$asn_path"
-      mv "/tmp/etc/openkill/core/" "/etc/openkill"
+      [ ! -f "/tmp/etc/openkill/Country.mmdb" ] || mv "/tmp/etc/openkill/Country.mmdb" "$ipdb_path"
+      [ ! -f "/tmp/etc/openkill/china_ip_route.ipset" ] || mv "/tmp/etc/openkill/china_ip_route.ipset" "$chnr_path"
+      [ ! -f "/tmp/etc/openkill/china_ip6_route.ipset" ] || mv "/tmp/etc/openkill/china_ip6_route.ipset" "$chnr6_path"
+      [ ! -f "/tmp/etc/openkill/GeoSite.dat" ] || mv "/tmp/etc/openkill/GeoSite.dat" "$geosite_path"
+      [ ! -f "/tmp/etc/openkill/GeoIP.dat" ] || mv "/tmp/etc/openkill/GeoIP.dat" "$geoip_path"
+      [ ! -f "/tmp/etc/openkill/ASN.mmdb" ] || mv "/tmp/etc/openkill/ASN.mmdb" "$asn_path"
+      [ ! -d "/tmp/etc/openkill/core" ] || mv "/tmp/etc/openkill/core/" "/etc/openkill"
       if [ "$CACHE_PATH" != "/tmp/etc/openkill/cache.db" ]; then
          rm -rf "/tmp/etc/openkill"
       fi
@@ -567,13 +611,13 @@ do_run_file()
       geosite_path="/tmp/etc/openkill/GeoSite.dat"
       geoip_path="/tmp/etc/openkill/GeoIP.dat"
       asn_path="/tmp/etc/openkill/ASN.mmdb"
-      [ ! -h "/etc/openkill/Country.mmdb" ] && mv "/etc/openkill/Country.mmdb" "$ipdb_path"
-      [ ! -h "/etc/openkill/china_ip_route.ipset" ] && mv "/etc/openkill/china_ip_route.ipset" "$chnr_path"
-      [ ! -h "/etc/openkill/china_ip6_route.ipset" ] && mv "/etc/openkill/china_ip6_route.ipset" "$chnr6_path"
-      [ ! -h "/etc/openkill/GeoSite.dat" ] && mv "/etc/openkill/GeoSite.dat" "$geosite_path"
-      [ ! -h "/etc/openkill/GeoIP.dat" ] && mv "/etc/openkill/GeoIP.dat" "$geoip_path"
-      [ ! -h "/etc/openkill/ASN.mmdb" ] && mv "/etc/openkill/ASN.mmdb" "$asn_path"
-      mv "/etc/openkill/core/" "/tmp/etc/openkill"
+      [ ! -h "/etc/openkill/Country.mmdb" ] && [ -f "/etc/openkill/Country.mmdb" ] && mv "/etc/openkill/Country.mmdb" "$ipdb_path"
+      [ ! -h "/etc/openkill/china_ip_route.ipset" ] && [ -f "/etc/openkill/china_ip_route.ipset" ] && mv "/etc/openkill/china_ip_route.ipset" "$chnr_path"
+      [ ! -h "/etc/openkill/china_ip6_route.ipset" ] && [ -f "/etc/openkill/china_ip6_route.ipset" ] && mv "/etc/openkill/china_ip6_route.ipset" "$chnr6_path"
+      [ ! -h "/etc/openkill/GeoSite.dat" ] && [ -f "/etc/openkill/GeoSite.dat" ] && mv "/etc/openkill/GeoSite.dat" "$geosite_path"
+      [ ! -h "/etc/openkill/GeoIP.dat" ] && [ -f "/etc/openkill/GeoIP.dat" ] && mv "/etc/openkill/GeoIP.dat" "$geoip_path"
+      [ ! -h "/etc/openkill/ASN.mmdb" ] && [ -f "/etc/openkill/ASN.mmdb" ] && mv "/etc/openkill/ASN.mmdb" "$asn_path"
+      [ ! -d "/etc/openkill/core" ] || mv "/etc/openkill/core/" "/tmp/etc/openkill"
    fi
 
    rm -rf "/etc/openkill/cache.db"
@@ -608,18 +652,18 @@ do_run_file()
          /usr/share/openkill/openkill_chnroute.sh
       fi
       if [ -n "$FW4" ]; then
-         if [ -z "$(cat "$chnr_path" |grep "define china_ip_route")" ] || [ -z "$(cat "$chnr6_path" |grep "define china_ip6_route")" ]; then
+         if ! grep -q "define china_ip_route" "$chnr_path" 2>/dev/null || ! grep -q "define china_ip6_route" "$chnr6_path" 2>/dev/null; then
             LOG_TIP "Detected that the Chnroute Cidr List Format is wrong, Ready to Reformat..."
             /usr/share/openkill/openkill_chnroute.sh
-            if [ -z "$(cat "$chnr_path" |grep "define china_ip_route")" ] || [ -z "$(cat "$chnr6_path" |grep "define china_ip6_route")" ]; then
+            if ! grep -q "define china_ip_route" "$chnr_path" 2>/dev/null || ! grep -q "define china_ip6_route" "$chnr6_path" 2>/dev/null; then
                start_fail
             fi
          fi
       else
-         if [ -n "$(cat "$chnr_path" |grep "define china_ip_route")" ] || [ -n "$(cat "$chnr6_path" |grep "define china_ip6_route")" ]; then
+         if grep -q "define china_ip_route" "$chnr_path" 2>/dev/null || grep -q "define china_ip6_route" "$chnr6_path" 2>/dev/null; then
             LOG_TIP "Detected that the Chnroute Cidr List Format is wrong, Ready to Reformat..."
             /usr/share/openkill/openkill_chnroute.sh
-            if [ -n "$(cat "$chnr_path" |grep "define china_ip_route")" ] || [ -n "$(cat "$chnr6_path" |grep "define china_ip6_route")" ]; then
+            if grep -q "define china_ip_route" "$chnr_path" 2>/dev/null || grep -q "define china_ip6_route" "$chnr6_path" 2>/dev/null; then
                start_fail
             fi
          fi

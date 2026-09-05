@@ -271,23 +271,12 @@ function release_branch()
 	return "master"
 end
 
-local function smart_enable()
-	return "0"
-end
-
--- Third-party oixCloud integration is intentionally disabled.
-local function is_oix()
-	return false
-end
-
 local function corever()
 	return fs.uci_get_config("config", "core_version") or "0"
 end
 
 local function corelv()
 	local core_meta_lv = ""
-	local core_smart_enable = fs.uci_get_config("config", "smart_enable") or "0"
-	local oix_token = fs.uci_get_config("config", "oix_token") or ""
 
 	local cache = ov.fetch_version_history(release_branch(), false)
 	if cache then
@@ -364,7 +353,7 @@ end
 
 function core_download()
 	local download_url = HTTP.formvalue("download_url")
-	local core_type = is_oix() and "Oix" or "Meta"
+	local core_type = "Meta"
 
 	if download_url and download_url ~= "" then
 		SYS.call(string.format("bash /usr/share/openkill/openkill_core.sh '%s' '%s' >/dev/null 2>&1 &", core_type, download_url))
@@ -1794,8 +1783,6 @@ function action_update()
 		coremodel = coremodel(),
 		corever = corever(),
 		release_branch = release_branch(),
-		smart_enable = smart_enable(),
-		oix_core = is_oix(),
 		pkg_type = fs.pkg_type(),
 		coremetacv = coremetacv(),
 		opcv = opcv(),
@@ -3130,7 +3117,7 @@ function action_cdn_info()
 	-- Read cache (skip if forced refresh)
 	local force = HTTP.formvalue("force") == "1"
 	local merge = HTTP.formvalue("merge") == "1"
-	local cur_oix = is_oix()
+	local product_mode = "meta"
 	local function version_ident(v)
 		if v ~= "" and v ~= "__latest__" then return v end
 		return nil
@@ -3156,7 +3143,7 @@ function action_cdn_info()
 			local ok, parsed = pcall(json.parse, cached)
 			if ok and parsed and type(parsed) == "table" then
 				local entry = parsed[cache_key]
-				if entry and entry.cached_at and entry.oix == cur_oix then
+				if entry and entry.cached_at and (entry.product_mode == nil or entry.product_mode == product_mode) then
 					local ttl = entry.cache_ttl or 300
 					if (os.time() - entry.cached_at) < ttl then
 						parsed_cache = entry
@@ -3481,7 +3468,7 @@ printf '{"plugin_ver":"%%s","core_meta_ver":"%%s","core_smart_ver":"%%s","latenc
 		result = result,
 		cache_ttl = cache_ttl,
 		cached_at = now,
-		oix = cur_oix
+		product_mode = product_mode
 	}
 	fs.writefile(cache_file, json.stringify(cdn_cache))
 end
@@ -5538,327 +5525,6 @@ function action_add_age_config()
 	HTTP.write_json({status = "success"})
 end
 
-function oix_login_info_save()
-	local token = HTTP.formvalue("token")
-	if token and token ~= "" then
-		uci:set("openkill", "config", "oix_token", token)
-	else
-		local email = HTTP.formvalue("email")
-		local passwd = HTTP.formvalue("passwd")
-		if email then uci:set("openkill", "config", "oix_email", email) end
-		if passwd then uci:set("openkill", "config", "oix_passwd", passwd) end
-	end
-	local checkin = HTTP.formvalue("checkin")
-	if checkin then uci:set("openkill", "config", "oix_checkin", checkin) end
-	local interval = tonumber(HTTP.formvalue("interval"))
-	if interval then
-		if interval < 1 then interval = 1 end
-		if interval > 720 then interval = 720 end
-		uci:set("openkill", "config", "oix_checkin_interval", tostring(interval))
-	end
-	local multiple = tonumber(HTTP.formvalue("multiple"))
-	if multiple then
-		if multiple < 1 then multiple = 1 end
-		if multiple > 100 then multiple = 100 end
-		uci:set("openkill", "config", "oix_checkin_multiple", tostring(multiple))
-	end
-	local show_info_page = HTTP.formvalue("show_info_page")
-	if show_info_page then uci:set("openkill", "config", "oix_show_info_page", show_info_page) end
-	local default_params = HTTP.formvalue("default_params")
-	if default_params then uci:set("openkill", "config", "oix_default_params", default_params) end
-	uci:commit("openkill")
-	HTTP.prepare_content("application/json")
-	HTTP.write_json({status = "success"})
-end
-
-function oix_params_sync()
-	local params = HTTP.formvalue("params") or ""
-	if #params > 8192 then
-		HTTP.status(400, "Params too long")
-		HTTP.write_json({status = "error", msg = "params too long"})
-		return
-	end
-
-	uci:set("openkill", "config", "oix_params", params)
-	uci:commit("openkill")
-
-	if is_running() then
-		local dase_val = dase() or ""
-		local daip_val = daip()
-		local cn_port_val = cn_port()
-		local auth_header = ""
-		if dase_val and dase_val ~= "" then
-			auth_header = string.format('-H "Authorization: Bearer %s"', dase_val)
-		end
-
-		if params == "" then
-			SYS.exec(string.format('curl -sL -m 3 --retry 2 -H "Content-Type: application/json" %s -XDELETE http://"%s":"%s"/oix/options', auth_header, daip_val, cn_port_val))
-		else
-			local encoded = params:gsub('"', '\\"'):gsub('\n', '')
-			SYS.exec(string.format('curl -sL -m 3 --retry 2 -H "Content-Type: application/json" %s -XPUT -d \'{"params":"%s"}\' http://"%s":"%s"/oix/options', auth_header, encoded, daip_val, cn_port_val))
-		end
-	end
-
-	HTTP.prepare_content("application/json")
-	HTTP.write_json({status = "success"})
-end
-
-function oix_params_get()
-	local result = {params = "", default_params = ""}
-	local home_dir = "/etc/openkill"
-	local params_file = home_dir .. "/.oix_params"
-	local default_params_file = home_dir .. "/.oix_default_params"
-
-	local uci_params = fs.uci_get_config("config", "oix_params")
-	if uci_params and uci_params ~= "" then
-		result.params = uci_params
-	elseif fs.access(params_file) then
-		local content = fs.readfile(params_file)
-		if content then
-			result.params = content:gsub("%s+", "")
-		end
-	end
-
-	local uci_default = fs.uci_get_config("config", "oix_default_params")
-	if uci_default and uci_default ~= "" then
-		result.default_params = uci_default
-	elseif fs.access(default_params_file) then
-		local content = fs.readfile(default_params_file)
-		if content then
-			result.default_params = content:gsub("%s+", "")
-		end
-	end
-
-	HTTP.prepare_content("application/json")
-	HTTP.write_json(result)
-end
-
-local function fetch_oix_sub(token)
-	write_padded('{"stage":"fetching_sub","text":"' .. luci.i18n.translate("Fetching subscription...") .. '"}')
-	local get_sub = string.format("curl -sL -H 'Content-Type: application/json' -H 'Authorization: Bearer %s' -X POST https://oix-api.dler.io/api/v1/managed/clash", token)
-	local sub_info = SYS.exec(get_sub)
-	if sub_info then sub_info = json.parse(sub_info) end
-	if sub_info and sub_info.ret == 200 then
-		local sub_key = {"openkill"}
-		for _,v in ipairs(sub_key) do
-			while true do
-				local sub_match, sub_convert, sid = false, false, nil
-				uci:foreach("openkill", "config_subscribe",
-				function(s)
-					if s.name == "oixCloud - smart" and s.address == sub_info[v] then
-						sub_match = true; return false
-					end
-					if s.name == "oixCloud - smart" and s.address ~= sub_info[v] then
-						sub_convert = true; sid = s['.name']; return false
-					end
-				end)
-				if sub_match then break end
-				if sub_convert then uci:set("openkill", sid, "address", sub_info[v])
-				elseif sub_info[v] then
-					sid = uci:add("openkill", "config_subscribe")
-					uci:set("openkill", sid, "name", "oixCloud - smart")
-					uci:set("openkill", sid, "address", sub_info[v])
-				end
-				uci:commit("openkill")
-				break
-			end
-			if sub_info[v] then
-				write_padded('{"stage":"downloading_config","text":"' .. luci.i18n.translate("Downloading config...") .. '"}')
-				SYS.exec(string.format('curl -sL -m 10 --retry 2 --user-agent "clash" "%s" -o "/etc/openkill/config/oixCloud - smart.yaml" >/dev/null 2>&1', sub_info[v]))
-				local core = coremetacv()
-				if core ~= "0" and not string.match(core, "oix") then
-					write_padded('{"stage":"downloading_core","text":"' .. luci.i18n.translate("Downloading core...") .. '"}')
-					SYS.exec("/usr/share/openkill/openkill_core.sh Oix")
-				else
-					write_padded('{"stage":"restarting","text":"' .. luci.i18n.translate("Restarting...") .. '"}')
-					SYS.call("/etc/init.d/openkill restart >/dev/null 2>&1 &")
-				end
-			end
-		end
-		return true
-	end
-	return false
-end
-
-function oix_login()
-	HTTP.prepare_content("text/plain; charset=utf-8")
-	local result, info, token
-	local input_token = HTTP.formvalue("token")
-	local email = fs.uci_get_config("config", "oix_email")
-	local passwd = fs.uci_get_config("config", "oix_passwd")
-	if input_token and input_token ~= "" then
-		-- Token direct login mode
-		write_padded('{"stage":"saving_token","text":"' .. luci.i18n.translate("Saving token...") .. '"}')
-		token = input_token
-		if fetch_oix_sub(token) then
-			uci:set("openkill", "config", "oix_token", input_token)
-			uci:commit("openkill")
-			write_padded('{"stage":"done","result":200}')
-		else
-			write_padded('{"stage":"error","result":' .. json.stringify(luci.i18n.translate("invalid token")) .. '}')
-		end
-	else
-		-- Email/password login mode
-		token = fs.uci_get_config("config", "oix_token")
-		if email and passwd then
-			write_padded('{"stage":"logging_in","text":"' .. luci.i18n.translate("Logging in...") .. '"}')
-			info = SYS.exec(string.format("curl -sL -H 'Content-Type: application/json' -H 'User-Agent: OpenKill for oixCloud' -d '{\"email\":\"%s\", \"passwd\":\"%s\", \"token_expire\":\"365\" }' -X POST https://oix-api.dler.io/api/v1/login", email, passwd))
-			if info then
-				info = json.parse(info)
-			end
-			if info and info.ret == 200 then
-				if token and token ~= "" then
-					oix_logout(token)
-				end
-				token = info.data.token
-				uci:set("openkill", "config", "oix_token", token)
-				uci:commit("openkill")
-				result = info.ret
-				fetch_oix_sub(token)
-				write_padded('{"stage":"done","result":200}')
-			else
-				uci:delete("openkill", "config", "oix_token")
-				uci:commit("openkill")
-				fs.unlink("/tmp/oix_checkin")
-				fs.unlink("/tmp/oix_info")
-				if info and info.msg then
-					result = info.msg
-				else
-					result = luci.i18n.translate("login failed")
-				end
-				write_padded('{"stage":"error","result":' .. json.stringify(result) .. '}')
-			end
-		else
-			uci:delete("openkill", "config", "oix_token")
-			uci:commit("openkill")
-			fs.unlink("/tmp/oix_checkin")
-			fs.unlink("/tmp/oix_info")
-			result = luci.i18n.translate("email or passwd is wrong")
-			write_padded('{"stage":"error","result":' .. json.stringify(result) .. '}')
-		end
-	end
-end
-
-function oix_logout(oldtoken)
-	local info, result, token
-	local is_token_login = false
-	if not oldtoken then
-		token = fs.uci_get_config("config", "oix_token")
-		is_token_login = not fs.uci_get_config("config", "oix_email")
-	else
-		token = oldtoken
-	end
-	if token then
-		if is_token_login then
-			uci:delete("openkill", "config", "oix_token")
-			uci:delete("openkill", "config", "oix_checkin")
-			uci:delete("openkill", "config", "oix_checkin_interval")
-			uci:delete("openkill", "config", "oix_checkin_multiple")
-			uci:delete("openkill", "config", "oix_params")
-			uci:delete("openkill", "config", "oix_default_params")
-			uci:delete("openkill", "config", "oix_show_info_page")
-			uci:commit("openkill")
-			fs.unlink("/tmp/oix_checkin")
-			fs.unlink("/tmp/oix_info")
-			result = 200
-		else
-			info = SYS.exec(string.format("curl -sL -H 'Content-Type: application/json' -H 'Authorization: Bearer %s' -X POST https://oix-api.dler.io/api/v1/logout", token))
-			if info then
-				info = json.parse(info)
-			end
-			if info and info.ret == 200 then
-				uci:delete("openkill", "config", "oix_token")
-				if not oldtoken then
-					uci:delete("openkill", "config", "oix_email")
-					uci:delete("openkill", "config", "oix_passwd")
-					uci:delete("openkill", "config", "oix_checkin")
-					uci:delete("openkill", "config", "oix_checkin_interval")
-					uci:delete("openkill", "config", "oix_checkin_multiple")
-					uci:delete("openkill", "config", "oix_params")
-					uci:delete("openkill", "config", "oix_default_params")
-					uci:delete("openkill", "config", "oix_show_info_page")
-				end
-				uci:commit("openkill")
-				fs.unlink("/tmp/oix_checkin")
-				fs.unlink("/tmp/oix_info")
-				result = info.ret
-			else
-				if info and info.msg then
-					result = info.msg
-				else
-					result = "logout failed"
-				end
-			end
-		end
-	else
-		result = "logout failed"
-	end
-	if not oldtoken then
-		HTTP.prepare_content("application/json")
-		HTTP.write_json({result = result})
-	end
-end
-
-function oix_info()
-	local info, path, get_info
-	local result = "error"
-	local token = fs.uci_get_config("config", "oix_token")
-	path = "/tmp/oix_info"
-	if token then
-		get_info = string.format("curl -sL -H 'Content-Type: application/json' -H 'Authorization: Bearer %s' -X POST https://oix-api.dler.io/api/v1/information -o %s", token, path)
-		if not fs.access(path) then
-			SYS.exec(get_info)
-		else
-			if fs.readfile(path) == "" or not fs.readfile(path) then
-				SYS.exec(get_info)
-			else
-				if (os.time() - fs.mtime(path) > 900) then
-					SYS.exec(get_info)
-				end
-			end
-		end
-		info = fs.readfile(path)
-		if info then
-			info = json.parse(info)
-		end
-		if info and info.ret == 200 and info.data then
-			result = info.data
-		elseif info and info.msg then
-			fs.writefile(path, json.stringify(info))
-		else
-			fs.unlink(path)
-		end
-	end
-	HTTP.prepare_content("application/json")
-	HTTP.write_json({result = result})
-end
-
-function oix_checkin()
-	local info, result
-	local path = "/tmp/oix_checkin"
-	local token = fs.uci_get_config("config", "oix_token")
-	local multiple = fs.uci_get_config("config", "oix_checkin_multiple") or 1
-	if token then
-		info = SYS.exec(string.format("curl -sL -H 'Content-Type: application/json' -H 'Authorization: Bearer %s' -d '{\"multiple\":\"%s\"}' -X POST https://oix-api.dler.io/api/v1/checkin", token, multiple))
-		if info then
-			info = json.parse(info)
-		end
-		if info and info.ret == 200 then
-			fs.unlink("/tmp/oix_info")
-			fs.writefile(path, info)
-			SYS.exec(string.format("echo -e %s [Info] oixCloud Checkin Successful, Result:【%s】 >> /tmp/openkill.log", os.date("%Y-%m-%d %H:%M:%S"), info.data.checkin))
-			result = info
-		else
-			if info and info.msg then
-				SYS.exec(string.format("echo -e %s [Info] oixCloud Checkin Failed, Result:【%s】 >> /tmp/openkill.log", os.date("%Y-%m-%d %H:%M:%S"), info.msg))
-			else
-				SYS.exec(string.format("echo -e %s [Info] oixCloud Checkin Failed! Please Check And Try Again... >> /tmp/openkill.log",os.date("%Y-%m-%d %H:%M:%S")))
-			end
-			result = info
-		end
-	else
-		result = "error"
-	end
-	HTTP.prepare_content("application/json")
-	HTTP.write_json({result = result})
-end
+-- OpenKill intentionally has no third-party cloud account, subscription, or
+-- check-in handlers. The removed OixCloud endpoints are not registered in
+-- index() and are kept out of the shipped controller to reduce attack surface.

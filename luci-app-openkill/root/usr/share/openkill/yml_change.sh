@@ -22,6 +22,44 @@ default_dashboard=$(uci_get_config "default_dashboard" || echo "metacubexd")
 yacd_type=$(uci_get_config "yacd_type" || echo "Official")
 dashboard_type=$(uci_get_config "dashboard_type" || echo "Official")
 
+# Bind addresses are kept explicit and validated here before they are inserted
+# into the generated YAML.  "lan" follows the router LAN address; if a
+# snapshot firmware does not expose it yet, loopback is the safe fallback.
+normalize_bind_address()
+{
+   local requested="${1:-lan}" resolved
+   case "$requested" in
+      lan)
+         resolved=$(uci -q get network.lan.ipaddr 2>/dev/null || true)
+         [ -n "$resolved" ] || resolved="127.0.0.1"
+         ;;
+      127.0.0.1|0.0.0.0)
+         resolved="$requested"
+         ;;
+      *)
+         resolved="127.0.0.1"
+         ;;
+   esac
+   case "$resolved" in
+      *[!0-9.]*) resolved="127.0.0.1" ;;
+   esac
+   printf '%s' "$resolved"
+}
+
+dashboard_bind_address=$(normalize_bind_address "$(uci_get_config "dashboard_bind_address" || echo lan)")
+dns_listen_address=$(normalize_bind_address "$(uci_get_config "dns_listen_address" || echo 127.0.0.1)")
+tun_auto_route=$(uci_get_config "tun_auto_route" || echo auto)
+tun_auto_redirect=$(uci_get_config "tun_auto_redirect" || echo auto)
+tun_auto_detect_interface=$(uci_get_config "tun_auto_detect_interface" || echo 1)
+tun_strict_route=$(uci_get_config "tun_strict_route" || echo 0)
+tun_endpoint_independent_nat=$(uci_get_config "tun_endpoint_independent_nat" || echo 0)
+
+case "$tun_auto_route" in 0|1|auto) ;; *) tun_auto_route=auto ;; esac
+case "$tun_auto_redirect" in 0|1|auto) ;; *) tun_auto_redirect=auto ;; esac
+case "$tun_auto_detect_interface" in 0|1) ;; *) tun_auto_detect_interface=1 ;; esac
+case "$tun_strict_route" in 0|1) ;; *) tun_strict_route=0 ;; esac
+case "$tun_endpoint_independent_nat" in 0|1) ;; *) tun_endpoint_independent_nat=0 ;; esac
+
 [ "$china_ip_route" -ne 0 ] && [ "$china_ip_route" -ne 1 ] && [ "$china_ip_route" -ne 2 ] && china_ip_route=0
 [ "$china_ip6_route" -ne 0 ] && [ "$china_ip6_route" -ne 1 ] && [ "$china_ip6_route" -ne 2 ] && china_ip6_route=0
 
@@ -343,6 +381,8 @@ rescue Exception => e
    exit
 end
 
+write_config = false
+
 begin
    fake_ip_mode = '$1'
    secret = '$2'
@@ -392,6 +432,13 @@ begin
    default_dashboard = '$default_dashboard'
    yacd_type = '$yacd_type'
    dashboard_type = '$dashboard_type'
+   dashboard_bind_address = '$dashboard_bind_address'
+   dns_listen_address = '$dns_listen_address'
+   tun_auto_route = '$tun_auto_route'
+   tun_auto_redirect = '$tun_auto_redirect'
+   tun_auto_detect_interface = '$tun_auto_detect_interface' == '1'
+   tun_strict_route = '$tun_strict_route' == '1'
+   tun_endpoint_independent_nat = '$tun_endpoint_independent_nat' == '1'
 
    enable_custom_dns = '$enable_custom_dns' == '1'
    append_wan_dns = '$append_wan_dns' == '1'
@@ -404,6 +451,24 @@ begin
    enable_redirect_dns = '$enable_redirect_dns'
 
    Value['dns'] ||= {}
+
+   # Give health-check groups bounded, consistent defaults without replacing a
+   # user's explicit endpoint or cadence.  This avoids the very long default
+   # probe timeout that can make the dashboard show "no delay" for a usable
+   # node and keeps all groups on the same 204 probe semantics.
+   if Value['proxy-groups'].is_a?(Array)
+      Value['proxy-groups'].each do |group|
+         next unless group.is_a?(Hash)
+         next unless %w[url-test fallback load-balance].include?(group['type'].to_s)
+         group['url'] = 'https://www.gstatic.com/generate_204' unless group.key?('url') && !group['url'].to_s.empty?
+         group['interval'] = 300 unless group.key?('interval') && group['interval'].to_i > 0
+         group['timeout'] = 5000 unless group.key?('timeout') && group['timeout'].to_i > 0
+         group['max-failed-times'] = 3 unless group.key?('max-failed-times') && group['max-failed-times'].to_i > 0
+         group['expected-status'] = 204 unless group.key?('expected-status')
+         group['lazy'] = true unless group.key?('lazy')
+         group['tolerance'] = 50 if group['type'].to_s == 'url-test' && !group.key?('tolerance')
+      end
+   end
    threads = []
 
    threads << Thread.new do
@@ -415,10 +480,13 @@ begin
          Value['mixed-port'] = mixed_port.to_i
          Value['mode'] = mode
          Value['log-level'] = log_level if log_level != '0'
-         Value['allow-lan'] = true
-         Value['external-controller'] = '0.0.0.0:' + controller_port
+         # The controller follows the LAN address by default instead of
+         # exposing every interface.  An explicit 0.0.0.0 remains available
+         # for users who need WAN/API access and is validated by the UI.
+         Value['allow-lan'] = (dashboard_bind_address != '127.0.0.1')
+         Value['external-controller'] = dashboard_bind_address + ':' + controller_port
          Value['secret'] = secret
-         Value['bind-address'] = '*'
+         Value['bind-address'] = dashboard_bind_address
          Value['global-ua'] = global_ua if global_ua != '0'
          Value['external-ui'] = '/usr/share/openkill/ui'
          Value['external-ui-name'] = default_dashboard
@@ -458,6 +526,19 @@ begin
          (Value['experimental'] ||= {})['quic-go-disable-gso'] = true if quic_gso
          if cors_origin != '0'
             (Value['external-controller-cors'] ||= {})['allow-origins'] = [cors_origin]
+            Value['external-controller-cors']['allow-private-network'] = true
+         else
+            # Keep browser dashboards functional on LAN without a wildcard
+            # CORS policy.  The loopback origin is useful for local LuCI.
+            origins = [
+               'http://' + dashboard_bind_address + ':' + controller_port,
+               'http://' + dashboard_bind_address
+            ]
+            unless dashboard_bind_address == '127.0.0.1'
+               origins << 'http://127.0.0.1:' + controller_port
+               origins << 'http://127.0.0.1'
+            end
+            (Value['external-controller-cors'] ||= {})['allow-origins'] = origins.uniq
             Value['external-controller-cors']['allow-private-network'] = true
          end
 
@@ -501,7 +582,7 @@ begin
                Value['dns']['fake-ip-range6'] = fake_ip_range6
             end
          end
-         Value['dns']['listen'] = '0.0.0.0:' + dns_listen_port
+         Value['dns']['listen'] = dns_listen_address + ':' + dns_listen_port
          Value['dns']['respect-rules'] = respect_rules
 
          if enable_sniffer
@@ -524,9 +605,14 @@ begin
          if en_mode_tun != '0' || ['2', '3'].include?(ipv6_mode)
             Value['tun'] = {
                'enable' => true, 'stack' => stack_type, 'device' => 'utun',
-               'dns-hijack' => ['127.0.0.1:53'], 'endpoint-independent-nat' => false,
-               'auto-route' => false, 'auto-detect-interface' => false,
-               'auto-redirect' => false, 'strict-route' => false, 'disable-icmp-forwarding' => false
+               'dns-hijack' => ['127.0.0.1:53'],
+               'endpoint-independent-nat' => tun_endpoint_independent_nat,
+               # auto keeps firewall ownership with OpenKill.  Explicit 1 is
+               # offered for installations that delegate routing to Mihomo.
+               'auto-route' => (tun_auto_route == '1'),
+               'auto-detect-interface' => tun_auto_detect_interface,
+               'auto-redirect' => (tun_auto_redirect == '1'),
+               'strict-route' => tun_strict_route, 'disable-icmp-forwarding' => false
             }
             Value['tun'].delete('iproute2-table-index')
          else
@@ -816,18 +902,23 @@ begin
          if all_psn_proxied
             (Value['dns']['proxy-server-nameserver'] ||= []).concat(default_proxy_servers).uniq!
             YAML.LOG_TIP('Proxy-server-nameserver Option Maybe All Setted The Proxy Option, Auto Set Proxy-server-nameserver Option to【%s】For Avoiding Proxies Server Resolve Loop...' % [default_proxy_servers.join(', ')])
-         end
       end
+   end
+   write_config = true
    rescue Exception => e
       YAML.LOG_ERROR('Config File params checked Failed,【%s】' % [e.message])
    end
 rescue Exception => e
    YAML.LOG_ERROR('Config File Overwrite Failed,【%s】' % [e.message])
 ensure
-   begin
-      YAML.dump(Value, config_file)
-   rescue Exception => e
-      YAML.LOG_ERROR('Write file failed:【%s】' % [e.message])
+   if write_config && defined?(Value) && Value.is_a?(Hash)
+      begin
+         YAML.dump(Value, config_file)
+      rescue Exception => e
+         YAML.LOG_ERROR('Write file failed:【%s】' % [e.message])
+      end
+   else
+      YAML.LOG_ERROR('Config transaction aborted; generated file was not replaced.')
    end
    File.delete('/tmp/yaml_change_marshal') rescue nil
 end

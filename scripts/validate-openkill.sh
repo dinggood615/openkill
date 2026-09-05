@@ -18,6 +18,7 @@ for file in \
   luci-app-openkill/root/usr/share/openkill/openkill_watchdog.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_watchdog_stream.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_validate.sh \
+  luci-app-openkill/root/usr/share/openkill/openkill_semantic_check.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_capabilities.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_zerotier.sh \
   luci-app-openkill/root/usr/share/openkill/yml_proxys_get.sh \
@@ -38,6 +39,7 @@ for file in \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_watchdog.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_watchdog_stream.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_validate.sh" \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_semantic_check.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_capabilities.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_zerotier.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/yml_proxys_get.sh" \
@@ -113,6 +115,25 @@ if ! grep -Fq 'procd_set_param env SAFE_PATHS=/usr/share/openkill:/etc/ssl:/tmp'
   "$ROOT_DIR/luci-app-openkill/root/etc/init.d/openkill"; then
   fail 'OpenKill service SAFE_PATHS allow-list is missing'
 fi
+
+# The shipped template must not expose a controller, wildcard CORS policy,
+# sample credentials, or an active named pipe before UCI has been applied.
+if grep -Eq "^[[:space:]]*(allow-lan:[[:space:]]*true|bind-address:[[:space:]]*[\"']?\\*|external-controller:[[:space:]]*0\\.0\\.0\\.0|external-controller-pipe:)" \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/res/default.yaml"; then
+  fail 'unsafe active controller defaults remain in default.yaml'
+fi
+if grep -Fq '    - "*"' "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/res/default.yaml" || \
+   grep -Fq 'username:password' "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/res/default.yaml"; then
+  fail 'wildcard CORS or sample credentials remain in default.yaml'
+fi
+for needle in 'dashboard_bind_address' 'dns_listen_address' 'tun_auto_route' 'tun_auto_redirect' \
+  'tun_auto_detect_interface' 'tun_strict_route' 'tun_endpoint_independent_nat' 'Config transaction aborted'; do
+  grep -Fq "$needle" \
+    "$ROOT_DIR/luci-app-openkill/root/etc/config/openkill" \
+    "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/yml_change.sh" \
+    "$ROOT_DIR/luci-app-openkill/luasrc/model/cbi/openkill/settings.lua" \
+    || fail "stability/network control is missing: $needle"
+done
 
 if command -v ruby >/dev/null 2>&1; then
   ruby -ryaml -e 'YAML.load_file(ARGV[0]); exit 0' \
