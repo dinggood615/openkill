@@ -4,7 +4,11 @@ set -euo pipefail
 case "$PACKAGE_FORMAT" in ipk|apk) ;; *) exit 1;; esac
 mapfile -t packages < <(find tmp/SDK/bin -type f -name "luci-app-openkill*.$PACKAGE_FORMAT")
 [ "${#packages[@]}" -eq 1 ] || { echo "Expected exactly one package"; exit 1; }
-asset="luci-app-openkill_${RELEASE_VERSION}_all.$PACKAGE_FORMAT"
+# APK's package database requires dotted numeric versions; keep the public
+# OpenKill version unchanged in the release manifest.
+package_version="$RELEASE_VERSION"
+[ "$PACKAGE_FORMAT" = apk ] && package_version="${RELEASE_VERSION/-/.}"
+asset="luci-app-openkill_${package_version}_all.$PACKAGE_FORMAT"
 stage=$(mktemp -d)
 cp "${packages[0]}" "$stage/$asset"
 tag="v${RELEASE_VERSION}-$PACKAGE_FORMAT"

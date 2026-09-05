@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1013"
+PROJECT_VERSION="2026-1014"
 ACTION=install
 PACKAGE_FILE=""
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
@@ -182,7 +182,7 @@ install_core(){
         mips64el) arch=linux-mips64le ;;
         mipsel) arch=linux-mipsle-hardfloat ;;
         mips) arch=linux-mips-hardfloat ;;
-        *) arch=linux-amd64-v1 ;;
+        *) die "Unsupported CPU architecture: $(uname -m)" ;;
       esac
       uci -q set openkill.config.core_version="$arch" || true
       uci -q commit openkill || true
@@ -218,7 +218,8 @@ resolve_package(){
          d=JSON.parse(File.read(ARGV[0]))
          abort unless d["format"]==ARGV[1] && d["architecture"]=="all"
          abort unless d["version"].match?(/\A2026-[0-9]+\z/) && d["sha256"].match?(/\A[0-9a-f]{64}\z/)
-         expected="luci-app-openkill_#{d["version"]}_all.#{ARGV[1]}"
+         package_version = ARGV[1] == "apk" ? d["version"].sub("-", ".") : d["version"]
+         expected="luci-app-openkill_#{package_version}_all.#{ARGV[1]}"
          abort unless d["filename"]==expected
          abort unless d["url"]=="https://github.com/"+ARGV[2]+"/releases/download/v"+d["version"]+"-"+ARGV[1]+"/"+expected
          puts [d["version"],d["filename"],d["sha256"],d["url"]]

@@ -6,6 +6,13 @@
 
 LOG_FILE="/tmp/openkill.log"
 CLASH="/etc/openkill/clash"
+# Prevent an overlapping watchdog instance from running expensive discovery
+# or streaming checks after a service reload.
+WATCHDOG_LOCK="/tmp/openkill-watchdog.lock"
+if ! mkdir "$WATCHDOG_LOCK" 2>/dev/null; then
+   exit 0
+fi
+trap 'rmdir "$WATCHDOG_LOCK" 2>/dev/null || true' EXIT INT TERM
 CFG_UPDATE_INT=0
 SKIP_PROXY_ADDRESS=1
 SKIP_PROXY_ADDRESS_INTERVAL=30
@@ -374,7 +381,10 @@ LOCALNETWORK_INT=$(expr "$LOCALNETWORK_INT" + 1)
 ## Skip Proxies Address
    if [ "$skip_proxy_address" -eq 1 ]; then
       if [ "$SKIP_PROXY_ADDRESS" -eq 1 ] || [ "$(expr "$SKIP_PROXY_ADDRESS" % "$SKIP_PROXY_ADDRESS_INTERVAL")" -eq 0 ]; then
-         skip_proxies_address
+         if mkdir /tmp/openkill-proxy-address.lock 2>/dev/null; then
+            skip_proxies_address
+            rmdir /tmp/openkill-proxy-address.lock 2>/dev/null || true
+         fi
          let SKIP_PROXY_ADDRESS++
       else
          let SKIP_PROXY_ADDRESS++

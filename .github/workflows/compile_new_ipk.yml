@@ -180,12 +180,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
+          cache-dependency-path: luci-app-openkill/tools/codemirror/package.json
 
       - name: Build CodeMirror 6 Bundle & Minify CSS/JS
         run: |
           cd tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/tools/codemirror
           # Install dependencies
-          npm install
+          npm install --prefer-offline --no-audit --no-fund
           # Build CodeMirror 6 JS
           npx esbuild entry.js --bundle --format=iife --global-name=CM6 --minify --target=es2019 --outfile=../../root/www/luci-static/resources/openkill/js/cm6.min.js --legal-comments=none --loader:.css=text
           # Minify other JS files (exclude cm6.min.js which is already built)
