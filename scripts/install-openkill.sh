@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1052"
+PROJECT_VERSION="2026-1053"
 ACTION=install
 PACKAGE_FILE=""
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
@@ -384,13 +384,33 @@ validate_manifest(){
 
 select_newest_manifest(){
   ruby -e '
+    # Do not use Array#> here: several OpenWrt Ruby builds only expose
+    # Array#<=>, so a direct array comparison raises NoMethodError.  Compare
+    # numeric components explicitly and keep the first (fastest) source on a
+    # version tie.
+    def version_compare(a, b)
+      aa=a.to_s.split("-").map(&:to_i)
+      bb=b.to_s.split("-").map(&:to_i)
+      n=[aa.length, bb.length].max
+      (0...n).each do |i|
+        av=aa[i] || 0
+        bv=bb[i] || 0
+        return 1 if av > bv
+        return -1 if av < bv
+      end
+      0
+    end
     rows=File.readlines(ARGV[0], chomp: true)
     best=nil
     rows.each do |line|
       version,index,base,file=line.split("\t",4)
-      key=[version.split("-").map(&:to_i), -index.to_i]
-      if best.nil? || key > best[0]
-        best=[key,index,base,file]
+      replace=best.nil?
+      if !replace
+        comparison=version_compare(version, best[0])
+        replace=comparison > 0 || (comparison == 0 && index.to_i < best[1].to_i)
+      end
+      if replace
+        best=[version,index,base,file]
       end
     end
     puts [best[1],best[2],best[3]].join("\n") if best
@@ -399,9 +419,19 @@ select_newest_manifest(){
 
 version_greater(){
   ruby -e '
-    a=ARGV[0].split("-").map(&:to_i)
-    b=ARGV[1].split("-").map(&:to_i)
-    exit(a > b ? 0 : 1)
+    def version_compare(a, b)
+      aa=a.to_s.split("-").map(&:to_i)
+      bb=b.to_s.split("-").map(&:to_i)
+      n=[aa.length, bb.length].max
+      (0...n).each do |i|
+        av=aa[i] || 0
+        bv=bb[i] || 0
+        return 1 if av > bv
+        return -1 if av < bv
+      end
+      0
+    end
+    exit(version_compare(ARGV[0], ARGV[1]) > 0 ? 0 : 1)
   ' "$1" "$2"
 }
 
