@@ -5,13 +5,194 @@
 <link rel="stylesheet" href="/luci-static/resources/openkill/css/oc.css?v=<%=plugin_version%>">
 <script type="text/javascript">
 (function() {
+    var SEARCH_HINT = '<%:Search settings by name or description%>';
+    var NO_MATCH = '<%:No matching settings%>';
+    var SHOW_ADVANCED = '<%:Show advanced settings%>';
+    var HIDE_ADVANCED = '<%:Hide advanced settings%>';
+
+    function addClass(el, name, enabled) {
+        if (!el) return;
+        el.classList.toggle(name, !!enabled);
+    }
+
+    function tabLabel(item) {
+        var link = item && item.querySelector('a');
+        return ((link && link.textContent) || (item && item.textContent) || '').trim();
+    }
+
+    function tabPanel(item) {
+        var link = item && item.querySelector('a[href]');
+        if (!link) return null;
+        var href = link.getAttribute('href') || '';
+        if (href.charAt(0) !== '#') return null;
+        return document.getElementById(href.substring(1));
+    }
+
+    function tabIsActive(item) {
+        return item.classList.contains('cbi-tabmenu-tab-active') ||
+            item.classList.contains('active') || item.classList.contains('selected');
+    }
+
+    function fieldSearchText(field) {
+        var text = field.textContent || '';
+        var controls = field.querySelectorAll('input, select, textarea');
+        for (var i = 0; i < controls.length; i++) {
+            text += ' ' + (controls[i].name || '') + ' ' +
+                (controls[i].id || '') + ' ' + (controls[i].placeholder || '');
+        }
+        return text.toLowerCase();
+    }
+
     function initOpenKillSettingsTheme() {
         var map = document.getElementById('cbi-openkill');
         if (!map) return;
+        if (map.getAttribute('data-openkill-ui-ready') === '1') return;
+        map.setAttribute('data-openkill-ui-ready', '1');
         map.classList.add('openkill-settings');
         document.body.classList.add('openkill-settings-page');
         var tabs = map.querySelector('.cbi-section-tabbed');
-        if (tabs) tabs.classList.add('openkill-settings-tabs');
+        if (!tabs) return;
+        tabs.classList.add('openkill-settings-tabs');
+
+        var menu = tabs.querySelector('ul.cbi-tabmenu') || tabs.querySelector('.cbi-tabmenu');
+        if (!menu) return;
+
+        var toolbar = document.createElement('div');
+        toolbar.className = 'openkill-settings-toolbar';
+        toolbar.setAttribute('role', 'search');
+
+        var searchWrap = document.createElement('label');
+        searchWrap.className = 'openkill-settings-search';
+        var searchIcon = document.createElement('span');
+        searchIcon.className = 'openkill-settings-search-icon';
+        searchIcon.textContent = '⌕';
+        var input = document.createElement('input');
+        input.type = 'search';
+        input.id = 'openkill-settings-search';
+        input.placeholder = SEARCH_HINT;
+        input.setAttribute('aria-label', SEARCH_HINT);
+        var clear = document.createElement('button');
+        clear.type = 'button';
+        clear.className = 'openkill-settings-search-clear';
+        clear.textContent = '×';
+        clear.title = '<%:Clear search%>';
+        clear.setAttribute('aria-label', '<%:Clear search%>');
+        searchWrap.appendChild(searchIcon);
+        searchWrap.appendChild(input);
+        searchWrap.appendChild(clear);
+
+        var status = document.createElement('span');
+        status.className = 'openkill-settings-search-status';
+        status.setAttribute('aria-live', 'polite');
+
+        var advancedToggle = document.createElement('button');
+        advancedToggle.type = 'button';
+        advancedToggle.className = 'openkill-settings-advanced-toggle';
+        advancedToggle.textContent = SHOW_ADVANCED;
+        advancedToggle.setAttribute('aria-expanded', 'false');
+
+        toolbar.appendChild(searchWrap);
+        toolbar.appendChild(status);
+        toolbar.appendChild(advancedToggle);
+        menu.parentNode.insertBefore(toolbar, menu);
+
+        var tabItems = [];
+        for (var i = 0; i < menu.children.length; i++) {
+            if (menu.children[i].tagName && menu.children[i].tagName.toLowerCase() === 'li') {
+                tabItems.push(menu.children[i]);
+            }
+        }
+        var advancedItems = tabItems.filter(function(item) {
+            return /(高级|advanced)/i.test(tabLabel(item));
+        });
+        advancedItems.forEach(function(item) {
+            item.classList.add('openkill-advanced-tab');
+        });
+        if (!advancedItems.length) advancedToggle.style.display = 'none';
+
+        function setAdvancedVisible(visible) {
+            visible = !!visible;
+            addClass(map, 'openkill-advanced-visible', visible);
+            addClass(map, 'openkill-advanced-collapsed', !visible);
+            advancedToggle.textContent = visible ? HIDE_ADVANCED : SHOW_ADVANCED;
+            advancedToggle.setAttribute('aria-expanded', visible ? 'true' : 'false');
+            try {
+                localStorage.setItem('openkill.settings.advanced', visible ? '1' : '0');
+            } catch (ignore) {}
+            if (!visible && advancedItems.some(tabIsActive)) {
+                var firstVisible = tabItems.filter(function(item) {
+                    return advancedItems.indexOf(item) === -1;
+                })[0];
+                var link = firstVisible && firstVisible.querySelector('a');
+                if (link) link.click();
+            }
+        }
+
+        function updateSearch() {
+            var query = (input.value || '').trim().toLowerCase();
+            var total = 0;
+            var firstMatch = null;
+            tabItems.forEach(function(item) {
+                var panel = tabPanel(item);
+                if (!panel) return;
+                var fields = panel.querySelectorAll('.cbi-value');
+                var matched = 0;
+                for (var j = 0; j < fields.length; j++) {
+                    var found = !query || fieldSearchText(fields[j]).indexOf(query) !== -1;
+                    addClass(fields[j], 'openkill-search-hidden', !found);
+                    if (found && query) {
+                        matched++;
+                        if (!firstMatch) firstMatch = {item: item, field: fields[j]};
+                    }
+                }
+                addClass(item, 'openkill-search-match', !!query && matched > 0);
+                var anchor = item.querySelector('a');
+                if (anchor) {
+                    var badge = anchor.querySelector('.openkill-tab-match-count');
+                    if (!badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'openkill-tab-match-count';
+                        anchor.appendChild(badge);
+                    }
+                    badge.textContent = query && matched ? String(matched) : '';
+                    badge.hidden = !(query && matched);
+                }
+                total += matched;
+            });
+            addClass(map, 'openkill-search-active', !!query);
+            if (!query) {
+                status.textContent = '';
+                return;
+            }
+            status.textContent = total ? String(total) : NO_MATCH;
+            if (!firstMatch) return;
+            if (advancedItems.indexOf(firstMatch.item) !== -1) setAdvancedVisible(true);
+            if (!tabIsActive(firstMatch.item)) {
+                var firstLink = firstMatch.item.querySelector('a');
+                if (firstLink) firstLink.click();
+            }
+        }
+
+        input.addEventListener('input', updateSearch);
+        clear.addEventListener('click', function() {
+            input.value = '';
+            input.focus();
+            updateSearch();
+        });
+        input.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && input.value) {
+                input.value = '';
+                updateSearch();
+            }
+        });
+        advancedToggle.addEventListener('click', function() {
+            setAdvancedVisible(!map.classList.contains('openkill-advanced-visible'));
+        });
+
+        var activeAdvanced = advancedItems.some(tabIsActive);
+        var savedAdvanced = false;
+        try { savedAdvanced = localStorage.getItem('openkill.settings.advanced') === '1'; } catch (ignore) {}
+        setAdvancedVisible(savedAdvanced || activeAdvanced);
     }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initOpenKillSettingsTheme);

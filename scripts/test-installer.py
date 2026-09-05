@@ -9,6 +9,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 BASH = shutil.which("bash") or "C:/Program Files/Git/bin/bash.exe"
 SOURCE = (ROOT / "scripts/install-openkill.sh").read_text(encoding="utf-8")
 CORE_SOURCE = (ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_core.sh").read_text(encoding="utf-8")
+SETTINGS_SOURCE = (ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua").read_text(encoding="utf-8")
+SETTINGS_THEME = (ROOT / "luci-app-openkill/luasrc/view/openkill/settings_theme.htm").read_text(encoding="utf-8")
 
 class InstallerTests(unittest.TestCase):
     def test_repository_is_reused_after_download_failure(self):
@@ -79,6 +81,22 @@ chosen=$(select_newest_manifest "$WORK_DIR/rows")
         self.assertIn('--max-time 300', CORE_SOURCE)
         self.assertNotIn('MetaCubeX/mihomo@${CORE_LV}', CORE_SOURCE)
         self.assertNotIn('cdn.jsdelivr.net/gh/MetaCubeX/mihomo', CORE_SOURCE)
+
+    def test_settings_keep_five_categories_and_ui_helpers(self):
+        expected = (
+            's:tab("basic", translate("Basic & Runtime"))',
+            's:tab("network", translate("Network & Routing"))',
+            's:tab("rules", translate("Rules & Resources"))',
+            's:tab("stability", translate("Stability & Performance"))',
+            's:tab("advanced", translate("Advanced & Maintenance"))',
+        )
+        for marker in expected:
+            self.assertIn(marker, SETTINGS_SOURCE)
+        self.assertEqual(SETTINGS_SOURCE.count('s:tab("'), 5)
+        self.assertIn("local native_taboption = s.taboption", SETTINGS_SOURCE)
+        self.assertIn("openkill-settings-toolbar", SETTINGS_THEME)
+        self.assertIn("openkill-settings-search", SETTINGS_THEME)
+        self.assertIn("openkill-advanced-collapsed", SETTINGS_THEME)
 
     def test_formats_publish_inside_their_own_job(self):
         data = yaml.safe_load((ROOT / ".github/workflows/compile_new_ipk.yml").read_text(encoding="utf-8"))

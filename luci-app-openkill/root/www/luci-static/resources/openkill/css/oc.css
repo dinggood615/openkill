@@ -341,6 +341,131 @@ html[data-darkmode="true"] #cbi-openkill.openkill-settings {
     box-shadow: var(--ok-shadow);
 }
 
+/* Settings toolbar: search stays lightweight and works with the native CBI
+ * markup, while the five tabs act as the page's collapsible setting groups. */
+#cbi-openkill.openkill-settings .openkill-settings-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 46px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--ok-border);
+    background: var(--ok-surface);
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-search {
+    display: flex;
+    align-items: center;
+    flex: 1 1 260px;
+    min-width: 0;
+    height: 32px;
+    padding: 0 6px 0 9px;
+    border: 1px solid var(--ok-border);
+    border-radius: 6px;
+    background: var(--ok-surface-muted);
+    color: var(--ok-muted);
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-search:focus-within {
+    border-color: var(--ok-primary);
+    box-shadow: 0 0 0 2px var(--ok-primary-soft);
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-search-icon {
+    flex: 0 0 auto;
+    width: 18px;
+    font-size: 19px;
+    line-height: 1;
+    text-align: center;
+    opacity: 0.8;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-search input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 30px;
+    padding: 4px 7px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--ok-text);
+    box-shadow: none;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-search input::placeholder {
+    color: var(--ok-muted);
+    opacity: 0.9;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-search-clear,
+#cbi-openkill.openkill-settings .openkill-settings-advanced-toggle {
+    flex: 0 0 auto;
+    min-height: 32px;
+    padding: 5px 10px;
+    border: 1px solid var(--ok-border);
+    border-radius: 6px;
+    background: var(--ok-surface);
+    color: var(--ok-muted);
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1.3;
+    transition: color var(--ok-transition), background var(--ok-transition), border-color var(--ok-transition);
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-search-clear {
+    min-width: 26px;
+    padding: 3px 6px;
+    border-color: transparent;
+    background: transparent;
+    font-size: 18px;
+    line-height: 1;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-search-clear:hover,
+#cbi-openkill.openkill-settings .openkill-settings-search-clear:focus,
+#cbi-openkill.openkill-settings .openkill-settings-advanced-toggle:hover,
+#cbi-openkill.openkill-settings .openkill-settings-advanced-toggle:focus {
+    border-color: var(--ok-primary);
+    background: var(--ok-primary-soft);
+    color: var(--ok-primary);
+    outline: 0;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-search-status {
+    flex: 0 0 auto;
+    min-width: 54px;
+    color: var(--ok-muted);
+    font-size: 12px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+#cbi-openkill.openkill-settings .openkill-tab-match-count {
+    display: inline-block;
+    min-width: 16px;
+    margin-left: 5px;
+    padding: 1px 4px;
+    border-radius: 10px;
+    background: var(--ok-primary);
+    color: #ffffff;
+    font-size: 10px;
+    line-height: 1.3;
+    text-align: center;
+    vertical-align: 1px;
+}
+
+#cbi-openkill.openkill-settings .cbi-value.openkill-search-hidden {
+    display: none !important;
+}
+
+#cbi-openkill.openkill-settings.openkill-search-active .cbi-tabmenu li.openkill-search-match a {
+    border-color: var(--ok-primary);
+}
+
+#cbi-openkill.openkill-settings.openkill-advanced-collapsed .cbi-tabmenu li.openkill-advanced-tab {
+    display: none !important;
+}
+
 #cbi-openkill.openkill-settings .cbi-section-tabbed > .cbi-section-node,
 #cbi-openkill.openkill-settings .cbi-section-tabbed > .cbi-tabcontainer {
     padding: 6px 14px 12px;
@@ -440,6 +565,18 @@ html[data-darkmode="true"] #cbi-openkill.openkill-settings {
 
     #cbi-openkill.openkill-settings .cbi-tabmenu li a {
         white-space: nowrap;
+    }
+
+    #cbi-openkill.openkill-settings .openkill-settings-toolbar {
+        flex-wrap: wrap;
+    }
+
+    #cbi-openkill.openkill-settings .openkill-settings-search {
+        flex-basis: 100%;
+    }
+
+    #cbi-openkill.openkill-settings .openkill-settings-search-status {
+        margin-left: auto;
     }
 
     #cbi-openkill.openkill-settings .cbi-section-tabbed > .cbi-section-node,

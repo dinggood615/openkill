@@ -67,23 +67,37 @@ m.description = nil
 s = m:section(TypedSection, "openkill")
 s.anonymous = true
 
-s:tab("op_mode", translate("Operation Mode"))
-s:tab("traffic_control", translate("Traffic Control"))
-s:tab("dns", "DNS "..translate("Settings"))
-s:tab("stream_enhance", translate("Streaming Enhance"))
-s:tab("lan_ac", translate("Black&White"))
-s:tab("dashboard", translate("Dashboard Settings"))
-s:tab("ipv6", translate("IPv6 Settings"))
-s:tab("rules_update", translate("Rules Update"))
-s:tab("geo_update", translate("GEO Update"))
-s:tab("chnr_update", translate("Chnroute Update"))
-s:tab("auto_restart", translate("Auto Restart"))
-s:tab("health", translate("Health & Watchdog"))
-s:tab("mihomo_features", translate("Mihomo Features"))
-s:tab("zerotier", translate("ZeroTier Network"))
-s:tab("debug", translate("Core Tests"))
-s:tab("developer", translate("Developer Settings"))
-s:tab("version_update", translate("Version Update"))
+-- 将原有并列选项归并为五个逻辑分类。保留旧 taboption 标识，
+-- 由下面的映射统一落到新分类，避免改变 UCI 字段、depends 条件和保存逻辑。
+local tab_groups = {
+	op_mode = "basic",
+	dashboard = "basic",
+	traffic_control = "network",
+	dns = "network",
+	ipv6 = "network",
+	lan_ac = "network",
+	stream_enhance = "network",
+	rules_update = "rules",
+	geo_update = "rules",
+	chnr_update = "rules",
+	auto_restart = "stability",
+	health = "stability",
+	debug = "stability",
+	mihomo_features = "advanced",
+	zerotier = "advanced",
+	developer = "advanced",
+	version_update = "advanced"
+}
+local native_taboption = s.taboption
+function s:taboption(tab, ...)
+	return native_taboption(self, tab_groups[tab] or tab, ...)
+end
+
+s:tab("basic", translate("Basic & Runtime"))
+s:tab("network", translate("Network & Routing"))
+s:tab("rules", translate("Rules & Resources"))
+s:tab("stability", translate("Stability & Performance"))
+s:tab("advanced", translate("Advanced & Maintenance"))
 
 o = s:taboption("op_mode", ListValue, "en_mode", font_red..bold_on..translate("Select Mode")..bold_off..font_off)
 o.description = translate("Select Mode For OpenKill Work, Try Flush DNS Cache If Network Error")
