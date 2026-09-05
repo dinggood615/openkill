@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1015"
+PROJECT_VERSION="2026-1016"
 ACTION=install
 PACKAGE_FILE=""
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
@@ -116,21 +116,20 @@ install_dependencies(){
   log "Installing OpenKill runtime dependencies"
   prepare_feeds
   if [ "$PM" = opkg ]; then
-    required="bash curl ca-bundle ip-full ruby ruby-yaml lua kmod-tun unzip dnsmasq-full luci-compat"
+    required="bash curl ca-bundle ip-full ruby ruby-yaml ruby-json lua kmod-tun unzip dnsmasq-full luci-compat"
     optional="ruby-base64 ruby-psych ruby-pstore kmod-inet-diag"
     if command -v fw4 >/dev/null 2>&1; then required="$required kmod-nft-tproxy"
     else required="$required kmod-ipt-tproxy iptables-mod-tproxy ipset"; optional="$optional kmod-ipt-extra kmod-ipt-nat iptables-mod-extra"; fi
   else
-    required="bash curl ca-certificates ip-full ruby ruby-yaml lua kmod-tun unzip dnsmasq-full luci-compat"
+    required="bash curl ca-certificates ip-full ruby ruby-yaml ruby-json lua kmod-tun unzip dnsmasq-full luci-compat"
     optional="ruby-base64 ruby-psych ruby-pstore kmod-inet-diag"
     if command -v fw4 >/dev/null 2>&1; then required="$required kmod-nft-tproxy"
     else required="$required ipset iptables-mod-tproxy"; fi
   fi
   for dep in $required; do install_dependency "$dep" || die "Required dependency could not be installed: $dep"; done
   for dep in $optional; do install_dependency "$dep" || log "Optional dependency unavailable: $dep"; done
-  # YAML is required by the watchdog and configuration tools.  base64/psych/
-  # pstore are optional on firmware builds where Ruby bundles them differently.
-  ruby -ryaml -e 'exit 0' || die "Ruby YAML runtime is incomplete"
+  # YAML and JSON are required for configuration and the release manifest.
+  ruby -ryaml -rjson -e 'exit 0' || die "Ruby YAML/JSON runtime is incomplete"
 }
 
 download(){
