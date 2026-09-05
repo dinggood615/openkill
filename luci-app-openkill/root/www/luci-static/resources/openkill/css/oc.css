@@ -481,6 +481,152 @@ html[data-darkmode="true"] #cbi-openkill.openkill-settings {
     border-bottom: 0;
 }
 
+/* The five logical tabs are intentionally split into small cards.  Keeping
+ * the native CBI rows inside these cards preserves field names, dependencies
+ * and form submission while making long pages scannable. */
+#cbi-openkill.openkill-settings .openkill-settings-card {
+    margin: 10px 0;
+    overflow: hidden;
+    border: 1px solid var(--ok-border);
+    border-radius: var(--ok-radius);
+    background: var(--ok-surface);
+    box-shadow: var(--ok-shadow);
+    transition: border-color var(--ok-transition), box-shadow var(--ok-transition);
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0 0 10px;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-stack .openkill-settings-card {
+    margin: 0;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card:hover {
+    border-color: var(--ok-primary-soft);
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-header {
+    border-bottom: 1px solid var(--ok-border);
+    background: var(--ok-surface-muted);
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-toggle {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    min-height: 42px;
+    gap: 8px;
+    padding: 9px 12px;
+    border: 0;
+    background: transparent;
+    color: var(--ok-text);
+    cursor: pointer;
+    text-align: left;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-toggle:hover,
+#cbi-openkill.openkill-settings .openkill-settings-card-toggle:focus {
+    background: var(--ok-primary-soft);
+    color: var(--ok-primary);
+    outline: 0;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-title {
+    flex: 1 1 auto;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-count {
+    flex: 0 0 auto;
+    min-width: 20px;
+    padding: 1px 6px;
+    border: 1px solid var(--ok-border);
+    border-radius: 10px;
+    color: var(--ok-muted);
+    font-size: 11px;
+    line-height: 1.25;
+    text-align: center;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-marker {
+    flex: 0 0 auto;
+    color: var(--ok-muted);
+    font-size: 16px;
+    line-height: 1;
+    transform: rotate(0deg);
+    transition: transform var(--ok-transition);
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card.is-collapsed .openkill-settings-card-marker {
+    transform: rotate(-90deg);
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-body {
+    padding: 0 12px;
+}
+
+#cbi-openkill.openkill-settings .openkill-stream-group {
+    margin: 10px 0;
+    border: 1px solid var(--ok-border);
+    border-radius: 6px;
+    background: var(--ok-surface-muted);
+}
+
+#cbi-openkill.openkill-settings .openkill-stream-group-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 10px;
+    color: var(--ok-text);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+#cbi-openkill.openkill-settings .openkill-stream-group-count {
+    min-width: 18px;
+    padding: 1px 5px;
+    border: 1px solid var(--ok-border);
+    border-radius: 9px;
+    color: var(--ok-muted);
+    font-size: 10px;
+    font-weight: 400;
+    line-height: 1.25;
+    text-align: center;
+}
+
+#cbi-openkill.openkill-settings .openkill-stream-group-body {
+    padding: 0 10px;
+    border-top: 1px solid var(--ok-border);
+    background: var(--ok-surface);
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value {
+    display: grid;
+    grid-template-columns: minmax(190px, 31%) minmax(0, 1fr);
+    column-gap: 16px;
+    align-items: start;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-title,
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-field {
+    min-width: 0;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-description {
+    grid-column: 2;
+    margin-top: 3px;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card.openkill-search-hidden {
+    display: none !important;
+}
+
 #cbi-openkill.openkill-settings .cbi-value-title {
     color: var(--ok-text);
     font-weight: 500;
@@ -583,6 +729,25 @@ html[data-darkmode="true"] #cbi-openkill.openkill-settings {
     #cbi-openkill.openkill-settings .cbi-section-tabbed > .cbi-tabcontainer {
         padding-right: 10px;
         padding-left: 10px;
+    }
+
+    #cbi-openkill.openkill-settings .openkill-settings-card-body {
+        padding: 0 8px;
+    }
+
+    #cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value {
+        display: block;
+    }
+
+    #cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-title,
+    #cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-field,
+    #cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-description {
+        display: block;
+        width: 100%;
+    }
+
+    #cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-description {
+        margin-top: 4px;
     }
 }
 

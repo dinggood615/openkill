@@ -76,7 +76,7 @@ local tab_groups = {
 	dns = "network",
 	ipv6 = "network",
 	lan_ac = "network",
-	stream_enhance = "network",
+	stream_enhance = "stability",
 	rules_update = "rules",
 	geo_update = "rules",
 	chnr_update = "rules",
@@ -93,11 +93,11 @@ function s:taboption(tab, ...)
 	return native_taboption(self, tab_groups[tab] or tab, ...)
 end
 
-s:tab("basic", translate("Basic & Runtime"))
+s:tab("basic", translate("Runtime & Services"))
 s:tab("network", translate("Network & Routing"))
-s:tab("rules", translate("Rules & Resources"))
-s:tab("stability", translate("Stability & Performance"))
-s:tab("advanced", translate("Advanced & Maintenance"))
+s:tab("rules", translate("Rules & Subscriptions"))
+s:tab("stability", translate("Performance & Stability"))
+s:tab("advanced", translate("System & Maintenance"))
 
 o = s:taboption("op_mode", ListValue, "en_mode", font_red..bold_on..translate("Select Mode")..bold_off..font_off)
 o.description = translate("Select Mode For OpenKill Work, Try Flush DNS Cache If Network Error")

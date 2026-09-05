@@ -50,6 +50,66 @@ msgstr "稳定与性能"
 msgid "Advanced & Maintenance"
 msgstr "高级与维护"
 
+msgid "Runtime & Services"
+msgstr "运行与服务"
+
+msgid "Rules & Subscriptions"
+msgstr "规则与订阅"
+
+msgid "Performance & Stability"
+msgstr "性能与稳定"
+
+msgid "System & Maintenance"
+msgstr "系统与维护"
+
+msgid "Operation & Core"
+msgstr "运行模式"
+
+msgid "Controller & Dashboard"
+msgstr "控制面板与监听"
+
+msgid "Device Compatibility"
+msgstr "设备兼容"
+
+msgid "DNS & Local Resolution"
+msgstr "DNS 与本地解析"
+
+msgid "IPv6 & TUN"
+msgstr "IPv6 与 TUN"
+
+msgid "LAN / WAN Access"
+msgstr "LAN / WAN 访问控制"
+
+msgid "Traffic Routing"
+msgstr "流量转发"
+
+msgid "Geo Databases"
+msgstr "Geo 数据库"
+
+msgid "China Route Lists"
+msgstr "中国路由列表"
+
+msgid "Stream Auto Selection"
+msgstr "流媒体自动选择"
+
+msgid "Watchdog & Auto Restart"
+msgstr "Watchdog 与自动重启"
+
+msgid "Logs & Diagnostics"
+msgstr "日志与诊断"
+
+msgid "Mihomo Capabilities"
+msgstr "Mihomo 能力"
+
+msgid "ZeroTier"
+msgstr "ZeroTier"
+
+msgid "Version & Developer Tools"
+msgstr "版本与开发工具"
+
+msgid "Other Settings"
+msgstr "其他设置"
+
 msgid "Search settings by name or description"
 msgstr "按名称或说明搜索设置"
 

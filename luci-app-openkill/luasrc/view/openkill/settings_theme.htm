@@ -9,6 +9,71 @@
     var NO_MATCH = '<%:No matching settings%>';
     var SHOW_ADVANCED = '<%:Show advanced settings%>';
     var HIDE_ADVANCED = '<%:Hide advanced settings%>';
+    var CARD_LAYOUTS = [
+        [
+            {id: 'runtime-core', title: '<%:Operation & Core%>', keys: [
+                'en_mode', 'enable_udp_proxy', 'stack_type', 'tun_auto_route',
+                'tun_auto_redirect', 'tun_auto_detect_interface', 'tun_strict_route',
+                'tun_endpoint_independent_nat', 'proxy_mode', 'delay_start', 'log_size'
+            ]},
+            {id: 'controller-dashboard', title: '<%:Controller & Dashboard%>', keys: [
+                'dashboard_bind_address', 'cn_port', 'dashboard_password',
+                'dashboard_forward_', 'yacd', 'metacubexd', 'zashboard'
+            ]},
+            {id: 'device-compatibility', title: '<%:Device Compatibility%>', keys: [
+                'bypass_gateway_compatible', 'disable_quic_go_gso', 'small_flash_memory'
+            ]}
+        ],
+        [
+            {id: 'dns-local', title: '<%:DNS & Local Resolution%>', keys: [
+                'dns_listen_address', 'enable_redirect_dns', 'flush_dns_cache', 'dnsmasq_fix',
+                'enable_custom_domain_dns_server', 'custom_domain_dns_server', 'custom_domain_dns'
+            ]},
+            {id: 'ipv6-tun', title: '<%:IPv6 & TUN%>', keys: [
+                'ipv6_enable', 'ipv6_mode', 'stack_type_v6', 'enable_v6_udp_proxy',
+                'ipv6_dns', 'fakeip_range6', 'local_network6_pass', 'chnroute6_pass',
+                'china_ip6_route'
+            ]},
+            {id: 'lan-wan', title: '<%:LAN / WAN Access%>', keys: [
+                'lan_ac_', 'wan_ac_', 'lan_interface_name', 'intranet_allowed',
+                'intranet_allowed_wan_name', 'local_network_pass'
+            ]},
+            {id: 'traffic-routing', title: '<%:Traffic Routing%>', keys: [
+                'router_self_proxy', 'disable_udp_quic', 'skip_proxy_address',
+                'common_ports', 'china_ip_route', 'chnroute_pass'
+            ]}
+        ],
+        [
+            {id: 'geo-databases', title: '<%:Geo Databases%>', keys: [
+                'geo_', 'geoip_', 'geosite_', 'geoasn_'
+            ]},
+            {id: 'china-routes', title: '<%:China Route Lists%>', keys: [
+                'chnr_', 'chnroute', 'china_ip'
+            ]}
+        ],
+        [
+            {id: 'stream-selection', title: '<%:Stream Auto Selection%>', keys: [
+                'stream_', 'flush unlock'
+            ]},
+            {id: 'watchdog-restart', title: '<%:Watchdog & Auto Restart%>', keys: [
+                'auto_restart', 'watchdog_', 'health_'
+            ]},
+            {id: 'logs-diagnostics', title: '<%:Logs & Diagnostics%>', keys: [
+                'debug', 'log_', 'diagnostic'
+            ]}
+        ],
+        [
+            {id: 'mihomo-capabilities', title: '<%:Mihomo Capabilities%>', keys: [
+                'capability_', 'feature_', 'refresh_capabilities'
+            ]},
+            {id: 'zerotier', title: '<%:ZeroTier%>', keys: [
+                'zerotier_'
+            ]},
+            {id: 'version-developer', title: '<%:Version & Developer Tools%>', keys: [
+                'version_', 'version', 'release_', 'developer', 'firewall_custom', 'core_version'
+            ], advanced: true}
+        ]
+    ];
 
     function addClass(el, name, enabled) {
         if (!el) return;
@@ -35,12 +100,186 @@
 
     function fieldSearchText(field) {
         var text = field.textContent || '';
-        var controls = field.querySelectorAll('input, select, textarea');
+        var controls = field.querySelectorAll('input, select, textarea, button');
         for (var i = 0; i < controls.length; i++) {
             text += ' ' + (controls[i].name || '') + ' ' +
-                (controls[i].id || '') + ' ' + (controls[i].placeholder || '');
+                (controls[i].id || '') + ' ' + (controls[i].placeholder || '') + ' ' +
+                (controls[i].getAttribute('data-name') || '') + ' ' +
+                (controls[i].getAttribute('aria-label') || '');
         }
         return text.toLowerCase();
+    }
+
+    function matchesKeys(field, keys) {
+        var text = fieldSearchText(field);
+        for (var i = 0; i < keys.length; i++) {
+            if (text.indexOf(String(keys[i]).toLowerCase()) !== -1) return true;
+        }
+        return false;
+    }
+
+    function panelContent(panel) {
+        return panel.querySelector('.cbi-section-node') ||
+            panel.querySelector('.cbi-tabcontainer') || panel;
+    }
+
+    function directFields(content) {
+        var fields = Array.prototype.filter.call(content.querySelectorAll('.cbi-value'), function(field) {
+            return field.parentNode === content;
+        });
+        if (fields.length) return fields;
+        return Array.prototype.filter.call(content.querySelectorAll('.cbi-value'), function(field) {
+            return !field.closest('.openkill-settings-card');
+        });
+    }
+
+    function setCardExpanded(card, expanded) {
+        var body = card.querySelector('.openkill-settings-card-body');
+        var toggle = card.querySelector('.openkill-settings-card-toggle');
+        if (!body || !toggle) return;
+        card.classList.toggle('is-collapsed', !expanded);
+        body.hidden = !expanded;
+        toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    }
+
+    var STREAM_GROUPS = [
+        {key: 'netflix', title: 'Netflix'},
+        {key: 'disney', title: 'Disney Plus'},
+        {key: 'ytb', title: 'YouTube Premium', aliases: ['ytb', 'youtube']},
+        {key: 'prime_video', title: 'Amazon Prime Video'},
+        {key: 'hbo_max', title: 'HBO Max'},
+        {key: 'tvb_anywhere', title: 'TVB Anywhere+'},
+        {key: 'dazn', title: 'DAZN'},
+        {key: 'paramount_plus', title: 'Paramount Plus'},
+        {key: 'discovery_plus', title: 'Discovery Plus'},
+        {key: 'bilibili', title: 'Bilibili'},
+        {key: 'google_not_cn', title: 'Google', aliases: ['google_not_cn', 'google']},
+        {key: 'openai', title: 'OpenAI'},
+        {key: 'claude', title: 'Claude'},
+        {key: 'gemini', title: 'Gemini'}
+    ];
+
+    function appendStreamFields(body, fields) {
+        var groups = {};
+        var general = [];
+        fields.forEach(function(field) {
+            var text = fieldSearchText(field);
+            var group = null;
+            for (var i = 0; i < STREAM_GROUPS.length; i++) {
+                var aliases = STREAM_GROUPS[i].aliases || [STREAM_GROUPS[i].key];
+                if (aliases.some(function(alias) { return text.indexOf(alias) !== -1; })) {
+                    group = STREAM_GROUPS[i];
+                    break;
+                }
+            }
+            if (!group) {
+                general.push(field);
+                return;
+            }
+            if (!groups[group.key]) groups[group.key] = {definition: group, fields: []};
+            groups[group.key].fields.push(field);
+        });
+        general.forEach(function(field) { body.appendChild(field); });
+        STREAM_GROUPS.forEach(function(group) {
+            var item = groups[group.key];
+            if (!item) return;
+            var section = document.createElement('section');
+            section.className = 'openkill-stream-group';
+            var heading = document.createElement('div');
+            heading.className = 'openkill-stream-group-title';
+            heading.textContent = item.definition.title;
+            var count = document.createElement('span');
+            count.className = 'openkill-stream-group-count';
+            count.textContent = String(item.fields.length);
+            heading.appendChild(count);
+            var content = document.createElement('div');
+            content.className = 'openkill-stream-group-body';
+            item.fields.forEach(function(field) { content.appendChild(field); });
+            section.appendChild(heading);
+            section.appendChild(content);
+            body.appendChild(section);
+        });
+    }
+
+    function createCard(content, definition, fields, index, host) {
+        if (!fields.length) return null;
+        var card = document.createElement('section');
+        card.className = 'openkill-settings-card';
+        card.setAttribute('data-openkill-card', definition.id);
+        if (definition.advanced) card.classList.add('openkill-settings-card-advanced');
+
+        var header = document.createElement('div');
+        header.className = 'openkill-settings-card-header';
+        var toggle = document.createElement('button');
+        toggle.type = 'button';
+        toggle.className = 'openkill-settings-card-toggle';
+        toggle.setAttribute('aria-controls', 'openkill-settings-card-body-' + index);
+        var title = document.createElement('span');
+        title.className = 'openkill-settings-card-title';
+        title.textContent = definition.title;
+        var count = document.createElement('span');
+        count.className = 'openkill-settings-card-count';
+        count.textContent = String(fields.length);
+        var marker = document.createElement('span');
+        marker.className = 'openkill-settings-card-marker';
+        marker.setAttribute('aria-hidden', 'true');
+        marker.textContent = '⌄';
+        toggle.appendChild(title);
+        toggle.appendChild(count);
+        toggle.appendChild(marker);
+        header.appendChild(toggle);
+
+        var body = document.createElement('div');
+        body.className = 'openkill-settings-card-body';
+        body.id = 'openkill-settings-card-body-' + index;
+        if (definition.id === 'stream-selection') appendStreamFields(body, fields);
+        else fields.forEach(function(field) { body.appendChild(field); });
+        card.appendChild(header);
+        card.appendChild(body);
+        if (host) host.appendChild(card);
+        else content.appendChild(card);
+
+        toggle.addEventListener('click', function() {
+            setCardExpanded(card, card.classList.contains('is-collapsed'));
+        });
+        setCardExpanded(card, !definition.advanced);
+        return card;
+    }
+
+    function buildCards(tabItems) {
+        tabItems.forEach(function(item, tabIndex) {
+            var panel = tabPanel(item);
+            var layout = CARD_LAYOUTS[tabIndex];
+            if (!panel || !layout || panel.getAttribute('data-openkill-cards-ready') === '1') return;
+            var content = panelContent(panel);
+            var fields = directFields(content);
+            if (!fields.length) return;
+            panel.setAttribute('data-openkill-cards-ready', '1');
+            var stack = document.createElement('div');
+            stack.className = 'openkill-settings-card-stack';
+            if (fields[0].parentNode === content) content.insertBefore(stack, fields[0]);
+            else content.appendChild(stack);
+            var remaining = fields.slice();
+            var cardIndex = 0;
+            layout.forEach(function(definition) {
+                var selected = remaining.filter(function(field) {
+                    return matchesKeys(field, definition.keys);
+                });
+                if (!selected.length) return;
+                selected.forEach(function(field) {
+                    var position = remaining.indexOf(field);
+                    if (position !== -1) remaining.splice(position, 1);
+                });
+                createCard(content, definition, selected, tabIndex + '-' + cardIndex++, stack);
+            });
+            if (remaining.length) {
+                createCard(content, {
+                    id: 'other-' + tabIndex,
+                    title: '<%:Other Settings%>',
+                    keys: []
+                }, remaining, tabIndex + '-other', stack);
+            }
+        });
     }
 
     function initOpenKillSettingsTheme() {
@@ -102,8 +341,10 @@
                 tabItems.push(menu.children[i]);
             }
         }
+        buildCards(tabItems);
+
         var advancedItems = tabItems.filter(function(item) {
-            return /(高级|advanced)/i.test(tabLabel(item));
+            return /(高级|系统|advanced|maintenance)/i.test(tabLabel(item));
         });
         advancedItems.forEach(function(item) {
             item.classList.add('openkill-advanced-tab');
@@ -143,7 +384,21 @@
                     if (found && query) {
                         matched++;
                         if (!firstMatch) firstMatch = {item: item, field: fields[j]};
+                        var matchCard = fields[j].closest('.openkill-settings-card');
+                        if (matchCard) setCardExpanded(matchCard, true);
                     }
+                }
+                var cards = panel.querySelectorAll('.openkill-settings-card');
+                for (var k = 0; k < cards.length; k++) {
+                    var cardFields = cards[k].querySelectorAll('.cbi-value');
+                    var cardMatch = !query;
+                    for (var n = 0; n < cardFields.length; n++) {
+                        if (!cardFields[n].classList.contains('openkill-search-hidden')) {
+                            cardMatch = true;
+                            break;
+                        }
+                    }
+                    addClass(cards[k], 'openkill-search-hidden', !!query && !cardMatch);
                 }
                 addClass(item, 'openkill-search-match', !!query && matched > 0);
                 var anchor = item.querySelector('a');

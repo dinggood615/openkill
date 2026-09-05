@@ -84,11 +84,11 @@ chosen=$(select_newest_manifest "$WORK_DIR/rows")
 
     def test_settings_keep_five_categories_and_ui_helpers(self):
         expected = (
-            's:tab("basic", translate("Basic & Runtime"))',
+            's:tab("basic", translate("Runtime & Services"))',
             's:tab("network", translate("Network & Routing"))',
-            's:tab("rules", translate("Rules & Resources"))',
-            's:tab("stability", translate("Stability & Performance"))',
-            's:tab("advanced", translate("Advanced & Maintenance"))',
+            's:tab("rules", translate("Rules & Subscriptions"))',
+            's:tab("stability", translate("Performance & Stability"))',
+            's:tab("advanced", translate("System & Maintenance"))',
         )
         for marker in expected:
             self.assertIn(marker, SETTINGS_SOURCE)
@@ -97,6 +97,8 @@ chosen=$(select_newest_manifest "$WORK_DIR/rows")
         self.assertIn("openkill-settings-toolbar", SETTINGS_THEME)
         self.assertIn("openkill-settings-search", SETTINGS_THEME)
         self.assertIn("openkill-advanced-collapsed", SETTINGS_THEME)
+        self.assertIn("openkill-settings-card", SETTINGS_THEME)
+        self.assertIn("data-openkill-cards-ready", SETTINGS_THEME)
 
     def test_formats_publish_inside_their_own_job(self):
         data = yaml.safe_load((ROOT / ".github/workflows/compile_new_ipk.yml").read_text(encoding="utf-8"))
