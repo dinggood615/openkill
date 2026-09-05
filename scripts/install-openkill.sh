@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1014"
+PROJECT_VERSION="2026-1015"
 ACTION=install
 PACKAGE_FILE=""
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
@@ -128,7 +128,9 @@ install_dependencies(){
   fi
   for dep in $required; do install_dependency "$dep" || die "Required dependency could not be installed: $dep"; done
   for dep in $optional; do install_dependency "$dep" || log "Optional dependency unavailable: $dep"; done
-  ruby -ryaml -rbase64 -rpsych -rpstore -e 'exit 0' || die "Ruby runtime libraries are incomplete"
+  # YAML is required by the watchdog and configuration tools.  base64/psych/
+  # pstore are optional on firmware builds where Ruby bundles them differently.
+  ruby -ryaml -e 'exit 0' || die "Ruby YAML runtime is incomplete"
 }
 
 download(){
