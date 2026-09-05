@@ -201,9 +201,8 @@
     font-family: "Microsoft Yahei", "sans-serif", "Helvetica Neue", "Helvetica", "Hiragino Sans GB", 'Twemoji Mozilla';
 }
 
-/* Compact dashboard: announcements and floating usage help are intentionally
- * hidden in the OpenKill UI worklog design. */
-.oc .announcement-card,
+/* Compact dashboard: the announcement bar was removed from the status page;
+ * keep the usage-help overlays disabled in the compact UI. */
 .oc .oc-usage-help-float,
 .oc #usage-help-overlay {
     display: none !important;
@@ -611,7 +610,7 @@ html[data-darkmode="true"] .oc svg {
 .oc .main-cards-container {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    grid-template-rows: minmax(60px, auto) 1fr;
+    grid-template-rows: 1fr;
     gap: var(--content-gap);
     margin: 0 auto;
     align-items: start;
@@ -649,7 +648,7 @@ html[data-darkmode="true"] .oc svg {
     grid-template-rows: var(--row-1-height) var(--row-2-height) var(--row-3-height) var(--row-4-height);
     gap: var(--card-grid-gap);
     overflow: visible;
-    grid-row: 2;
+    grid-row: 1;
     max-width: 100%;
     width: 100%;
     box-sizing: border-box;
@@ -7033,11 +7032,9 @@ html[data-darkmode=true] .oc #addCustomOption:hover {
         max-width: 95%;
         width: 95%;
     }
-    .oc .announcement-banner { grid-column: 1; width: 80%; max-width: 95%; }
-    .oc .announcement-card   { grid-column: 1; width: 100%; max-width: 100%; }
     .oc .main-card { grid-column: 1; grid-template-rows: auto auto auto auto; max-width: 100%; width: 100%; }
-    .oc .main-card:first-of-type { grid-column: 1; grid-row: 2; }
-    .oc .main-card:last-of-type  { grid-column: 1; grid-row: 3; }
+    .oc .main-card:first-of-type { grid-column: 1; grid-row: 1; }
+    .oc .main-card:last-of-type  { grid-column: 1; grid-row: 2; }
     .oc .card-row.dual-cards { grid-template-columns: 1fr 1fr; }
     .oc .card-row.stats-grid { grid-template-columns: repeat(4, 2fr); }
     .oc .config-selector { min-width: 200px; flex: 1; }
@@ -7096,7 +7093,6 @@ html[data-darkmode=true] .oc #addCustomOption:hover {
     .oc .sub-card { padding: var(--card-outer-padding); min-height: auto; }
     .oc .card-row { gap: 12px; }
     .oc .card-row.stats-grid { grid-template-columns: repeat(2, 2fr); }
-    .oc .announcement-banner { width: 85%; max-width: 98%; }
     .oc .dashboard-btn { font-size: 10px !important; height: 40px !important; }
     .oc .card-value { font-size: 13px; }
     .oc .value-indicator { font-size: 11px; padding: 5px 5px; }

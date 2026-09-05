@@ -16,14 +16,6 @@
         <td colspan="4">
             <div class="oc">
                 <div class="main-cards-container">
-                    <div class="announcement-card">
-                        <div id="announcement-banner" class="announcement-banner">
-                            <div class="megaphone-container">
-                                <svg id="megaphone" width="15" height="15"><use href="#oc-icon-megaphone"/></svg>
-                            </div>
-                            <div id="announcement-content" class="announcement-content"></div>
-                        </div>
-                    </div>
                     <div class="main-card">
                         <!-- Row 1: Running Status -->
                         <div class="card-row full-width core-status-row">
@@ -3033,7 +3025,6 @@
         OverwriteSubscribeManager.init();
         SubscriptionManager.init();
         UsageHelpManager.init();
-        loadAnnouncement();
     }, 300);
 
     setTimeout(function() { check_core(); }, 1000);
