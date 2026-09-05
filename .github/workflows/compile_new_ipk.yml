@@ -41,15 +41,18 @@ jobs:
           case "$version" in *[!0-9-]*) echo "Invalid version: $version"; exit 1;; esac
           echo "version=$version" >> $GITHUB_OUTPUT
 
-      - name: Clone Repository
+      - name: Read published package channel
         uses: actions/checkout@v6
         with:
           ref: package
+          path: package-channel
+          fetch-depth: 1
 
       - name: Current Version
         id: current_version
         run: |
-          current=$(sed -n 1p ./${{ github.ref_name }}/version | sed 's/^v//' | tr -d '[:space:]')
+          current=$(sed -n 1p package-channel/master/version 2>/dev/null | sed 's/^v//' | tr -d '[:space:]')
+          current=${current:-0}
           echo "version=$current" >> $GITHUB_OUTPUT
 
       - name: Require Version Bump
@@ -125,6 +128,13 @@ jobs:
 
       - name: Update Third-Party Resources
         run: |
+          set -euo pipefail
+          download() {
+            url="$1"
+            out="$2"
+            curl --fail --silent --show-error --location --retry 4 --retry-all-errors \
+              --connect-timeout 15 --max-time 180 "$url" -o "$out"
+          }
           CHNR_PATH=tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/root/etc/openkill/china_ip_route.ipset
           CHNR6_PATH=tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/root/etc/openkill/china_ip6_route.ipset
           ZASHBOARD_PATH=tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/root/usr/share/openkill/ui/zashboard
@@ -134,16 +144,16 @@ jobs:
 
           # 更新 China IP Route
           mkdir -p tmp
-          curl -sSL https://ispip.clang.cn/all_cn.txt -o tmp/china_ip_route.ipset
+          download https://ispip.clang.cn/all_cn.txt tmp/china_ip_route.ipset
           mkdir -p $(dirname $CHNR_PATH)
           cp tmp/china_ip_route.ipset $CHNR_PATH
-          curl -sSL https://ispip.clang.cn/all_cn_ipv6.txt -o tmp/china_ip6_route.ipset
+          download https://ispip.clang.cn/all_cn_ipv6.txt tmp/china_ip6_route.ipset
           mkdir -p $(dirname $CHNR6_PATH)
           cp tmp/china_ip6_route.ipset $CHNR6_PATH
 
           # 更新 MetaCubeXD UI
           mkdir -p tmp/metacubexd_zip
-          curl -sSL https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip -o tmp/metacubexd.zip
+          download https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip tmp/metacubexd.zip
           unzip -q -o tmp/metacubexd.zip -d tmp/metacubexd_zip
           METACUBEXD_UNZIP_PATH="tmp/metacubexd_zip/metacubexd-gh-pages"
           mkdir -p "$METACUBEXD_PATH"
@@ -152,7 +162,7 @@ jobs:
 
           # 更新 ZashBoard UI
           mkdir -p tmp/zashboard_zip
-          curl -sSL https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip -o tmp/zashboard.zip
+          download https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip tmp/zashboard.zip
           unzip -q -o tmp/zashboard.zip -d tmp/zashboard_zip
           mkdir -p "$ZASHBOARD_PATH"
           rm -rf "$ZASHBOARD_PATH"/*
@@ -167,13 +177,15 @@ jobs:
           fi
 
           # 更新 GeoSite.dat
-          RULES_RELEASE=$(curl -s https://api.github.com/repos/Loyalsoldier/v2ray-rules-dat/releases/latest | jq -r '.tag_name')
-          curl -sSL "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/download/${RULES_RELEASE}/geosite.dat" -o tmp/GeoSite.dat
+          RULES_RELEASE=$(curl --fail --silent --show-error --retry 4 --retry-all-errors \
+            https://api.github.com/repos/Loyalsoldier/v2ray-rules-dat/releases/latest | jq -r '.tag_name')
+          [ -n "$RULES_RELEASE" ] && [ "$RULES_RELEASE" != "null" ]
+          download "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/download/${RULES_RELEASE}/geosite.dat" tmp/GeoSite.dat
           mkdir -p $(dirname "$GEOSITE_PATH")
           cp tmp/GeoSite.dat "$GEOSITE_PATH"
 
           # 更新 Country.mmdb
-          curl -sSL "https://github.com/alecthw/mmdb_china_ip_list/releases/latest/download/Country-lite.mmdb" -o tmp/Country.mmdb
+          download "https://github.com/alecthw/mmdb_china_ip_list/releases/latest/download/Country-lite.mmdb" tmp/Country.mmdb
           mkdir -p $(dirname "$COUNTRY_MMDB_PATH")
           cp tmp/Country.mmdb "$COUNTRY_MMDB_PATH"
 

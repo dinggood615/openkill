@@ -18,15 +18,38 @@ SKIP_PROXY_ADDRESS=1
 SKIP_PROXY_ADDRESS_INTERVAL=30
 UPNP_INT=1
 UPNP_INTERVAL=30
-STREAM_AUTO_SELECT=0
 FIREWALL_RELOAD=0
 MAX_FIREWALL_RELOAD=3
 # Expensive address discovery is only needed periodically.  Keeping the
 # watchdog loop at one minute preserves recovery speed while avoiding a full
 # interface scan on every tick.
 LOCALNETWORK_INT=1
-LOCALNETWORK_INTERVAL=5
+LOCALNETWORK_INTERVAL=10
+HISTORY_INT=1
+HISTORY_INTERVAL=5
+FIREWALL_INT=1
+FIREWALL_INTERVAL=2
 FW4=$(command -v fw4)
+
+# Values are expressed in watchdog cycles.  Keeping the defaults conservative
+# avoids a full interface/firewall scan on every heartbeat while still
+# allowing advanced users to tune the maintenance cadence in UCI.
+valid_cycles() {
+   case "${1:-}" in
+      ''|*[!0-9]*|0) echo "$2" ;;
+      *) echo "$1" ;;
+   esac
+}
+valid_bool() {
+   [ "${1:-}" = "1" ] && echo 1 || echo 0
+}
+WATCHDOG_SLEEP=$(valid_cycles "$(uci_get_config "watchdog_interval" || echo 60)" 60)
+LOCALNETWORK_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_network_cycles" || echo 10)" 10)
+HISTORY_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_history_cycles" || echo 5)" 5)
+FIREWALL_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_firewall_cycles" || echo 2)" 2)
+UPNP_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_upnp_cycles" || echo 30)" 30)
+SKIP_PROXY_ADDRESS_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_proxy_cycles" || echo 30)" 30)
+CORE_FAILURES=0
 
 ## Skip Proxies Address
 skip_proxies_address()
@@ -180,33 +203,18 @@ end" 2>/dev/null >> $LOG_FILE
 while :;
 do
    CONFIG_FILE="/etc/openkill/$(uci_get_config "config_path" |awk -F '/' '{print $5}' 2>/dev/null)"
-   ipv6_enable=$(uci_get_config "ipv6_enable" || echo 0)
-   enable_redirect_dns=$(uci_get_config "enable_redirect_dns")
-   dns_port=$(uci_get_config "dns_port")
-   disable_masq_cache=$(uci_get_config "disable_masq_cache")
-   log_size=$(uci_get_config "log_size" || echo 1024)
-   router_self_proxy=$(uci_get_config "router_self_proxy" || echo 1)
-   skip_proxy_address=$(uci_get_config "skip_proxy_address" || echo 0)
+   ipv6_enable=$(valid_bool "$(uci_get_config "ipv6_enable" || echo 0)")
+   enable_redirect_dns=$(valid_bool "$(uci_get_config "enable_redirect_dns" || echo 0)")
+   dns_port=$(valid_cycles "$(uci_get_config "dns_port" || echo 7874)" 7874)
+   disable_masq_cache=$(valid_bool "$(uci_get_config "disable_masq_cache" || echo 0)")
+   log_size=$(valid_cycles "$(uci_get_config "log_size" || echo 1024)" 1024)
+   router_self_proxy=$(valid_bool "$(uci_get_config "router_self_proxy" || echo 1)")
+   skip_proxy_address=$(valid_bool "$(uci_get_config "skip_proxy_address" || echo 0)")
 
-   cfg_update=$(uci_get_config "auto_update")
-   cfg_update_mode=$(uci_get_config "config_auto_update_mode")
+   cfg_update=$(valid_bool "$(uci_get_config "auto_update" || echo 0)")
+   cfg_update_mode=$(valid_bool "$(uci_get_config "config_auto_update_mode" || echo 0)")
    cfg_update_interval=$(uci_get_config "config_update_interval" || echo 60)
-   stream_auto_select=$(uci_get_config "stream_auto_select" || echo 0)
-   stream_auto_select_interval=$(uci_get_config "stream_auto_select_interval" || echo 30)
-   stream_auto_select_netflix=$(uci_get_config "stream_auto_select_netflix" || echo 0)
-   stream_auto_select_disney=$(uci_get_config "stream_auto_select_disney" || echo 0)
-   stream_auto_select_hbo_max=$(uci_get_config "stream_auto_select_hbo_max" || echo 0)
-   stream_auto_select_tvb_anywhere=$(uci_get_config "stream_auto_select_tvb_anywhere" || echo 0)
-   stream_auto_select_prime_video=$(uci_get_config "stream_auto_select_prime_video" || echo 0)
-   stream_auto_select_ytb=$(uci_get_config "stream_auto_select_ytb" || echo 0)
-   stream_auto_select_dazn=$(uci_get_config "stream_auto_select_dazn" || echo 0)
-   stream_auto_select_paramount_plus=$(uci_get_config "stream_auto_select_paramount_plus" || echo 0)
-   stream_auto_select_discovery_plus=$(uci_get_config "stream_auto_select_discovery_plus" || echo 0)
-   stream_auto_select_bilibili=$(uci_get_config "stream_auto_select_bilibili" || echo 0)
-   stream_auto_select_google_not_cn=$(uci_get_config "stream_auto_select_google_not_cn" || echo 0)
-   stream_auto_select_openai=$(uci_get_config "stream_auto_select_openai" || echo 0)
-   stream_auto_select_claude=$(uci_get_config "stream_auto_select_claude" || echo 0)
-   stream_auto_select_gemini=$(uci_get_config "stream_auto_select_gemini" || echo 0)
+   case "$cfg_update_interval" in ''|*[!0-9]*|0) cfg_update_interval=60 ;; esac
    upnp_lease_file=$(uci -q get upnpd.config.upnp_lease_file)
 
 #wait for core start complete
@@ -217,14 +225,35 @@ done >/dev/null 2>&1
 
 #check the clash service status
 if ! ubus call service list '{"name":"openkill"}' 2>/dev/null | jsonfilter -e '@.openkill.instances.*.running' | grep -q 'true'; then
-   uci -q set openkill.config.enable=0
-   uci -q commit openkill
-   /etc/init.d/openkill stop >/dev/null 2>&1
+   # Do not disable the service or launch a second copy while procd is
+   # respawning the core.  This was the source of restart loops on some
+   # snapshot firmwares; the next cycle will observe the recovered instance.
+   if [ "$(uci_get_config "enable" || echo 0)" = "1" ]; then
+      LOG_WATCHDOG "OpenKill service is not ready; waiting for procd recovery."
+      sleep "$WATCHDOG_SLEEP"
+      continue
+   fi
    exit 0
 fi
 
-## Porxy history
+# Health observation only: procd owns restart policy.  The watchdog records a
+# persistent failure after three cycles but never starts a duplicate core.
+if ! pidof clash >/dev/null 2>&1; then
+   CORE_FAILURES=$(expr "$CORE_FAILURES" + 1)
+   if [ "$CORE_FAILURES" -ge 3 ]; then
+      LOG_WATCHDOG "Mihomo core is not running; procd restart is pending (no duplicate start)."
+      CORE_FAILURES=0
+   fi
+   sleep "$WATCHDOG_SLEEP"
+   continue
+fi
+CORE_FAILURES=0
+
+## Proxy history (maintenance task; the health loop must stay cheap)
+if [ "$HISTORY_INT" -eq 1 ] || [ "$(expr "$HISTORY_INT" % "$HISTORY_INTERVAL")" -eq 0 ]; then
    /usr/share/openkill/openkill_history_get.sh
+fi
+HISTORY_INT=$(expr "$HISTORY_INT" + 1)
 
 ## Log File Size Manage:
    LOGSIZE=`ls -l /tmp/openkill.log |awk '{print int($5/1024)}'`
@@ -233,7 +262,8 @@ fi
       LOG_WATCHDOG "Log Size Limit, Clean Up All Log Records..."
    fi
 
-## 防火墙检查
+## 防火墙检查（每两分钟，避免每个心跳都遍历完整规则集）
+   if [ "$FIREWALL_INT" -eq 1 ] || [ "$(expr "$FIREWALL_INT" % "$FIREWALL_INTERVAL")" -eq 0 ]; then
    if [ "$FIREWALL_RELOAD" -le "$MAX_FIREWALL_RELOAD" ]; then
       if [ -z "$FW4" ]; then
          nat_last_line=$(iptables -t nat -nL PREROUTING --line-number 2>/dev/null | awk 'END {print $1}')
@@ -261,6 +291,8 @@ fi
          FIREWALL_RELOAD=0
       fi
    fi
+   fi
+   FIREWALL_INT=$(expr "$FIREWALL_INT" + 1)
 
 ## Localnetwork 刷新 (periodic; phase-2 CPU/network overhead reduction)
 if [ "$LOCALNETWORK_INT" -eq 1 ] || [ "$(expr "$LOCALNETWORK_INT" % "$LOCALNETWORK_INTERVAL")" -eq 0 ]; then
@@ -316,7 +348,6 @@ if [ "$LOCALNETWORK_INT" -eq 1 ] || [ "$(expr "$LOCALNETWORK_INT" % "$LOCALNETWO
          fi
       fi
    fi
-   LOCALNETWORK_INT=0
 fi
 LOCALNETWORK_INT=$(expr "$LOCALNETWORK_INT" + 1)
 
@@ -415,72 +446,8 @@ LOCALNETWORK_INT=$(expr "$LOCALNETWORK_INT" + 1)
       CFG_UPDATE_INT=$(expr "$CFG_UPDATE_INT" + 1)
    fi
 
-##STREAMING_UNLOCK_CHECK
-   if [ "$stream_auto_select" -eq 1 ] && [ "$router_self_proxy" -eq 1 ]; then
-      if [ "$STREAM_AUTO_SELECT" -ne 0 ]; then
-         if [ "$(expr "$STREAM_AUTO_SELECT" % "$stream_auto_select_interval")" -eq 0 ] || [ "$STREAM_AUTO_SELECT" -eq 1 ]; then
-            if [ "$stream_auto_select_netflix" -eq 1 ]; then
-               LOG_INFO "【Netflix】Start Auto Select Unlock Proxy..."
-               /usr/share/openkill/openkill_streaming_unlock.lua "Netflix" >> $LOG_FILE
-            fi
-            if [ "$stream_auto_select_disney" -eq 1 ]; then
-               LOG_INFO "【Disney Plus】Start Auto Select Unlock Proxy..."
-               /usr/share/openkill/openkill_streaming_unlock.lua "Disney Plus" >> $LOG_FILE
-            fi
-            if [ "$stream_auto_select_google_not_cn" -eq 1 ]; then
-               LOG_INFO "【Google Not CN】Start Auto Select Unlock Proxy..."
-               /usr/share/openkill/openkill_streaming_unlock.lua "Google" >> $LOG_FILE
-            fi
-            if [ "$stream_auto_select_ytb" -eq 1 ]; then
-               LOG_INFO "【YouTube Premium】Start Auto Select Unlock Proxy..."
-               /usr/share/openkill/openkill_streaming_unlock.lua "YouTube Premium" >> $LOG_FILE
-            fi
-            if [ "$stream_auto_select_prime_video" -eq 1 ]; then
-               LOG_INFO "【Amazon Prime Video】Start Auto Select Unlock Proxy..."
-               /usr/share/openkill/openkill_streaming_unlock.lua "Amazon Prime Video" >> $LOG_FILE
-            fi
-            if [ "$stream_auto_select_hbo_max" -eq 1 ]; then
-               LOG_INFO "【HBO Max】Start Auto Select Unlock Proxy..."
-               /usr/share/openkill/openkill_streaming_unlock.lua "HBO Max" >> $LOG_FILE
-            fi
-            if [ "$stream_auto_select_tvb_anywhere" -eq 1 ]; then
-               LOG_INFO "【TVB Anywhere+】Start Auto Select Unlock Proxy..."
-               /usr/share/openkill/openkill_streaming_unlock.lua "TVB Anywhere+" >> $LOG_FILE
-            fi
-            if [ "$stream_auto_select_dazn" -eq 1 ]; then
-               LOG_INFO "【DAZN】Start Auto Select Unlock Proxy..."
-               /usr/share/openkill/openkill_streaming_unlock.lua "DAZN" >> $LOG_FILE
-            fi
-            if [ "$stream_auto_select_paramount_plus" -eq 1 ]; then
-               LOG_INFO "【Paramount Plus】Start Auto Select Unlock Proxy..."
-               /usr/share/openkill/openkill_streaming_unlock.lua "Paramount Plus" >> $LOG_FILE
-            fi
-            if [ "$stream_auto_select_discovery_plus" -eq 1 ]; then
-               LOG_INFO "【Discovery Plus】Start Auto Select Unlock Proxy..."
-               /usr/share/openkill/openkill_streaming_unlock.lua "Discovery Plus" >> $LOG_FILE
-            fi
-            if [ "$stream_auto_select_bilibili" -eq 1 ]; then
-               LOG_INFO "【Bilibili】Start Auto Select Unlock Proxy..."
-               /usr/share/openkill/openkill_streaming_unlock.lua "Bilibili" >> $LOG_FILE
-            fi
-            if [ "$stream_auto_select_openai" -eq 1 ]; then
-               LOG_INFO "【OpenAI】Start Auto Select Unlock Proxy..."
-               /usr/share/openkill/openkill_streaming_unlock.lua "OpenAI" >> $LOG_FILE
-            fi
-            if [ "$stream_auto_select_claude" -eq 1 ]; then
-               LOG_INFO "【Claude】Start Auto Select Unlock Proxy..."
-               /usr/share/openkill/openkill_streaming_unlock.lua "Claude" >> $LOG_FILE
-            fi
-            if [ "$stream_auto_select_gemini" -eq 1 ]; then
-               LOG_INFO "【Gemini】Start Auto Select Unlock Proxy..."
-               /usr/share/openkill/openkill_streaming_unlock.lua "Gemini" >> $LOG_FILE
-            fi
-         fi
-      fi
-      STREAM_AUTO_SELECT=$(expr "$STREAM_AUTO_SELECT" + 1)
-   elif [ "$router_self_proxy" != "1" ] && [ "$stream_auto_select" -eq 1 ]; then
-      LOG_ERROR "Streaming Unlock Could not Work Because of Router-Self Proxy Disabled, Exiting..."
-   fi
+##STREAMING_UNLOCK_CHECK (isolated from the health loop)
+   /usr/share/openkill/openkill_watchdog_stream.sh &
 
-   sleep 60
+    sleep "$WATCHDOG_SLEEP"
 done 2>/dev/null

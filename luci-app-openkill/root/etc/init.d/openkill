@@ -327,6 +327,12 @@ EOF
 
 start_fail()
 {
+   # Restore the last generated configuration when startup or health checks
+   # fail.  The copy is updated only after a successful core health check.
+   if [ -n "$CONFIG_FILE" ] && [ -n "$LAST_GOOD_CONFIG" ] && [ -s "$LAST_GOOD_CONFIG" ]; then
+      cp -f "$LAST_GOOD_CONFIG" "$CONFIG_FILE" >/dev/null 2>&1
+      LOG_WARN "Restored the last known-good OpenKill configuration."
+   fi
    uci -q set openkill.config.enable=0
    uci -q commit openkill
    stop
@@ -421,6 +427,7 @@ fi
 
 CONFIG_NAME=$(echo "$RAW_CONFIG_FILE" |awk -F '/' '{print $5}' 2>/dev/null)
 HISTORY_PATH="/etc/openkill/history/${CONFIG_NAME%.*}.db"
+LAST_GOOD_CONFIG="/tmp/openkill-${CONFIG_NAME}.last-good"
 } >/dev/null 2>&1
 
 config_check()
@@ -444,6 +451,17 @@ elif [ ! -f "$TMP_CONFIG_FILE" ] || [ ! -s "$TMP_CONFIG_FILE" ]; then
    LOG_ERROR "Config File Format Validation Failed..."
    start_fail
 fi
+}
+
+validate_generated_config()
+{
+   [ "$QUICK_START" = "true" ] && return 0
+   [ -f "$TMP_CONFIG_FILE" ] || return 1
+   if ! /usr/share/openkill/openkill_validate.sh "$TMP_CONFIG_FILE" "$CLASH" >> "$LOG_FILE" 2>&1; then
+      LOG_ERROR "Generated configuration failed Mihomo validation; the active configuration was kept."
+      return 1
+   fi
+   return 0
 }
 
 check_run_quick()
@@ -531,14 +549,12 @@ do_run_file()
       geosite_path="/etc/openkill/GeoSite.dat"
       geoip_path="/etc/openkill/GeoIP.dat"
       asn_path="/etc/openkill/ASN.mmdb"
-      lgbm_path="/etc/openkill/Model.bin"
       mv "/tmp/etc/openkill/Country.mmdb" "$ipdb_path"
       mv "/tmp/etc/openkill/china_ip_route.ipset" "$chnr_path"
       mv "/tmp/etc/openkill/china_ip6_route.ipset" "$chnr6_path"
       mv "/tmp/etc/openkill/GeoSite.dat" "$geosite_path"
       mv "/tmp/etc/openkill/GeoIP.dat" "$geoip_path"
       mv "/tmp/etc/openkill/ASN.mmdb" "$asn_path"
-      mv "/tmp/etc/openkill/Model.bin" "$lgbm_path"
       mv "/tmp/etc/openkill/core/" "/etc/openkill"
       if [ "$CACHE_PATH" != "/tmp/etc/openkill/cache.db" ]; then
          rm -rf "/tmp/etc/openkill"
@@ -551,14 +567,12 @@ do_run_file()
       geosite_path="/tmp/etc/openkill/GeoSite.dat"
       geoip_path="/tmp/etc/openkill/GeoIP.dat"
       asn_path="/tmp/etc/openkill/ASN.mmdb"
-      lgbm_path="/tmp/etc/openkill/Model.bin"
       [ ! -h "/etc/openkill/Country.mmdb" ] && mv "/etc/openkill/Country.mmdb" "$ipdb_path"
       [ ! -h "/etc/openkill/china_ip_route.ipset" ] && mv "/etc/openkill/china_ip_route.ipset" "$chnr_path"
       [ ! -h "/etc/openkill/china_ip6_route.ipset" ] && mv "/etc/openkill/china_ip6_route.ipset" "$chnr6_path"
       [ ! -h "/etc/openkill/GeoSite.dat" ] && mv "/etc/openkill/GeoSite.dat" "$geosite_path"
       [ ! -h "/etc/openkill/GeoIP.dat" ] && mv "/etc/openkill/GeoIP.dat" "$geoip_path"
       [ ! -h "/etc/openkill/ASN.mmdb" ] && mv "/etc/openkill/ASN.mmdb" "$asn_path"
-      [ ! -h "/etc/openkill/Model.bin" ] && mv "/etc/openkill/Model.bin" "$lgbm_path"
       mv "/etc/openkill/core/" "/tmp/etc/openkill"
    fi
 
@@ -567,7 +581,8 @@ do_run_file()
 
    ln -s "$meta_core_path" /etc/openkill/clash
 
-   # OpenKill uses the official stable Mihomo/Meta core only.
+   # OpenKill uses the official stable Mihomo/Meta core only.  A stale or
+   # damaged binary is treated as missing and replaced before config tests.
    core_type="Meta"
 
    if [ -f "$CLASH" ] && [ ! -x "$CLASH" ]; then
@@ -575,13 +590,17 @@ do_run_file()
       chown root:root "$CLASH"
    fi
 
-   [ ! -f "$CLASH" ] || { [ "$core_type" = "Smart" ] && [ -z "$($CLASH -v | grep 'smart')" ] && [ -z "$($CLASH -v | grep 'oix')" ]; } || { [ "$core_type" = "Oix" ] && [ -z "$($CLASH -v | grep 'oix')" ]; } && {
+   core_valid=0
+   if [ -x "$CLASH" ] && "$CLASH" -v >/dev/null 2>&1; then
+      core_valid=1
+   fi
+   if [ "$core_valid" -ne 1 ]; then
       LOG_TIP "【$core_type】Core is not Detected installed, Ready to Download..."
       /usr/share/openkill/openkill_core.sh "$core_type"
-      if [ ! -f "$meta_core_path" ]; then
+      if [ ! -x "$meta_core_path" ]; then
          start_fail
       fi
-   }
+   fi
 
    if [ "$china_ip_route" != "0" ] || [ "$china_ip6_route" != "0" ] || [ "$disable_udp_quic" = "1" ]; then
       if [ ! -f "$chnr_path" ] || [ ! -f "$chnr6_path" ]; then
@@ -622,10 +641,6 @@ do_run_file()
 
    [ -f "$geoip_path" ] && [ "$small_flash_memory" = "1" ] && {
       ln -s "$geoip_path" /etc/openkill/GeoIP.dat
-   }
-
-   [ -f "$lgbm_path" ] && [ "$small_flash_memory" = "1" ] && {
-      ln -s "$lgbm_path" /etc/openkill/Model.bin
    }
 
    [ -f "$chnr_path" ] && [ "$small_flash_memory" = "1" ] && {
@@ -786,6 +801,7 @@ check_core_status()
    if [ "$1" == "start" ]; then
       change_dnsmasq "$enable_redirect_dns"
       set_firewall
+      [ -s "$CONFIG_FILE" ] && cp -f "$CONFIG_FILE" "$LAST_GOOD_CONFIG" >/dev/null 2>&1
       LOG_TIP "OpenKill Start Successful!"
    else
       set_firewall
@@ -802,6 +818,10 @@ start_run_core()
    ulimit -u unlimited
 
    if ! $QUICK_START; then
+      # Keep a rollback copy until the asynchronous core health check passes.
+      if [ -s "$CONFIG_FILE" ]; then
+         cp -f "$CONFIG_FILE" "$LAST_GOOD_CONFIG" >/dev/null 2>&1
+      fi
       mv "$TMP_CONFIG_FILE" "$CONFIG_FILE"
       rm -rf "$TMP_CONFIG_FILE"
    fi
@@ -809,8 +829,6 @@ start_run_core()
    procd_open_instance "openkill"
    procd_set_param env SAFE_PATHS=/usr/share/openkill:/etc/ssl
    procd_append_param env CLASH_AGE_SECRET_KEY="$SECRET_KEY"
-   procd_append_param env OIX_TOKEN="$OIX_TOKEN"
-   procd_append_param env OIX_PARAMS="$OIX_PARAMS"
    procd_set_param command /bin/sh -c "exec $CLASH -d $CLASH_CONFIG -f \"$CONFIG_FILE\" >> $LOG_FILE 2>&1"
    procd_set_param user "root"
    procd_set_param group "nogroup"
@@ -3133,8 +3151,6 @@ EOF
       LGBM_CUSTOM_URL:string \
       LGBM_UPDATE_INTERVAL:int \
       MIXED_PORT:int \
-      OIX_TOKEN:string \
-      OIX_PARAMS:string \
       PROXY_MODE:string \
       PROXY_PORT:int \
       ROUTER_SELF_PROXY:int_bool \
@@ -3481,9 +3497,8 @@ get_config()
    CONFIG_FILE="/etc/openkill/${CFG_NAME}"
    TMP_CONFIG_FILE="/tmp/${CFG_NAME}"
    CFG_NO_EXT_NAME="${CFG_NAME%.*}"
+   LAST_GOOD_CONFIG="/tmp/openkill-${CFG_NAME}.last-good"
    SECRET_KEY=$(uci_get_age_secret_keys "$CFG_NO_EXT_NAME")
-   OIX_TOKEN=$(uci_get_config "oix_token")
-   OIX_PARAMS=$(uci_get_config "oix_params")
    enable=$(uci_get_config "enable")
    enable_custom_clash_rules=$(uci_get_config "enable_custom_clash_rules")
    da_password=$(uci_get_config "dashboard_password")
@@ -3533,8 +3548,10 @@ get_config()
    operation_mode=$(uci_get_config "operation_mode")
    lan_ac_mode=$(uci_get_config "lan_ac_mode")
    enable_rule_proxy=$(uci_get_config "enable_rule_proxy")
-   stack_type=$(uci_get_config "stack_type")
-   stack_type_v6=$(uci_get_config "stack_type_v6" || echo "system")
+    stack_type=$(uci_get_config "stack_type" || echo "mixed")
+    [ -z "$stack_type" ] || [ "$stack_type" = "0" ] && stack_type="mixed"
+    stack_type_v6=$(uci_get_config "stack_type_v6" || echo "mixed")
+    [ -z "$stack_type_v6" ] || [ "$stack_type_v6" = "0" ] && stack_type_v6="mixed"
    china_ip_route=$(uci_get_config "china_ip_route"); [[ "$china_ip_route" != "0" && "$china_ip_route" != "1" && "$china_ip_route" != "2" ]] && china_ip_route=0
    china_ip6_route=$(uci_get_config "china_ip6_route"); [[ "$china_ip6_route" != "0" && "$china_ip6_route" != "1" && "$china_ip6_route" != "2" ]] && china_ip6_route=0
    small_flash_memory=$(uci_get_config "small_flash_memory")
@@ -3561,24 +3578,26 @@ get_config()
    custom_fakeip_filter_mode=$(uci_get_config "custom_fakeip_filter_mode" || echo "blacklist")
    iptables_compat=$(iptables -m owner -h 2>/dev/null | grep "owner match options" || command -v fw4 || echo 0)
    disable_quic_go_gso=$(uci_get_config "disable_quic_go_gso" || echo 0)
-   smart_enable=$(uci_get_config "smart_enable" || echo 0)
    cors_allow=$(uci_get_config "dashboard_forward_domain" || echo 0)
    geo_custom_url=$(uci_get_config "geo_custom_url" || echo 0)
    geoip_custom_url=$(uci_get_config "geoip_custom_url" || echo 0)
    geosite_custom_url=$(uci_get_config "geosite_custom_url" || echo 0)
    geoasn_custom_url=$(uci_get_config "geoasn_custom_url" || echo 0)
    global_ua=$(uci_get_config "global_ua" || echo 0)
-   auto_smart_switch=$(uci_get_config "auto_smart_switch" || echo 0)
-   lgbm_auto_update=$(uci_get_config "lgbm_auto_update" || echo 0)
-   lgbm_custom_url=$(uci_get_config "lgbm_custom_url" || echo "https://github.com/vernesong/mihomo/releases/download/LightGBM-Model/Model.bin")
-   lgbm_update_interval=$(uci_get_config "lgbm_update_interval" || echo 72)
-   smart_collect=$(uci_get_config "smart_collect" || echo 0)
-   smart_collect_size=$(uci_get_config "smart_collect_size" || echo 100)
-   smart_collect_rate=$(uci_get_config "smart_collect_rate" || echo 1)
-   smart_policy_priority=$(uci_get_config "smart_policy_priority" || echo 0)
-   smart_enable_lgbm=$(uci_get_config "smart_enable_lgbm" || echo 0)
-   smart_prefer_asn=$(uci_get_config "smart_prefer_asn" || echo 0)
-   smart_tolerance=$(uci_get_config "smart_tolerance" || echo 0)
+   # OpenKill is Meta-only.  Keep the legacy positional arguments consumed by
+   # the YAML helpers, but force every removed Smart/LightGBM switch off so old
+   # UCI values can never re-enable the retired code path.
+   auto_smart_switch=0
+   lgbm_auto_update=0
+   lgbm_custom_url=""
+   lgbm_update_interval=0
+   smart_collect=0
+   smart_collect_size=0
+   smart_collect_rate=0
+   smart_policy_priority=""
+   smart_enable_lgbm=0
+   smart_prefer_asn=0
+   smart_tolerance=0
 
    [ -z "$dns_port" ] && dns_port=7874 && uci -q set openkill.config.dns_port=7874
    uci -q commit openkill
@@ -3691,6 +3710,15 @@ start_service()
                YAML.LOG_ERROR('Edit Provider Path Failed,【%s】' % [e.message])
             end
          " >> $LOG_FILE 2>&1
+
+         # Validate the fully generated file (including overrides and provider
+         # paths) before it can replace the active configuration.  A failed
+         # check keeps the previous file and disables the service cleanly.
+         if ! validate_generated_config; then
+            rm -f "$TMP_CONFIG_FILE"
+            LOG_ERROR "OpenKill startup aborted; active configuration was not replaced."
+            start_fail
+         fi
       else
          LOG_OUT "Step 3: Quick Start Mode, Skip Modify The Config File..."
       fi

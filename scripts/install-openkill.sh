@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1020"
+PROJECT_VERSION="2026-1030"
 ACTION=install
 PACKAGE_FILE=""
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
@@ -94,6 +94,10 @@ prepare_feeds(){
 }
 install_dependency(){
   dep="$1"
+  # json is bundled with the supported Ruby runtimes on several OpenWrt
+  # releases and has no standalone package there.  Treat the split package as
+  # optional when the interpreter already provides it.
+  if [ "$dep" = "ruby-json" ] && ruby -rjson -e 'exit 0' >/dev/null 2>&1; then return 0; fi
   if [ "$PM" = opkg ]; then
     opkg status "$dep" 2>/dev/null | grep -q '^Status:.* installed$' && return 0
     operation=install
@@ -116,13 +120,13 @@ install_dependencies(){
   log "Installing OpenKill runtime dependencies"
   prepare_feeds
   if [ "$PM" = opkg ]; then
-    required="bash curl ca-bundle ip-full ruby ruby-yaml ruby-json lua kmod-tun unzip dnsmasq-full luci-compat"
-    optional="ruby-base64 ruby-psych ruby-pstore kmod-inet-diag"
+    required="bash curl ca-bundle ip-full ruby ruby-yaml lua kmod-tun unzip dnsmasq-full luci-compat"
+    optional="ruby-json ruby-base64 ruby-psych ruby-pstore kmod-inet-diag"
     if command -v fw4 >/dev/null 2>&1; then required="$required kmod-nft-tproxy"
     else required="$required kmod-ipt-tproxy iptables-mod-tproxy ipset"; optional="$optional kmod-ipt-extra kmod-ipt-nat iptables-mod-extra"; fi
   else
-    required="bash curl ca-certificates ip-full ruby ruby-yaml ruby-json lua kmod-tun unzip dnsmasq-full luci-compat"
-    optional="ruby-base64 ruby-psych ruby-pstore kmod-inet-diag"
+    required="bash curl ca-certificates ip-full ruby ruby-yaml lua kmod-tun unzip dnsmasq-full luci-compat"
+    optional="ruby-json ruby-base64 ruby-psych ruby-pstore kmod-inet-diag"
     if command -v fw4 >/dev/null 2>&1; then required="$required kmod-nft-tproxy"
     else required="$required ipset iptables-mod-tproxy"; fi
   fi
@@ -173,19 +177,24 @@ install_core(){
   # Fresh installs may not have an architecture selected yet. Set a safe
   # Meta-compatible default so the first install can download the stable core.
   if command -v uci >/dev/null 2>&1; then
-    arch=$(uci -q get openkill.config.core_version || true)
+    arch=$(uci -q get openkill.config.core_arch || true)
     if [ -z "$arch" ] || [ "$arch" = "0" ]; then
       case "$(uname -m)" in
         x86_64|amd64) arch=linux-amd64-v1 ;;
+        i[3-6]86) arch=linux-386 ;;
         aarch64|arm64) arch=linux-arm64 ;;
         armv7l|armv7*) arch=linux-armv7 ;;
         armv6l|armv6*) arch=linux-armv6 ;;
+        armv5*) arch=linux-armv5 ;;
         mips64el) arch=linux-mips64le ;;
         mipsel) arch=linux-mipsle-hardfloat ;;
         mips) arch=linux-mips-hardfloat ;;
+        riscv64) arch=linux-riscv64 ;;
+        s390x) arch=linux-s390x ;;
+        loongarch64) arch=linux-loong64-abi2 ;;
         *) die "Unsupported CPU architecture: $(uname -m)" ;;
       esac
-      uci -q set openkill.config.core_version="$arch" || true
+      uci -q set openkill.config.core_arch="$arch" || true
       uci -q commit openkill || true
       log "Detected core architecture: $arch"
     fi
@@ -207,13 +216,24 @@ validate_install(){
   [ -x /etc/init.d/openkill ] || die "OpenKill service was not installed"
   uci -q show openkill >/dev/null 2>&1 || die "OpenKill UCI configuration is invalid"
   sh -n /etc/init.d/openkill || die "OpenKill service script validation failed"
+  sh -n /usr/share/openkill/openkill_core.sh || die "OpenKill core installer validation failed"
+  sh -n /usr/share/openkill/openkill_update.sh || die "OpenKill updater validation failed"
   sh -n /usr/share/openkill/openkill_watchdog.sh || die "OpenKill watchdog validation failed"
+  ruby -ryaml -rjson -e 'exit 0' || die "Ruby YAML/JSON runtime is incomplete"
 }
 
 resolve_package(){
   manifest="$WORK_DIR/latest.json"
+  # Probe the manifest itself so the first successful source is also the
+  # preferred package download mirror.  A source that returns a fast 404 is
+  # never ranked as healthy.
+  manifest_source=""
+  if select_source "latest-$EXT.json"; then
+    manifest_source="$SOURCE_ROOT"
+  fi
   # Authoritative origin first; cached mirrors are only a connectivity fallback.
-  for base in "https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF" "https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF" "https://fastly.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF"; do
+  for base in "$manifest_source" "https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF" "https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF" "https://fastly.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF"; do
+    [ -n "$base" ] || continue
     if download "$base/latest-$EXT.json" "$manifest" >/dev/null 2>&1 &&
        ruby -rjson -e '
          d=JSON.parse(File.read(ARGV[0]))
@@ -227,13 +247,49 @@ resolve_package(){
        ' "$manifest" "$EXT" "$REPO" > "$WORK_DIR/metadata"; then break; fi
     : > "$WORK_DIR/metadata"
   done
+  # Older package channels may not contain a manifest yet.  Query the release
+  # API as a fallback so a newly published package is installable immediately.
+  if [ ! -s "$WORK_DIR/metadata" ]; then
+    release_json="$WORK_DIR/releases.json"
+    for api in "https://api.github.com/repos/$REPO/releases?per_page=30" "https://ghfast.top/https://api.github.com/repos/$REPO/releases?per_page=30"; do
+      if download "$api" "$release_json" >/dev/null 2>&1; then
+        if ruby -rjson -e '
+          begin
+            releases=JSON.parse(File.read(ARGV[0]))
+            ext=ARGV[1]
+            rows=[]
+            releases.each do |rel|
+              tag=rel["tag_name"].to_s
+              m=tag.match(/\Av(2026-[0-9]+)-#{Regexp.escape(ext)}\z/)
+              next unless m
+              asset=(rel["assets"]||[]).find{|a| a["name"].to_s.end_with?("."+ext) && a["name"].to_s.start_with?("luci-app-openkill_")}
+              next unless asset
+              digest=asset["digest"].to_s.sub(/^sha256:/,"")
+              next unless digest.match?(/\A[0-9a-f]{64}\z/)
+              rows << [m[1].sub(/-/,"."), m[1], asset["name"], digest, asset["browser_download_url"]]
+            end
+            row=rows.sort_by{|r| r[0].split(".").map(&:to_i)}.last
+            puts row.join("\n") if row
+          rescue StandardError
+            exit 1
+          end
+        ' "$release_json" "$EXT" > "$WORK_DIR/release-metadata" && [ -s "$WORK_DIR/release-metadata" ]; then
+          # The first line is a normalized package-manager version; expose the
+          # public date-counter version in the same shape as channel manifests.
+          sed -n '2,5p' "$WORK_DIR/release-metadata" > "$WORK_DIR/metadata"
+          break
+        fi
+      fi
+    done
+  fi
   [ -s "$WORK_DIR/metadata" ] || die "No valid published $EXT release manifest is available"
   ver=$(sed -n '1p' "$WORK_DIR/metadata")
   name=$(sed -n '2p' "$WORK_DIR/metadata")
   checksum=$(sed -n '3p' "$WORK_DIR/metadata")
   release_url=$(sed -n '4p' "$WORK_DIR/metadata")
   PACKAGE_FILE="$WORK_DIR/$name"
-  for url in "$release_url" "https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF/$name" "https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF/$name" "https://fastly.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF/$name"; do
+  for url in "$release_url" "${manifest_source:+$manifest_source/$name}" "https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF/$name" "https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF/$name" "https://fastly.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF/$name"; do
+    [ -n "$url" ] || continue
     if download "$url" "$PACKAGE_FILE" &&
        [ "$(sha256sum "$PACKAGE_FILE" | awk '{print $1}')" = "$checksum" ]; then
       log "Verified published $EXT version: $ver"
@@ -269,6 +325,7 @@ if command -v uci >/dev/null 2>&1; then
   uci -q commit openkill || true
 fi
 rm -f /tmp/oix_checkin /tmp/oix_info /tmp/openkill_oix_version.json
+rm -f /tmp/openkill_version_history.json /tmp/openkill_version_history_openkill.json
 rm -f "/etc/openkill/config/oixCloud - smart.yaml"
 # Remove obsolete Smart/LGBM state so the installation remains Meta-only.
 rm -f /etc/openkill/Model.bin /tmp/etc/openkill/Model.bin

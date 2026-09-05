@@ -10,6 +10,7 @@ local M = {}
 -- Version metadata is published by OpenKill itself.  This prevents the
 -- update selector from displaying unrelated upstream OpenClash versions.
 local OPENKILL_REPO = "dinggood615/openkill"
+local MIHOMO_API = "https://api.github.com/repos/MetaCubeX/mihomo/releases/latest"
 
 -- Use a product-specific cache name so installations upgraded from the old
 -- OpenClash-derived build cannot reuse its version list.
@@ -27,10 +28,6 @@ function M.is_valid_version(s)
 	if s == "" then return false end
 	if s:match("^<") then return false end
 	return true
-end
-
-function M.is_oix_mode()
-	return false
 end
 
 function try_read(fd, maxlen)
@@ -198,106 +195,20 @@ local function try_fetch(urls, validator)
 	return ""
 end
 
-function M.prepare_oix_cdn_data(force)
-	if not M.is_oix_mode() then
-		return false, "", ""
-	end
+local function latest_mihomo_version()
+	local raw = try_fetch({ MIHOMO_API, "https://ghfast.top/" .. MIHOMO_API }, function(buf)
+		return buf:match('"tag_name"%s*:%s*"v%d+%.%d+') ~= nil
+	end)
+	if not raw or raw == "" then return "" end
+	local tag = raw:match('"tag_name"%s*:%s*"(v%d+%.%d+%.%d+)"')
+	return tag or ""
+end
 
-	local parsed = read_version_cache()
-	if parsed and parsed.oix and parsed.oix.cached_at then
-		local age = os.time() - parsed.oix.cached_at
-		local ttl = parsed.oix.cache_ttl or 300
-		if age < 5 or (not force and age < ttl) then
-			return true, parsed.oix.ver or "", parsed.oix.error or ""
-		end
-	end
-
-	local function fork_oix_version(url)
-		local fdi, fdo = nixio.pipe()
-		if not fdi or not fdo then return nil end
-		local cmd = string.format('curl -sL -m 3 --connect-timeout 3 "%s" 2>/dev/null', url)
-		local child = nixio.fork()
-		if child > 0 then
-			fdo:close()
-			return { pid = child, fdi = fdi, buf = "" }
-		elseif child == 0 then
-			nixio.dup(fdo, nixio.stdout)
-			fdi:close()
-			fdo:close()
-			nixio.exec("/bin/sh", "-c", cmd)
-		else
-			if fdi then fdi:close() end
-			if fdo then fdo:close() end
-			return nil
-		end
-	end
-
-	local jobs = {}
-	local dl_job = fork_oix_version("https://dl.dler.io/mihomo-oix/version.txt?tag=Pre-Alpha")
-	if dl_job then jobs[#jobs + 1] = dl_job end
-	local gh_job = fork_oix_version("https://github.com/vernesong/mihomo-oix/releases/download/Pre-Alpha/version.txt")
-	if gh_job then jobs[#jobs + 1] = gh_job end
-
-	if #jobs == 0 then
-		return true, "", "error"
-	end
-
-	local ver = ""
-	local delay = 50000000
-	local max_wait = 40
-	for _ = 1, max_wait do
-		for _, job in ipairs(jobs) do
-			if not job.done then
-				local ok_r, buf = pcall(try_read, job.fdi, 4096)
-				if ok_r and buf then job.buf = job.buf .. buf end
-				local ok_w, wpid = pcall(nixio.waitpid, job.pid, "nohang")
-				if ok_w and wpid then
-					while true do
-						local ok_b, b = pcall(try_read, job.fdi, 4096)
-						if not ok_b or not b then break end
-						job.buf = job.buf .. b
-					end
-					pcall(job.fdi.close, job.fdi)
-					job.done = true
-				end
-			end
-		end
-		for _, job in ipairs(jobs) do
-			if job.done and ver == "" then
-				local candidate = trim(job.buf:gsub("[\n\r]+", ""))
-				if M.is_valid_version(candidate) then
-					ver = candidate
-				end
-			end
-		end
-		if ver ~= "" then
-			for _, job in ipairs(jobs) do
-				if not job.done then
-					pcall(job.fdi.close, job.fdi)
-					nixio.kill(job.pid, 9)
-				end
-			end
-			update_version_cache(function(p) p.oix = { ver = ver, error = "", cache_ttl = 300, cached_at = os.time() } end)
-			return true, ver, ""
-		end
-		local all_done = true
-		for _, job in ipairs(jobs) do
-			if not job.done then all_done = false break end
-		end
-		if all_done then break end
-		nixio.nanosleep(0, delay)
-		delay = math.min(delay * 2, 200000000)
-	end
-
-	for _, job in ipairs(jobs) do
-		if not job.done then
-			pcall(job.fdi.close, job.fdi)
-			nixio.kill(job.pid, 9)
-		end
-	end
-
-	update_version_cache(function(p) p.oix = { ver = "", error = "error", cache_ttl = 5, cached_at = os.time() } end)
-	return true, "", "error"
+-- Public helper used by the update page to display the official stable core.
+-- The old implementation fetched the removed third-party oixCloud core here,
+-- which added slow background requests even though OpenKill is Meta-only.
+function M.latest_mihomo_version()
+		return latest_mihomo_version()
 end
 
 local function fork_file_fetch(sha, file_path, mod)
@@ -466,9 +377,9 @@ local function parse_commit_feed(raw, max_count)
 end
 
 function M.fetch_version_history(branch, force, cdn, latest_only)
-	local result = { plugin = {}, core_meta = {}, core_smart = {}, latest = nil, error = nil, oix_ver = "" }
-	local cur_oix = M.is_oix_mode()
-	local skip_core = cur_oix
+	local result = { plugin = {}, core_meta = {}, core_smart = {}, latest = nil, error = nil, schema = 2 }
+	-- OpenKill is Meta-only.  Keep the legacy result fields for old LuCI
+	-- clients, but never query the removed generated `core/` or Smart feeds.
 	local github_address_mod = fs.uci_get_config("config", "github_address_mod") or "0"
 	if cdn and cdn ~= "" then
 		github_address_mod = cdn
@@ -482,10 +393,10 @@ function M.fetch_version_history(branch, force, cdn, latest_only)
 		if parsed and parsed[branch] and parsed[branch].cached_at then
 			local blk = parsed[branch]
 			local ttl = blk.cache_ttl or 300
-			if os.time() - blk.cached_at < ttl and blk.oix == cur_oix then
+			if os.time() - blk.cached_at < ttl and blk.schema == 2 then
 				if latest_only then
 					local lt = blk.latest
-					if lt and lt.plugin and lt.plugin ~= "" and (cur_oix or (lt.core_meta and lt.core_meta ~= "")) then
+					if lt and lt.plugin and lt.plugin ~= "" and lt.core_meta and lt.core_meta ~= "" then
 						return blk
 					end
 				elseif blk.plugin and #blk.plugin > 0 then
@@ -497,7 +408,7 @@ function M.fetch_version_history(branch, force, cdn, latest_only)
 
 	if latest_only then
 		local plugin_latest = ""
-		local core_meta_latest = ""
+		local core_meta_latest = latest_mihomo_version()
 		local core_smart_latest = ""
 
 		local plugin_raw = try_fetch(build_fetch_urls(github_address_mod, "package/" .. branch .. "/version"))
@@ -505,27 +416,12 @@ function M.fetch_version_history(branch, force, cdn, latest_only)
 			plugin_latest = trim(plugin_raw:match("^[^\n\r]*") or "")
 		end
 
-		if not cur_oix then
-			local core_raw = try_fetch(build_fetch_urls(github_address_mod, "core/" .. branch .. "/core_version"))
-			if core_raw and core_raw ~= "" then
-				core_meta_latest = trim(core_raw:match("^[^\n\r]*") or "")
-				local after = core_raw:match("[\n\r]+(.*)")
-				if after then
-					core_smart_latest = trim(after:match("^[^\n\r]*") or "")
-				end
-			end
-		end
-
 		result.latest = { plugin = plugin_latest, core_meta = core_meta_latest, core_smart = core_smart_latest }
 		if plugin_latest == "" then
 			result.error = "network_error"
 		end
-		if cur_oix then
-			M.prepare_oix_cdn_data(force)
-		end
 		result.cache_ttl = (plugin_latest == "") and 5 or 300
 		result.cached_at = os.time()
-		result.oix = cur_oix
 
 		update_version_cache(function(parsed)
 			local blk = parsed[branch] or {}
@@ -533,11 +429,10 @@ function M.fetch_version_history(branch, force, cdn, latest_only)
 			blk.error = result.error
 			blk.cache_ttl = result.cache_ttl
 			blk.cached_at = result.cached_at
-			blk.oix = cur_oix
+			blk.schema = 2
 			blk.plugin = nil
 			blk.core_meta = nil
 			blk.core_smart = nil
-			blk.oix_ver = nil
 			parsed[branch] = blk
 		end)
 
@@ -571,53 +466,15 @@ function M.fetch_version_history(branch, force, cdn, latest_only)
 		end
 	end
 
-	if not skip_core then
-		local core_feed = fetch_commit_feed(github_address_mod, "core/" .. branch .. "/core_version")
-		local core_commits = parse_commit_feed(core_feed, 5)
-		if #core_commits > 0 then
-			local file_jobs = {}
-			for _, c in ipairs(core_commits) do
-				local job = fork_file_fetch(c.sha, branch .. "/core_version", github_address_mod)
-				if job then file_jobs[#file_jobs + 1] = job end
-			end
-
-			local file_results = collect_fork_results(file_jobs, 2)
-
-			for _, c in ipairs(core_commits) do
-				local content = file_results[c.sha]
-				if content and content ~= "" then
-					local meta_ver = content:match("^[^\n\r]*")
-					local after_first = content:match("[\n\r]+(.*)")
-					local smart_ver = after_first and after_first:match("^[^\n\r]*") or nil
-					if meta_ver then
-						meta_ver = trim(meta_ver)
-						if M.is_valid_version(meta_ver) then
-							result.core_meta[#result.core_meta + 1] = { version = meta_ver, date = c.date, sha = c.sha }
-						end
-					end
-					if smart_ver then
-						smart_ver = trim(smart_ver)
-						if M.is_valid_version(smart_ver) then
-							result.core_smart[#result.core_smart + 1] = { version = smart_ver, date = c.date, sha = c.sha }
-						end
-					end
-				end
-			end
-		end
-	end
-
+	-- Historical core selectors were generated by the removed Smart pipeline.
+	-- The current core is resolved from the official stable API, so retaining
+	-- those feed requests only adds latency and can return stale versions.
+	local official_meta = latest_mihomo_version()
 	result.latest = {
 		plugin = (result.plugin[1] and result.plugin[1].version) or "",
-		core_meta = (result.core_meta[1] and result.core_meta[1].version) or "",
+		core_meta = official_meta,
 		core_smart = (result.core_smart[1] and result.core_smart[1].version) or ""
 	}
-
-	if cur_oix then
-		local _, oix_ver = M.prepare_oix_cdn_data(force)
-		if oix_ver and oix_ver ~= "" then
-			result.oix_ver = oix_ver
-		end
-	end
 
 	local cache_ttl = 300
 	if #result.plugin == 0 then
@@ -632,7 +489,7 @@ function M.fetch_version_history(branch, force, cdn, latest_only)
 
 	result.cache_ttl = cache_ttl
 	result.cached_at = os.time()
-	result.oix = cur_oix
+	result.schema = 2
 
 	update_version_cache(function(parsed)
 		parsed[branch] = result

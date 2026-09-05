@@ -1,8 +1,8 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-openkill
-PKG_VERSION:=2026-1020
-PKG_MAINTAINER:=vernesong <https://github.com/vernesong/OpenClash>
+PKG_VERSION:=2026-1030
+PKG_MAINTAINER:=dinggood615 <https://github.com/dinggood615/openkill>
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
 
@@ -40,15 +40,15 @@ endef
 define Package/$(PKG_NAME)
 	CATEGORY:=LuCI
 	SUBMENU:=3. Applications
-	TITLE:=LuCI support for clash
+	TITLE:=LuCI support for OpenKill
 	PKGARCH:=all
-	DEPENDS:=+dnsmasq-full +bash +curl +ca-bundle +ip-full \
-	+ruby +ruby-yaml +kmod-tun +unzip
-	MAINTAINER:=vernesong
+	DEPENDS:=+dnsmasq-full +bash +curl +ca-bundle +ip-full +lua \
+	+ruby +ruby-yaml +luci-compat +kmod-tun +unzip
+	MAINTAINER:=dinggood615
 endef
 
 define Package/$(PKG_NAME)/description
-    A LuCI support for clash
+    A lightweight LuCI client for the official Mihomo (Meta) core
 endef
 
 define Build/Prepare
@@ -113,7 +113,7 @@ define Package/$(PKG_NAME)/postrm
 	rm -rf /tmp/openkill_start.log >/dev/null 2>&1
 	rm -rf /tmp/openkill.change >/dev/null 2>&1
 	rm -rf /usr/share/openkill >/dev/null 2>&1
-	rm -rf /tmp/openkill_version_history.json >/dev/null 2>&1
+	rm -rf /tmp/openkill_version_history.json /tmp/openkill_version_history_openkill.json >/dev/null 2>&1
     rm -rf /tmp/openkill_cdn_info.json >/dev/null 2>&1
 	rm -rf ${DNSMASQ_CONF_DIR}/dnsmasq_openkill_custom_domain.conf >/dev/null 2>&1
 	rm -rf ${DNSMASQ_CONF_DIR}/dnsmasq_openkill_chnroute_pass.conf >/dev/null 2>&1

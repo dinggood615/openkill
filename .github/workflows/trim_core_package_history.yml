@@ -1,4 +1,4 @@
-name: Trim Core and Package History
+name: Trim package history
 
 on:
   schedule:
@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        branch: [core, package]
+        branch: [package]
     steps:
       - name: Apt Update
         env:
@@ -21,19 +21,16 @@ jobs:
 
       - name: Trim History
         env:
-          REPO_URL: https://github.com/vernesong/OpenClash.git
+          REPO_URL: https://github.com/dinggood615/openkill.git
           BRANCH: ${{ matrix.branch }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
-          if [ "${BRANCH}" = "core" ]; then
-            MAX_COMMITS=20
-            LIMIT_COMMITS=10
-          else
-            MAX_COMMITS=50
-            LIMIT_COMMITS=30
-          fi
+          # Only the package channel is maintained.  Mihomo binaries are
+          # fetched from the official release and never copied into Git.
+          MAX_COMMITS=50
+          LIMIT_COMMITS=30
 
           echo "Start full clone for history check (branch: ${BRANCH})..."
           mkdir -p ../full_clone_tmp
@@ -119,7 +116,7 @@ jobs:
             echo "Built commit: $LAST_COMMIT"
 
             if [ -n "${GITHUB_TOKEN:-}" ]; then
-              git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/vernesong/OpenClash.git"
+              git remote set-url origin "https://x-access-token:${GITHUB_TOKEN}@github.com/dinggood615/openkill.git"
             fi
 
             git push --force --quiet origin "$LAST_COMMIT:refs/heads/${BRANCH}" || true

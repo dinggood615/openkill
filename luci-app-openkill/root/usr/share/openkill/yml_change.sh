@@ -450,7 +450,10 @@ begin
          Value['geodata-loader'] = geodata_loader if geodata_loader != '0'
          Value['tcp-concurrent'] = true if tcp_concurrent
          Value['unified-delay'] = true if unified_delay
-         Value['find-process-mode'] = find_process_mode if find_process_mode != '0'
+          # Routers do not have a meaningful process table for every flow;
+          # `off` avoids repeated process lookups and is the Mihomo-recommended
+          # low-overhead default.  Keep an explicit user value when supplied.
+          Value['find-process-mode'] = (find_process_mode == '0' ? 'off' : find_process_mode)
 
          (Value['experimental'] ||= {})['quic-go-disable-gso'] = true if quic_gso
          if cors_origin != '0'
@@ -458,15 +461,14 @@ begin
             Value['external-controller-cors']['allow-private-network'] = true
          end
 
-         Value['lgbm-auto-update'] = true if lgbm_auto_update
-         if lgbm_auto_update
-            Value['lgbm-url'] = lgbm_custom_url.strip
-            Value['lgbm-update-interval'] = lgbm_update_interval.to_i
-         end
-
-         if smart_collect
-            (Value['profile'] ||= {})['smart-collector-size'] = smart_collect_size.to_f
-         end
+          # Smart/LightGBM fields are not part of the official Meta core.  Old
+          # UCI values are ignored so they cannot reintroduce unsupported keys.
+          Value.delete('lgbm-auto-update')
+          Value.delete('lgbm-url')
+          Value.delete('lgbm-update-interval')
+          if Value['profile'].is_a?(Hash)
+             Value['profile'].delete('smart-collector-size')
+          end
 
          Value['geox-url'] ||= {}
          if geo_custom_url != '0'
@@ -482,9 +484,12 @@ begin
             Value['geox-url']['asn'] = geoasn_custom_url
          end
 
-         Value['dns']['enable'] = true
-         Value['dns']['ipv6'] = dns_ipv6
-         Value['ipv6'] = true if dns_ipv6
+          Value['dns']['enable'] = true
+          Value['dns']['ipv6'] = dns_ipv6
+          Value['ipv6'] = true if dns_ipv6
+          Value['dns']['prefer-h3'] = false
+          Value['dns']['cache-algorithm'] = 'arc'
+          Value['dns']['ipv6-timeout'] = 100 if !Value['dns'].key?('ipv6-timeout')
 
          if fake_ip_mode == 'redir-host'
             Value['dns']['enhanced-mode'] = 'redir-host'
@@ -519,7 +524,7 @@ begin
          if en_mode_tun != '0' || ['2', '3'].include?(ipv6_mode)
             Value['tun'] = {
                'enable' => true, 'stack' => stack_type, 'device' => 'utun',
-               'dns-hijack' => ['127.0.0.1:53'], 'endpoint-independent-nat' => true,
+               'dns-hijack' => ['127.0.0.1:53'], 'endpoint-independent-nat' => false,
                'auto-route' => false, 'auto-detect-interface' => false,
                'auto-redirect' => false, 'strict-route' => false, 'disable-icmp-forwarding' => false
             }
@@ -543,7 +548,7 @@ begin
          (Value['ntp'] ||= {})['enable'] = true
          Value['ntp']['server'] = 'time.apple.com' if !Value['ntp'].key?('server')
          Value['ntp']['port'] = 123 if !Value['ntp'].key?('port')
-         Value['ntp']['interval'] = 30 if !Value['ntp'].key?('interval')
+          Value['ntp']['interval'] = 1800 if !Value['ntp'].key?('interval')
          Value['ntp']['write-to-system'] = true if !Value['ntp'].key?('write-to-system')
 
       rescue Exception => e

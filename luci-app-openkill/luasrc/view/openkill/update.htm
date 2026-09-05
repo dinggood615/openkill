@@ -59,12 +59,9 @@
                         <div class="form-select-wrapper">
                             <select class="select-class" id="RELEASE_BRANCH" onchange="onBranchChange()">
                                 <option value="master">Master</option>
-                                <option value="dev">Developer</option>
                             </select>
                         </div>
                     </div>
-                    <!-- Smart 内核已移除；保留隐藏状态字段以兼容旧版前端逻辑，始终使用 Meta。 -->
-                    <input type="hidden" id="SMART_ENABLE" value="0">
                 </div>
                 <div class="version-card">
                     <div class="version-row">
@@ -192,7 +189,6 @@
 //<![CDATA[
     var core_version = document.getElementById('CORE_VERSION');
     var release_branch = document.getElementById('RELEASE_BRANCH');
-    var smart_enable = document.getElementById('SMART_ENABLE');
     var versionTabMode = document.getElementById('selectPopup').classList.contains('select-popup-tab');
     var currentDownloadType = 'one_key';
     var refreshTimer = null;
@@ -216,7 +212,6 @@
     var lastLogLineCount = null;
     var logMaxWaitTimer = null;
     var fetchedBranch = null;
-    var _isOix = false;
     var _pkgType = 'opkg';
     var forceRefresh = false;
     var infoCache = {};
@@ -308,13 +303,13 @@
             }
             pathPrefix = 'package/' + branch;
         } else {
-            filename = 'clash-' + arch + '.tar.gz';
-            var coreSubPath = (smart_enable.value === '1') ? 'smart' : 'meta';
-            pathPrefix = 'core/' + branch + '/' + coreSubPath;
+            // OpenKill retrieves the official Mihomo core through the
+            // controller; generated core branch files are no longer used.
+            return '';
         }
 
         if (sha) {
-            var refPath = (type === 'plugin') ? branch : branch + '/' + coreSubPath;
+            var refPath = branch;
             if (isJsDelivr)
                 return addr + 'gh/dinggood615/openkill@' + sha + '/' + refPath + '/' + filename;
             else if (classifyAddr(addr) === 'raw')
@@ -347,7 +342,7 @@
     }
 
     function makeVerCell(addrUrl, type, version) {
-        var branch = fetchedBranch || release_branch.value || 'dev';
+        var branch = fetchedBranch || release_branch.value || 'master';
         var arch = core_version.value;
         var selectEl = type === 'plugin'
             ? document.getElementById('select-plugin-ver')
@@ -383,7 +378,6 @@
     }
 
     function updateAddrRow(row, addrUrl, info) {
-        var smart = smart_enable.value || '0';
         var latencyEl = row.querySelector('.addr-status');
         var verSpans = row.querySelectorAll('.ver-text');
         var pluginEl = verSpans[0];
@@ -429,7 +423,7 @@
             }
         }
         if (coreEl) {
-            var coreVer = (smart === '1' && info.core_smart_ver) ? info.core_smart_ver : info.core_meta_ver;
+            var coreVer = info.core_meta_ver;
             if (coreVer) {
                 coreEl.innerHTML = makeVerCell(addrUrl, 'core', coreVer);
                 coreEl.classList.add('has-data');
@@ -464,7 +458,6 @@
         infoCache[addrUrl] = {
             plugin_ver: info.plugin_ver || null,
             core_meta_ver: info.core_meta_ver || null,
-            core_smart_ver: info.core_smart_ver || null,
             latency: info.latency,
             core_error: info.core_error || null
         };
@@ -524,15 +517,12 @@
     function fetchUpdateInfo(opts) {
         core_version.disabled = true;
         release_branch.disabled = true;
-        smart_enable.disabled = true;
         document.getElementById('select-plugin-ver').disabled = true;
         document.getElementById('select-core-ver').disabled = true;
         XHR.get('<%=luci.dispatcher.build_url("admin", "services", "openkill", "update")%>', null, function(x, st) {
             if (x && x.status == 200) {
                 if (st.corever && st.corever != '0') core_version.value = st.corever; else core_version.value = '0';
                 if (st.release_branch) release_branch.value = st.release_branch; else release_branch.value = 'master';
-                if (st.smart_enable) smart_enable.value = st.smart_enable; else smart_enable.value = '0';
-                _isOix = false;
                 _pkgType = st.pkg_type || 'opkg';
                 document.getElementById('installed-plugin').textContent = (st.opcv && st.opcv != '0') ? st.opcv : '--';
                 document.getElementById('installed-core').textContent = (st.coremetacv && st.coremetacv != '0') ? st.coremetacv : '--';
@@ -546,7 +536,6 @@
             }
             core_version.disabled = false;
             release_branch.disabled = false;
-            smart_enable.disabled = false;
             fetchedBranch = release_branch.value;
             updateDataStatus({ update: true });
             fetchVersionHistory(!!(opts && opts.force), {cancel: true});
@@ -569,19 +558,16 @@
         }
         versionHistoryBusy = true;
         updateDataStatus({ version: false });
-        var branch = fetchedBranch || release_branch.value || 'dev';
+        var branch = fetchedBranch || release_branch.value || 'master';
         var pluginSelect = document.getElementById('select-plugin-ver');
         var coreSelect = document.getElementById('select-core-ver');
         var hint = document.getElementById('version-hint');
         var params = { branch: branch };
-        var smart = smart_enable.value || '0';
 
         var appendHistoryEntry = function(entry) {
             if (entry.type === 'plugin' && entry.version) {
                 pluginSelect.innerHTML += '<option value="' + entry.sha + '" data-ver="' + entry.version + '">' + entry.version + ' (<%:Date%>: ' + (entry.date||'').substring(0,10) + ')</option>';
-            } else if (!_isOix && entry.type === 'core_meta' && smart !== '1' && entry.version) {
-                coreSelect.innerHTML += '<option value="' + entry.sha + '" data-ver="' + entry.version + '">' + entry.version + ' (<%:Date%>: ' + (entry.date||'').substring(0,10) + ')</option>';
-            } else if (!_isOix && entry.type === 'core_smart' && smart === '1' && entry.version) {
+            } else if (entry.type === 'core_meta' && entry.version) {
                 coreSelect.innerHTML += '<option value="' + entry.sha + '" data-ver="' + entry.version + '">' + entry.version + ' (<%:Date%>: ' + (entry.date||'').substring(0,10) + ')</option>';
             }
         };
@@ -719,8 +705,7 @@
     function saveOptions() {
         XHR.get('<%=luci.dispatcher.build_url("admin", "services", "openkill", "save_corever_branch")%>', {
             core_ver: core_version.value,
-            release_branch: release_branch.value,
-            smart_enable: smart_enable.value
+            release_branch: release_branch.value
         },function() {});
     }
 
@@ -738,14 +723,6 @@
         fetchedBranch = release_branch.value;
         if (versionRetryTimer) { clearInterval(versionRetryTimer); versionRetryTimer = null; }
         if (retryTimer) { clearInterval(retryTimer); retryTimer = null; }
-        saveOptions();
-        resetDataStatus(true);
-        fetchVersionHistory(false, {cancel: true});
-        forceRefresh = true;
-        refreshAddrInfo({cancel: true, user: true});
-    }
-
-    function onSmartChange() {
         saveOptions();
         resetDataStatus(true);
         fetchVersionHistory(false, {cancel: true});
@@ -812,14 +789,12 @@
         addrInfoBusy = true;
         if (opts && opts.user) updateDataStatus({ addr: false });
 
-        var branch = fetchedBranch || release_branch.value || 'dev';
-        var smart = smart_enable.value || '0';
+        var branch = fetchedBranch || release_branch.value || 'master';
         var pluginVer = document.getElementById('select-plugin-ver').value;
         var coreVer = document.getElementById('select-core-ver').value;
         var params = {
             addrs: addrs.join(','),
             branch: branch,
-            smart: smart,
             plugin_ver: pluginVer || '',
             core_ver: coreVer || ''
         };
@@ -1005,20 +980,19 @@
         var ver = verLink.getAttribute('data-ver') || '';
         var dlUrl = verLink.getAttribute('data-dl') || '';
 
-        var branch = fetchedBranch || release_branch.value || 'dev';
+        var branch = fetchedBranch || release_branch.value || 'master';
         var arch = core_version.value;
         var selectEl = type === 'plugin'
             ? document.getElementById('select-plugin-ver')
             : document.getElementById('select-core-ver');
 
-        if (type === 'core' && (!arch || arch === '0')) {
-            showHint('<%:No Compiled Version Selected, Please Select In Update Page And Try Again%>');
-            return;
-        }
-        var sha = ver ? findSHAbyVersion(selectEl, ver) : '';
+        // The Meta core is downloaded by the backend from the official stable
+        // release API and detects the local architecture itself.  It no longer
+        // depends on a generated OpenKill core branch or CDN URL.
+        var sha = (type === 'core') ? '' : (ver ? findSHAbyVersion(selectEl, ver) : '');
         var selOpt = selectEl.options[selectEl.selectedIndex];
         var isLatest = !selOpt || selOpt.value === '__latest__';
-        if (ver && !sha && !isLatest && !(type === 'core' && _isOix)) {
+        if (type !== 'core' && ver && !sha && !isLatest) {
             showHint('<%:The selected version is not in the version history, please refresh and try again%>');
             return;
         }
@@ -1040,7 +1014,7 @@
             return;
         }
 
-        if (!dlUrl) {
+        if (type !== 'core' && !dlUrl) {
             showHint('<%:Failed to get download link%>');
             return;
         }
@@ -1065,7 +1039,8 @@
         if (addr === 'https://raw.githubusercontent.com/') addr = '';
 
         if (type === 'core') {
-            var params = {download_url: dlUrl};
+            // Empty parameters select the official latest stable Mihomo build.
+            var params = {};
             if (addr && addr !== '') params.url = addr;
             XHR.get('<%=luci.dispatcher.build_url("admin", "services", "openkill", "core_download")%>', params, function() {});
         } else {
@@ -1155,16 +1130,10 @@
                 return;
             }
 
-            var branch = fetchedBranch || release_branch.value || 'dev';
+            var branch = fetchedBranch || release_branch.value || 'master';
             var arch = core_version.value;
             var v = core_version.value;
             var r = release_branch.value;
-            var s = smart_enable.value;
-
-            if (!arch || arch === '0') {
-                showHint('<%:No Compiled Version Selected, Please Select In Update Page And Try Again%>');
-                return;
-            }
 
             var pluginSel = document.getElementById('select-plugin-ver');
             var coreSel = document.getElementById('select-core-ver');
@@ -1174,19 +1143,17 @@
             var isCoreLatest = !coreOpt || coreOpt.value === '__latest__';
 
             var pluginVer = addrInfo.plugin_ver || '';
-            var coreVer = (s === '1' && addrInfo.core_smart_ver)
-                ? addrInfo.core_smart_ver
-                : (addrInfo.core_meta_ver || '');
+            var coreVer = addrInfo.core_meta_ver || '';
 
             var pluginSHA = (!isPluginLatest && addrInfo.plugin_ver) ? findSHAbyVersion(pluginSel, addrInfo.plugin_ver) : '';
-            var useCoreVer = (s === '1' && addrInfo.core_smart_ver) ? addrInfo.core_smart_ver : addrInfo.core_meta_ver;
+            var useCoreVer = addrInfo.core_meta_ver;
             var coreSHA = (!isCoreLatest && useCoreVer) ? findSHAbyVersion(coreSel, useCoreVer) : '';
 
             if (currentDownloadType !== 'core_download' && !isPluginLatest && addrInfo.plugin_ver && !pluginSHA) {
                 showHint('<%:The selected version is not in the version history, please refresh and try again%>');
                 return;
             }
-            if (!isCoreLatest && useCoreVer && !coreSHA) {
+            if (currentDownloadType !== 'core_download' && !isCoreLatest && useCoreVer && !coreSHA) {
                 showHint('<%:The selected version is not in the version history, please refresh and try again%>');
                 return;
             }
@@ -1230,8 +1197,9 @@
             if (addr === 'https://raw.githubusercontent.com/') addr = '';
 
             if (currentDownloadType === 'core_download') {
-                var coreURL = buildDownloadURL(addr, 'core', r, coreVer, coreSHA, arch);
-                var params = {download_url: coreURL};
+                // Official Meta updater resolves the current stable release and
+                // selects the architecture from uname on the router.
+                var params = {};
                 if (addr && addr !== '') params.url = addr;
                 XHR.get('<%=luci.dispatcher.build_url("admin", "services", "openkill", "core_download")%>', params, function() {});
             } else {

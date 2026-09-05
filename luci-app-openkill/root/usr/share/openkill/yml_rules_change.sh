@@ -21,6 +21,23 @@ yml_other_set()
 
    begin
       thread_pool = [];
+
+      # OpenKill ships the official Meta core only.  Convert configurations
+      # written by older Smart builds to the native url-test group while
+      # retaining their members, URL and interval.  Removing Smart-only keys
+      # prevents an old setting from making Mihomo reject the whole file.
+      begin
+         if Value['proxy-groups'].is_a?(Array)
+            Value['proxy-groups'].each do |group|
+               next unless group.is_a?(Hash) && group['type'].to_s.downcase == 'smart'
+               group['type'] = 'url-test'
+               %w[collectdata sample-rate uselightgbm policy-priority prefer-asn].each { |key| group.delete(key) }
+               YAML.LOG_TIP('Converted legacy Smart group【%s】to url-test.' % [group['name'].to_s])
+            end
+         end
+      rescue Exception => e
+         YAML.LOG_ERROR('Convert legacy Smart groups failed,【' + e.message + '】')
+      end;
       # GEOIP replace
       geoip_pattern = /^GEOIP,([A-Za-z]{2}),([^,]+)(,.*)?/;
       match_pattern = /(^MATCH.*|^FINAL.*)/;
@@ -383,39 +400,6 @@ yml_other_set()
             end;
          rescue Exception => e
             YAML.LOG_ERROR('Edit URL-Test URL Failed,【' + e.message + '】');
-         end;
-
-         # smart auto switch
-         begin
-            if ('${8}' == '1' or '${9}' == '1' or '${11}' != '0' or '${12}' != '0' or '${12}' == '1' or '${13}' == '1' or '${14}' != '0') and Value.key?('proxy-groups') and Value['proxy-groups'].is_a?(Array) then
-               Value['proxy-groups'].each{|group|
-                  threads << Thread.new {
-                     if '${8}' == '1' and ['url-test', 'load-balance'].include?(group['type']) then
-                        group['type'] = 'smart';
-                     end;
-                     if group['type'] == 'smart' then
-                        if '${9}' == '1' then
-                           group['collectdata'] = true;
-                           group['sample-rate'] = '${10}'.to_f;
-                        end;
-                        if '${11}' != '0'then
-                           group['policy-priority'] = '${11}';
-                        end;
-                        if '${12}' == '1' then
-                           group['uselightgbm'] = true;
-                        end;
-                        if '${13}' == '1' then
-                           group['prefer-asn'] = true;
-                        end;
-                        if '${14}' != '0' then
-                           group['tolerance'] = '${14}'.to_i;
-                        end;
-                     end;
-                  };
-               };
-            end;
-         rescue Exception => e
-            YAML.LOG_ERROR('Setting Smart Auto Switch Failed,【' + e.message + '】');
          end;
 
          threads.each(&:join);

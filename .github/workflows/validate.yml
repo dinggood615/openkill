@@ -1,0 +1,30 @@
+name: Validate OpenKill source
+
+on:
+  push:
+    branches: [master, package]
+    paths:
+      - 'luci-app-openkill/**'
+      - 'scripts/**'
+      - '.github/workflows/**'
+      - 'README.md'
+  pull_request:
+    paths:
+      - 'luci-app-openkill/**'
+      - 'scripts/**'
+      - '.github/workflows/**'
+      - 'README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate shell, YAML and version metadata
+        shell: bash
+        run: sh scripts/validate-openkill.sh

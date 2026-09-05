@@ -1,62 +1,32 @@
-name: Sync Core and Package to Master When release
+name: Validate OpenKill release metadata
+
+# IPK and APK are published independently by their build jobs.  There is no
+# generated core branch to synchronise; the installer retrieves the official
+# stable Mihomo release directly.  This workflow therefore validates source
+# metadata after a tagged release without copying or rewriting branches.
 on:
   push:
     tags:
       - "v*"
   workflow_dispatch:
-  
+
+permissions:
+  contents: read
+
 jobs:
-  Sync_core_to_master:
+  validate:
     runs-on: ubuntu-latest
     steps:
-      - name: Apt Update
-        env:
-          DEBIAN_FRONTEND: noninteractive
+      - name: Check source and release conventions
+        uses: actions/checkout@v4
+      - name: Validate repository
+        shell: bash
+        run: sh scripts/validate-openkill.sh
+      - name: Verify official core API is reachable
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get -y install git
-
-      - name: Clone OpenKill Repository
-        uses: actions/checkout@v6
-        with:
-          ref: core
-
-      - name: Sync dev core to master
-        run: |
-          if [ -n "$(diff -r ./master/ ./dev/)" ]; then
-            rm -rf ./master/premium
-            rm -rf ./master/dev
-            rm -rf ./master/meta/*
-            rm -rf ./master/smart/*
-            rm -rf ./master/core_version
-            cp -rf "./dev/." "./master/"
-            git config user.name 'github-actions[bot]'
-            git config user.email 'github-actions[bot]@users.noreply.github.com'
-            git add .
-            git commit -m "Release: Auto sync dev core"
-            git push
-          else
-            echo "master core already sync to dev, exit"
-          fi
-
-      - name: Clone OpenKill Repository
-        uses: actions/checkout@v6
-        with:
-          ref: package
-
-      - name: Sync dev package to master
-        run: |
-          if [ -n "$(diff -r ./master/ ./dev/)" ]; then
-            rm -rf ./master/README.md
-            rm -rf ./master/luci-app-openkill*
-            rm -rf ./master/version
-            cp -rf "./dev/." "./master/"
-            git config user.name 'github-actions[bot]'
-            git config user.email 'github-actions[bot]@users.noreply.github.com'
-            git add .
-            git commit -m "Release: Auto sync dev package"
-            git push
-          else
-            echo "master package already sync to dev, exit"
-          fi
-          
+          set -eu
+          curl --fail --silent --show-error --retry 3 --connect-timeout 15 --max-time 60 \
+            -H 'Accept: application/vnd.github+json' \
+            https://api.github.com/repos/MetaCubeX/mihomo/releases/latest \
+            | grep -q '"tag_name"'

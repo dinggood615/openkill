@@ -25,7 +25,6 @@ function index()
 	entry({"admin", "services", "openkill", "opupdate"},call("action_opupdate"))
 	entry({"admin", "services", "openkill", "coreupdate"},call("action_coreupdate"))
 	entry({"admin", "services", "openkill", "flush_dns_cache"}, call("action_flush_dns_cache"))
-	entry({"admin", "services", "openkill", "flush_smart_cache"}, call("action_flush_smart_cache"))
 	entry({"admin", "services", "openkill", "update_config"}, call("action_update_config"))
 	entry({"admin", "services", "openkill", "download_rule"}, call("action_download_rule"))
 	entry({"admin", "services", "openkill", "restore"}, call("action_restore_config"))
@@ -267,7 +266,9 @@ local function coremetacv()
 end
 
 function release_branch()
-	return fs.uci_get_config("config", "release_branch") or "master"
+	-- OpenKill publishes stable packages from the master channel; the former
+	-- developer branch was tied to the removed Smart/Oix core pipeline.
+	return "master"
 end
 
 local function smart_enable()
@@ -290,11 +291,11 @@ local function corelv()
 
 	local cache = ov.fetch_version_history(release_branch(), false)
 	if cache then
-		if oix_token ~= "" then
-			core_meta_lv = cache.oix_ver or ""
-		elseif core_smart_enable == "1" then
-			core_meta_lv = (cache.core_smart and cache.core_smart[1] and cache.core_smart[1].version) or ""
-		else
+		-- Meta is the only supported core.  Prefer the official stable release
+		-- reported in the latest block; the history list is a compatibility
+		-- fallback for installations that still have an older cache.
+		core_meta_lv = (cache.latest and cache.latest.core_meta) or ""
+		if core_meta_lv == "" then
 			core_meta_lv = (cache.core_meta and cache.core_meta[1] and cache.core_meta[1].version) or ""
 		end
 	end
@@ -342,9 +343,9 @@ end
 
 local function coreup()
 	uci:set("openkill", "config", "enable", "1")
+	uci:set("openkill", "config", "core_type", "Meta")
 	uci:commit("openkill")
-	local type = HTTP.formvalue("core_type")
-	return SYS.call(string.format("/usr/share/openkill/openkill_core.sh '%s' >/dev/null 2>&1 &", type))
+	return SYS.call("/usr/share/openkill/openkill_core.sh Meta >/dev/null 2>&1 &")
 end
 
 local function save_corever_branch()
@@ -354,9 +355,9 @@ local function save_corever_branch()
 	if HTTP.formvalue("release_branch") then
 		uci:set("openkill", "config", "release_branch", HTTP.formvalue("release_branch"))
 	end
-	if HTTP.formvalue("smart_enable") then
-		uci:set("openkill", "config", "smart_enable", HTTP.formvalue("smart_enable"))
-	end
+	-- Smart/Oix cores are intentionally not selectable; OpenKill is Meta-only.
+	uci:set("openkill", "config", "core_type", "Meta")
+	uci:delete("openkill", "config", "smart_enable")
 	uci:commit("openkill")
 	return "success"
 end
@@ -390,22 +391,6 @@ function action_flush_dns_cache()
 		fakeip_flush = fake_ip_state;
 		dns_flush = dns_state;
 		flush_status = (fake_ip_state == "" and dns_state == "") and "" or (fake_ip_state ~= "" and fake_ip_state or dns_state);
-	})
-end
-
-function action_flush_smart_cache()
-	local flush_state = ""
-	if is_running() then
-		local daip = daip()
-		local dase = dase() or ""
-		local cn_port = cn_port()
-		if daip and cn_port then
-			flush_state = SYS.exec(string.format('curl -sL -m 3 --retry 2 -H "Content-Type: application/json" -H "Authorization: Bearer %s" -XPOST http://"%s":"%s"/cache/smart/flush', dase, daip, cn_port))
-		end
-	end
-	HTTP.prepare_content("application/json")
-	HTTP.write_json({
-		flush_status = flush_state;
 	})
 end
 
@@ -1686,10 +1671,10 @@ function process_status(name)
 end
 
 local START_SCRIPT_PATTERNS = {
-	["init"] = "/etc/init.d/[o]penclash",
-	["openkill.sh"] = "[o]penclash\\.sh",
-	["openkill_core.sh"] = "[o]penclash_core\\.sh",
-	["openkill_update.sh"] = "[o]penclash_update\\.sh",
+	["init"] = "/etc/init.d/[o]penkill",
+	["openkill.sh"] = "[o]penkill\\.sh",
+	["openkill_core.sh"] = "[o]penkill_core\\.sh",
+	["openkill_update.sh"] = "[o]penkill_update\\.sh",
 }
 
 local function stream_log_and_parse(reader)
@@ -2306,13 +2291,9 @@ function all_proxies_stream_test()
 end
 
 function action_announcement()
-	if not fs.access("/tmp/openkill_announcement") or fs.readfile("/tmp/openkill_announcement") == "" or fs.mtime("/tmp/openkill_announcement") < (os.time() - 86400) then
-		local HTTP_CODE = SYS.exec("curl -SsL -m 5 -w '%{http_code}' -o /tmp/openkill_announcement https://raw.githubusercontent.com/vernesong/OpenClash/dev/announcement 2>/dev/null")
-		if HTTP_CODE ~= "200" then
-			fs.unlink("/tmp/openkill_announcement")
-		end
-	end
-	local info = SYS.exec("cat /tmp/openkill_announcement 2>/dev/null") or ""
+	-- The announcement bar was removed from OpenKill. Keep this endpoint as a
+	-- compatibility no-op for cached frontends, without making a network call.
+	local info = ""
 	HTTP.prepare_content("application/json")
 	HTTP.write_json({
 		content = info;
@@ -3091,12 +3072,7 @@ function action_version_history()
 			write_padded(json.stringify(entry))
 		end
 	end
-	if parsed.core_smart then
-		for _, entry in ipairs(parsed.core_smart) do
-			entry.type = "core_smart"
-			write_padded(json.stringify(entry))
-		end
-	end
+	-- OpenKill is Meta-only; never expose the retired Smart core history.
 	local complete_line = {complete = true}
 	if parsed.error then
 		complete_line.error = parsed.error
@@ -3205,36 +3181,19 @@ function action_cdn_info()
 		return "proxy"
 	end
 
-	local function build_version_url(cdn, file_type)
-		if file_type == "core" and is_oix() then
-			local oix_version = "https://github.com/vernesong/mihomo-oix/releases/download/Pre-Alpha/version.txt"
-			local oix_dler = "https://dl.dler.io/mihomo-oix/version.txt?tag=Pre-Alpha"
-			local ctype = classify_cdn(cdn)
-			if ctype == "dler" then
-				return oix_dler
-			elseif ctype == "proxy" then
-				return cdn .. oix_version
-			elseif ctype == "jsdelivr" then
-				return oix_dler
-			end
-			return oix_version
-		end
-
-		local file = file_type == "plugin" and branch .. "/version" or branch .. "/core_version"
-		local ref
-		if file_type == "plugin" then
-			ref = (plugin_ver ~= "" and plugin_ver ~= "__latest__") and plugin_ver or "package"
-		else
-			ref = (core_ver ~= "" and core_ver ~= "__latest__") and core_ver or "core"
-		end
+	local function build_version_url(cdn)
+		-- Plugin metadata is published by OpenKill.  The core is resolved from
+		-- MetaCubeX's official release API and is not represented by a branch file.
+		local file = branch .. "/version"
+		local ref = (plugin_ver ~= "" and plugin_ver ~= "__latest__") and plugin_ver or "package"
 		local ctype = classify_cdn(cdn)
 
 		if ctype == "raw" then
-			return "https://raw.githubusercontent.com/vernesong/OpenClash/" .. ref .. "/" .. file
+			return "https://raw.githubusercontent.com/dinggood615/openkill/" .. ref .. "/" .. file
 		elseif ctype == "jsdelivr" then
-			return cdn .. "gh/vernesong/OpenKill@" .. ref .. "/" .. file
+			return cdn .. "gh/dinggood615/openkill@" .. ref .. "/" .. file
 		else
-			return cdn .. "https://raw.githubusercontent.com/vernesong/OpenClash/" .. ref .. "/" .. file
+			return cdn .. "https://raw.githubusercontent.com/dinggood615/openkill/" .. ref .. "/" .. file
 		end
 	end
 
@@ -3258,7 +3217,7 @@ function action_cdn_info()
 	local max_iter = 250
 	local iter = 0
 
-	local oix_mode, oix_core_ver, oix_core_error = ov.prepare_oix_cdn_data(force)
+	local official_core_ver = ov.latest_mihomo_version()
 
 	if merge and parsed_cache and parsed_cache.result then
 		for cdn, info in pairs(parsed_cache.result) do
@@ -3278,20 +3237,13 @@ function action_cdn_info()
 
 	local function launch_cdn(cdn)
 		pcall(io.flush)
-		local plugin_url = build_version_url(cdn, "plugin")
-		local core_url = build_version_url(cdn, "core")
-		local raw_core_url = ""
-		if not is_oix() then
-			local raw_ref = (core_ver ~= "" and core_ver ~= "__latest__") and core_ver or "core"
-			raw_core_url = "https://raw.githubusercontent.com/vernesong/OpenClash/" .. raw_ref .. "/" .. branch .. "/core_version"
-		end
+		local plugin_url = build_version_url(cdn)
 		local cmd = string.format([[
 PLUGIN_VER=""
 CORE_META_VER="%s"
 CORE_SMART_VER=""
-CORE_ERR="%s"
-OIX_MODE="%s"
-RAW_CORE_URL="%s"
+CORE_ERR=""
+OIX_MODE="0"
 LATENCY="null"
 
 PLUGIN_RAW=$(curl -sL -m 5 -w '\n%%{http_code} %%{time_starttransfer}' "%s" 2>/dev/null)
@@ -3312,36 +3264,9 @@ else
 	LATENCY=-2
 fi
 
-CORE_RAW=$(curl -sL -m 5 -w '\n%%{http_code} %%{time_starttransfer}' "%s" 2>/dev/null)
-C_EXIT=$?
-if [ $C_EXIT -ne 0 ] && [ -n "$RAW_CORE_URL" ]; then
-	CORE_RAW=$(curl -sL -m 5 -w '\n%%{http_code} %%{time_starttransfer}' "$RAW_CORE_URL" 2>/dev/null)
-	C_EXIT=$?
-fi
-
-if [ $C_EXIT -eq 0 ] && [ -n "$CORE_RAW" ]; then
-	C_CODE=$(echo "$CORE_RAW" | tail -1 | awk '{print $1}')
-	C_TIME=$(echo "$CORE_RAW" | tail -1 | awk '{printf "%%d", $2 * 1000}')
-	if [ "$C_CODE" -ge 200 ] 2>/dev/null && [ "$C_CODE" -lt 400 ] 2>/dev/null && [ "$C_TIME" -gt 0 ] 2>/dev/null; then
-		CORE_META_VER=$(echo "$CORE_RAW" | sed '$d' | sed -n '1p' | tr -d '\n\r')
-		CORE_SMART_VER=$(echo "$CORE_RAW" | sed '$d' | sed -n '2p' | tr -d '\n\r')
-		if [ "$LATENCY" = "null" ] || [ "$C_TIME" -lt "$LATENCY" ] 2>/dev/null; then
-			LATENCY=$C_TIME
-		fi
-	elif [ "$LATENCY" != "null" ] && [ "$LATENCY" != "-3" ]; then
-		:
-	else
-		[ "$C_CODE" = "404" ] && LATENCY=-3 || LATENCY=-2
-	fi
-elif [ $C_EXIT -ne 0 ]; then
-	[ "$LATENCY" = "null" ] && LATENCY=-1
-else
-	[ "$LATENCY" = "null" ] && LATENCY=-2
-fi
-
 printf '{"plugin_ver":"%%s","core_meta_ver":"%%s","core_smart_ver":"%%s","latency":%%s,"core_error":"%%s"}\n' \
 	"$PLUGIN_VER" "$CORE_META_VER" "$CORE_SMART_VER" "${LATENCY:-null}" "$CORE_ERR"
-]], oix_core_ver, oix_core_error, oix_mode and "1" or "0", raw_core_url, plugin_url, core_url)
+]], official_core_ver, plugin_url)
 		local fdi, fdo = nixio.pipe()
 		if fdi and fdo then
 			local pid = nixio.fork()

@@ -60,7 +60,7 @@ m.description = nil
 "<br/>"..font_green..translate("Note: Game proxy please use nodes except VMess")..font_off..
 "<br/>"..font_green..translate("Note: If you need to perform client access control in Fake-IP mode, please change the DNS hijacking mode to firewall forwarding")..font_off..
 "<br/>"..translate("Note: The default proxy routes local traffic, BT, PT download, etc., please use Redir-Host mode as much as possible and pay attention to traffic avoidance")..
-"<br/>"..translate("Note: If the connection is abnormal, please follow the steps on this page to check first")..": ".."<a href='javascript:void(0)' onclick='javascript:return winOpen(\"https://github.com/vernesong/OpenClash/wiki/%E7%BD%91%E7%BB%9C%E8%BF%9E%E6%8E%A5%E5%BC%82%E5%B8%B8%E6%97%B6%E6%8E%92%E6%9F%A5%E5%8E%9F%E5%9B%A0\")'>"..font_green..bold_on..translate("Click to the page")..bold_off..font_off.."</a>"..
+"<br/>"..translate("Note: If the connection is abnormal, please follow the steps on this page to check first")..": ".."<a href='javascript:void(0)' onclick='javascript:return winOpen(\"https://github.com/dinggood615/openkill/wiki\")'>"..font_green..bold_on..translate("Click to the page")..bold_off..font_off.."</a>"..
 "<br/>"..font_green..translate("For More Useful Meta Core Functions Go Wiki")..": "..font_off.."<a href='javascript:void(0)' onclick='javascript:return winOpen(\"https://wiki.metacubex.one/\")'>"..translate("https://wiki.metacubex.one/").."</a>"
 ]]
 
@@ -111,7 +111,7 @@ o:depends("en_mode", "fake-ip-mix")
 o:value("system", translate("System　"))
 o:value("gvisor", translate("gVisor"))
 o:value("mixed", translate("Mixed"))
-o.default = "system"
+o.default = "mixed"
 
 o = s:taboption("op_mode", ListValue, "proxy_mode", translate("Proxy Mode"))
 o.description = translate("Select Proxy Mode")
@@ -1312,7 +1312,7 @@ o:depends({ipv6_mode= "3", en_mode = "fake-ip"})
 o:value("system", translate("System　"))
 o:value("gvisor", translate("gVisor"))
 o:value("mixed", translate("Mixed"))
-o.default = "system"
+o.default = "mixed"
 
 o = s:taboption("ipv6", Flag, "enable_v6_udp_proxy", translate("Proxy UDP Traffics"))
 o.description = translate("The Servers Must Support UDP forwarding").."<br>"..font_red..bold_on..translate("If Docker is Installed, UDP May Not Forward Normally")..bold_off..font_off
@@ -1430,7 +1430,6 @@ local t = {
 
 local CORE_VERSION = HTTP.formvalue("CORE_VERSION")
 local RELEASE_BRANCH = HTTP.formvalue("RELEASE_BRANCH")
-local SMART_ENABLE = HTTP.formvalue("SMART_ENABLE")
 
 a = m:section(Table, t)
 
@@ -1438,10 +1437,9 @@ o = a:option(Button, "Commit", " ")
 o.inputtitle = translate("Commit Settings")
 o.inputstyle = "apply"
 o.write = function()
-	if CORE_VERSION and RELEASE_BRANCH and SMART_ENABLE then
+	if CORE_VERSION and RELEASE_BRANCH then
 		m.uci:set("openkill", "config", "core_version", CORE_VERSION)
 		m.uci:set("openkill", "config", "release_branch", RELEASE_BRANCH)
-		m.uci:set("openkill", "config", "smart_enable", SMART_ENABLE)
 	end
 	m.uci:commit("openkill")
 end
@@ -1450,10 +1448,9 @@ o = a:option(Button, "Apply", " ")
 o.inputtitle = translate("Apply Settings")
 o.inputstyle = "apply"
 o.write = function()
-	if CORE_VERSION and RELEASE_BRANCH and SMART_ENABLE then
+	if CORE_VERSION and RELEASE_BRANCH then
 		m.uci:set("openkill", "config", "core_version", CORE_VERSION)
 		m.uci:set("openkill", "config", "release_branch", RELEASE_BRANCH)
-		m.uci:set("openkill", "config", "smart_enable", SMART_ENABLE)
 	end
 	m.uci:set("openkill", "config", "enable", 1)
 	m.uci:commit("openkill")

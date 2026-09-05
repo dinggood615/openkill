@@ -36,6 +36,7 @@ unify_ps_cfgname() {
 }
 
 inc_job_counter() {
+   mkdir -p /tmp/lock 2>/dev/null || return 1
    exec 999>"/tmp/lock/openkill_jobs.lock"
    flock -x 999
    local cnt=0
@@ -48,6 +49,7 @@ inc_job_counter() {
 
 dec_job_counter_and_restart() {
    local restart_flag="$1"
+   mkdir -p /tmp/lock 2>/dev/null || return 1
    exec 999>"/tmp/lock/openkill_jobs.lock"
    flock -x 999
    local cnt=0

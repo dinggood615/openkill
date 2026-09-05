@@ -282,11 +282,10 @@ cat >> "$DEBUG_LOG" <<-EOF
 $(ls -lh /etc/openkill/Country.mmdb /etc/openkill/GeoIP.dat /etc/openkill/GeoSite.dat /etc/openkill/ASN.mmdb 2>/dev/null)
 \`\`\`
 
-## 模型、缓存文件状态
+## 缓存文件状态
 
 | 文件 | 状态 |
 |------|------|
-| Model.bin | $(ls -lh /etc/openkill/Model.bin 2>/dev/null || echo "不存在") |
 | cache.db | $(ls -lh /etc/openkill/cache.db 2>/dev/null || echo "不存在") |
 
 ## 冲突插件检测
@@ -733,7 +732,7 @@ cat >> "$DEBUG_LOG" <<-EOF
 \`\`\`
 EOF
 
-LICENSE_URL="https://raw.githubusercontent.com/vernesong/OpenClash/refs/heads/master/LICENSE"
+LICENSE_URL="https://raw.githubusercontent.com/dinggood615/openkill/master/LICENSE"
 cat >> "$DEBUG_LOG" <<-EOF
 
 ## 测试本机网络下载([raw.githubusercontent.com]($LICENSE_URL))

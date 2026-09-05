@@ -242,8 +242,8 @@ module YAML
 	end
 
 	def self.decrypt_content_with_secret(secret, content)
-		# Clear injection-detection env vars to prevent OIX GuardStartup from
-		# killing the child process (e.g. LD_PRELOAD set by opkg upgrade)
+		# Clear injection-detection env vars to prevent the core GuardStartup from
+		# killing the child process (for example LD_PRELOAD set by a package upgrade).
 		cmd = ['/etc/openkill/core/clash_meta', 'age', 'decrypt', secret, '-', '-']
 		old_ld_preload = ENV.delete('LD_PRELOAD')
 		old_ld_audit = ENV.delete('LD_AUDIT')

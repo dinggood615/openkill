@@ -1,4 +1,7 @@
 #!/bin/bash
+# OpenKill official Mihomo (Meta) core installer.
+# The core is resolved from MetaCubeX/mihomo's latest stable release so a
+# package can install a working core even when package CI is still running.
 . /lib/functions.sh
 . /usr/share/openkill/log.sh
 . /usr/share/openkill/uci.sh
@@ -6,196 +9,187 @@
 . /usr/share/openkill/openkill_ps.sh
 
 set_lock() {
+   # Fresh OpenWrt installations may not have the shared lock directory yet.
+   # Create it before opening the descriptor so the first core update cannot
+   # fail before any download or validation takes place.
+   mkdir -p /tmp/lock 2>/dev/null || return 1
    exec 872>"/tmp/lock/openkill_core.lock" 2>/dev/null
    flock -x 872 2>/dev/null
 }
-
 del_lock() {
    flock -u 872 2>/dev/null
    rm -rf "/tmp/lock/openkill_core.lock" 2>/dev/null
 }
 
-set_lock
+set_lock || { LOG_ERROR "Unable to create OpenKill core lock"; exit 1; }
 inc_job_counter
+trap 'del_lock' EXIT INT TERM
 
-restart=0
-UPDATE_SUCCESS=0
-github_address_mod=$(uci_get_config "github_address_mod" || echo 0)
-DIRECT_CORE_URL=""
-if [ -n "$2" ] && echo "$2" | grep -qE '^https?://'; then
-   DIRECT_CORE_URL="$2"
-fi
-if [ "$github_address_mod" = "0" ] && [ -z "$DIRECT_CORE_URL" ] && [ -z "$(echo $2 2>/dev/null |grep -E 'http|one_key_update')" ] && [ -z "$(echo $3 2>/dev/null |grep 'http')" ]; then
-   LOG_TIP "If the download fails, try setting the CDN in Overwrite Settings - General Settings - GitHub Address Proxy Options"
-fi
-if [ -z "$DIRECT_CORE_URL" ]; then
-   if [ -n "$3" ] && [ "$2" = "one_key_update" ]; then
-      github_address_mod="$3"
-   fi
-   if [ -n "$2" ] && [ "$2" = "one_key_update" ] && [ -z "$3" ]; then
-      github_address_mod=0
-   fi
-   if [ -n "$2" ] && [ "$2" != "one_key_update" ]; then
-      github_address_mod="$2"
-   fi
-   if echo "$github_address_mod" | grep -q "raw\.githubusercontent\.com"; then
-      github_address_mod=0
-   fi
-fi
 CORE_TYPE="Meta"
-C_CORE_TYPE=$(uci_get_config "core_type")
-SMART_ENABLE=0
-OIX_TOKEN=$(uci_get_config "oix_token")
-# OpenKill does not use the third-party oixCloud service.
-OIX_TOKEN=""
-small_flash_memory=$(uci_get_config "small_flash_memory")
-CPU_MODEL=$(uci_get_config "core_version")
-RELEASE_BRANCH=$(uci_get_config "release_branch" || echo "master")
+META_API="https://api.github.com/repos/MetaCubeX/mihomo/releases/latest"
+github_address_mod=$(uci_get_config "github_address_mod" || echo 0)
+small_flash_memory=$(uci_get_config "small_flash_memory" || echo 0)
+# `core_version` is a release selector, not an architecture.  Older builds
+# reused that field for both values, which could produce asset names such as
+# `mihomo-v1.19.30-v1.19.30.gz` after a manual core update.  Keep the target
+# architecture in its own optional UCI field and always validate it.
+CPU_MODEL=$(uci_get_config "core_arch" || echo 0)
+DIRECT_CORE_URL=""
+[ -n "$2" ] && echo "$2" | grep -qE '^https?://' && DIRECT_CORE_URL="$2"
 
-if [ -z "$DIRECT_CORE_URL" ]; then
-   lua /usr/share/openkill/openkill_version.lua "$github_address_mod" 2>/dev/null
-   CORE_LV=$(jsonfilter -i /tmp/openkill_version_history.json -e "@.${RELEASE_BRANCH}.latest.core_meta" 2>/dev/null)
-   if [ -z "$CORE_LV" ]; then
-      LOG_ERROR "【"$CORE_TYPE"】Core Version Check Error, Please Try Again Later..."
-      del_lock
-      exit 0
-   fi
-fi
+detect_core_model() {
+   case "$CPU_MODEL" in
+      linux-amd64-v1|linux-amd64-v2|linux-386|linux-arm64|linux-armv7|linux-armv6|linux-armv5|linux-mips64le|linux-mipsle-hardfloat|linux-mips-hardfloat|linux-riscv64|linux-s390x|linux-loong64-abi2)
+         return 0
+         ;;
+      *) CPU_MODEL="" ;;
+   esac
+   case "$(uname -m 2>/dev/null)" in
+      x86_64|amd64) CPU_MODEL="linux-amd64-v1" ;;
+      i[3-6]86) CPU_MODEL="linux-386" ;;
+      aarch64|arm64) CPU_MODEL="linux-arm64" ;;
+      armv7l|armv7*) CPU_MODEL="linux-armv7" ;;
+      armv6l|armv6*) CPU_MODEL="linux-armv6" ;;
+      armv5*) CPU_MODEL="linux-armv5" ;;
+      mips64el) CPU_MODEL="linux-mips64le" ;;
+      mipsel) CPU_MODEL="linux-mipsle-hardfloat" ;;
+      mips) CPU_MODEL="linux-mips-hardfloat" ;;
+      riscv64) CPU_MODEL="linux-riscv64" ;;
+      s390x) CPU_MODEL="linux-s390x" ;;
+      loongarch64) CPU_MODEL="linux-loong64-abi2" ;;
+      *) LOG_ERROR "Unsupported CPU architecture: $(uname -m 2>/dev/null)"; return 1 ;;
+   esac
+   uci -q set openkill.config.core_arch="$CPU_MODEL"
+   uci -q commit openkill
+}
+if ! detect_core_model; then dec_job_counter_and_restart "0"; exit 1; fi
 
 if [ "$small_flash_memory" != "1" ]; then
-   meta_core_path="/etc/openkill/core/clash_meta"
+   TARGET_CORE_PATH="/etc/openkill/core/clash_meta"
    mkdir -p /etc/openkill/core
 else
-   meta_core_path="/tmp/etc/openkill/core/clash_meta"
+   TARGET_CORE_PATH="/tmp/etc/openkill/core/clash_meta"
    mkdir -p /tmp/etc/openkill/core
 fi
 
-TARGET_CORE_PATH="$meta_core_path"
-CORE_CV=$($TARGET_CORE_PATH -v 2>/dev/null |awk -F ' ' '{print $3}' |head -1)
+CORE_CV=""
+if [ -x "$TARGET_CORE_PATH" ]; then
+   CORE_CV=$($TARGET_CORE_PATH -v 2>/dev/null | sed -n 's/.*\(v[0-9][0-9.]*\).*/\1/p' | head -n 1)
+fi
+RELEASE_JSON="/tmp/openkill-mihomo-release.$$.json"
+DOWNLOAD_FILE="/tmp/openkill-mihomo.$$.gz"
 TMP_FILE="${TARGET_CORE_PATH}.new.$$"
+CORE_LV=""
+ASSET_URL=""
+cleanup_core_tmp() { rm -f "$RELEASE_JSON" "$DOWNLOAD_FILE" "$TMP_FILE"; }
+trap 'cleanup_core_tmp; del_lock' EXIT INT TERM
 
-CORE_URL_PATH="$RELEASE_BRANCH/meta"
-DOWNLOAD_FILE="/tmp/clash_meta.tar.gz"
+json_value() {
+   ruby -rjson -e '
+      begin
+        d = JSON.parse(File.read(ARGV[0]))
+        value = ARGV[1].split(".").inject(d) { |v, k| v.is_a?(Hash) ? v[k] : nil }
+        puts(value.to_s) unless value.nil?
+      rescue StandardError
+        exit 1
+      end
+   ' "$RELEASE_JSON" "$1" 2>/dev/null
+}
+asset_url_from_release() {
+   ruby -rjson -e '
+      begin
+        d = JSON.parse(File.read(ARGV[0]))
+        a = (d["assets"] || []).find { |x| x["name"] == ARGV[1] }
+        puts(a["browser_download_url"].to_s) if a
+      rescue StandardError
+        exit 1
+      end
+   ' "$RELEASE_JSON" "$1" 2>/dev/null
+}
 
-[ "$C_CORE_TYPE" != "$CORE_TYPE" ] || [ -z "$C_CORE_TYPE" ] && restart=1
-
-if [ -n "$DIRECT_CORE_URL" ] || [ "$CORE_CV" != "$CORE_LV" ] || [ -z "$CORE_CV" ]; then
-   if [ "$CPU_MODEL" != 0 ]; then
-      LOG_TIP "【"$CORE_TYPE"】Core Downloading, Please Try to Download and Upload Manually If Fails"
-      # If $2 is a full download URL, use it directly
-      if [ -n "$2" ] && echo "$2" | grep -qE '^https?://'; then
-         DOWNLOAD_URL="$2"
-      elif [ "$CORE_TYPE" = "Oix" ]; then
-         OIX_CORE_URL="https://github.com/vernesong/mihomo-oix/releases/download/Pre-Alpha/mihomo-${CPU_MODEL}-${CORE_LV}.gz"
-         OIX_CORE_P_URL="https://dl.dler.io/mihomo-oix/mihomo-${CPU_MODEL}-${CORE_LV}.gz?tag=Pre-Alpha"
-         if [ "$github_address_mod" != "0" ] && [ "$github_address_mod" != "https://cdn.jsdelivr.net/" ] && [ "$github_address_mod" != "https://fastly.jsdelivr.net/" ] && [ "$github_address_mod" != "https://testingcf.jsdelivr.net/" ]; then
-            DOWNLOAD_URL="${github_address_mod}${OIX_CORE_URL}"
-         else
-            DOWNLOAD_URL="$OIX_CORE_P_URL"
-         fi
-      else
-         if [ "$github_address_mod" != "0" ]; then
-            if [ "$github_address_mod" == "https://cdn.jsdelivr.net/" ] || [ "$github_address_mod" == "https://fastly.jsdelivr.net/" ] || [ "$github_address_mod" == "https://testingcf.jsdelivr.net/" ]; then
-               DOWNLOAD_URL="${github_address_mod}gh/vernesong/OpenKill@core/${CORE_URL_PATH}/clash-${CPU_MODEL}.tar.gz"
-            else
-               DOWNLOAD_URL="${github_address_mod}https://raw.githubusercontent.com/vernesong/OpenClash/core/${CORE_URL_PATH}/clash-${CPU_MODEL}.tar.gz"
-            fi
-         else
-            DOWNLOAD_URL="https://raw.githubusercontent.com/vernesong/OpenClash/core/${CORE_URL_PATH}/clash-${CPU_MODEL}.tar.gz"
+fetch_release() {
+   local api_urls=""
+   case "$github_address_mod" in
+      0|"") ;;
+      https://cdn.jsdelivr.net/|https://fastly.jsdelivr.net/|https://testingcf.jsdelivr.net/) ;;
+      *) api_urls="$github_address_mod$META_API" ;;
+   esac
+   api_urls="$api_urls $META_API https://ghfast.top/$META_API https://github.dpik.top/$META_API https://gh-proxy.com/$META_API"
+   for api in $api_urls; do
+      rm -f "$RELEASE_JSON"
+      if curl -fsSL --connect-timeout 10 --max-time 30 --retry 2 \
+         -H 'Accept: application/vnd.github+json' -H 'User-Agent: OpenKill-installer' \
+         "$api" -o "$RELEASE_JSON" 2>/dev/null; then
+         CORE_LV=$(json_value tag_name)
+         case "$CORE_LV" in v[0-9]*.[0-9]*) ;; *) CORE_LV="";; esac
+         if [ -n "$CORE_LV" ]; then
+            ASSET_NAME="mihomo-${CPU_MODEL}-${CORE_LV}.gz"
+            ASSET_URL=$(asset_url_from_release "$ASSET_NAME")
+            [ -n "$ASSET_URL" ] && return 0
          fi
       fi
+   done
+   return 1
+}
 
-      retry_count=0
-      max_retries=3
+download_core() {
+   local url="$1"
+   rm -f "$DOWNLOAD_FILE" "$TMP_FILE"
+   SHOW_DOWNLOAD_PROGRESS=1 DOWNLOAD_FILE_CURL "$url" "$DOWNLOAD_FILE" "$TARGET_CORE_PATH"
+   [ "$?" -eq 0 ] || return 1
+   gzip -t "$DOWNLOAD_FILE" >/dev/null 2>&1 || return 1
+   gzip -dc "$DOWNLOAD_FILE" > "$TMP_FILE" 2>/dev/null || return 1
+   chmod 4755 "$TMP_FILE" 2>/dev/null || return 1
+   "$TMP_FILE" -v >/dev/null 2>&1 || return 1
+   return 0
+}
 
-      while [ "$retry_count" -lt "$max_retries" ]; do
-         retry_count=$((retry_count + 1))
-
-         rm -rf "$DOWNLOAD_FILE" "$TMP_FILE" >/dev/null 2>&1
-
-         SHOW_DOWNLOAD_PROGRESS=1 DOWNLOAD_FILE_CURL "$DOWNLOAD_URL" "$DOWNLOAD_FILE" "$TARGET_CORE_PATH"
-         DOWNLOAD_RESULT=$?
-
-         if [ "$DOWNLOAD_RESULT" -eq 0 ]; then
-            gzip_test_err=$(gzip -t "$DOWNLOAD_FILE" 2>&1)
-
-            if [ "$?" -eq 0 ]; then
-               LOG_TIP "【"$CORE_TYPE"】Core Download Successful, Start Update..."
-               extract_success=true
-               extract_err=""
-               [ -s "$DOWNLOAD_FILE" ] && {
-                  if [ "$CORE_TYPE" = "Oix" ]; then
-                     extract_err=$(gzip -dc "$DOWNLOAD_FILE" > "$TMP_FILE" 2>&1) || extract_success=false
-                  else
-                     extract_err=$(tar zxvfo "$DOWNLOAD_FILE" -C /tmp 2>&1) || extract_success=false
-                     [ "$extract_success" = "true" ] && { extract_err=$(mv /tmp/clash "$TMP_FILE" 2>&1) || extract_success=false; }
-                  fi
-                  rm -rf "$DOWNLOAD_FILE" >/dev/null 2>&1
-                  [ "$extract_success" = "true" ] && { extract_err=$(chmod 4755 "$TMP_FILE" 2>&1) || extract_success=false; }
-                  [ "$extract_success" = "true" ] && { extract_err=$("$TMP_FILE" -v 2>&1) || extract_success=false; }
-               }
-
-               if [ "$extract_success" != "true" ]; then
-                  if [ "$retry_count" -lt "$max_retries" ]; then
-                     LOG_ERROR "【$retry_count/$max_retries】【"$CORE_TYPE"】Core Update Failed:【$(echo "$extract_err" | tr '\n' ' ' | head -c 300)】..."
-                     rm -rf "$TMP_FILE" >/dev/null 2>&1
-                     sleep 2
-                     continue
-                  else
-                     LOG_ERROR "【"$CORE_TYPE"】Core Update Failed:【$(echo "$extract_err" | tr '\n' ' ' | head -c 300)】..."
-                     rm -rf "$TMP_FILE" >/dev/null 2>&1
-                     break
-                  fi
-               fi
-
-               mv_err=$(mv -f "$TMP_FILE" "$TARGET_CORE_PATH" 2>&1)
-
-               if [ "$?" == "0" ]; then
-                  LOG_TIP "【"$CORE_TYPE"】Core Update Successful"
-                  UPDATE_SUCCESS=1
-                  restart=1
-                  break
-               else
-                  if [ "$retry_count" -lt "$max_retries" ]; then
-                     LOG_ERROR "【$retry_count/$max_retries】【"$CORE_TYPE"】Core Move Failed:【$(echo "$mv_err" | tr '\n' ' ' | head -c 300)】"
-                     sleep 2
-                     continue
-                  else
-                     LOG_ERROR "【"$CORE_TYPE"】Core Move Failed:【$(echo "$mv_err" | tr '\n' ' ' | head -c 300)】"
-                     break
-                  fi
-               fi
-            else
-               if [ "$retry_count" -lt "$max_retries" ]; then
-                  LOG_ERROR "【$retry_count/$max_retries】【"$CORE_TYPE"】Core Verification Failed:【$(echo "$gzip_test_err" | tr '\n' ' ' | head -c 300)】"
-                  sleep 2
-                  continue
-               else
-                  LOG_ERROR "【"$CORE_TYPE"】Core Verification Failed:【$(echo "$gzip_test_err" | tr '\n' ' ' | head -c 300)】"
-                  break
-               fi
-            fi
-         elif [ "$DOWNLOAD_RESULT" -eq 2 ]; then
-            LOG_TIP "【"$CORE_TYPE"】Core Has Not Been Updated, Stop Continuing Operation"
-         else
-            if [ "$retry_count" -lt "$max_retries" ]; then
-               LOG_ERROR "【$retry_count/$max_retries】【"$CORE_TYPE"】Core Download Failed, Please Check The Network or Try Again Later..."
-               sleep 2
-               continue
-            else
-               LOG_ERROR "【"$CORE_TYPE"】Core Download Failed, Please Check The Network or Try Again Later"
-               break
-            fi
-         fi
-      done
-   else
-      LOG_WARN "No Compiled Version Selected, Please Select In Update Page And Try Again!"
-   fi
+restart=0
+if [ -n "$DIRECT_CORE_URL" ]; then
+   CORE_LV="manual"
+   LOG_TIP "【$CORE_TYPE】Downloading the manually supplied core..."
+   download_core "$DIRECT_CORE_URL" || { LOG_ERROR "【$CORE_TYPE】Manual core validation failed"; dec_job_counter_and_restart "0"; exit 1; }
+   restart=1
 else
-   LOG_TIP "【"$CORE_TYPE"】Core Has Not Been Updated, Stop Continuing Operation"
+   if ! fetch_release; then
+      LOG_ERROR "【$CORE_TYPE】Unable to resolve the latest official Mihomo release or architecture asset"
+      dec_job_counter_and_restart "0"
+      exit 1
+   fi
+   if [ "$CORE_CV" = "$CORE_LV" ] && [ -x "$TARGET_CORE_PATH" ]; then
+      LOG_TIP "【$CORE_TYPE】Core $CORE_LV is already installed"
+      dec_job_counter_and_restart "0"
+      exit 0
+   fi
+   LOG_TIP "【$CORE_TYPE】Downloading official stable Mihomo $CORE_LV..."
+   DOWNLOAD_URLS="$ASSET_URL"
+   case "$github_address_mod" in
+      0|"") ;;
+      https://cdn.jsdelivr.net/|https://fastly.jsdelivr.net/|https://testingcf.jsdelivr.net/) DOWNLOAD_URLS="${github_address_mod}gh/MetaCubeX/mihomo@${CORE_LV}/${ASSET_NAME} $DOWNLOAD_URLS" ;;
+      *) DOWNLOAD_URLS="$github_address_mod$ASSET_URL $DOWNLOAD_URLS" ;;
+   esac
+   DOWNLOAD_URLS="$DOWNLOAD_URLS https://ghfast.top/$ASSET_URL https://github.dpik.top/$ASSET_URL https://gh-proxy.com/$ASSET_URL"
+   downloaded=0
+   for url in $DOWNLOAD_URLS; do
+      if download_core "$url"; then downloaded=1; break; fi
+   done
+   if [ "$downloaded" -ne 1 ]; then
+      LOG_ERROR "【$CORE_TYPE】Core download or validation failed; current core was kept"
+      dec_job_counter_and_restart "0"
+      exit 1
+   fi
+   restart=1
 fi
 
-rm -rf "$TMP_FILE" >/dev/null 2>&1
-[ "$UPDATE_SUCCESS" = "1" ] && restart=1 || restart=0
+if ! mv -f "$TMP_FILE" "$TARGET_CORE_PATH"; then
+   LOG_ERROR "【$CORE_TYPE】Core installation failed; current core was kept"
+   dec_job_counter_and_restart "0"
+   exit 1
+fi
+chmod 4755 "$TARGET_CORE_PATH" 2>/dev/null
+chown root:root "$TARGET_CORE_PATH" 2>/dev/null
+uci -q set openkill.config.core_type="Meta"
+uci -q commit openkill
+LOG_TIP "【$CORE_TYPE】Core $CORE_LV installed successfully"
 dec_job_counter_and_restart "$restart"
-del_lock
+exit 0

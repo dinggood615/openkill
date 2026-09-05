@@ -18,6 +18,9 @@ config openkill 'config'
 	option ipv6_dns '0'
 	option enable_custom_clash_rules '0'
 	option core_version '0'
+	# Architecture is detected from uname once and kept separate from the
+	# release selector above, avoiding incompatible Mihomo asset names.
+	option core_arch '0'
 	option en_mode 'fake-ip'
 	option enable_redirect_dns '1'
 	option disable_masq_cache '1'
@@ -28,7 +31,11 @@ config openkill 'config'
 	# Mihomo 官方性能选项：并发连接候选地址并统一延迟口径。
 	option enable_tcp_concurrent '1'
 	option enable_unified_delay '1'
-	option disable_udp_quic '1'
+	option find_process_mode 'off'
+	option geodata_loader 'memconservative'
+	# Keep UDP/QUIC available for HTTP/3 and Hysteria2; users can still opt out
+	# from the UI when a specific ISP or firewall requires TCP-only routing.
+	option disable_udp_quic '0'
 	option lan_ac_mode '0'
 	option operation_mode 'fake-ip'
 	option enable_rule_proxy '0'
@@ -47,6 +54,14 @@ config openkill 'config'
 	option custom_name_policy '0'
 	option append_wan_dns '0'
 	option stream_auto_select '0'
+	# Watchdog maintenance cadence (seconds/cycles).  The health observer never
+	# starts a duplicate core; procd remains the sole restart owner.
+	option watchdog_interval '60'
+	option watchdog_network_cycles '10'
+	option watchdog_history_cycles '5'
+	option watchdog_firewall_cycles '2'
+	option watchdog_upnp_cycles '30'
+	option watchdog_proxy_cycles '30'
 	option bypass_gateway_compatible '0'
 	option github_address_mod '0'
 	option urltest_address_mod '0'
@@ -291,7 +306,7 @@ config dns_servers
 config config_overwrite
 	option name 'default'
 	option enable '0'
-	option url 'https://raw.githubusercontent.com/vernesong/OpenClash/refs/heads/dev/luci-app-openkill/root/etc/openkill/overwrite/default'
+	option url 'https://raw.githubusercontent.com/dinggood615/openkill/master/luci-app-openkill/root/etc/openkill/overwrite/default'
 	option update_days 'off'
 	option update_hour 'off'
 	option type 'http'

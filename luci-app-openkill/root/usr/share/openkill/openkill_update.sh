@@ -5,6 +5,7 @@
 . /usr/share/openkill/openkill_ps.sh
 
 set_lock() {
+   mkdir -p /tmp/lock 2>/dev/null || return 1
    exec 878>"/tmp/lock/openkill_update.lock" 2>/dev/null
    flock -x 878 2>/dev/null
 }
@@ -20,10 +21,12 @@ early_exit() {
    exit "${1:-0}"
 }
 
-set_lock
+set_lock || { LOG_ERROR "Unable to create OpenKill update lock"; exit 1; }
 inc_job_counter
 
 RELEASE_BRANCH=$(uci_get_config "release_branch" || echo "master")
+VERSION_CACHE_FILE="/tmp/openkill_version_history_openkill.json"
+OPENKILL_REPO="dinggood615/openkill"
 
 PLUGIN_DIRECT=0
 if [ -n "$3" ] && echo "$3" | grep -qE '^https?://'; then
@@ -32,7 +35,7 @@ fi
 
 lua /usr/share/openkill/openkill_version.lua "$2" 2>/dev/null
 
-PLUGIN_LATEST=$(jsonfilter -i /tmp/openkill_version_history.json -e "@.${RELEASE_BRANCH}.latest.plugin" 2>/dev/null)
+PLUGIN_LATEST=$(jsonfilter -i "$VERSION_CACHE_FILE" -e "@.${RELEASE_BRANCH}.latest.plugin" 2>/dev/null)
 
 if [ "$PLUGIN_DIRECT" -eq 0 ] && [ -z "$PLUGIN_LATEST" ]; then
    LOG_ERROR "Failed to get version information, please try again later..."
@@ -139,27 +142,27 @@ elif [ -n "$OP_CV" ] && [ -n "$OP_LV" ] && version_compare "$OP_CV" "$OP_LV" && 
    if [ "$github_address_mod" != "0" ]; then
       if [ "$github_address_mod" == "https://cdn.jsdelivr.net/" ] || [ "$github_address_mod" == "https://fastly.jsdelivr.net/" ] || [ "$github_address_mod" == "https://testingcf.jsdelivr.net/" ]; then
          if [ -x "/bin/opkg" ]; then
-            DOWNLOAD_URL="${github_address_mod}gh/vernesong/OpenKill@package/${RELEASE_BRANCH}/luci-app-openkill_${LAST_VER}_all.ipk"
+             DOWNLOAD_URL="${github_address_mod}gh/${OPENKILL_REPO}@package/${RELEASE_BRANCH}/luci-app-openkill_${LAST_VER}_all.ipk"
             DOWNLOAD_PATH="/tmp/openkill.ipk"
          elif [ -x "/usr/bin/apk" ]; then
-            DOWNLOAD_URL="${github_address_mod}gh/vernesong/OpenKill@package/${RELEASE_BRANCH}/luci-app-openkill-${LAST_VER}.apk"
+             DOWNLOAD_URL="${github_address_mod}gh/${OPENKILL_REPO}@package/${RELEASE_BRANCH}/luci-app-openkill-${LAST_VER}.apk"
             DOWNLOAD_PATH="/tmp/openkill.apk"
          fi
       else
          if [ -x "/bin/opkg" ]; then
-            DOWNLOAD_URL="${github_address_mod}https://raw.githubusercontent.com/vernesong/OpenClash/package/${RELEASE_BRANCH}/luci-app-openkill_${LAST_VER}_all.ipk"
+             DOWNLOAD_URL="${github_address_mod}https://raw.githubusercontent.com/${OPENKILL_REPO}/package/${RELEASE_BRANCH}/luci-app-openkill_${LAST_VER}_all.ipk"
             DOWNLOAD_PATH="/tmp/openkill.ipk"
          elif [ -x "/usr/bin/apk" ]; then
-            DOWNLOAD_URL="${github_address_mod}https://raw.githubusercontent.com/vernesong/OpenClash/package/${RELEASE_BRANCH}/luci-app-openkill-${LAST_VER}.apk"
+             DOWNLOAD_URL="${github_address_mod}https://raw.githubusercontent.com/${OPENKILL_REPO}/package/${RELEASE_BRANCH}/luci-app-openkill-${LAST_VER}.apk"
             DOWNLOAD_PATH="/tmp/openkill.apk"
          fi
       fi
    else
       if [ -x "/bin/opkg" ]; then
-         DOWNLOAD_URL="https://raw.githubusercontent.com/vernesong/OpenClash/package/${RELEASE_BRANCH}/luci-app-openkill_${LAST_VER}_all.ipk"
+          DOWNLOAD_URL="https://raw.githubusercontent.com/${OPENKILL_REPO}/package/${RELEASE_BRANCH}/luci-app-openkill_${LAST_VER}_all.ipk"
          DOWNLOAD_PATH="/tmp/openkill.ipk"
       elif [ -x "/usr/bin/apk" ]; then
-         DOWNLOAD_URL="https://raw.githubusercontent.com/vernesong/OpenClash/package/${RELEASE_BRANCH}/luci-app-openkill-${LAST_VER}.apk"
+          DOWNLOAD_URL="https://raw.githubusercontent.com/${OPENKILL_REPO}/package/${RELEASE_BRANCH}/luci-app-openkill-${LAST_VER}.apk"
          DOWNLOAD_PATH="/tmp/openkill.apk"
       fi
    fi
