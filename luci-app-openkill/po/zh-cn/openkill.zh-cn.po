@@ -4359,3 +4359,113 @@ msgstr "版本号"
 msgid "to update individually"
 msgstr "则独立更新"
 
+msgid "Health & Watchdog"
+msgstr "健康与守护"
+
+msgid "Stability Profile"
+msgstr "稳定性配置"
+
+msgid "OpenKill validates generated configurations before activation, keeps the last known-good file, and lets watchdog observe the service without starting duplicate core processes."
+msgstr "OpenKill 会在启用前校验生成的配置，保留最近一次可用配置，并让 watchdog 只观察服务状态，避免重复启动内核进程。"
+
+msgid "Watchdog Check Interval (s)"
+msgstr "Watchdog 检查间隔（秒）"
+
+msgid "How often the health monitor checks the service and core. A larger value reduces background CPU usage."
+msgstr "健康监视器检查服务和内核的间隔。数值越大，后台 CPU 占用越低。"
+
+msgid "Network Scan Interval (cycles)"
+msgstr "网络扫描间隔（周期）"
+
+msgid "Run local-network and IPv6 route maintenance on the first cycle and then at this interval."
+msgstr "首个周期执行本地网络和 IPv6 路由维护，之后按此周期执行。"
+
+msgid "History Scan Interval (cycles)"
+msgstr "连接历史扫描间隔（周期）"
+
+msgid "Refresh connection history less often to avoid repeated process and file scans."
+msgstr "降低连接历史刷新频率，避免重复扫描进程和文件。"
+
+msgid "Firewall Check Interval (cycles)"
+msgstr "防火墙检查间隔（周期）"
+
+msgid "Check firewall state at this watchdog cadence; lower values react faster but use more CPU."
+msgstr "按此 watchdog 周期检查防火墙状态；数值越小响应越快，但 CPU 占用更高。"
+
+msgid "UPnP Check Interval (cycles)"
+msgstr "UPnP 检查间隔（周期）"
+
+msgid "Check UPnP state at a low frequency; set a larger value when UPnP is not used."
+msgstr "低频检查 UPnP 状态；不使用 UPnP 时可设置更大的数值。"
+
+msgid "Proxy Address Scan Interval (cycles)"
+msgstr "代理地址扫描间隔（周期）"
+
+msgid "Refresh proxy-address metadata only periodically; this avoids a full Ruby scan on every watchdog cycle."
+msgstr "仅定期刷新代理地址信息，避免每个 watchdog 周期都执行完整 Ruby 扫描。"
+
+msgid "Detected CPU Arch"
+msgstr "自动识别 CPU 架构"
+
+msgid "Detecting automatically..."
+msgstr "正在自动识别…"
+
+msgid "Core Architecture Source"
+msgstr "内核架构来源"
+
+msgid "Automatic official asset matching"
+msgstr "自动匹配官方内核文件"
+
+msgid "Release Channel"
+msgstr "发布通道"
+
+msgid "Official Mihomo stable"
+msgstr "官方 Mihomo 稳定版"
+
+msgid "Select Plugin Version"
+msgstr "选择插件版本"
+
+msgid "Latest OpenKill"
+msgstr "最新 OpenKill"
+
+msgid "Installed Mihomo Core"
+msgstr "已安装 Mihomo 内核"
+
+msgid "Core Update Policy"
+msgstr "内核更新策略"
+
+msgid "Latest official stable, automatic"
+msgstr "官方最新稳定版（自动）"
+
+msgid "Latest official stable"
+msgstr "官方最新稳定版"
+
+msgid "Official Core"
+msgstr "官方内核"
+
+msgid "IPv6 disabled"
+msgstr "IPv6 未启用"
+
+msgid "IPv6 + DNS"
+msgstr "IPv6 + DNS"
+
+msgid "IPv6"
+msgstr "IPv6"
+
+msgid "IPv4"
+msgstr "IPv4"
+
+msgid "Stable"
+msgstr "稳定"
+
+msgid "IPv6 proxy and AAAA DNS are enabled"
+msgstr "IPv6 代理和 AAAA DNS 均已启用"
+
+msgid "IPv6 proxy is enabled; AAAA DNS is disabled"
+msgstr "IPv6 代理已启用；AAAA DNS 未启用"
+
+msgid "IPv6 proxy is disabled"
+msgstr "IPv6 代理未启用"
+
+msgid "Read-only health monitor interval"
+msgstr "只读健康监视间隔"

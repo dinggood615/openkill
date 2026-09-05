@@ -24,43 +24,19 @@
                 <div class="config-grid">
                     <div class="config-item">
                         <div class="oc-option-title">
-                            <span class="oc-option-text"><%:CPU Arch%></span>
+                            <span class="oc-option-text"><%:Detected CPU Arch%></span>
                         </div>
-                        <span class="ver-value" id="CPU_ARCH_VALUE"><%:Collecting data...%></span>
+                        <span class="ver-value" id="CPU_ARCH_VALUE"><%:Detecting automatically...%></span>
                     </div>
                     <div class="config-item">
-                        <div class="oc-option-title"><span class="oc-option-text"><%:Compiled Version%><b> *</b></span></div>
-                        <div class="form-select-wrapper">
-                            <select class="select-class oc-arch-select" id="CORE_VERSION" onchange="onArchChange()">
-                                <option value="linux-386"><%:linux-386%></option>
-                                <option value="linux-amd64-v1"><%:linux-amd64-v1(x86-64)%></option>
-                                <option value="linux-amd64-v2"><%:linux-amd64-v2(x86-64)%></option>
-                                <option value="linux-amd64-v3"><%:linux-amd64-v3(x86-64)%></option>
-                                <option value="linux-armv5"><%:linux-armv5%></option>
-                                <option value="linux-armv6"><%:linux-armv6%></option>
-                                <option value="linux-armv7"><%:linux-armv7%></option>
-                                <option value="linux-arm64"><%:linux-arm64(armv8)%></option>
-                                <option value="linux-loong64-abi1"><%:linux-loong64-abi1%></option>
-                                <option value="linux-loong64-abi2"><%:linux-loong64-abi2%></option>
-                                <option value="linux-riscv64"><%:linux-riscv64%></option>
-                                <option value="linux-s390x"><%:linux-s390x%></option>
-                                <option value="linux-mips-hardfloat"><%:linux-mips-hardfloat%></option>
-                                <option value="linux-mips-softfloat"><%:linux-mips-softfloat%></option>
-                                <option value="linux-mips64"><%:linux-mips64%></option>
-                                <option value="linux-mips64le"><%:linux-mips64le%></option>
-                                <option value="linux-mipsle-softfloat"><%:linux-mipsle-softfloat%></option>
-                                <option value="linux-mipsle-hardfloat"><%:linux-mipsle-hardfloat%></option>
-                                <option value="0"><%:Not Set%></option>
-                            </select>
-                        </div>
+                        <div class="oc-option-title"><span class="oc-option-text"><%:Core Architecture Source%></span></div>
+                        <span class="ver-value version-source-value"><%:Automatic official asset matching%></span>
+                        <input type="hidden" id="CORE_VERSION" value="0">
                     </div>
                     <div class="config-item">
-                        <div class="oc-option-title"><span class="oc-option-text"><%:Release Branch%></span></div>
-                        <div class="form-select-wrapper">
-                            <select class="select-class" id="RELEASE_BRANCH" onchange="onBranchChange()">
-                                <option value="master">Master</option>
-                            </select>
-                        </div>
+                        <div class="oc-option-title"><span class="oc-option-text"><%:Release Channel%></span></div>
+                        <span class="ver-value version-source-value"><%:Official Mihomo stable%></span>
+                        <input type="hidden" id="RELEASE_BRANCH" value="master">
                     </div>
                 </div>
                 <div class="version-card">
@@ -70,24 +46,23 @@
                             <span class="ver-value" id="installed-plugin">--</span>
                         </div>
                         <div class="config-item">
-                            <span class="oc-option-title"><span class="oc-option-text"><%:Select Version%></span></span>
+                            <span class="oc-option-title"><span class="oc-option-text"><%:Select Plugin Version%></span></span>
                             <div class="form-select-wrapper">
                                 <select class="select-class" id="select-plugin-ver" onchange="forceRefresh=true;refreshAddrInfo({cancel:true,user:true})">
-                                    <option value="__latest__"><%:Latest%></option>
+                                    <option value="__latest__"><%:Latest OpenKill%></option>
                                 </select>
                             </div>
                         </div>
                         <div class="config-item">
-                            <span class="oc-option-title"><span class="oc-option-text"><%:Core Version%></span></span>
+                            <span class="oc-option-title"><span class="oc-option-text"><%:Installed Mihomo Core%></span></span>
                             <span class="ver-value" id="installed-core">--</span>
                         </div>
                         <div class="config-item">
-                            <span class="oc-option-title"><span class="oc-option-text"><%:Select Version%></span></span>
-                            <div class="form-select-wrapper">
-                                <select class="select-class" id="select-core-ver" onchange="forceRefresh=true;refreshAddrInfo({cancel:true,user:true})">
-                                    <option value="__latest__"><%:Latest%></option>
-                                </select>
-                            </div>
+                            <span class="oc-option-title"><span class="oc-option-text"><%:Core Update Policy%></span></span>
+                            <span class="ver-value version-source-value"><%:Latest official stable, automatic%></span>
+                            <select class="select-class oc-hidden" id="select-core-ver" aria-hidden="true" tabindex="-1">
+                                <option value="__latest__"><%:Latest official stable%></option>
+                            </select>
                         </div>
                     </div>
                 </div>
@@ -101,7 +76,7 @@
                     <span class="addr-header-label"><span class="addr-header-icon"><svg><use href="#oc-icon-link-tabler"/></svg></span><span><%:Address%></span></span>
                     <span class="addr-header-label"><span class="addr-header-icon"><svg><use href="#oc-icon-speedtest"/></svg></span><span><%:Latency%></span></span>
                     <span class="addr-header-label"><span class="addr-header-icon"><svg><use href="#oc-icon-package"/></svg></span><span><%:Plugin%></span></span>
-                    <span class="addr-header-label"><span class="addr-header-icon"><svg><use href="#oc-icon-cpu"/></svg></span><span><%:Core%></span>
+                    <span class="addr-header-label"><span class="addr-header-icon"><svg><use href="#oc-icon-cpu"/></svg></span><span><%:Official Core%></span>
                         <div class="help-link" title="<%:Core path:%>/etc/openkill/core/clash_meta">
                             <svg width="12" height="12"><use href="#oc-icon-help"/></svg>
                         </div>
@@ -521,8 +496,12 @@
         document.getElementById('select-core-ver').disabled = true;
         XHR.get('<%=luci.dispatcher.build_url("admin", "services", "openkill", "update")%>', null, function(x, st) {
             if (x && x.status == 200) {
-                if (st.corever && st.corever != '0') core_version.value = st.corever; else core_version.value = '0';
-                if (st.release_branch) release_branch.value = st.release_branch; else release_branch.value = 'master';
+                // The official core updater selects the asset from uname -m.
+                // Do not reuse the legacy core_version value as a manual
+                // architecture selector; old installations may contain a
+                // Mihomo tag there.
+                core_version.value = '0';
+                release_branch.value = 'master';
                 _pkgType = st.pkg_type || 'opkg';
                 document.getElementById('installed-plugin').textContent = (st.opcv && st.opcv != '0') ? st.opcv : '--';
                 document.getElementById('installed-core').textContent = (st.coremetacv && st.coremetacv != '0') ? st.coremetacv : '--';
@@ -567,8 +546,6 @@
         var appendHistoryEntry = function(entry) {
             if (entry.type === 'plugin' && entry.version) {
                 pluginSelect.innerHTML += '<option value="' + entry.sha + '" data-ver="' + entry.version + '">' + entry.version + ' (<%:Date%>: ' + (entry.date||'').substring(0,10) + ')</option>';
-            } else if (entry.type === 'core_meta' && entry.version) {
-                coreSelect.innerHTML += '<option value="' + entry.sha + '" data-ver="' + entry.version + '">' + entry.version + ' (<%:Date%>: ' + (entry.date||'').substring(0,10) + ')</option>';
             }
         };
 
@@ -577,8 +554,8 @@
         pluginSelect.disabled = true;
         coreSelect.disabled = true;
 
-        pluginSelect.innerHTML = '<option value="__latest__"><%:Latest%></option>';
-        coreSelect.innerHTML = '<option value="__latest__"><%:Latest%></option>';
+        pluginSelect.innerHTML = '<option value="__latest__"><%:Latest OpenKill%></option>';
+        coreSelect.innerHTML = '<option value="__latest__"><%:Latest official stable%></option>';
 
         var url = '<%=luci.dispatcher.build_url("admin", "services", "openkill", "version_history")%>?' +
             Object.keys(params).map(function(k) { return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]); }).join('&');
@@ -612,7 +589,10 @@
                             }
                         } else {
                             pluginSelect.disabled = false;
-                            coreSelect.disabled = false;
+                            // Historical core versions are not selectable;
+                            // the backend always installs the official stable
+                            // Mihomo release for the detected architecture.
+                            coreSelect.disabled = true;
                             if (versionRetryTimer) { clearInterval(versionRetryTimer); versionRetryTimer = null; }
                         }
                         continue;
@@ -651,7 +631,7 @@
                                 }
                             } else {
                                 pluginSelect.disabled = false;
-                                coreSelect.disabled = false;
+                                coreSelect.disabled = true;
                                 if (versionRetryTimer) { clearInterval(versionRetryTimer); versionRetryTimer = null; }
                             }
                             continue;
@@ -675,7 +655,7 @@
                             }
                         } else {
                             pluginSelect.disabled = false;
-                            coreSelect.disabled = false;
+                            coreSelect.disabled = true;
                             if (versionRetryTimer) { clearInterval(versionRetryTimer); versionRetryTimer = null; }
                         }
                     } else {

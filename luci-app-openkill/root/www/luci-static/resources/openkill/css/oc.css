@@ -835,7 +835,7 @@ html[data-darkmode="true"] .oc svg {
 }
 
 .oc .core-status-row .sub-card {
-    gap: 20px;
+    gap: 10px;
 }
 
 .oc .core-main-controls {
@@ -976,6 +976,55 @@ html[data-darkmode="true"] .oc svg {
 .oc .version-display:hover {
     background: var(--bg-light);
     color: var(--text-primary);
+}
+
+/* Runtime profile badges mirror the effective four-stage baseline without
+ * adding another settings panel or a high-frequency status request. */
+.oc .runtime-profile {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-height: 18px;
+    margin-top: -2px;
+    padding-left: 5px;
+    color: var(--text-secondary);
+}
+
+.oc .runtime-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 20px;
+    padding: 1px 6px;
+    border: 1px solid var(--border-light);
+    border-radius: 999px;
+    background: var(--bg-gray);
+    color: var(--text-secondary);
+    font-size: 11px;
+    line-height: 1.35;
+    white-space: nowrap;
+    transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.oc .runtime-chip svg {
+    width: 12px;
+    height: 12px;
+    flex: 0 0 12px;
+}
+
+.oc .runtime-chip-core {
+    color: var(--primary-color);
+}
+
+.oc .runtime-chip-success {
+    color: var(--success-color);
+    border-color: var(--success-a20);
+    background: var(--success-a5);
+}
+
+.oc .runtime-chip-muted {
+    color: var(--text-secondary);
 }
 
 .oc .config-selector {
@@ -3388,6 +3437,13 @@ html[data-darkmode="true"] .oc .overwrite-config-option-state {
     margin: 8px 0;
     border-radius: var(--radius-sm);
     line-height: 1.5;
+}
+
+.openkill-health-note {
+    display: block;
+    color: var(--text-secondary, #64748b);
+    line-height: 1.5;
+    padding: 2px 0;
 }
 
 .oc .cbi-section-card {
@@ -6570,6 +6626,15 @@ html[data-darkmode=true] .oc .oix-msg-bar svg { color: inherit; }
     color: var(--text-primary);
     box-sizing: border-box;
 }
+
+.oc .version-source-value {
+    display: flex;
+    align-items: center;
+    line-height: 1.35;
+    white-space: normal;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
 .oc .ver-hint {
     display: none;
     justify-content: center;
@@ -7244,6 +7309,9 @@ html[data-darkmode=true] .oc #addCustomOption:hover {
     .oc .icon-btn svg { width: 12px !important; height: 12px !important; }
     .oc .version-display { max-width: 120px; font-size: 9px; padding: 1px 4px; }
     .oc .version-display svg { width: 9px; height: 9px; }
+    .oc .runtime-profile { gap: 3px; padding-left: 3px; }
+    .oc .runtime-chip { min-height: 18px; padding: 1px 4px; font-size: 9px; }
+    .oc .runtime-chip svg { width: 10px; height: 10px; flex-basis: 10px; }
     .oc .dashboard-btn { font-size: 9px !important; height: 25px !important; }
     .oc .cbi-button-group { padding: 2px; gap: 1px; height: 28px; }
     .oc input[type="radio"]:checked + .cbi-button-option { height: 22px; }
@@ -7337,6 +7405,7 @@ html[data-darkmode=true] .oc #addCustomOption:hover {
     .oc .select-option { padding: 8px 10px; font-size: 12px; }
     .oc .custom-option-input, .oc #addCustomOption { font-size: 12px; padding: 8px 10px; margin: 6px 0; }
     .oc .config-grid { grid-template-columns: 1fr 1fr; }
+    .oc .version-source-value { padding-left: 8px; padding-right: 8px; }
     .oc .version-row { grid-template-columns: 1fr 1fr; gap: 6px; }
     .oc .version-card { margin-bottom: 4px; }
     .oc .config-item { gap: 6px; }

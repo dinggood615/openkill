@@ -78,6 +78,7 @@ s:tab("rules_update", translate("Rules Update"))
 s:tab("geo_update", translate("GEO Update"))
 s:tab("chnr_update", translate("Chnroute Update"))
 s:tab("auto_restart", translate("Auto Restart"))
+s:tab("health", translate("Health & Watchdog"))
 s:tab("debug", translate("Core Tests"))
 s:tab("developer", translate("Developer Settings"))
 s:tab("version_update", translate("Version Update"))
@@ -1242,6 +1243,49 @@ o:value(t, t..":00")
 end
 o.default = "0"
 
+---- Health & Watchdog
+o = s:taboption("health", DummyValue, "health_profile", translate("Stability Profile"))
+o.rawhtml = true
+o.cfgvalue = function()
+	return "<span class='openkill-health-note'>" .. translate("OpenKill validates generated configurations before activation, keeps the last known-good file, and lets watchdog observe the service without starting duplicate core processes.") .. "</span>"
+end
+
+o = s:taboption("health", Value, "watchdog_interval", translate("Watchdog Check Interval (s)"))
+o.description = translate("How often the health monitor checks the service and core. A larger value reduces background CPU usage.")
+o.datatype = "range(15,300)"
+o.default = "60"
+o.rmempty = false
+
+o = s:taboption("health", Value, "watchdog_network_cycles", translate("Network Scan Interval (cycles)"))
+o.description = translate("Run local-network and IPv6 route maintenance on the first cycle and then at this interval.")
+o.datatype = "range(1,120)"
+o.default = "10"
+o.rmempty = false
+
+o = s:taboption("health", Value, "watchdog_history_cycles", translate("History Scan Interval (cycles)"))
+o.description = translate("Refresh connection history less often to avoid repeated process and file scans.")
+o.datatype = "range(1,120)"
+o.default = "5"
+o.rmempty = false
+
+o = s:taboption("health", Value, "watchdog_firewall_cycles", translate("Firewall Check Interval (cycles)"))
+o.description = translate("Check firewall state at this watchdog cadence; lower values react faster but use more CPU.")
+o.datatype = "range(1,60)"
+o.default = "2"
+o.rmempty = false
+
+o = s:taboption("health", Value, "watchdog_upnp_cycles", translate("UPnP Check Interval (cycles)"))
+o.description = translate("Check UPnP state at a low frequency; set a larger value when UPnP is not used.")
+o.datatype = "range(1,240)"
+o.default = "30"
+o.rmempty = false
+
+o = s:taboption("health", Value, "watchdog_proxy_cycles", translate("Proxy Address Scan Interval (cycles)"))
+o.description = translate("Refresh proxy-address metadata only periodically; this avoids a full Ruby scan on every watchdog cycle.")
+o.datatype = "range(1,240)"
+o.default = "30"
+o.rmempty = false
+
 ---- Dashboard Settings
 local cn_port=SYS.exec("uci get openkill.config.cn_port 2>/dev/null |tr -d '\n'")
 o = s:taboption("dashboard", Value, "cn_port")
@@ -1292,7 +1336,7 @@ o.rawhtml = true
 
 ---- ipv6
 o = s:taboption("ipv6", Flag, "ipv6_enable", translate("Proxy IPv6 Traffic"))
-o.description = font_red..bold_on..translate("The Gateway and DNS of The Connected Device Must be The Router IP, Disable IPv6 DHCP To Avoid Abnormal Connection If You Do Not Use")..bold_off..font_off
+o.description = translate("Keep the router as the LAN IPv6 gateway and DNS. OpenKill keeps dual-stack DNS and uses the selected IPv6 proxy mode; if IPv6 is unavailable, keep IPv6 DNS disabled to avoid AAAA first-connection delays.")
 o.default = 0
 
 o = s:taboption("ipv6", ListValue, "ipv6_mode", translate("IPv6 Proxy Mode"))
@@ -1321,7 +1365,7 @@ o:depends("ipv6_mode", "1")
 o.default = 1
 
 o = s:taboption("ipv6", Flag, "ipv6_dns", translate("IPv6 DNS Resolve"))
-o.description = translate("Enable to Resolve IPv6 DNS Requests")
+o.description = translate("Resolve AAAA records through the configured DNS path. Enable only when the router has a working IPv6 route; the local YAML keeps a short IPv6 fallback window.")
 o.default = 0
 
 if op_mode == "fake-ip" then

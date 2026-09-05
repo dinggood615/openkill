@@ -1,14 +1,11 @@
 <%
     local fs = require "luci.openkill"
     local plugin_version = fs.oc_version()
-    local uci = require("luci.model.uci").cursor()
-    local RELEASE_BRANCH = fs.uci_get_config("config", "release_branch")
 %>
 <html>
 <head>
 <script src="/luci-static/resources/openkill/js/common.js?v=<%=plugin_version%>"></script>
 <link rel="stylesheet" href="/luci-static/resources/openkill/css/oc.css?v=<%=plugin_version%>">
-<script src="/luci-static/resources/openkill/js/cm6.min.js?v=<%=plugin_version%>"></script>
 </head>
 <fieldset class="cbi-section">
     <table width="100%">
@@ -30,6 +27,20 @@
                                         <svg width="12" height="12"><use href="#oc-icon-cpu"/></svg>
                                         <span class="version-text" id="core-version-text">-</span>
                                     </div>
+                                </div>
+                                <div class="runtime-profile" id="runtime-profile" aria-live="polite">
+                                    <span class="runtime-chip runtime-chip-core" id="runtime-core-chip">
+                                        <svg width="12" height="12"><use href="#oc-icon-cpu"/></svg>
+                                        <span>Meta</span>
+                                    </span>
+                                    <span class="runtime-chip" id="runtime-ipv6-chip">
+                                        <svg width="12" height="12"><use href="#oc-icon-globe"/></svg>
+                                        <span><%:IPv6 disabled%></span>
+                                    </span>
+                                    <span class="runtime-chip" id="runtime-watchdog-chip">
+                                        <svg width="12" height="12"><use href="#oc-icon-shield-check"/></svg>
+                                        <span><%:Watchdog%> 60s</span>
+                                    </span>
                                 </div>
                                 <div class="core-main-controls">
                                     <div class="core-status-toggle">
@@ -279,37 +290,6 @@
                     </div>
                 </div>
 
-            <!-- Usage Help Model -->
-            <div class="config-upload-model-overlay" id="usage-help-overlay">
-                <div class="config-upload-model usage-help-model" id="usage-help-model">
-                    <div class="config-upload-header">
-                        <div class="config-upload-title"><%:Usage Help%></div>
-                        <button type="button" class="icon-btn" onclick="UsageHelpManager.hide()">
-                            <svg width="14" height="14"><use href="#oc-icon-close"/></svg>
-                        </button>
-                    </div>
-                    <div class="config-upload-content">
-                        <div class="form-group">
-                            <label class="highlight-label"><%:Copy the following text to any AI (ChatGPT, DeepSeek, etc.) to get usage help for OpenKill:%></label>
-                            <textarea id="usage-help-textarea" class="form-textarea oc-hidden"></textarea>
-                            <div id="usage-help-editor"></div>
-                        </div>
-                    </div>
-                    <div class="config-upload-footer">
-                        <div class="config-upload-status" id="usage-help-status"></div>
-                        <div class="config-upload-buttons">
-                            <button type="button" class="btn cancel-btn" onclick="UsageHelpManager.hide()"><%:Cancel%></button>
-                            <button type="button" class="btn upload-btn" onclick="UsageHelpManager.copyAndHide()"><%:Copy%></button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Usage Help Button -->
-            <div class="oc-usage-help-float" id="usage-help-float" title="<%:Usage Help%>" onclick="UsageHelpManager.show()">
-                <svg width="24" height="24"><use href="#oc-icon-usage-help"/></svg>
-                <span class="oc-usage-help-bubble" id="usage-help-bubble"><%:Click to get usage help%></span>
-            </div>
             </div>
         </td>
     </tr>
@@ -366,13 +346,51 @@
         core_version_display: document.getElementById('core-version-display'),
         core_version_text: document.getElementById('core-version-text'),
         plugin_version_display: document.getElementById('plugin-version-display'),
-        plugin_version_text: document.getElementById('plugin-version-text')
+        plugin_version_text: document.getElementById('plugin-version-text'),
+        runtime_core_chip: document.getElementById('runtime-core-chip'),
+        runtime_ipv6_chip: document.getElementById('runtime-ipv6-chip'),
+        runtime_watchdog_chip: document.getElementById('runtime-watchdog-chip')
     };
 
     var getDashboardBaseURL = ocGetDashboardBaseURL;
     var buildDashboardURL = ocBuildDashboardURL;
     var bytesToSize = ocFormatBytes;
     var debounceButton = ocDebounce;
+
+    // Keep the dashboard's compact runtime profile aligned with the four-stage
+    // baseline. Values are read-only summaries; settings remain editable in
+    // Plugin Settings and Overwrite Settings.
+    function updateRuntimeProfile(status) {
+        var coreChip = DOMCache.runtime_core_chip;
+        if (coreChip) {
+            var coreLabel = coreChip.querySelector('span:last-child');
+            if (coreLabel) {
+                coreLabel.textContent = (status && status.core_type ? status.core_type : 'Meta') + ' <%:Stable%>';
+            }
+        }
+
+        var ipv6Chip = DOMCache.runtime_ipv6_chip;
+        if (ipv6Chip) {
+            var ipv6Label = ipv6Chip.querySelector('span:last-child');
+            var ipv6Enabled = !!(status && status.ipv6_enable);
+            var ipv6Dns = !!(status && status.ipv6_dns);
+            if (ipv6Label) {
+                ipv6Label.textContent = ipv6Enabled ? (ipv6Dns ? '<%:IPv6 + DNS%>' : '<%:IPv6%>') : '<%:IPv4%>';
+            }
+            ipv6Chip.classList.toggle('runtime-chip-success', ipv6Enabled);
+            ipv6Chip.classList.toggle('runtime-chip-muted', !ipv6Enabled);
+            ipv6Chip.title = ipv6Enabled ? (ipv6Dns ? '<%:IPv6 proxy and AAAA DNS are enabled%>' : '<%:IPv6 proxy is enabled; AAAA DNS is disabled%>') : '<%:IPv6 proxy is disabled%>';
+        }
+
+        var watchdogChip = DOMCache.runtime_watchdog_chip;
+        if (watchdogChip) {
+            var watchdogLabel = watchdogChip.querySelector('span:last-child');
+            var seconds = parseInt(status && status.watchdog_interval, 10);
+            if (!isFinite(seconds) || seconds < 15) seconds = 60;
+            if (watchdogLabel) watchdogLabel.textContent = '<%:Watchdog%> ' + seconds + 's';
+            watchdogChip.title = '<%:Read-only health monitor interval%>: ' + seconds + 's';
+        }
+    }
 
     var DarkModeDetector = {
         init: function() {
@@ -2635,229 +2653,13 @@
         }
     };
 
-    var AnnouncementDataManager = (function() {
-        var defaultTips = [
-            '<%:You can modify the profile on the profile page (for content that is not taken over)%>',
-            '<%:do not write configuration files? Try to create one click on the server page%>',
-            '<%:some website are abnormal? Try switching modes or using third-party rules%>',
-            '<%:using the fake IP mode can get a faster access experience%>',
-            '<%:the nameserver group must have at least one server set when using custom DNS%>',
-            '<%:after started, please wait patiently until the connection is normal%>',
-            '<%:if you don not use IPv6, please turn off the DHCP service of IPv6, otherwise the connection will be abnormal%>',
-            '<%:you can update the version in the settings page%>',
-            '<%:Note: It is not recommended to enable IPv6 and related services for routing. Most of the network connection problems reported so far are related to it%>',
-            '<%:Note: Turning on secure DNS in the browser will cause abnormal shunting, please be careful to turn it off%>',
-            '<%:Note: Some software will modify the device HOSTS, which will cause abnormal shunt, please pay attention to check%>',
-            '<%:Note: The default proxy routes local traffic, BT, PT download, etc., please use Redir-Host mode as much as possible and pay attention to traffic avoidance%>'
-        ];
-
-        function getRandomTips(count, sourceArray) {
-            var source = sourceArray || defaultTips;
-            var shuffled = source.slice();
-            for (var i = shuffled.length - 1; i > 0; i--) {
-                var j = Math.floor(Math.random() * (i + 1));
-                var temp = shuffled[i];
-                shuffled[i] = shuffled[j];
-                shuffled[j] = temp;
-            }
-            return shuffled.slice(0, count);
-        }
-
-        function extractAnnouncements(remoteData, isChineseUser) {
-            var announcements = [];
-            if (!remoteData) return announcements;
-
-            if (Array.isArray(remoteData)) {
-                if (remoteData.length > 0 && (remoteData[0].zh || remoteData[0].en)) {
-                    remoteData.forEach(function(item) {
-                        if (isChineseUser && item.zh) {
-                            announcements.push(item.zh);
-                        } else if (item.en) {
-                            announcements.push(item.en);
-                        } else if (item.zh) {
-                            announcements.push(item.zh);
-                        }
-                    });
-                } else {
-                    announcements = remoteData.filter(function(item) {
-                        return typeof item === 'string' && item.trim() !== '';
-                    });
-                }
-            } else if (typeof remoteData === 'string' && remoteData.trim() !== '') {
-                announcements = [remoteData];
-            }
-            return announcements;
-        }
-
-        function prepareData(remoteData, isChineseUser, randomCount) {
-            var announcements = extractAnnouncements(remoteData, isChineseUser);
-            var isRandomTips = false;
-            if (announcements.length === 0) {
-                announcements = getRandomTips(randomCount || 3);
-                isRandomTips = true;
-            }
-            return { announcements: announcements, isRandomTips: isRandomTips };
-        }
-
-        function updateIconShape(megaphoneSvgElement, isRandomTips) {
-            if (!megaphoneSvgElement) return;
-            if (isRandomTips) {
-                megaphoneSvgElement.innerHTML = '<use href="#oc-icon-bell-phosphor"/>';
-            } else {
-                megaphoneSvgElement.innerHTML = '<use href="#oc-icon-megaphone"/>';
-            }
-            megaphoneSvgElement.setAttribute('viewBox', '0 0 256 256');
-        }
-
-        return {
-            getRandomTips: getRandomTips,
-            extractAnnouncements: extractAnnouncements,
-            prepareData: prepareData,
-            updateIconShape: updateIconShape
-        };
-    })();
-
-    var UsageHelpManager = {
-        overlay: null,
-        textarea: null,
-        statusEl: null,
-        initialized: false,
-        bubbleTimer: null,
-
-        init: function() {
-            if (this.initialized) return;
-            this.overlay = document.getElementById('usage-help-overlay');
-            this.textarea = document.getElementById('usage-help-textarea');
-            this.statusEl = document.getElementById('usage-help-status');
-
-            var floatBtn = document.getElementById('usage-help-float');
-            if (floatBtn) {
-                floatBtn.addEventListener('click', function() {
-                    UsageHelpManager.show();
-                });
-                floatBtn.addEventListener('mouseenter', function() {
-                    UsageHelpManager.dismissBubble();
-                });
-            }
-
-            document.addEventListener('keydown', function(e) {
-                if (e.key === 'Escape' && UsageHelpManager.overlay && UsageHelpManager.overlay.style.display === 'flex') {
-                    UsageHelpManager.hide();
-                }
-            });
-
-            this.startBubbleTimer();
-
-            this.initialized = true;
-        },
-
-        buildPrompt: function() {
-            var skillUrl = 'https://raw.githubusercontent.com/dinggood615/openkill/master/.github/skills/openkill-user-guide/SKILL.md';
-            var prompt = '# <%:OpenKill Expert Assistant%>\n\n';
-            prompt += '<%:You are an OpenKill expert assistant. OpenKill is a LuCI plugin for OpenWrt that manages the Mihomo core.%>\n\n';
-            prompt += '<%:**IMPORTANT** — Before answering, you MUST fetch and read this authoritative reference guide. ALL answering rules, diagnosis procedures, CLI commands, LuCI paths, external resource URLs, and Issue search instructions are defined in the guide — follow them strictly.%>\n';
-            prompt += '- [<%:OpenKill User Guide%>](' + skillUrl + ')\n\n';
-            prompt += '<%:The guide is the single source of truth — it covers everything from debug log procedures to external resource queries. Do NOT rely on memory; always verify against the guide.%>\n\n';
-            prompt += '## <%:Question%>\n\n';
-            prompt += '<%:My question is:%>\n';
-            return prompt;
-        },
-
-        show: function() {
-            this.init();
-            if (!this.overlay || !this.textarea) return;
-            if (!this._portal) {
-                this._portal = document.createElement('div');
-                this._portal.className = 'oc';
-                this._portal.style.overflow = 'visible';
-                document.body.appendChild(this._portal);
-                this._portal.appendChild(this.overlay);
-            }
-            this.overlay.classList.add('show');
-            if (this.statusEl) {
-                this.statusEl.textContent = '';
-            }
-
-            if (!this._editor) {
-                var prompt = this.buildPrompt();
-                this.textarea.value = prompt;
-                var container = document.getElementById('usage-help-editor');
-                var isDark = isDarkBackground(document.body);
-                var exts = [CM6.lineNumbers(), CM6.EditorView.lineWrapping, CM6.themeExtension(isDark), CM6.markdown()];
-                var view = new CM6.EditorView({
-                    state: CM6.EditorState.create({ doc: prompt, extensions: exts })
-                });
-                container.innerHTML = '';
-                container.appendChild(view.dom);
-                this._editor = view;
-            }
-
-            var self = this;
-            setTimeout(function() {
-                if (self._editor && self._editor.contentDOM) {
-                    self._editor.focus();
-                }
-            }, 100);
-        },
-
-        hide: function() {
-            if (this.overlay) {
-                this.overlay.classList.remove('show');
-            }
-        },
-
-        copyAndHide: function() {
-            if (!this._editor) return;
-            var text = this._editor.state.sliceDoc();
-            if (!text) return;
-            var self = this;
-            ocCopyToClipboard(text, null);
-            var btn = document.querySelector('#usage-help-model .upload-btn');
-            var origHTML = btn ? btn.innerHTML : '';
-            if (btn) {
-                btn.innerHTML = '<svg width="14" height="14" style="vertical-align:middle;margin-right:4px"><use href="#oc-icon-success"/></svg><%:Copied!%>';
-                btn.disabled = true;
-            }
-            setTimeout(function() {
-                if (btn) { btn.innerHTML = origHTML; btn.disabled = false; }
-                self.hide();
-            }, 2000);
-        },
-
-        startBubbleTimer: function() {
-            var bubble = document.getElementById('usage-help-bubble');
-            if (!bubble) return;
-
-            var delay = Math.random() * 60000;
-            if (delay > 20000) return;
-
-            var self = this;
-            this.bubbleTimer = setTimeout(function() {
-                bubble.classList.add('show');
-            }, Math.min(delay, 5000));
-        },
-
-        dismissBubble: function() {
-            var bubble = document.getElementById('usage-help-bubble');
-            if (!bubble) return;
-            bubble.classList.remove('show');
-            if (this._bubbleAutoHide) {
-                clearTimeout(this._bubbleAutoHide);
-                this._bubbleAutoHide = null;
-            }
-            if (this.bubbleTimer) {
-                clearTimeout(this.bubbleTimer);
-                this.bubbleTimer = null;
-            }
-        }
-    };
-
     var pluginToggleUserAction = false;
 
     // Status changes are not sub-second events; polling every 15 seconds keeps
     // the dashboard responsive while reducing repeated LuCI requests.
     XHR.poll(15, '<%=luci.dispatcher.build_url("admin", "services", "openkill", "status")%>', null, function(x, status) {
         if (x && x.status == 200) {
+            updateRuntimeProfile(status || {});
             var updates = [];
 
             if (!pluginToggleUserAction) {
@@ -3024,7 +2826,6 @@
     setTimeout(function() {
         OverwriteSubscribeManager.init();
         SubscriptionManager.init();
-        UsageHelpManager.init();
     }, 300);
 
     setTimeout(function() { check_core(); }, 1000);
@@ -3091,262 +2892,6 @@
         }
 
         return protocol + host + ":" + port;
-    }
-
-    function AnnouncementAnimator(config) {
-        var bannerElement = config.bannerElement;
-        var contentElement = config.contentElement;
-        var announcements = config.announcements;
-        var isRandomTips = config.isRandomTips || false;
-        var randomTipCount = config.randomTipCount || 3;
-        var getRandomTipsCallback = config.getRandomTipsCallback;
-        var onIndexChange = config.onIndexChange || function(index, text) {};
-        var loopDelay = config.loopDelay || 2000; 
-        var animationRefreshThreshold = 250;
-        var currentIndex = 0;
-        var isHovered = false;
-        var pauseTimeout = null;
-        var nextAnimationTimeout = null;
-        var resizeTimeout = null;
-        var animationEndHandler = null;
-        var destroyed = false;
-        var _cachedBannerWidth = 0;
-        var _cachedContentWidth = 0;
-        var _cachedDuration = 0;
-
-        function calculateAnimationDuration() {
-            var bannerWidth = bannerElement.offsetWidth;
-            var contentWidth = contentElement.offsetWidth;
-            if (bannerWidth === _cachedBannerWidth && contentWidth === _cachedContentWidth && _cachedDuration > 0) {
-                return _cachedDuration;
-            }
-            _cachedBannerWidth = bannerWidth;
-            _cachedContentWidth = contentWidth;
-            var refreshRate = window.screen && window.screen.refreshRate ? window.screen.refreshRate : 60;
-            if (refreshRate <= 0) refreshRate = 60;
-            if (refreshRate > 480) refreshRate = 480;
-
-            var scrollDistance = contentWidth + bannerWidth;
-
-            var minDistance = 400;
-            var maxDistance = 20000;
-            var minSpeed = 60;
-            var maxSpeed = 360;
-            var clampedDistance = Math.min(maxDistance, Math.max(minDistance, scrollDistance));
-            var targetVelocity = minSpeed + (maxSpeed - minSpeed) * (clampedDistance - minDistance) / (maxDistance - minDistance);
-
-            var duration = (scrollDistance / targetVelocity) * 1000;
-
-            var refreshRateMultiplier = 1;
-            if (refreshRate > 60) {
-                refreshRateMultiplier = 1 + (refreshRate - 60) / 240;
-            }
-            duration = duration * refreshRateMultiplier;
-
-            _cachedDuration = Math.max(4000, Math.min(duration, 50000));
-            return _cachedDuration;
-        }
-
-        function updateScrollAnimation(duration) {
-            var viewport = bannerElement.parentElement;
-            if (!viewport) viewport = bannerElement;
-            
-            var viewportWidth = viewport.clientWidth;
-            var contentWidth = contentElement.scrollWidth;
-            var scrollDistance = -(contentWidth + viewportWidth);
-            
-            viewport.style.setProperty('--scroll-distance', scrollDistance + 'px');
-            contentElement.style.animationDuration = duration + 'ms';
-        }
-
-        function refreshAnimation() {
-            if (!contentElement.classList.contains('scrolling')) return;
-            var duration = calculateAnimationDuration();
-            updateScrollAnimation(duration);
-            contentElement.classList.remove('scrolling');
-            contentElement.offsetHeight;
-            contentElement.classList.add('scrolling');
-        }
-
-        function refreshAnnouncementsForRandomMode() {
-            if (!isRandomTips) return;
-            var newTips;
-            if (getRandomTipsCallback) {
-                newTips = getRandomTipsCallback(randomTipCount);
-            } else {
-                newTips = AnnouncementDataManager.getRandomTips(randomTipCount);
-            }
-            if (newTips && newTips.length) {
-                announcements = newTips;
-            }
-        }
-
-        function startSingleScroll() {
-            if (destroyed) return;
-            if (nextAnimationTimeout) {
-                clearTimeout(nextAnimationTimeout);
-                nextAnimationTimeout = null;
-            }
-
-            var text = announcements[currentIndex] || '';
-            contentElement.textContent = text;
-            if (onIndexChange) onIndexChange(currentIndex, text);
-
-            setTimeout(function() {
-                if (destroyed) return;
-                var duration = calculateAnimationDuration();
-                updateScrollAnimation(duration);
-
-                if (animationEndHandler) {
-                    contentElement.removeEventListener('animationend', animationEndHandler);
-                }
-
-                animationEndHandler = function(e) {
-                    if (e.target === contentElement && e.animationName === 'announceScroll') {
-                        contentElement.removeEventListener('animationend', animationEndHandler);
-                        animationEndHandler = null;
-
-                        pauseTimeout = setTimeout(function() {
-                            if (destroyed) return;
-                            if (!isHovered) {
-                                currentIndex = (currentIndex + 1) % announcements.length;
-                                if (isRandomTips && currentIndex === 0) {
-                                    refreshAnnouncementsForRandomMode();
-                                }
-                                startSingleScroll();
-                            }
-                        }, loopDelay);
-                    }
-                };
-                contentElement.addEventListener('animationend', animationEndHandler);
-
-                contentElement.classList.remove('scrolling');
-                contentElement.offsetHeight;
-                contentElement.classList.add('scrolling');
-            }, 50);
-        }
-
-        function pause() {
-            if (destroyed) return;
-            isHovered = true;
-            contentElement.classList.add('paused');
-            if (pauseTimeout) {
-                clearTimeout(pauseTimeout);
-                pauseTimeout = null;
-            }
-        }
-
-        function resume() {
-            if (destroyed) return;
-            isHovered = false;
-            contentElement.classList.remove('paused');
-        }
-
-        function destroy() {
-            destroyed = true;
-            if (pauseTimeout) clearTimeout(pauseTimeout);
-            if (nextAnimationTimeout) clearTimeout(nextAnimationTimeout);
-            if (resizeTimeout) clearTimeout(resizeTimeout);
-            if (animationEndHandler) {
-                contentElement.removeEventListener('animationend', animationEndHandler);
-                animationEndHandler = null;
-            }
-            contentElement.classList.remove('scrolling', 'paused');
-            bannerElement.removeEventListener('mouseenter', mouseEnterHandler);
-            bannerElement.removeEventListener('mouseleave', mouseLeaveHandler);
-            window.removeEventListener('resize', resizeHandler);
-        }
-
-        function mouseEnterHandler() { pause(); }
-        function mouseLeaveHandler() { resume(); }
-        function resizeHandler() {
-            clearTimeout(resizeTimeout);
-            _cachedBannerWidth = 0;
-            _cachedContentWidth = 0;
-            _cachedDuration = 0;
-            resizeTimeout = setTimeout(function() {
-                if (!destroyed && contentElement.classList.contains('scrolling')) {
-                    refreshAnimation();
-                }
-            }, animationRefreshThreshold);
-        }
-
-        function init() {
-            if (!bannerElement || !contentElement || !announcements || announcements.length === 0) {
-                console.warn('AnnouncementAnimator: invalid config');
-                return false;
-            }
-            bannerElement.style.display = 'block';
-            bannerElement.addEventListener('mouseenter', mouseEnterHandler);
-            bannerElement.addEventListener('mouseleave', mouseLeaveHandler);
-            window.addEventListener('resize', resizeHandler);
-            startSingleScroll();
-            return true;
-        }
-
-        return {
-            init: init,
-            pause: pause,
-            resume: resume,
-            destroy: destroy,
-            updateAnnouncements: function(newList, newRandomFlag) {
-                announcements = newList || announcements;
-                isRandomTips = (newRandomFlag !== undefined) ? newRandomFlag : isRandomTips;
-                currentIndex = 0;
-                if (pauseTimeout) clearTimeout(pauseTimeout);
-                if (nextAnimationTimeout) clearTimeout(nextAnimationTimeout);
-                if (animationEndHandler) {
-                    contentElement.removeEventListener('animationend', animationEndHandler);
-                    animationEndHandler = null;
-                }
-                contentElement.classList.remove('scrolling');
-                startSingleScroll();
-            }
-        };
-    }
-
-    function loadAnnouncement() {
-        var userLang = navigator.language || navigator.userLanguage;
-        var isChineseUser = (userLang.indexOf('zh') === 0);
-        var bannerElement = document.getElementById('announcement-banner');
-        var contentElement = document.getElementById('announcement-content');
-        var megaphoneSvg = document.getElementById('megaphone');
-
-        if (!bannerElement || !contentElement) return;
-
-        StateManager.cachedXHRGet('<%=luci.dispatcher.build_url("admin", "services", "openkill", "announcement")%>', function(x, status) {
-            var remoteData = null;
-            if (x && x.status == 200 && status.content) {
-                try {
-                    remoteData = typeof status.content === 'string' ? JSON.parse(status.content) : status.content;
-                } catch(e) {
-                    remoteData = status.content;
-                }
-            }
-
-            var prepared = AnnouncementDataManager.prepareData(remoteData, isChineseUser, 3);
-            if (megaphoneSvg) {
-                AnnouncementDataManager.updateIconShape(megaphoneSvg, prepared.isRandomTips);
-            }
-
-            var animator = new AnnouncementAnimator({
-                bannerElement: bannerElement,
-                contentElement: contentElement,
-                announcements: prepared.announcements,
-                isRandomTips: prepared.isRandomTips,
-                randomTipCount: 3,
-                getRandomTipsCallback: function(count) {
-                    return AnnouncementDataManager.getRandomTips(count);
-                },
-                loopDelay: 2000,
-            });
-
-            animator.init();
-
-            window.addEventListener('beforeunload', function() {
-                animator.destroy();
-            });
-        });
     }
 
     function get_rule_mode() {

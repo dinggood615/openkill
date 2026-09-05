@@ -1502,6 +1502,14 @@ function action_status()
 		metacubexd = fs.isdirectory("/usr/share/openkill/ui/metacubexd"),
 		zashboard = fs.isdirectory("/usr/share/openkill/ui/zashboard"),
 		core_type = fs.uci_get_config("config", "core_type") or "Meta",
+		-- Runtime profile exposed to the compact status page.  These values are
+		-- read-only summaries of the four-stage baseline; changing them still
+		-- happens in Plugin Settings / Overwrite Settings.
+		ipv6_enable = fs.uci_get_config("config", "ipv6_enable") == "1",
+		ipv6_dns = fs.uci_get_config("config", "ipv6_dns") == "1",
+		watchdog_interval = fs.uci_get_config("config", "watchdog_interval") or "60",
+		find_process_mode = fs.uci_get_config("config", "find_process_mode") or "off",
+		geodata_loader = fs.uci_get_config("config", "geodata_loader") or "memconservative",
 		-- run_mode
 		run_mode = mode(),
 		-- rule_mode
