@@ -332,7 +332,8 @@ function isMultiValueField(field) {
         wg_dns: true,
         host_key: true,
         host_key_algorithms: true,
-        masque_dns: true
+        masque_dns: true,
+        shadowquic_quic_versions: true
     }[field] === true;
 }
 
@@ -656,6 +657,7 @@ function isYamlListLikeKey(key) {
     return {
         alpn: true,
         dns: true,
+        'quic-versions': true,
         'host-key': true,
         'host-key-algorithms': true
     }[key] === true;
@@ -765,6 +767,9 @@ function export_url(btn, urlname, sid) {
                 break;
             case "anytls":
                 url = exportAnyTLS(sid);
+                break;
+            case "shadowquic":
+                url = exportShadowQUIC(sid);
                 break;
             case "mieru":
                 url = exportMieru(sid);
@@ -1593,6 +1598,71 @@ function exportAnyTLS(sid) {
     return 'anytls://' + url;
 }
 
+function exportShadowQUIC(sid) {
+    var server = getFormValue(sid, 'server');
+    var port = getFormValue(sid, 'port');
+    var username = getFormValue(sid, 'shadowquic_username');
+    var password = getFormValue(sid, 'password');
+    var name = getFormValue(sid, 'name');
+    var sni = getFormValue(sid, 'sni');
+    var alpn = getFormValue(sid, 'alpn');
+    var skipCert = getFormValue(sid, 'skip_cert_verify');
+    var clientFingerprint = getFormValue(sid, 'client_fingerprint');
+    var udp = getFormValue(sid, 'udp');
+    var quicVersions = getFormValue(sid, 'shadowquic_quic_versions');
+    var udpOverStream = getFormValue(sid, 'shadowquic_udp_over_stream');
+    var zeroRtt = getFormValue(sid, 'shadowquic_zero_rtt');
+    var keepAlive = getFormValue(sid, 'shadowquic_keep_alive_interval');
+    var congestion = getFormValue(sid, 'shadowquic_congestion_controller');
+    var up = getFormValue(sid, 'shadowquic_up');
+    var down = getFormValue(sid, 'shadowquic_down');
+    var cwnd = getFormValue(sid, 'shadowquic_cwnd');
+    var bbrProfile = getFormValue(sid, 'shadowquic_bbr_profile');
+    var maxDatagram = getFormValue(sid, 'shadowquic_max_datagram_frame_size');
+    var maxStreams = getFormValue(sid, 'shadowquic_max_open_streams');
+    var recvWindowConn = getFormValue(sid, 'shadowquic_recv_window_conn');
+    var recvWindow = getFormValue(sid, 'shadowquic_recv_window');
+    var disableMtu = getFormValue(sid, 'shadowquic_disable_mtu_discovery');
+
+    if (!server || !port || !password) {
+        return null;
+    }
+
+    var url = '';
+    if (username) {
+        url += encodeURIComponent(username) + ':' + encodeURIComponent(password) + '@';
+    } else {
+        url += encodeURIComponent(password) + '@';
+    }
+    url += server + ':' + port + '?';
+
+    var queryMap = {};
+    if (sni) queryMap.sni = sni;
+    if (alpn) queryMap.alpn = alpn;
+    if (skipCert === 'true') queryMap.insecure = '1';
+    if (clientFingerprint) queryMap['client-fingerprint'] = clientFingerprint;
+    if (udp) queryMap.udp = udp;
+    if (quicVersions) queryMap['quic-versions'] = quicVersions;
+    if (udpOverStream) queryMap['udp-over-stream'] = udpOverStream;
+    if (zeroRtt) queryMap['zero-rtt'] = zeroRtt;
+    if (keepAlive) queryMap['keep-alive-interval'] = keepAlive;
+    if (congestion) queryMap['congestion-controller'] = congestion;
+    if (up) queryMap.up = up;
+    if (down) queryMap.down = down;
+    if (cwnd) queryMap.cwnd = cwnd;
+    if (bbrProfile && congestion === 'bbr') queryMap['bbr-profile'] = bbrProfile;
+    if (maxDatagram) queryMap['max-datagram-frame-size'] = maxDatagram;
+    if (maxStreams) queryMap['max-open-streams'] = maxStreams;
+    if (recvWindowConn) queryMap['recv-window-conn'] = recvWindowConn;
+    if (recvWindow) queryMap['recv-window'] = recvWindow;
+    if (disableMtu === 'true') queryMap['disable-mtu-discovery'] = '1';
+
+    mergeOtherParametersToQuery(sid, queryMap, null, getDefaultOtherParamSkipKeys());
+    url += queryMapToString(queryMap);
+    if (name) url += '#' + encodeURIComponent(name);
+    return 'shadowquic://' + url;
+}
+
 function exportMieru(sid) {
     var server = getFormValue(sid, 'server');
     var username = getFormValue(sid, 'username');
@@ -1751,6 +1821,15 @@ function import_url(btn, urlname, sid) {
 
             case "anytls":
                 if (parseAnyTLS(ssrurl, sid)) {
+                    s.innerHTML = "<font style=\"color:green\"><%:Import configuration information successfully%></font>";
+                } else {
+                    s.innerHTML = "<font style=\"color:red\"><%:Invalid format%></font>";
+                }
+                break;
+
+            case "shadowquic":
+            case "shadowquic+":
+                if (parseShadowQUIC(ssrurl, sid)) {
                     s.innerHTML = "<font style=\"color:green\"><%:Import configuration information successfully%></font>";
                 } else {
                     s.innerHTML = "<font style=\"color:red\"><%:Invalid format%></font>";
@@ -2769,6 +2848,95 @@ function parseAnyTLS(url, sid) {
     }
 
     mergeUnknownParamsToOtherParameters(sid, unknownParams);
+
+    return true;
+}
+
+function parseShadowQUIC(url, sid) {
+    var parsed = parseUrl(url);
+    if (!parsed) return false;
+
+    var query = parseQuery(parsed.search);
+    var password = parsed.password || parsed.username || '';
+
+    setFormValue(sid, 'type', 'shadowquic');
+    setFormValue(sid, 'server', parsed.hostname);
+    setFormValue(sid, 'port', parsed.port || '443');
+    setFormValue(sid, 'shadowquic_username', parsed.password ? decodeURIComponentSafe(parsed.username) : '');
+    setFormValue(sid, 'password', decodeURIComponentSafe(password));
+
+    var advanced = false;
+    if (query.sni) setFormValue(sid, 'sni', decodeURIComponentSafe(query.sni));
+    if (query.alpn) setFormValue(sid, 'alpn', decodeURIComponentSafe(query.alpn));
+    if (query.insecure === '1' || query.insecure === 'true') setFormValue(sid, 'skip_cert_verify', 'true');
+    if (query['client-fingerprint'] || query.fp) {
+        setFormValue(sid, 'client_fingerprint', decodeURIComponentSafe(query['client-fingerprint'] || query.fp));
+    }
+    if (query.udp) setFormValue(sid, 'udp', query.udp === '1' || query.udp === 'true' ? 'true' : 'false');
+
+    var listFields = {
+        'quic-versions': 'shadowquic_quic_versions'
+    };
+    for (var listKey in listFields) {
+        if (!listFields.hasOwnProperty(listKey) || !query[listKey]) continue;
+        setFormValue(sid, listFields[listKey], decodeURIComponentSafe(query[listKey]));
+        advanced = true;
+    }
+
+    var scalarFields = {
+        'udp-over-stream': 'shadowquic_udp_over_stream',
+        'zero-rtt': 'shadowquic_zero_rtt',
+        'keep-alive-interval': 'shadowquic_keep_alive_interval',
+        'congestion-controller': 'shadowquic_congestion_controller',
+        up: 'shadowquic_up',
+        down: 'shadowquic_down',
+        cwnd: 'shadowquic_cwnd',
+        'bbr-profile': 'shadowquic_bbr_profile',
+        'max-datagram-frame-size': 'shadowquic_max_datagram_frame_size',
+        'max-open-streams': 'shadowquic_max_open_streams',
+        'recv-window-conn': 'shadowquic_recv_window_conn',
+        'recv-window': 'shadowquic_recv_window',
+        'disable-mtu-discovery': 'shadowquic_disable_mtu_discovery'
+    };
+    for (var scalarKey in scalarFields) {
+        if (!scalarFields.hasOwnProperty(scalarKey) || !query[scalarKey]) continue;
+        var scalarValue = decodeURIComponentSafe(query[scalarKey]);
+        if (scalarKey === 'disable-mtu-discovery') {
+            scalarValue = scalarValue === '1' || scalarValue === 'true' ? 'true' : 'false';
+        }
+        setFormValue(sid, scalarFields[scalarKey], scalarValue);
+        advanced = true;
+    }
+    if (advanced) setFormValue(sid, 'shadowquic_advanced', 'true');
+
+    if (parsed.hash) {
+        setFormValue(sid, 'name', decodeFragment(parsed.hash.substr(1)));
+    } else {
+        setFormValue(sid, 'name', parsed.hostname + ':' + (parsed.port || '443'));
+    }
+
+    mergeUnknownParamsToOtherParameters(sid, collectUnknownQueryParams(query, {
+        sni: true,
+        alpn: true,
+        insecure: true,
+        'client-fingerprint': true,
+        fp: true,
+        udp: true,
+        'quic-versions': true,
+        'udp-over-stream': true,
+        'zero-rtt': true,
+        'keep-alive-interval': true,
+        'congestion-controller': true,
+        up: true,
+        down: true,
+        cwnd: true,
+        'bbr-profile': true,
+        'max-datagram-frame-size': true,
+        'max-open-streams': true,
+        'recv-window-conn': true,
+        'recv-window': true,
+        'disable-mtu-discovery': true
+    }));
 
     return true;
 }

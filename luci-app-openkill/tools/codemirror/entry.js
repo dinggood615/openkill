@@ -152,7 +152,7 @@ const mihomoKeywords = [
     { label: "enhanced-mode", type: "property", detail: "DNS mode: normal / redir-host / fake-ip" },
     { label: "fake-ip-range", type: "property", detail: "Fake-IP address range" },
     { label: "fake-ip-filter", type: "property", detail: "Fake-IP filter domains" },
-    { label: "type", type: "type", detail: "ss / ssr / vmess / trojan / snell / http / socks5 / hysteria / vless / tuic / wireguard" },
+    { label: "type", type: "type", detail: "ss / ssr / vmess / trojan / snell / http / socks5 / hysteria / vless / tuic / wireguard / shadowquic / masque / zerotier / anytls" },
     { label: "server", type: "property", detail: "Server address" },
     { label: "name", type: "property", detail: "Proxy name" },
     { label: "password", type: "property", detail: "Password" },
@@ -212,6 +212,15 @@ const mihomoKeywords = [
     { label: "path", type: "property", detail: "Local path" },
     { label: "format", type: "property", detail: "Format: yaml / text / mrs" },
     { label: "health-check", type: "property", detail: "Health check configuration" },
+    { label: "quic-versions", type: "property", detail: "ShadowQUIC QUIC version list: v1 / v2" },
+    { label: "udp-over-stream", type: "property", detail: "ShadowQUIC UDP over stream" },
+    { label: "zero-rtt", type: "property", detail: "ShadowQUIC 0-RTT handshake" },
+    { label: "amnezia-wg-option", type: "property", detail: "AmneziaWG camouflage options" },
+    { label: "client-metadata", type: "property", detail: "AnyTLS client metadata (opt-in)" },
+    { label: "ip-stack", type: "property", detail: "MASQUE / ZeroTier IP stack" },
+    { label: "primary-port", type: "property", detail: "ZeroTier primary UDP port" },
+    { label: "secondary-port", type: "property", detail: "ZeroTier secondary UDP port" },
+    { label: "tcp-fallback-mode", type: "property", detail: "ZeroTier TCP fallback mode" },
 ]
 
 // ============================================================
@@ -271,6 +280,15 @@ const mihomoSnippets = [
     }),
     snippetCompletion("- name: \"#{1}\"\n  type: anytls\n  server: \"#{2}\"\n  port: #{3}\n  password: \"#{4}\"\n  # udp: true\n  # sni: \"\"\n  # skip-cert-verify: true\n  # client-fingerprint: chrome\n  # alpn:\n  #   - h2\n#{}", {
         label: "anytls-template", type: "snippet", detail: "AnyTLS node"
+    }),
+    snippetCompletion("- name: \"#{1}\"\n  type: shadowquic\n  server: \"#{2}\"\n  port: #{3}\n  username: \"#{4}\"\n  password: \"#{5}\"\n  udp: true\n  # sni: \"\"\n  # alpn:\n  #   - h3\n  # quic-versions:\n  #   - v1\n  #   - v2\n  # congestion-controller: bbr\n  # zero-rtt: false\n#{}", {
+        label: "shadowquic-template", type: "snippet", detail: "ShadowQUIC node"
+    }),
+    snippetCompletion("- name: \"#{1}\"\n  type: wireguard\n  server: \"#{2}\"\n  port: #{3}\n  ip: \"#{4}\"\n  private-key: \"#{5}\"\n  public-key: \"#{6}\"\n  # amnezia-wg-option:\n  #   jc: 5\n  #   jmin: 10\n  #   jmax: 50\n#{}", {
+        label: "amneziawg-template", type: "snippet", detail: "AmneziaWG options"
+    }),
+    snippetCompletion("- name: \"#{1}\"\n  type: zerotier\n  network: \"#{2}\"\n  udp: true\n  # state-dir: ./zerotier-node\n  # planet: ./planet\n  # mtu: 1400\n  # physical-mtu: 1432\n  # ip-stack:\n  #   mode: auto\n  #   congestion-controller: cubic\n  # primary-port: 0\n  # secondary-port: 0\n  # tcp-fallback-mode: auto\n  # remote-dns-resolve: true\n  # dns: [10.147.17.1]\n#{}", {
+        label: "zerotier-template", type: "snippet", detail: "Mihomo ZeroTier node"
     }),
     snippetCompletion("- name: \"#{1}\"\n  type: trusttunnel\n  server: \"#{2}\"\n  port: #{3}\n  username: \"#{4}\"\n  password: \"#{5}\"\n  udp: true\n  # sni: \"\"\n  # skip-cert-verify: true\n  # client-fingerprint: chrome\n  # quic: true\n  # congestion-controller: bbr\n#{}", {
         label: "trusttunnel-template", type: "snippet", detail: "TrustTunnel node"

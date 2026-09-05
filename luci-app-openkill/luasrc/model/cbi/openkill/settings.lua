@@ -79,6 +79,8 @@ s:tab("geo_update", translate("GEO Update"))
 s:tab("chnr_update", translate("Chnroute Update"))
 s:tab("auto_restart", translate("Auto Restart"))
 s:tab("health", translate("Health & Watchdog"))
+s:tab("mihomo_features", translate("Mihomo Features"))
+s:tab("zerotier", translate("ZeroTier Network"))
 s:tab("debug", translate("Core Tests"))
 s:tab("developer", translate("Developer Settings"))
 s:tab("version_update", translate("Version Update"))
@@ -1285,6 +1287,96 @@ o.description = translate("Refresh proxy-address metadata only periodically; thi
 o.datatype = "range(1,240)"
 o.default = "30"
 o.rmempty = false
+
+---- Mihomo optional features
+o = s:taboption("mihomo_features", DummyValue, "capability_summary", translate("Detected Core Capabilities"))
+o.rawhtml = true
+o.cfgvalue = function()
+	local summary = SYS.exec("/usr/share/openkill/openkill_capabilities.sh --summary 2>/dev/null") or ""
+	return "<pre class='openkill-capability-summary'>" .. UTIL.pcdata(summary) .. "</pre>"
+end
+
+o = s:taboption("mihomo_features", Button, "refresh_capabilities", translate("Capability Probe"))
+o.description = translate("Run Mihomo -t probes without starting a listener. Optional fields should only be enabled when the probe reports support.")
+o.inputtitle = translate("Refresh Probe")
+o.inputstyle = "reload"
+o.write = function()
+	SYS.call("/usr/share/openkill/openkill_capabilities.sh --refresh >/dev/null 2>&1")
+	HTTP.redirect(DISP.build_url("admin", "services", "openkill"))
+end
+
+o = s:taboption("mihomo_features", Flag, "feature_h2c", translate("Enable H2C / QUIC v2"))
+o.description = translate("Expose the H2C transport switch for VMess and the v2 value in ShadowQUIC. Disabled by default for compatibility.")
+o.default = 0
+o.rmempty = false
+
+o = s:taboption("mihomo_features", Flag, "feature_shadowquic", translate("Enable ShadowQUIC"))
+o.description = translate("Enable ShadowQUIC/QUIC v2 fields in node configuration. Verify the detected core capability first.")
+o.default = 0
+o.rmempty = false
+
+o = s:taboption("mihomo_features", Flag, "feature_masque", translate("Enable MASQUE Advanced Fields"))
+o.description = translate("Allow MASQUE network, IP stack, handshake timeout and congestion settings when the node advanced switch is enabled.")
+o.default = 0
+o.rmempty = false
+
+o = s:taboption("mihomo_features", Flag, "feature_amnezia_wg", translate("Enable AmneziaWG"))
+o.description = translate("Allow the AmneziaWG option fields on WireGuard nodes. No kernel module is installed by OpenKill.")
+o.default = 0
+o.rmempty = false
+
+o = s:taboption("mihomo_features", Flag, "feature_anytls_metadata", translate("Enable AnyTLS Client Metadata"))
+o.description = translate("Send explicitly configured client-metadata to an AnyTLS server. It is off by default for privacy and compatibility.")
+o.default = 0
+o.rmempty = false
+
+o = s:taboption("mihomo_features", Flag, "feature_bbr3", translate("Enable BBR3"))
+o.description = translate("Allow BBR3 in MASQUE and ZeroTier IP-stack congestion control. It has no effect with the gVisor stack and requires core support.")
+o.default = 0
+o.rmempty = false
+
+---- ZeroTier optional overlay
+o = s:taboption("zerotier", DummyValue, "zerotier_status", translate("ZeroTier Status"))
+o.rawhtml = true
+o.cfgvalue = function()
+	local status = SYS.exec("/usr/share/openkill/openkill_zerotier.sh status 2>/dev/null") or ""
+	return "<pre class='openkill-zerotier-status'>" .. UTIL.pcdata(status) .. "</pre>"
+end
+
+o = s:taboption("zerotier", Flag, "feature_zerotier", translate("Enable ZeroTier Support"))
+o.description = translate("Enables Mihomo built-in type: zerotier nodes. A separate system ZeroTier service is optional and is only managed by the Apply button.")
+o.default = 0
+o.rmempty = false
+
+o = s:taboption("zerotier", Value, "zerotier_network_id", translate("System ZeroTier Network ID"))
+o.description = translate("Optional host-service network ID (exactly 16 hexadecimal characters). Built-in Mihomo nodes use their own network field on the Servers page.")
+o.placeholder = "8056c2e21c000001"
+o.rmempty = true
+function o.validate(self, value)
+	if value == nil or value == "" then return value end
+	if value:match("^[0-9a-fA-F]+$") and #value == 16 then return value end
+	return nil, translate("ZeroTier network ID must contain exactly 16 hexadecimal characters")
+end
+
+o = s:taboption("zerotier", Value, "zerotier_interface", translate("System ZeroTier Interface Hint"))
+o.description = translate("Display hint for the optional host service; OpenKill does not change routes for this interface.")
+o.default = "zt0"
+o.rmempty = false
+
+o = s:taboption("zerotier", Flag, "zerotier_auto_start", translate("Start ZeroTier At Boot"))
+o.description = translate("Enable the firmware service at boot after the optional package is installed.")
+o.default = 0
+o.rmempty = false
+
+o = s:taboption("zerotier", Button, "zerotier_apply", translate("Apply System ZeroTier"))
+o.description = translate("Start the optional host service and join its configured network. Built-in Mihomo nodes do not require this action.")
+o.inputtitle = translate("Apply")
+o.inputstyle = "apply"
+o.write = function()
+	m.uci:commit("openkill")
+	SYS.call("/usr/share/openkill/openkill_zerotier.sh apply >/tmp/openkill_zerotier.log 2>&1")
+	HTTP.redirect(DISP.build_url("admin", "services", "openkill"))
+end
 
 ---- Dashboard Settings
 local cn_port=SYS.exec("uci get openkill.config.cn_port 2>/dev/null |tr -d '\n'")

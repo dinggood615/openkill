@@ -4469,3 +4469,345 @@ msgstr "IPv6 代理未启用"
 
 msgid "Read-only health monitor interval"
 msgstr "只读健康监视间隔"
+
+msgid "Mihomo Features"
+msgstr "Mihomo 能力"
+
+msgid "ZeroTier Network"
+msgstr "ZeroTier 网络"
+
+msgid "Detected Core Capabilities"
+msgstr "检测到的内核能力"
+
+msgid "Capability Probe"
+msgstr "能力探测"
+
+msgid "Refresh Probe"
+msgstr "刷新探测"
+
+msgid "Enable H2C / QUIC v2"
+msgstr "启用 H2C / QUIC v2"
+
+msgid "Enable ShadowQUIC"
+msgstr "启用 ShadowQUIC"
+
+msgid "Enable MASQUE Advanced Fields"
+msgstr "启用 MASQUE 高级字段"
+
+msgid "Enable AmneziaWG"
+msgstr "启用 AmneziaWG"
+
+msgid "Enable AnyTLS Client Metadata"
+msgstr "启用 AnyTLS 客户端元数据"
+
+msgid "Enable BBR3"
+msgstr "启用 BBR3"
+
+msgid "ZeroTier Status"
+msgstr "ZeroTier 状态"
+
+msgid "Enable ZeroTier Support"
+msgstr "启用 ZeroTier 支持"
+
+msgid "ZeroTier Network ID"
+msgstr "ZeroTier 网络 ID"
+
+msgid "System ZeroTier Network ID"
+msgstr "系统 ZeroTier 网络 ID"
+
+msgid "ZeroTier Interface Hint"
+msgstr "ZeroTier 接口提示"
+
+msgid "System ZeroTier Interface Hint"
+msgstr "系统 ZeroTier 接口提示"
+
+msgid "Start ZeroTier At Boot"
+msgstr "开机启动 ZeroTier"
+
+msgid "Apply System ZeroTier"
+msgstr "应用系统 ZeroTier"
+
+msgid "Run Mihomo -t probes without starting a listener. Optional fields should only be enabled when the probe reports support."
+msgstr "运行 Mihomo -t 探测，不启动监听端口。只有探测显示支持时才启用可选字段。"
+
+msgid "Expose the H2C transport switch for VMess and the v2 value in ShadowQUIC. Disabled by default for compatibility."
+msgstr "提供 VMess H2C 传输和 ShadowQUIC v2 选项。默认关闭以确保兼容性。"
+
+msgid "Enable ShadowQUIC/QUIC v2 fields in node configuration. Verify the detected core capability first."
+msgstr "在节点配置中启用 ShadowQUIC/QUIC v2 字段。请先确认内核能力探测结果。"
+
+msgid "Allow MASQUE network, IP stack, handshake timeout and congestion settings when the node advanced switch is enabled."
+msgstr "节点高级开关启用后允许配置 MASQUE 网络、IP 栈、握手超时和拥塞控制。"
+
+msgid "Allow the AmneziaWG option fields on WireGuard nodes. No kernel module is installed by OpenKill."
+msgstr "允许 WireGuard 节点使用 AmneziaWG 字段。OpenKill 不会安装额外内核模块。"
+
+msgid "Send explicitly configured client-metadata to an AnyTLS server. It is off by default for privacy and compatibility."
+msgstr "向 AnyTLS 服务器发送明确配置的 client-metadata。出于隐私和兼容性考虑默认关闭。"
+
+msgid "Allow BBR3 in MASQUE and ZeroTier IP-stack congestion control. It has no effect with the gVisor stack and requires core support."
+msgstr "允许 MASQUE 和 ZeroTier IP 栈使用 BBR3 拥塞控制。gVisor 栈不生效且需要内核支持。"
+
+msgid "Enables Mihomo built-in type: zerotier nodes. A separate system ZeroTier service is optional and is only managed by the Apply button."
+msgstr "启用 Mihomo 内置的 type: zerotier 节点。系统 ZeroTier 服务为可选项，仅由“应用”按钮管理。"
+
+msgid "Optional host-service network ID (exactly 16 hexadecimal characters). Built-in Mihomo nodes use their own network field on the Servers page."
+msgstr "可选系统服务的网络 ID（必须为 16 位十六进制字符）。Mihomo 内置节点请在服务器页面填写各自的 network 字段。"
+
+msgid "Display hint for the optional host service; OpenKill does not change routes for this interface."
+msgstr "可选系统服务的显示提示；OpenKill 不会修改此接口的路由。"
+
+msgid "Enable the firmware service at boot after the optional package is installed."
+msgstr "安装可选软件包后，让固件服务随系统启动。"
+
+msgid "Start the optional host service and join its configured network. Built-in Mihomo nodes do not require this action."
+msgstr "启动可选系统服务并加入其配置的网络。Mihomo 内置节点无需执行此操作。"
+
+msgid "AnyTLS Advanced Metadata"
+msgstr "AnyTLS 高级元数据"
+
+msgid "AnyTLS Client Metadata"
+msgstr "AnyTLS 客户端元数据"
+
+msgid "Optional metadata sent to the AnyTLS server; leave empty to keep the default privacy behavior."
+msgstr "发送给 AnyTLS 服务器的可选元数据；留空可保持默认隐私行为。"
+
+msgid "ShadowQUIC Advanced Settings"
+msgstr "ShadowQUIC 高级设置"
+
+msgid "Show optional QUIC v2, 0-RTT, congestion and window parameters for this node."
+msgstr "显示此节点的 QUIC v2、0-RTT、拥塞控制和窗口可选参数。"
+
+msgid "ShadowQUIC Username"
+msgstr "ShadowQUIC 用户名"
+
+msgid "QUIC Versions"
+msgstr "QUIC 版本"
+
+msgid "Supported values are v1 and v2; leave empty for the core default."
+msgstr "支持 v1 和 v2；留空使用内核默认值。"
+
+msgid "UDP Over Stream"
+msgstr "UDP over Stream"
+
+msgid "QUIC 0-RTT"
+msgstr "QUIC 0-RTT"
+
+msgid "Keep Alive Interval (ms)"
+msgstr "保活间隔（毫秒）"
+
+msgid "ShadowQUIC Congestion Controller"
+msgstr "ShadowQUIC 拥塞控制"
+
+msgid "ShadowQUIC Upload Capacity"
+msgstr "ShadowQUIC 上行容量"
+
+msgid "ShadowQUIC Download Capacity"
+msgstr "ShadowQUIC 下行容量"
+
+msgid "ShadowQUIC Initial CWND"
+msgstr "ShadowQUIC 初始 CWND"
+
+msgid "ShadowQUIC BBR Profile"
+msgstr "ShadowQUIC BBR 配置"
+
+msgid "ShadowQUIC Max Datagram Size"
+msgstr "ShadowQUIC 最大数据报大小"
+
+msgid "ShadowQUIC Max Open Streams"
+msgstr "ShadowQUIC 最大打开流数"
+
+msgid "ShadowQUIC Receive Window (stream)"
+msgstr "ShadowQUIC 接收窗口（流）"
+
+msgid "ShadowQUIC Receive Window (connection)"
+msgstr "ShadowQUIC 接收窗口（连接）"
+
+msgid "ShadowQUIC Disable MTU Discovery"
+msgstr "ShadowQUIC 禁用 MTU 探测"
+
+msgid "MASQUE Advanced Settings"
+msgstr "MASQUE 高级设置"
+
+msgid "Enable the official MASQUE IP-stack, network and handshake options for this node. The global MASQUE switch must also be enabled."
+msgstr "启用此节点官方 MASQUE IP 栈、网络和握手选项。还必须启用全局 MASQUE 开关。"
+
+msgid "MASQUE IP Stack"
+msgstr "MASQUE IP 栈"
+
+msgid "MASQUE IP Stack Congestion"
+msgstr "MASQUE IP 栈拥塞控制"
+
+msgid "cubic, reno, bbr and bbr3 are supported by the MIPS stack; gVisor ignores this field."
+msgstr "MIPS 栈支持 cubic、reno、bbr 和 bbr3；gVisor 会忽略此字段。"
+
+msgid "MASQUE Congestion Controller"
+msgstr "MASQUE 拥塞控制"
+
+msgid "MASQUE Network"
+msgstr "MASQUE 网络"
+
+msgid "Leave empty for QUIC; use h2 or h3-l4proxy only when the server supports that mode. h3-l4proxy forces UDP off."
+msgstr "留空使用 QUIC；仅当服务器支持时使用 h2 或 h3-l4proxy。h3-l4proxy 会强制关闭 UDP。"
+
+msgid "MASQUE Handshake Timeout (s)"
+msgstr "MASQUE 握手超时（秒）"
+
+msgid "MASQUE BBR Profile"
+msgstr "MASQUE BBR 配置"
+
+msgid "ZeroTier Advanced Settings"
+msgstr "ZeroTier 高级设置"
+
+msgid "Expose the official ZeroTier transport, IP-stack and fallback options for this node. The global ZeroTier switch must also be enabled."
+msgstr "显示此节点官方 ZeroTier 传输、IP 栈和回退选项。还必须启用全局 ZeroTier 开关。"
+
+msgid "ZeroTier State Directory"
+msgstr "ZeroTier 状态目录"
+
+msgid "ZeroTier Planet File"
+msgstr "ZeroTier Planet 文件"
+
+msgid "ZeroTier MTU"
+msgstr "ZeroTier MTU"
+
+msgid "ZeroTier Physical MTU"
+msgstr "ZeroTier 物理 MTU"
+
+msgid "ZeroTier UDP payload MTU, valid range 510-10324."
+msgstr "ZeroTier UDP 负载 MTU，有效范围为 510-10324。"
+
+msgid "ZeroTier IP Stack"
+msgstr "ZeroTier IP 栈"
+
+msgid "ZeroTier IP Stack Congestion"
+msgstr "ZeroTier IP 栈拥塞控制"
+
+msgid "ZeroTier Primary Port"
+msgstr "ZeroTier 主端口"
+
+msgid "UDP port; use 0 to let ZeroTier choose an available port."
+msgstr "UDP 端口；填写 0 让 ZeroTier 自动选择可用端口。"
+
+msgid "ZeroTier primary port must be an integer from 0 to 65535"
+msgstr "ZeroTier 主端口必须是 0 到 65535 的整数"
+
+msgid "ZeroTier Secondary Port"
+msgstr "ZeroTier 备用端口"
+
+msgid "UDP port; use 0 for automatic selection or -1 to disable the secondary port."
+msgstr "UDP 端口；填写 0 自动选择，或填写 -1 禁用备用端口。"
+
+msgid "ZeroTier secondary port must be an integer from -1 to 65535"
+msgstr "ZeroTier 备用端口必须是 -1 到 65535 的整数"
+
+msgid "ZeroTier TCP Fallback"
+msgstr "ZeroTier TCP 回退"
+
+msgid "ZeroTier TCP Fallback Relay"
+msgstr "ZeroTier TCP 回退中继"
+
+msgid "ZeroTier Remote Trace Target"
+msgstr "ZeroTier 远程跟踪目标"
+
+msgid "ZeroTier Remote Trace Level"
+msgstr "ZeroTier 远程跟踪级别"
+
+msgid "ZeroTier Low Bandwidth"
+msgstr "ZeroTier 低带宽模式"
+
+msgid "ZeroTier Encrypted Hello"
+msgstr "ZeroTier 加密 Hello"
+
+msgid "ZeroTier Orbit"
+msgstr "ZeroTier Orbit"
+
+msgid "ZeroTier Remote DNS Resolve"
+msgstr "ZeroTier 远程 DNS 解析"
+
+msgid "ZeroTier DNS"
+msgstr "ZeroTier DNS"
+
+msgid "ZeroTier network ID must contain exactly 16 hexadecimal characters"
+msgstr "ZeroTier 网络 ID 必须为 16 位十六进制字符"
+
+msgid "Exactly 16 hexadecimal characters; this is the network field used by Mihomo."
+msgstr "必须为 16 位十六进制字符；这是 Mihomo 使用的 network 字段。"
+
+msgid "One entry per moon in world:seed format; leave empty unless a private moon is configured."
+msgstr "每个 Moon 一行，格式为 world:seed；未配置私有 Moon 时请留空。"
+
+msgid "Only used with the top-level BBR congestion controller."
+msgstr "仅用于顶层 BBR 拥塞控制。"
+
+msgid "Enable AmneziaWG Options"
+msgstr "启用 AmneziaWG 选项"
+
+msgid "WireGuard remains compatible when this is off. The global AmneziaWG switch must also be enabled."
+msgstr "关闭时保持 WireGuard 兼容；还必须启用全局 AmneziaWG 开关。"
+
+msgid "H2C Cleartext HTTP/2"
+msgstr "H2C 明文 HTTP/2"
+
+msgid "For VMess H2 transport only. Enables network h2 with TLS disabled; the global H2C/QUIC v2 switch is an optional safety gate."
+msgstr "仅适用于 VMess H2 传输。启用关闭 TLS 的 h2 网络；全局 H2C/QUIC v2 开关用于安全控制。"
+
+msgid "AmneziaWG jc"
+msgstr "AmneziaWG jc"
+
+msgid "AmneziaWG jmin"
+msgstr "AmneziaWG jmin"
+
+msgid "AmneziaWG jmax"
+msgstr "AmneziaWG jmax"
+
+msgid "AmneziaWG s1"
+msgstr "AmneziaWG s1"
+
+msgid "AmneziaWG s2"
+msgstr "AmneziaWG s2"
+
+msgid "AmneziaWG s3"
+msgstr "AmneziaWG s3"
+
+msgid "AmneziaWG s4"
+msgstr "AmneziaWG s4"
+
+msgid "AmneziaWG h1"
+msgstr "AmneziaWG h1"
+
+msgid "AmneziaWG h2"
+msgstr "AmneziaWG h2"
+
+msgid "AmneziaWG h3"
+msgstr "AmneziaWG h3"
+
+msgid "AmneziaWG h4"
+msgstr "AmneziaWG h4"
+
+msgid "AmneziaWG i1"
+msgstr "AmneziaWG i1"
+
+msgid "AmneziaWG i2"
+msgstr "AmneziaWG i2"
+
+msgid "AmneziaWG i3"
+msgstr "AmneziaWG i3"
+
+msgid "AmneziaWG i4"
+msgstr "AmneziaWG i4"
+
+msgid "AmneziaWG i5"
+msgstr "AmneziaWG i5"
+
+msgid "AmneziaWG j1"
+msgstr "AmneziaWG j1"
+
+msgid "AmneziaWG j2"
+msgstr "AmneziaWG j2"
+
+msgid "AmneziaWG j3"
+msgstr "AmneziaWG j3"
+
+msgid "AmneziaWG itime"
+msgstr "AmneziaWG itime"

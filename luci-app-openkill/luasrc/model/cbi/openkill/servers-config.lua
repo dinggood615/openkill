@@ -137,6 +137,7 @@ o:value("trojan", translate("trojan"))
 o:value("vless", translate("Vless"))
 o:value("hysteria", translate("Hysteria"))
 o:value("hysteria2", translate("Hysteria2"))
+o:value("shadowquic", translate("ShadowQUIC"))
 o:value("wireguard", translate("WireGuard"))
 o:value("tuic", translate("Tuic"))
 o:value("snell", translate("Snell"))
@@ -149,6 +150,7 @@ o:value("direct", translate("DIRECT"))
 o:value("dns", translate("DNS"))
 o:value("ssh", translate("SSH"))
 o:value("masque", translate("MASQUE"))
+o:value("zerotier", translate("ZeroTier"))
 o:value("trusttunnel", translate("TrustTunnel"))
 
 o.description = translate("Using incorrect encryption mothod may causes service fail to start")
@@ -167,6 +169,7 @@ o:depends("type", "trojan")
 o:depends("type", "vless")
 o:depends("type", "hysteria")
 o:depends("type", "hysteria2")
+o:depends("type", "shadowquic")
 o:depends("type", "wireguard")
 o:depends("type", "tuic")
 o:depends("type", "mieru")
@@ -190,6 +193,7 @@ o:depends("type", "trojan")
 o:depends("type", "vless")
 o:depends("type", "hysteria")
 o:depends("type", "hysteria2")
+o:depends("type", "shadowquic")
 o:depends("type", "wireguard")
 o:depends("type", "tuic")
 o:depends("type", "mieru")
@@ -223,6 +227,7 @@ o:depends("type", "ss")
 o:depends("type", "ssr")
 o:depends("type", "trojan")
 o:depends("type", "hysteria2")
+o:depends("type", "shadowquic")
 o:depends("type", "mieru")
 o:depends("type", "anytls")
 
@@ -505,7 +510,9 @@ o:depends("type", "wireguard")
 o:depends("type", "direct")
 o:depends("type", "anytls")
 o:depends("type", "masque")
+o:depends("type", "zerotier")
 o:depends("type", "trusttunnel")
+o:depends("type", "shadowquic")
 
 o = s:option(ListValue, "udp_over_tcp", translate("udp-over-tcp"))
 o.rmempty = true
@@ -613,6 +620,12 @@ o.rmempty = true
 o.default = "/"
 o:depends("obfs_vmess", "h2")
 
+o = s:option(Flag, "h2c_enable", translate("H2C Cleartext HTTP/2"))
+o.description = translate("For VMess H2 transport only. Enables network h2 with TLS disabled; the global H2C/QUIC v2 switch is an optional safety gate.")
+o.rmempty = true
+o.default = 0
+o:depends("obfs_vmess", "h2")
+
 o = s:option(DynamicList, "http_path", translate("path"))
 o.rmempty = true
 o:value("/")
@@ -711,6 +724,8 @@ o:depends("type", "hysteria2")
 o:depends("type", "tuic")
 o:depends("type", "anytls")
 o:depends("type", "trusttunnel")
+o:depends("type", "shadowquic")
+o:depends("type", "masque")
 
 -- [[ TLS ]]--
 o = s:option(ListValue, "tls", translate("TLS"))
@@ -759,6 +774,7 @@ o:depends("type", "hysteria")
 o:depends("type", "hysteria2")
 o:depends("type", "anytls")
 o:depends("type", "trusttunnel")
+o:depends("type", "shadowquic")
 
 -- [[ headers ]]--
 o = s:option(DynamicList, "http_headers", translate("headers"))
@@ -803,6 +819,8 @@ o:value("h2")
 o:value("http/1.1")
 o:depends("type", "trojan")
 o:depends("type", "anytls")
+o:value("h3")
+o:depends("type", "shadowquic")
 o:depends("type", "trusttunnel")
 
 -- [[ alpn ]]--
@@ -969,6 +987,108 @@ o.rmempty = true
 o.default = "0"
 o:depends("type", "anytls")
 
+o = s:option(Flag, "anytls_advanced", translate("AnyTLS Advanced Metadata"))
+o.description = translate("Enable the explicit client-metadata field for this node. The global AnyTLS metadata switch must also be enabled.")
+o.rmempty = true
+o.default = 0
+o:depends("type", "anytls")
+
+o = s:option(Value, "anytls_client_metadata", translate("AnyTLS Client Metadata"))
+o.description = translate("Optional metadata sent to the AnyTLS server; leave empty to keep the default privacy behavior.")
+o.rmempty = true
+o:depends({type = "anytls", anytls_advanced = true})
+
+-- [[ ShadowQUIC / QUIC v2 ]] --
+o = s:option(Flag, "shadowquic_advanced", translate("ShadowQUIC Advanced Settings"))
+o.description = translate("Show optional QUIC v2, 0-RTT, congestion and window parameters for this node.")
+o.rmempty = true
+o.default = 0
+o:depends("type", "shadowquic")
+
+o = s:option(Value, "shadowquic_username", translate("ShadowQUIC Username"))
+o.rmempty = false
+o.placeholder = "username"
+o:depends("type", "shadowquic")
+
+o = s:option(DynamicList, "shadowquic_quic_versions", translate("QUIC Versions"))
+o.description = translate("Supported values are v1 and v2; leave empty for the core default.")
+o.rmempty = true
+o:value("v1")
+o:value("v2")
+o:depends({type = "shadowquic", shadowquic_advanced = true})
+
+o = s:option(ListValue, "shadowquic_udp_over_stream", translate("UDP Over Stream"))
+o.rmempty = true
+o:value("true")
+o:value("false")
+o:depends({type = "shadowquic", shadowquic_advanced = true})
+
+o = s:option(ListValue, "shadowquic_zero_rtt", translate("QUIC 0-RTT"))
+o.rmempty = true
+o:value("true")
+o:value("false")
+o:depends({type = "shadowquic", shadowquic_advanced = true})
+
+o = s:option(Value, "shadowquic_keep_alive_interval", translate("Keep Alive Interval (ms)"))
+o.datatype = "uinteger"
+o.rmempty = true
+o:depends({type = "shadowquic", shadowquic_advanced = true})
+
+o = s:option(ListValue, "shadowquic_congestion_controller", translate("ShadowQUIC Congestion Controller"))
+o.rmempty = true
+o:value("cubic")
+o:value("new_reno")
+o:value("bbr")
+o:depends({type = "shadowquic", shadowquic_advanced = true})
+
+o = s:option(Value, "shadowquic_up", translate("ShadowQUIC Upload Capacity"))
+o.rmempty = true
+o.placeholder = "100 Mbps"
+o:depends({type = "shadowquic", shadowquic_advanced = true})
+
+o = s:option(Value, "shadowquic_down", translate("ShadowQUIC Download Capacity"))
+o.rmempty = true
+o.placeholder = "100 Mbps"
+o:depends({type = "shadowquic", shadowquic_advanced = true})
+
+o = s:option(Value, "shadowquic_cwnd", translate("ShadowQUIC Initial CWND"))
+o.datatype = "uinteger"
+o.rmempty = true
+o:depends({type = "shadowquic", shadowquic_advanced = true})
+
+o = s:option(ListValue, "shadowquic_bbr_profile", translate("ShadowQUIC BBR Profile"))
+o.rmempty = true
+o:value("standard")
+o:value("conservative")
+o:value("aggressive")
+o:depends({type = "shadowquic", shadowquic_advanced = true})
+
+o = s:option(Value, "shadowquic_max_datagram_frame_size", translate("ShadowQUIC Max Datagram Size"))
+o.datatype = "uinteger"
+o.rmempty = true
+o:depends({type = "shadowquic", shadowquic_advanced = true})
+
+o = s:option(Value, "shadowquic_max_open_streams", translate("ShadowQUIC Max Open Streams"))
+o.datatype = "uinteger"
+o.rmempty = true
+o:depends({type = "shadowquic", shadowquic_advanced = true})
+
+o = s:option(Value, "shadowquic_recv_window_conn", translate("ShadowQUIC Receive Window (stream)"))
+o.datatype = "uinteger"
+o.rmempty = true
+o:depends({type = "shadowquic", shadowquic_advanced = true})
+
+o = s:option(Value, "shadowquic_recv_window", translate("ShadowQUIC Receive Window (connection)"))
+o.datatype = "uinteger"
+o.rmempty = true
+o:depends({type = "shadowquic", shadowquic_advanced = true})
+
+o = s:option(ListValue, "shadowquic_disable_mtu_discovery", translate("ShadowQUIC Disable MTU Discovery"))
+o.rmempty = true
+o:value("true")
+o:value("false")
+o:depends({type = "shadowquic", shadowquic_advanced = true})
+
 -- [[ MASQUE ]] --
 o = s:option(Value, "masque_private_key", translate("private-key"))
 o:depends("type", "masque")
@@ -1001,6 +1121,196 @@ o = s:option(DynamicList, "masque_dns", translate("DNS"))
 o.rmempty = true
 o.placeholder = translate("8.8.8.8")
 o:depends("type", "masque")
+
+o = s:option(Flag, "masque_advanced", translate("MASQUE Advanced Settings"))
+o.description = translate("Enable the official MASQUE IP-stack, network and handshake options for this node. The global MASQUE switch must also be enabled.")
+o.rmempty = true
+o.default = 0
+o:depends("type", "masque")
+
+o = s:option(ListValue, "masque_ip_stack_mode", translate("MASQUE IP Stack"))
+o.rmempty = true
+o:value("auto")
+o:value("gvisor")
+o:value("mips")
+o:depends({type = "masque", masque_advanced = true})
+
+o = s:option(ListValue, "masque_ip_stack_congestion_controller", translate("MASQUE IP Stack Congestion"))
+o.description = translate("cubic, reno, bbr and bbr3 are supported by the MIPS stack; gVisor ignores this field.")
+o.rmempty = true
+o:value("cubic")
+o:value("reno")
+o:value("bbr")
+o:value("bbr3")
+o:depends({type = "masque", masque_advanced = true})
+
+o = s:option(ListValue, "masque_congestion_controller", translate("MASQUE Congestion Controller"))
+o.rmempty = true
+o:value("bbr")
+o:depends({type = "masque", masque_advanced = true})
+
+o = s:option(ListValue, "masque_network", translate("MASQUE Network"))
+o.description = translate("Leave empty for QUIC; use h2 or h3-l4proxy only when the server supports that mode. h3-l4proxy forces UDP off.")
+o.rmempty = true
+o:value("quic")
+o:value("h2")
+o:value("h3-l4proxy")
+o:depends({type = "masque", masque_advanced = true})
+
+o = s:option(Value, "masque_handshake_timeout", translate("MASQUE Handshake Timeout (s)"))
+o.datatype = "uinteger"
+o.rmempty = true
+o:depends({type = "masque", masque_advanced = true})
+
+o = s:option(ListValue, "masque_bbr_profile", translate("MASQUE BBR Profile"))
+o.description = translate("Only used with the top-level BBR congestion controller.")
+o.rmempty = true
+o:value("standard")
+o:value("conservative")
+o:value("aggressive")
+o:depends({type = "masque", masque_advanced = true})
+
+-- [[ ZeroTier (built-in Mihomo proxy) ]] --
+o = s:option(Flag, "zerotier_advanced", translate("ZeroTier Advanced Settings"))
+o.description = translate("Expose the official ZeroTier transport, IP-stack and fallback options for this node. The global ZeroTier switch must also be enabled.")
+o.rmempty = true
+o.default = 0
+o:depends("type", "zerotier")
+
+o = s:option(Value, "zerotier_network", translate("ZeroTier Network ID"))
+o.description = translate("Exactly 16 hexadecimal characters; this is the network field used by Mihomo.")
+o.rmempty = false
+o.placeholder = "0123456789abcdef"
+o:depends("type", "zerotier")
+function o.validate(self, value)
+	if value and value:match("^[0-9a-fA-F]+$") and #value == 16 then return value end
+	return nil, translate("ZeroTier network ID must contain exactly 16 hexadecimal characters")
+end
+
+o = s:option(Value, "zerotier_state_dir", translate("ZeroTier State Directory"))
+o.rmempty = true
+o:depends({type = "zerotier", zerotier_advanced = true})
+
+o = s:option(Value, "zerotier_planet", translate("ZeroTier Planet File"))
+o.rmempty = true
+o:depends({type = "zerotier", zerotier_advanced = true})
+
+o = s:option(Value, "zerotier_mtu", translate("ZeroTier MTU"))
+o.datatype = "uinteger"
+o.rmempty = true
+o:depends({type = "zerotier", zerotier_advanced = true})
+
+o = s:option(Value, "zerotier_physical_mtu", translate("ZeroTier Physical MTU"))
+o.datatype = "uinteger"
+o.rmempty = true
+o.description = translate("ZeroTier UDP payload MTU, valid range 510-10324.")
+o:depends({type = "zerotier", zerotier_advanced = true})
+
+o = s:option(ListValue, "zerotier_ip_stack_mode", translate("ZeroTier IP Stack"))
+o.rmempty = true
+o:value("auto")
+o:value("gvisor")
+o:value("mips")
+o:depends({type = "zerotier", zerotier_advanced = true})
+
+o = s:option(ListValue, "zerotier_ip_stack_congestion_controller", translate("ZeroTier IP Stack Congestion"))
+o.rmempty = true
+o:value("cubic")
+o:value("reno")
+o:value("bbr")
+o:value("bbr3")
+o:depends({type = "zerotier", zerotier_advanced = true})
+
+o = s:option(Value, "zerotier_primary_port", translate("ZeroTier Primary Port"))
+o.rmempty = true
+o.description = translate("UDP port; use 0 to let ZeroTier choose an available port.")
+o:depends({type = "zerotier", zerotier_advanced = true})
+function o.validate(self, value)
+	local n = tonumber(value)
+	if value == nil or value == "" then return value end
+	if n and n >= 0 and n <= 65535 and n % 1 == 0 then return value end
+	return nil, translate("ZeroTier primary port must be an integer from 0 to 65535")
+end
+
+o = s:option(Value, "zerotier_secondary_port", translate("ZeroTier Secondary Port"))
+o.rmempty = true
+o.description = translate("UDP port; use 0 for automatic selection or -1 to disable the secondary port.")
+o:depends({type = "zerotier", zerotier_advanced = true})
+function o.validate(self, value)
+	local n = tonumber(value)
+	if value == nil or value == "" then return value end
+	if n and n >= -1 and n <= 65535 and n % 1 == 0 then return value end
+	return nil, translate("ZeroTier secondary port must be an integer from -1 to 65535")
+end
+
+o = s:option(ListValue, "zerotier_tcp_fallback_mode", translate("ZeroTier TCP Fallback"))
+o.rmempty = true
+o:value("auto")
+o:value("force")
+o:value("disable")
+o:depends({type = "zerotier", zerotier_advanced = true})
+
+o = s:option(Value, "zerotier_tcp_fallback_relay", translate("ZeroTier TCP Fallback Relay"))
+o.rmempty = true
+o.placeholder = "204.80.128.1:443"
+o:depends({type = "zerotier", zerotier_advanced = true})
+
+o = s:option(Value, "zerotier_remote_trace_target", translate("ZeroTier Remote Trace Target"))
+o.rmempty = true
+o:depends({type = "zerotier", zerotier_advanced = true})
+
+o = s:option(Value, "zerotier_remote_trace_level", translate("ZeroTier Remote Trace Level"))
+o.datatype = "uinteger"
+o.rmempty = true
+o:depends({type = "zerotier", zerotier_advanced = true})
+
+o = s:option(ListValue, "zerotier_low_bandwidth", translate("ZeroTier Low Bandwidth"))
+o.rmempty = true
+o:value("true")
+o:value("false")
+o:depends({type = "zerotier", zerotier_advanced = true})
+
+o = s:option(ListValue, "zerotier_encrypted_hello", translate("ZeroTier Encrypted Hello"))
+o.rmempty = true
+o:value("true")
+o:value("false")
+o:depends({type = "zerotier", zerotier_advanced = true})
+
+o = s:option(DynamicList, "zerotier_orbit", translate("ZeroTier Orbit"))
+o.description = translate("One entry per moon in world:seed format; leave empty unless a private moon is configured.")
+o.rmempty = true
+o:depends({type = "zerotier", zerotier_advanced = true})
+
+o = s:option(ListValue, "zerotier_remote_dns_resolve", translate("ZeroTier Remote DNS Resolve"))
+o.rmempty = true
+o:value("true")
+o:value("false")
+o:depends("type", "zerotier")
+
+o = s:option(DynamicList, "zerotier_dns", translate("ZeroTier DNS"))
+o.rmempty = true
+o.placeholder = translate("10.147.17.1")
+o:depends("type", "zerotier")
+
+-- [[ AmneziaWG ]] --
+o = s:option(Flag, "amnezia_wg_enable", translate("Enable AmneziaWG Options"))
+o.description = translate("WireGuard remains compatible when this is off. The global AmneziaWG switch must also be enabled.")
+o.rmempty = true
+o.default = 0
+o:depends("type", "wireguard")
+
+local amnezia_fields = {
+	{"amnezia_jc", "AmneziaWG jc"}, {"amnezia_jmin", "AmneziaWG jmin"}, {"amnezia_jmax", "AmneziaWG jmax"},
+	{"amnezia_s1", "AmneziaWG s1"}, {"amnezia_s2", "AmneziaWG s2"}, {"amnezia_s3", "AmneziaWG s3"}, {"amnezia_s4", "AmneziaWG s4"},
+	{"amnezia_h1", "AmneziaWG h1"}, {"amnezia_h2", "AmneziaWG h2"}, {"amnezia_h3", "AmneziaWG h3"}, {"amnezia_h4", "AmneziaWG h4"},
+	{"amnezia_i1", "AmneziaWG i1"}, {"amnezia_i2", "AmneziaWG i2"}, {"amnezia_i3", "AmneziaWG i3"}, {"amnezia_i4", "AmneziaWG i4"}, {"amnezia_i5", "AmneziaWG i5"},
+	{"amnezia_j1", "AmneziaWG j1"}, {"amnezia_j2", "AmneziaWG j2"}, {"amnezia_j3", "AmneziaWG j3"}, {"amnezia_itime", "AmneziaWG itime"}
+}
+for _, field in ipairs(amnezia_fields) do
+	o = s:option(Value, field[1], translate(field[2]))
+	o.rmempty = true
+	o:depends({type = "wireguard", amnezia_wg_enable = true})
+end
 
 -- [[ TrustTunnel ]] --
 o = s:option(Value, "trusttunnel_username", translate("Username"))
@@ -1056,6 +1366,7 @@ o:depends("type", "vmess")
 o:depends("type", "ss")
 o:depends("type", "ssr")
 o:depends("type", "snell")
+o:depends("type", "shadowquic")
 
 -- [[ fingerprint ]]--
 o = s:option(Value, "fingerprint", translate("Fingerprint"))
@@ -1066,6 +1377,7 @@ o:depends("type", "socks5")
 o:depends("type", "http")
 o:depends("type", "trojan")
 o:depends("type", "vless")
+o:depends("type", "shadowquic")
 o:depends({type = "ss", obfs = "websocket"})
 o:depends({type = "ss", obfs = "shadow-tls"})
 o:depends({type = "vmess", obfs_vmess = "websocket"})
@@ -1092,6 +1404,7 @@ o:depends({type = "vmess", obfs_vmess = "h2"})
 o:depends({type = "vmess", obfs_vmess = "grpc"})
 o:depends("type", "anytls")
 o:depends("type", "trusttunnel")
+o:depends("type", "shadowquic")
 
 -- [[ ip version ]]--
 o = s:option(ListValue, "ip_version", translate("IP Version"))
@@ -1117,6 +1430,10 @@ o:depends("type", "socks5")
 o:depends("type", "http")
 o:depends("type", "ssh")
 o:depends("type", "direct")
+o:depends("type", "shadowquic")
+o:depends("type", "masque")
+o:depends("type", "trusttunnel")
+o:depends("type", "zerotier")
 
 -- [[ smux ]]--
 o = s:option(ListValue, "multiplex", translate("Multiplex"))
@@ -1195,6 +1512,10 @@ o:depends("type", "socks5")
 o:depends("type", "http")
 o:depends("type", "ssh")
 o:depends("type", "direct")
+o:depends("type", "shadowquic")
+o:depends("type", "masque")
+o:depends("type", "trusttunnel")
+o:depends("type", "zerotier")
 
 -- [[ routing-mark ]]--
 o = s:option(Value, "routing_mark", translate("routing-mark"))
@@ -1215,6 +1536,10 @@ o:depends("type", "socks5")
 o:depends("type", "http")
 o:depends("type", "ssh")
 o:depends("type", "direct")
+o:depends("type", "shadowquic")
+o:depends("type", "masque")
+o:depends("type", "trusttunnel")
+o:depends("type", "zerotier")
 
 -- [[ other-setting ]]--
 o = s:option(Value, "other_parameters", translate("Other Parameters"))

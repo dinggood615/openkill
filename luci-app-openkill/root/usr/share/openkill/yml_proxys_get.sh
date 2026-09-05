@@ -562,9 +562,12 @@ ruby -ryaml -rYAML -I "/usr/share/openkill" -E UTF-8 -e "
                            end
                         end
                      end
-                  elsif x['network'].to_s == 'h2'
-                     uci_commands << uci_set + 'obfs_vmess=h2'
-                     if x.key?('h2-opts') then
+                   elsif x['network'].to_s == 'h2'
+                      uci_commands << uci_set + 'obfs_vmess=h2'
+                      if x.key?('tls') && x['tls'].to_s == 'false' then
+                         uci_commands << uci_set + 'h2c_enable=1'
+                      end
+                      if x.key?('h2-opts') then
                         if x['h2-opts'].key?('host') then
                            cmd = uci_del + 'h2_host >/dev/null 2>&1'
                            system(cmd)
@@ -624,7 +627,7 @@ ruby -ryaml -rYAML -I "/usr/share/openkill" -E UTF-8 -e "
             end;
 
             #AnyTLS
-            if x['type'] == 'anytls' then
+               if x['type'] == 'anytls' then
                threads << Thread.new{
                if x.key?('password') then
                   uci_commands << uci_set + 'password=\"' + x['password'].to_s + '\"'
@@ -649,6 +652,15 @@ ruby -ryaml -rYAML -I "/usr/share/openkill" -E UTF-8 -e "
                threads << Thread.new{
                if x.key?('min-idle-session') then
                   uci_commands << uci_set + 'min_idle_session=\"' + x['min-idle-session'].to_s + '\"'
+               end
+               };
+
+               #client-metadata (explicit opt-in)
+               threads << Thread.new{
+               if x.key?('client-metadata') then
+                   metadata = x['client-metadata'].to_s.gsub(%r{[\x22\x27\x3b\x5c\x60]}, '')
+                  uci_commands << uci_set + 'anytls_advanced=\"1\"'
+                  uci_commands << uci_set + 'anytls_client_metadata=\"' + metadata + '\"'
                end
                };
 
@@ -684,6 +696,67 @@ ruby -ryaml -rYAML -I "/usr/share/openkill" -E UTF-8 -e "
                   uci_commands << uci_set + 'client_fingerprint=\"' + x['client-fingerprint'].to_s + '\"'
                end
                };
+            end;
+
+            #ShadowQUIC / QUIC v2
+            if x['type'] == 'shadowquic' then
+               threads << Thread.new{
+                   safe = lambda { |value| value.to_s.gsub(%r{[\x22\x27\x3b\x5c\x60]}, '') }
+                  if x.key?('username') then
+                     uci_commands << uci_set + 'shadowquic_username=\"' + safe.call(x['username']) + '\"'
+                  end
+                  if x.key?('password') then
+                     uci_commands << uci_set + 'password=\"' + safe.call(x['password']) + '\"'
+                  end
+                  if x.key?('sni') then
+                     uci_commands << uci_set + 'sni=\"' + safe.call(x['sni']) + '\"'
+                  end
+                  if x.key?('skip-cert-verify') then
+                     uci_commands << uci_set + 'skip_cert_verify=\"' + safe.call(x['skip-cert-verify']) + '\"'
+                  end
+                  if x.key?('client-fingerprint') then
+                     uci_commands << uci_set + 'client_fingerprint=\"' + safe.call(x['client-fingerprint']) + '\"'
+                  end
+                  if x.key?('alpn') then
+                     cmd = uci_del + 'alpn >/dev/null 2>&1'
+                     system(cmd)
+                     Array(x['alpn']).each do |value|
+                        uci_commands << uci_add + 'alpn=\"' + safe.call(value) + '\"'
+                     end
+                  end
+
+                  advanced = false
+                  if x.key?('quic-versions') then
+                     cmd = uci_del + 'shadowquic_quic_versions >/dev/null 2>&1'
+                     system(cmd)
+                     Array(x['quic-versions']).each do |value|
+                        uci_commands << uci_add + 'shadowquic_quic_versions=\"' + safe.call(value) + '\"'
+                     end
+                     advanced = true
+                  end
+                  shadowquic_map = {
+                     'udp-over-stream' => 'shadowquic_udp_over_stream',
+                     'zero-rtt' => 'shadowquic_zero_rtt',
+                     'keep-alive-interval' => 'shadowquic_keep_alive_interval',
+                     'congestion-controller' => 'shadowquic_congestion_controller',
+                     'up' => 'shadowquic_up',
+                     'down' => 'shadowquic_down',
+                     'cwnd' => 'shadowquic_cwnd',
+                     'bbr-profile' => 'shadowquic_bbr_profile',
+                     'max-datagram-frame-size' => 'shadowquic_max_datagram_frame_size',
+                     'max-open-streams' => 'shadowquic_max_open_streams',
+                     'recv-window-conn' => 'shadowquic_recv_window_conn',
+                     'recv-window' => 'shadowquic_recv_window',
+                     'disable-mtu-discovery' => 'shadowquic_disable_mtu_discovery'
+                  }
+                  shadowquic_map.each do |yaml_key, uci_key|
+                     if x.key?(yaml_key) then
+                        uci_commands << uci_set + uci_key + '=\"' + safe.call(x[yaml_key]) + '\"'
+                        advanced = true
+                     end
+                  end
+                  uci_commands << uci_set + 'shadowquic_advanced=\"1\"' if advanced
+               end
             end;
 
             #Tuic
@@ -846,6 +919,26 @@ ruby -ryaml -rYAML -I "/usr/share/openkill" -E UTF-8 -e "
                      uci_commands << uci_add + 'wg_dns=\"' + x.to_s + '\"'
                   }
                end;
+               };
+
+               #AmneziaWG options (kept in UCI even when the global switch is off)
+               threads << Thread.new{
+                  if x.key?('amnezia-wg-option') && x['amnezia-wg-option'].is_a?(Hash) then
+                      safe = lambda { |value| value.to_s.gsub(%r{[\x22\x27\x3b\x5c\x60]}, '') }
+                     amnezia_map = {
+                        'jc' => 'amnezia_jc', 'jmin' => 'amnezia_jmin', 'jmax' => 'amnezia_jmax',
+                        's1' => 'amnezia_s1', 's2' => 'amnezia_s2', 's3' => 'amnezia_s3', 's4' => 'amnezia_s4',
+                        'h1' => 'amnezia_h1', 'h2' => 'amnezia_h2', 'h3' => 'amnezia_h3', 'h4' => 'amnezia_h4',
+                        'i1' => 'amnezia_i1', 'i2' => 'amnezia_i2', 'i3' => 'amnezia_i3', 'i4' => 'amnezia_i4', 'i5' => 'amnezia_i5',
+                        'j1' => 'amnezia_j1', 'j2' => 'amnezia_j2', 'j3' => 'amnezia_j3', 'itime' => 'amnezia_itime'
+                     }
+                     amnezia_map.each do |yaml_key, uci_key|
+                        if x['amnezia-wg-option'].key?(yaml_key) then
+                           uci_commands << uci_set + uci_key + '=\"' + safe.call(x['amnezia-wg-option'][yaml_key]) + '\"'
+                        end
+                     end
+                     uci_commands << uci_set + 'amnezia_wg_enable=\"1\"'
+                  end
                };
             end;
 
@@ -1437,7 +1530,7 @@ ruby -ryaml -rYAML -I "/usr/share/openkill" -E UTF-8 -e "
                };
             end;
 
-            if x['type'] == 'masque' then
+             if x['type'] == 'masque' then
                threads << Thread.new{
                #private-key
                if x.key?('private-key') then
@@ -1491,9 +1584,104 @@ ruby -ryaml -rYAML -I "/usr/share/openkill" -E UTF-8 -e "
                   }
                   end
                };
-            end;
 
-            if x['type'] == 'trusttunnel' then
+               #MASQUE advanced IP-stack/network options
+               threads << Thread.new{
+                   safe = lambda { |value| value.to_s.gsub(%r{[\x22\x27\x3b\x5c\x60]}, '') }
+                  advanced = false
+                  if x.key?('ip-stack') && x['ip-stack'].is_a?(Hash) then
+                     if x['ip-stack'].key?('mode') then
+                        uci_commands << uci_set + 'masque_ip_stack_mode=\"' + safe.call(x['ip-stack']['mode']) + '\"'
+                     end
+                     if x['ip-stack'].key?('congestion-controller') then
+                        uci_commands << uci_set + 'masque_ip_stack_congestion_controller=\"' + safe.call(x['ip-stack']['congestion-controller']) + '\"'
+                     end
+                     advanced = true
+                  end
+                  masque_map = {
+                     'congestion-controller' => 'masque_congestion_controller',
+                     'network' => 'masque_network',
+                     'handshake-timeout' => 'masque_handshake_timeout',
+                     'bbr-profile' => 'masque_bbr_profile'
+                  }
+                  masque_map.each do |yaml_key, uci_key|
+                     if x.key?(yaml_key) then
+                        uci_commands << uci_set + uci_key + '=\"' + safe.call(x[yaml_key]) + '\"'
+                        advanced = true
+                     end
+                  end
+                  uci_commands << uci_set + 'masque_advanced=\"1\"' if advanced
+               };
+             end;
+
+             #Mihomo built-in ZeroTier overlay node
+             if x['type'] == 'zerotier' then
+                threads << Thread.new{
+                   safe = lambda { |value| value.to_s.gsub(%r{[\x22\x27\x3b\x5c\x60]}, '') }
+                   token = lambda { |value| value.to_s.gsub(/[^A-Za-z0-9_.-]/, '') }
+                   if x.key?('network') then
+                      network = token.call(x['network'])
+                      uci_commands << uci_set + 'zerotier_network=\"' + network + '\"' unless network.empty?
+                   end
+
+                   zerotier_map = {
+                      'state-dir' => 'zerotier_state_dir',
+                      'planet' => 'zerotier_planet',
+                      'mtu' => 'zerotier_mtu',
+                      'physical-mtu' => 'zerotier_physical_mtu',
+                      'primary-port' => 'zerotier_primary_port',
+                      'secondary-port' => 'zerotier_secondary_port',
+                      'tcp-fallback-mode' => 'zerotier_tcp_fallback_mode',
+                      'tcp-fallback-relay' => 'zerotier_tcp_fallback_relay',
+                      'remote-trace-target' => 'zerotier_remote_trace_target',
+                      'remote-trace-level' => 'zerotier_remote_trace_level',
+                      'low-bandwidth' => 'zerotier_low_bandwidth',
+                      'encrypted-hello' => 'zerotier_encrypted_hello',
+                      'remote-dns-resolve' => 'zerotier_remote_dns_resolve'
+                   }
+                   zerotier_advanced = false
+                   zerotier_map.each do |yaml_key, uci_key|
+                      if x.key?(yaml_key) then
+                         uci_commands << uci_set + uci_key + '=\"' + safe.call(x[yaml_key]) + '\"'
+                         zerotier_advanced = true
+                      end
+                   end
+                   if x.key?('ip-stack') && x['ip-stack'].is_a?(Hash) then
+                      if x['ip-stack'].key?('mode') then
+                         uci_commands << uci_set + 'zerotier_ip_stack_mode=\"' + token.call(x['ip-stack']['mode']) + '\"'
+                         zerotier_advanced = true
+                      end
+                      if x['ip-stack'].key?('congestion-controller') then
+                         uci_commands << uci_set + 'zerotier_ip_stack_congestion_controller=\"' + token.call(x['ip-stack']['congestion-controller']) + '\"'
+                         zerotier_advanced = true
+                      end
+                   end
+                   if x.key?('orbit') then
+                      cmd = uci_del + 'zerotier_orbit >/dev/null 2>&1'
+                      system(cmd)
+                      Array(x['orbit']).each do |orbit|
+                         if orbit.is_a?(Hash) then
+                            world = token.call(orbit['world'])
+                            seed = token.call(orbit['seed'])
+                            unless world.empty? || seed.empty?
+                               uci_commands << uci_add + 'zerotier_orbit=\"' + world + ':' + seed + '\"'
+                            end
+                         end
+                      end
+                      zerotier_advanced = true
+                   end
+                   if x.key?('dns') then
+                      cmd = uci_del + 'zerotier_dns >/dev/null 2>&1'
+                      system(cmd)
+                      Array(x['dns']).each do |value|
+                         uci_commands << uci_add + 'zerotier_dns=\"' + safe.call(value) + '\"'
+                      end
+                   end
+                   uci_commands << uci_set + 'zerotier_advanced=\"1\"' if zerotier_advanced
+                }
+             end;
+
+             if x['type'] == 'trusttunnel' then
                threads << Thread.new{
                #username
                if x.key?('username') then

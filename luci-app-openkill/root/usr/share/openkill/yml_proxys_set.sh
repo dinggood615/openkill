@@ -23,6 +23,13 @@ UPDATE_CONFIG_NAME=$(echo "$UPDATE_CONFIG_FILE" |awk -F '/' '{print $5}' 2>/dev/
 UCI_DEL_LIST="uci -q del_list openkill.config.new_servers_group"
 UCI_ADD_LIST="uci -q add_list openkill.config.new_servers_group"
 UCI_SET="uci -q set openkill.config."
+FEATURE_H2C=$(uci -q get openkill.config.feature_h2c 2>/dev/null || echo 0)
+FEATURE_SHADOWQUIC=$(uci -q get openkill.config.feature_shadowquic 2>/dev/null || echo 0)
+FEATURE_MASQUE=$(uci -q get openkill.config.feature_masque 2>/dev/null || echo 0)
+FEATURE_AMNEZIA_WG=$(uci -q get openkill.config.feature_amnezia_wg 2>/dev/null || echo 0)
+FEATURE_ANYTLS_METADATA=$(uci -q get openkill.config.feature_anytls_metadata 2>/dev/null || echo 0)
+FEATURE_BBR3=$(uci -q get openkill.config.feature_bbr3 2>/dev/null || echo 0)
+FEATURE_ZEROTIER=$(uci -q get openkill.config.feature_zerotier 2>/dev/null || echo 0)
 servers_name="/tmp/servers_name.list"
 proxy_provider_name="/tmp/provider_name.list"
 set_lock
@@ -175,6 +182,41 @@ cat >> "$SERVER_FILE" <<-EOF
 EOF
 }
 
+set_zerotier_orbit()
+{
+   local value="$1"
+   local world seed
+   [ -n "$value" ] || return
+   case "$value" in
+      *:*) ;;
+      *) return ;;
+   esac
+   world="${value%%:*}"
+   seed="${value#*:}"
+   world=$(printf '%s' "$world" | sed 's/[^A-Za-z0-9_.-]//g')
+   seed=$(printf '%s' "$seed" | sed 's/[^A-Za-z0-9_.-]//g')
+   printf '%s\n' "$world" | grep -Eq '^[0-9A-Fa-f]{16}$' || return
+   printf '%s\n' "$seed" | grep -Eq '^[0-9]{10}$' || return
+cat >> "$SERVER_FILE" <<-EOF
+      - world: "$world"
+        seed: "$seed"
+EOF
+}
+
+emit_amnezia_option()
+{
+   local key="$1"
+   local value="$2"
+   [ -n "$value" ] || return
+   case "$key" in
+      jc|jmin|jmax|s1|s2|s3|s4|h1|h2|h3|h4|i1|i2|i3|i4|i5|j1|j2|j3|itime) ;;
+      *) return ;;
+   esac
+cat >> "$SERVER_FILE" <<-EOF
+      $key: $value
+EOF
+}
+
 #写入服务器节点到配置文件
 yml_servers_set()
 {
@@ -199,17 +241,27 @@ yml_servers_set()
       return
    fi
 
-   if [ -z "$server" ] && [ "$type" != "direct" ] && [ "$type" != "dns" ]; then
+   if [ -z "$server" ] && [ "$type" != "direct" ] && [ "$type" != "dns" ] && [ "$type" != "zerotier" ]; then
       return
    fi
 
-   if [ -z "$port" ] && [ "$type" != "direct" ] && [ "$type" != "dns" ]; then
+   if [ -z "$port" ] && [ "$type" != "direct" ] && [ "$type" != "dns" ] && [ "$type" != "zerotier" ]; then
       return
    fi
 
-    if [ "$type" = "ss" ] || [ "$type" = "trojan" ] || [ "$type" = "ssr" ]; then
+    if [ "$type" = "ss" ] || [ "$type" = "trojan" ] || [ "$type" = "ssr" ] || [ "$type" = "shadowquic" ]; then
         config_get "password" "$section" "password" ""
         if [ -z "$password" ]; then
+            return
+        fi
+    fi
+
+    # ShadowQUIC requires both credentials.  Keep malformed imported nodes
+    # out of the generated YAML instead of letting them fail the whole core
+    # preflight later.
+    if [ "$type" = "shadowquic" ]; then
+        config_get "shadowquic_username" "$section" "shadowquic_username" ""
+        if [ -z "$shadowquic_username" ]; then
             return
         fi
     fi
@@ -451,6 +503,7 @@ if [ "$type" = "vmess" ]; then
    config_get "keep_alive" "$section" "keep_alive" ""
    config_get "h2_path" "$section" "h2_path" ""
    config_get "h2_host" "$section" "h2_host" ""
+   config_get "h2c_enable" "$section" "h2c_enable" ""
    config_get "grpc_service_name" "$section" "grpc_service_name" ""
 
    if [ "$obfs_vmess" = "websocket" ]; then
@@ -464,6 +517,10 @@ if [ "$type" = "vmess" ]; then
    fi
    if [ "$obfs_vmess" = "grpc" ]; then
       obfs_vmess="network: grpc"
+   fi
+
+   if [ "$FEATURE_H2C" = "1" ] && [ "$h2c_enable" = "1" ] && [ "$obfs_vmess" = "network: h2" ]; then
+      tls="false"
    fi
 
    if [ ! -z "$custom" ]; then
@@ -623,6 +680,8 @@ if [ "$type" = "anytls" ]; then
    config_get "idle_session_check_interval" "$section" "idle_session_check_interval" ""
    config_get "idle_session_timeout" "$section" "idle_session_timeout" ""
    config_get "min_idle_session" "$section" "min_idle_session" ""
+   config_get "anytls_advanced" "$section" "anytls_advanced" ""
+   config_get "anytls_client_metadata" "$section" "anytls_client_metadata" ""
 
 cat >> "$SERVER_FILE" <<-EOF
   - name: "$name"
@@ -658,6 +717,11 @@ EOF
     if [ -n "$min_idle_session" ]; then
 cat >> "$SERVER_FILE" <<-EOF
     min-idle-session: $min_idle_session
+EOF
+    fi
+    if [ "$FEATURE_ANYTLS_METADATA" = "1" ] && [ "$anytls_advanced" = "1" ] && [ -n "$anytls_client_metadata" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    client-metadata: "$anytls_client_metadata"
 EOF
     fi
     if [ -n "$sni" ]; then
@@ -823,6 +887,27 @@ if [ "$type" = "wireguard" ]; then
    config_get "preshared_key" "$section" "preshared_key" ""
    config_get "wg_dns" "$section" "wg_dns" ""
    config_get "wg_mtu" "$section" "wg_mtu" ""
+   config_get "amnezia_wg_enable" "$section" "amnezia_wg_enable" ""
+   config_get "amnezia_jc" "$section" "amnezia_jc" ""
+   config_get "amnezia_jmin" "$section" "amnezia_jmin" ""
+   config_get "amnezia_jmax" "$section" "amnezia_jmax" ""
+   config_get "amnezia_s1" "$section" "amnezia_s1" ""
+   config_get "amnezia_s2" "$section" "amnezia_s2" ""
+   config_get "amnezia_s3" "$section" "amnezia_s3" ""
+   config_get "amnezia_s4" "$section" "amnezia_s4" ""
+   config_get "amnezia_h1" "$section" "amnezia_h1" ""
+   config_get "amnezia_h2" "$section" "amnezia_h2" ""
+   config_get "amnezia_h3" "$section" "amnezia_h3" ""
+   config_get "amnezia_h4" "$section" "amnezia_h4" ""
+   config_get "amnezia_i1" "$section" "amnezia_i1" ""
+   config_get "amnezia_i2" "$section" "amnezia_i2" ""
+   config_get "amnezia_i3" "$section" "amnezia_i3" ""
+   config_get "amnezia_i4" "$section" "amnezia_i4" ""
+   config_get "amnezia_i5" "$section" "amnezia_i5" ""
+   config_get "amnezia_j1" "$section" "amnezia_j1" ""
+   config_get "amnezia_j2" "$section" "amnezia_j2" ""
+   config_get "amnezia_j3" "$section" "amnezia_j3" ""
+   config_get "amnezia_itime" "$section" "amnezia_itime" ""
 
 cat >> "$SERVER_FILE" <<-EOF
   - name: "$name"
@@ -865,6 +950,39 @@ EOF
 cat >> "$SERVER_FILE" <<-EOF
     mtu: "$wg_mtu"
 EOF
+    fi
+    amnezia_has_options=0
+    if [ -n "$amnezia_jc" ] || [ -n "$amnezia_jmin" ] || [ -n "$amnezia_jmax" ] || \
+       [ -n "$amnezia_s1" ] || [ -n "$amnezia_s2" ] || [ -n "$amnezia_s3" ] || [ -n "$amnezia_s4" ] || \
+       [ -n "$amnezia_h1" ] || [ -n "$amnezia_h2" ] || [ -n "$amnezia_h3" ] || [ -n "$amnezia_h4" ] || \
+       [ -n "$amnezia_i1" ] || [ -n "$amnezia_i2" ] || [ -n "$amnezia_i3" ] || [ -n "$amnezia_i4" ] || [ -n "$amnezia_i5" ] || \
+       [ -n "$amnezia_j1" ] || [ -n "$amnezia_j2" ] || [ -n "$amnezia_j3" ] || [ -n "$amnezia_itime" ]; then
+        amnezia_has_options=1
+    fi
+    if [ "$FEATURE_AMNEZIA_WG" = "1" ] && [ "$amnezia_wg_enable" = "1" ] && [ "$amnezia_has_options" = "1" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    amnezia-wg-option:
+EOF
+        emit_amnezia_option jc "$amnezia_jc"
+        emit_amnezia_option jmin "$amnezia_jmin"
+        emit_amnezia_option jmax "$amnezia_jmax"
+        emit_amnezia_option s1 "$amnezia_s1"
+        emit_amnezia_option s2 "$amnezia_s2"
+        emit_amnezia_option s3 "$amnezia_s3"
+        emit_amnezia_option s4 "$amnezia_s4"
+        emit_amnezia_option h1 "$amnezia_h1"
+        emit_amnezia_option h2 "$amnezia_h2"
+        emit_amnezia_option h3 "$amnezia_h3"
+        emit_amnezia_option h4 "$amnezia_h4"
+        emit_amnezia_option i1 "$amnezia_i1"
+        emit_amnezia_option i2 "$amnezia_i2"
+        emit_amnezia_option i3 "$amnezia_i3"
+        emit_amnezia_option i4 "$amnezia_i4"
+        emit_amnezia_option i5 "$amnezia_i5"
+        emit_amnezia_option j1 "$amnezia_j1"
+        emit_amnezia_option j2 "$amnezia_j2"
+        emit_amnezia_option j3 "$amnezia_j3"
+        emit_amnezia_option itime "$amnezia_itime"
     fi
     if [ -n "$udp" ]; then
 cat >> "$SERVER_FILE" <<-EOF
@@ -1110,6 +1228,139 @@ EOF
 cat >> "$SERVER_FILE" <<-EOF
     hop-interval: $hop_interval
 EOF
+    fi
+fi
+
+#shadowquic
+if [ "$type" = "shadowquic" ]; then
+   [ "$FEATURE_SHADOWQUIC" = "1" ] || return
+   config_get "password" "$section" "password" ""
+   config_get "shadowquic_username" "$section" "shadowquic_username" ""
+   config_get "shadowquic_advanced" "$section" "shadowquic_advanced" ""
+   config_get "shadowquic_quic_versions" "$section" "shadowquic_quic_versions" ""
+   config_get "shadowquic_udp_over_stream" "$section" "shadowquic_udp_over_stream" ""
+   config_get "shadowquic_zero_rtt" "$section" "shadowquic_zero_rtt" ""
+   config_get "shadowquic_keep_alive_interval" "$section" "shadowquic_keep_alive_interval" ""
+   config_get "shadowquic_congestion_controller" "$section" "shadowquic_congestion_controller" ""
+   config_get "shadowquic_up" "$section" "shadowquic_up" ""
+   config_get "shadowquic_down" "$section" "shadowquic_down" ""
+   config_get "shadowquic_cwnd" "$section" "shadowquic_cwnd" ""
+   config_get "shadowquic_bbr_profile" "$section" "shadowquic_bbr_profile" ""
+   config_get "shadowquic_max_datagram_frame_size" "$section" "shadowquic_max_datagram_frame_size" ""
+   config_get "shadowquic_max_open_streams" "$section" "shadowquic_max_open_streams" ""
+   config_get "shadowquic_recv_window_conn" "$section" "shadowquic_recv_window_conn" ""
+   config_get "shadowquic_recv_window" "$section" "shadowquic_recv_window" ""
+   config_get "shadowquic_disable_mtu_discovery" "$section" "shadowquic_disable_mtu_discovery" ""
+
+cat >> "$SERVER_FILE" <<-EOF
+  - name: "$name"
+    type: shadowquic
+    server: "$server"
+    port: $port
+    username: "$shadowquic_username"
+    password: "$password"
+EOF
+    if [ -n "$udp" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    udp: $udp
+EOF
+    fi
+    if [ -n "$sni" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    sni: "$sni"
+EOF
+    fi
+    if [ -n "$alpn" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    alpn:
+EOF
+        config_list_foreach "$section" "alpn" set_alpn
+    fi
+    if [ -n "$skip_cert_verify" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    skip-cert-verify: $skip_cert_verify
+EOF
+    fi
+    if [ -n "$client_fingerprint" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    client-fingerprint: "$client_fingerprint"
+EOF
+    fi
+    # Advanced ShadowQUIC fields require both the global capability switch
+    # and the per-node advanced switch.  Required credentials and common TLS
+    # fields above remain available for every enabled ShadowQUIC node.
+    if [ "$FEATURE_SHADOWQUIC" = "1" ] && [ "$shadowquic_advanced" = "1" ]; then
+      if [ "$FEATURE_H2C" = "1" ] && [ -n "$shadowquic_quic_versions" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    quic-versions:
+EOF
+        config_list_foreach "$section" "shadowquic_quic_versions" set_alpn
+      fi
+    if [ -n "$shadowquic_udp_over_stream" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    udp-over-stream: $shadowquic_udp_over_stream
+EOF
+    fi
+    if [ -n "$shadowquic_zero_rtt" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    zero-rtt: $shadowquic_zero_rtt
+EOF
+    fi
+    if [ -n "$shadowquic_keep_alive_interval" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    keep-alive-interval: $shadowquic_keep_alive_interval
+EOF
+    fi
+    if [ -n "$shadowquic_congestion_controller" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    congestion-controller: $shadowquic_congestion_controller
+EOF
+    fi
+    if [ -n "$shadowquic_up" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    up: "$shadowquic_up"
+EOF
+    fi
+    if [ -n "$shadowquic_down" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    down: "$shadowquic_down"
+EOF
+    fi
+    if [ -n "$shadowquic_cwnd" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    cwnd: $shadowquic_cwnd
+EOF
+    fi
+    if [ -n "$shadowquic_bbr_profile" ] && [ "$shadowquic_congestion_controller" = "bbr" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    bbr-profile: "$shadowquic_bbr_profile"
+EOF
+    fi
+    if [ -n "$shadowquic_max_datagram_frame_size" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    max-datagram-frame-size: $shadowquic_max_datagram_frame_size
+EOF
+    fi
+    if [ -n "$shadowquic_max_open_streams" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    max-open-streams: $shadowquic_max_open_streams
+EOF
+    fi
+    if [ -n "$shadowquic_recv_window_conn" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    recv-window-conn: $shadowquic_recv_window_conn
+EOF
+    fi
+    if [ -n "$shadowquic_recv_window" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    recv-window: $shadowquic_recv_window
+EOF
+    fi
+    if [ -n "$shadowquic_disable_mtu_discovery" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    disable-mtu-discovery: $shadowquic_disable_mtu_discovery
+EOF
+    fi
     fi
 fi
 
@@ -1599,6 +1850,22 @@ if [ "$type" = "masque" ]; then
    config_get "masque_mtu" "$section" "masque_mtu" ""
    config_get "masque_remote_dns_resolve" "$section" "masque_remote_dns_resolve" ""
    config_get "masque_dns" "$section" "masque_dns" ""
+   config_get "masque_advanced" "$section" "masque_advanced" ""
+   config_get "masque_ip_stack_mode" "$section" "masque_ip_stack_mode" ""
+   config_get "masque_ip_stack_congestion_controller" "$section" "masque_ip_stack_congestion_controller" ""
+   config_get "masque_congestion_controller" "$section" "masque_congestion_controller" ""
+   config_get "masque_network" "$section" "masque_network" ""
+   config_get "masque_handshake_timeout" "$section" "masque_handshake_timeout" ""
+   config_get "masque_bbr_profile" "$section" "masque_bbr_profile" ""
+   case "$masque_network" in
+      ""|quic|h2|h3-l4proxy) ;;
+      *) masque_network="" ;;
+   esac
+   masque_udp="$udp"
+   if [ "$masque_network" = "h3-l4proxy" ]; then
+      # Mihomo's h3-l4proxy transport currently does not support UDP.
+      masque_udp="false"
+   fi
 
 cat >> "$SERVER_FILE" <<-EOF
   - name: "$name"
@@ -1636,9 +1903,54 @@ cat >> "$SERVER_FILE" <<-EOF
     remote-dns-resolve: $masque_remote_dns_resolve
 EOF
     fi
-    if [ ! -z "$udp" ]; then
+    masque_emit_ip_stack=0
+    if [ -n "$masque_ip_stack_mode" ]; then
+        masque_emit_ip_stack=1
+    elif [ -n "$masque_ip_stack_congestion_controller" ] && { [ "$masque_ip_stack_congestion_controller" != "bbr3" ] || [ "$FEATURE_BBR3" = "1" ]; }; then
+        masque_emit_ip_stack=1
+    fi
+    if [ "$FEATURE_MASQUE" = "1" ] && [ "$masque_advanced" = "1" ]; then
+        if [ "$masque_emit_ip_stack" = "1" ]; then
 cat >> "$SERVER_FILE" <<-EOF
-    udp: $udp
+    ip-stack:
+EOF
+            if [ -n "$masque_ip_stack_mode" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+      mode: $masque_ip_stack_mode
+EOF
+            fi
+            if [ -n "$masque_ip_stack_congestion_controller" ]; then
+                if [ "$masque_ip_stack_congestion_controller" != "bbr3" ] || [ "$FEATURE_BBR3" = "1" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+      congestion-controller: $masque_ip_stack_congestion_controller
+EOF
+                fi
+            fi
+        fi
+        if [ -n "$masque_network" ] && [ "$masque_network" != "quic" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    network: $masque_network
+EOF
+        fi
+        if [ -n "$masque_congestion_controller" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    congestion-controller: $masque_congestion_controller
+EOF
+        fi
+        if [ -n "$masque_bbr_profile" ] && [ "$masque_congestion_controller" = "bbr" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    bbr-profile: "$masque_bbr_profile"
+EOF
+        fi
+        if [ -n "$masque_handshake_timeout" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    handshake-timeout: $masque_handshake_timeout
+EOF
+        fi
+    fi
+    if [ ! -z "$masque_udp" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    udp: $masque_udp
 EOF
    fi
    if [ ! -z "$masque_dns" ]; then
@@ -1647,6 +1959,148 @@ cat >> "$SERVER_FILE" <<-EOF
 EOF
         config_list_foreach "$section" "masque_dns" set_alpn
     fi
+fi
+
+#ZeroTier (Mihomo built-in overlay node)
+if [ "$type" = "zerotier" ]; then
+   [ "$FEATURE_ZEROTIER" = "1" ] || return
+   config_get "zerotier_network" "$section" "zerotier_network" ""
+   config_get "zerotier_advanced" "$section" "zerotier_advanced" ""
+   config_get "zerotier_state_dir" "$section" "zerotier_state_dir" ""
+   config_get "zerotier_planet" "$section" "zerotier_planet" ""
+   config_get "zerotier_mtu" "$section" "zerotier_mtu" ""
+   config_get "zerotier_physical_mtu" "$section" "zerotier_physical_mtu" ""
+   config_get "zerotier_ip_stack_mode" "$section" "zerotier_ip_stack_mode" ""
+   config_get "zerotier_ip_stack_congestion_controller" "$section" "zerotier_ip_stack_congestion_controller" ""
+   config_get "zerotier_primary_port" "$section" "zerotier_primary_port" ""
+   config_get "zerotier_secondary_port" "$section" "zerotier_secondary_port" ""
+   config_get "zerotier_tcp_fallback_mode" "$section" "zerotier_tcp_fallback_mode" ""
+   config_get "zerotier_tcp_fallback_relay" "$section" "zerotier_tcp_fallback_relay" ""
+   config_get "zerotier_remote_trace_target" "$section" "zerotier_remote_trace_target" ""
+   config_get "zerotier_remote_trace_level" "$section" "zerotier_remote_trace_level" ""
+   config_get "zerotier_low_bandwidth" "$section" "zerotier_low_bandwidth" ""
+   config_get "zerotier_encrypted_hello" "$section" "zerotier_encrypted_hello" ""
+   config_get "zerotier_orbit" "$section" "zerotier_orbit" ""
+   config_get "zerotier_remote_dns_resolve" "$section" "zerotier_remote_dns_resolve" ""
+   config_get "zerotier_dns" "$section" "zerotier_dns" ""
+
+   # Mihomo requires a 16-character hexadecimal network id.  A malformed
+   # section is ignored so one optional node cannot invalidate all proxies.
+   if ! printf '%s\n' "$zerotier_network" | grep -Eq '^[0-9a-fA-F]{16}$'; then
+      return
+   fi
+
+cat >> "$SERVER_FILE" <<-EOF
+  - name: "$name"
+    type: zerotier
+    network: "$zerotier_network"
+EOF
+   if [ -n "$zerotier_state_dir" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    state-dir: "$zerotier_state_dir"
+EOF
+   fi
+   if [ -n "$zerotier_planet" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    planet: "$zerotier_planet"
+EOF
+   fi
+   if [ -n "$zerotier_mtu" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    mtu: $zerotier_mtu
+EOF
+   fi
+   if [ -n "$zerotier_physical_mtu" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    physical-mtu: $zerotier_physical_mtu
+EOF
+   fi
+
+   zerotier_emit_ip_stack=0
+   if [ -n "$zerotier_ip_stack_mode" ]; then
+      zerotier_emit_ip_stack=1
+   elif [ -n "$zerotier_ip_stack_congestion_controller" ] && { [ "$zerotier_ip_stack_congestion_controller" != "bbr3" ] || [ "$FEATURE_BBR3" = "1" ]; }; then
+      zerotier_emit_ip_stack=1
+   fi
+   if [ "$zerotier_emit_ip_stack" = "1" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    ip-stack:
+EOF
+      if [ -n "$zerotier_ip_stack_mode" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+      mode: $zerotier_ip_stack_mode
+EOF
+      fi
+      if [ -n "$zerotier_ip_stack_congestion_controller" ] && { [ "$zerotier_ip_stack_congestion_controller" != "bbr3" ] || [ "$FEATURE_BBR3" = "1" ]; }; then
+cat >> "$SERVER_FILE" <<-EOF
+      congestion-controller: $zerotier_ip_stack_congestion_controller
+EOF
+      fi
+   fi
+   if [ "$zerotier_advanced" = "1" ]; then
+      if [ -n "$zerotier_primary_port" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    primary-port: $zerotier_primary_port
+EOF
+      fi
+      if [ -n "$zerotier_secondary_port" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    secondary-port: $zerotier_secondary_port
+EOF
+      fi
+      if [ -n "$zerotier_tcp_fallback_mode" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    tcp-fallback-mode: $zerotier_tcp_fallback_mode
+EOF
+      fi
+      if [ -n "$zerotier_tcp_fallback_relay" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    tcp-fallback-relay: "$zerotier_tcp_fallback_relay"
+EOF
+      fi
+      if [ -n "$zerotier_remote_trace_target" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    remote-trace-target: "$zerotier_remote_trace_target"
+EOF
+      fi
+      if [ -n "$zerotier_remote_trace_level" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    remote-trace-level: $zerotier_remote_trace_level
+EOF
+      fi
+      if [ -n "$zerotier_low_bandwidth" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    low-bandwidth: $zerotier_low_bandwidth
+EOF
+      fi
+      if [ -n "$zerotier_encrypted_hello" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    encrypted-hello: $zerotier_encrypted_hello
+EOF
+      fi
+      if [ -n "$zerotier_orbit" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    orbit:
+EOF
+         config_list_foreach "$section" "zerotier_orbit" set_zerotier_orbit
+      fi
+   fi
+   if [ -n "$udp" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    udp: $udp
+EOF
+   fi
+   if [ -n "$zerotier_remote_dns_resolve" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    remote-dns-resolve: $zerotier_remote_dns_resolve
+EOF
+   fi
+   if [ -n "$zerotier_dns" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    dns:
+EOF
+      config_list_foreach "$section" "zerotier_dns" set_alpn
+   fi
 fi
 
 #TrustTunnel

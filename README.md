@@ -5,7 +5,7 @@
 
 OpenKill 是基于 OpenClash 源码的 OpenWrt 客户端项目。
 
-当前版本：`2026-1033`。
+当前版本：`2026-1040`。
 
 许可：本项目遵循 [MIT License](LICENSE)，并保留上游 OpenClash 及相关组件的版权声明。
 
@@ -25,7 +25,7 @@ curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/scripts
 更新统一使用 `--update`，会更新 OpenKill 软件包并安装/更新官方稳定 Meta（Mihomo）内核。
 
 IPK/APK 构建完成后独立发布，互不等待。安装器读取对应格式的最新发布清单，优先查询官方仓库，网络失败时回退镜像；下载 Release 附件或镜像副本后校验 SHA256。页面源码版本可能领先于尚在构建的软件包，安装器显示实际选中的发布版本。
-项目版本使用 2026-1013 形式；APK 内部版本转换为 2026.1013，以满足 APK 包管理器的版本语法，数字序号保持同步。
+项目版本使用 `2026-1040` 形式；后续发布按同一数字序号递增，APK 内部版本转换为 `2026.1040`，以满足 APK 包管理器的版本语法，数字序号保持同步。
 依赖索引和安装共用临时源配置；官方 OpenWrt 源不可用时自动尝试北大、清华镜像，保留固件路径和自定义源，不永久修改系统源。依赖下载失败也会重试兼容镜像，必需依赖缺失会停止安装并显示原因。
 
 当前版本已按四阶段基线整理：
@@ -33,7 +33,9 @@ IPK/APK 构建完成后独立发布，互不等待。安装器读取对应格式
 1. 配置预检、健康检查、最近可用配置回滚，以及只观察 procd 的 watchdog 防重复重启。
 2. 拆分低频维护任务，移除 Smart/LightGBM 运行入口，关闭逐连接进程扫描，降低后台开销。
 3. 双栈 DNS/IPv6、Geo 数据和代理组测速采用有界超时与失败重试，减少首连等待和节点抖动。
-4. 通过官方 Mihomo stable release 动态获取内核，静态检查脚本与版本清单统一；可选新特性只在内核支持时启用。详见 [Mihomo 兼容基线](docs/MIHOMO_COMPATIBILITY.md)。
+4. 通过官方 Mihomo stable release 动态获取内核，静态检查脚本与版本清单统一；新增能力探测和可选开关，按内核支持情况启用 ShadowQUIC/QUIC v2、MASQUE 高级参数、AmneziaWG、AnyTLS 元数据、BBR3 与原生 ZeroTier 节点。系统 ZeroTier 服务仍为独立可选项，不作为硬依赖。详见 [Mihomo 兼容基线](docs/MIHOMO_COMPATIBILITY.md)。
+
+2026-1040：第四阶段能力真正接入；新增内核能力探测、ShadowQUIC/QUIC v2、H2C、MASQUE 高级参数、AmneziaWG、AnyTLS 元数据、BBR3 及 ZeroTier 可选开关，并完成节点 UCI/YAML 读写。
 
 2026-1032：修复依赖源重复声明和旧备份缺少路由集合文件的问题；依赖、软件包和官方内核下载增加快速失败与镜像回退，已安装依赖时跳过无必要的源刷新。
 2026-1033：修复启动前 Mihomo 配置预检未继承 SAFE_PATHS，导致 external-ui 路径被拒绝、OpenKill 无法启动的问题；统一预检、订阅校验和运行时的安全路径。

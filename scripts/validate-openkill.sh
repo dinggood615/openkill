@@ -18,6 +18,13 @@ for file in \
   luci-app-openkill/root/usr/share/openkill/openkill_watchdog.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_watchdog_stream.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_validate.sh \
+  luci-app-openkill/root/usr/share/openkill/openkill_capabilities.sh \
+  luci-app-openkill/root/usr/share/openkill/openkill_zerotier.sh \
+  luci-app-openkill/root/usr/share/openkill/yml_proxys_get.sh \
+  luci-app-openkill/root/usr/share/openkill/yml_proxys_set.sh \
+  luci-app-openkill/luasrc/model/cbi/openkill/settings.lua \
+  luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua \
+  luci-app-openkill/luasrc/view/openkill/server_url.htm \
   luci-app-openkill/root/usr/share/openkill/res/default.yaml \
   README.md; do
   need_file "$file"
@@ -31,6 +38,10 @@ for file in \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_watchdog.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_watchdog_stream.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_validate.sh" \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_capabilities.sh" \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_zerotier.sh" \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/yml_proxys_get.sh" \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/yml_proxys_set.sh" \
   "$ROOT_DIR/luci-app-openkill/root/etc/uci-defaults/luci-openkill"; do
   sh -n "$file" || fail "shell syntax error: ${file#$ROOT_DIR/}"
 done
@@ -56,6 +67,27 @@ done
 if grep -Eq '^[[:space:]]*\+ruby-json([[:space:]]|$)' "$ROOT_DIR/luci-app-openkill/Makefile"; then
   fail 'ruby-json is still a hard package dependency'
 fi
+
+for needle in \
+  'feature_h2c' 'feature_shadowquic' 'feature_masque' 'feature_amnezia_wg' \
+  'feature_anytls_metadata' 'feature_bbr3' 'feature_zerotier' \
+  'openkill_capabilities.sh' 'openkill_zerotier.sh' 'shadowquic' \
+  'amnezia-wg-option' 'client-metadata' 'ip-stack' 'type: zerotier' \
+  'zerotier_network' 'zerotier_orbit'; do
+  if ! grep -Fq "$needle" \
+    "$ROOT_DIR/luci-app-openkill/root/etc/config/openkill" \
+    "$ROOT_DIR/luci-app-openkill/luasrc/model/cbi/openkill/settings.lua" \
+    "$ROOT_DIR/luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua" \
+    "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/yml_proxys_get.sh" \
+    "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/yml_proxys_set.sh"; then
+    fail "optional capability marker is missing: $needle"
+  fi
+done
+
+for needle in 'exportShadowQUIC' 'parseShadowQUIC' 'shadowquic_quic_versions'; do
+  grep -Fq "$needle" "$ROOT_DIR/luci-app-openkill/luasrc/view/openkill/server_url.htm" \
+    || fail "ShadowQUIC URL support is missing: $needle"
+done
 
 # The generated default config keeps external-ui under /usr/share/openkill.
 # Both the standalone preflight and the procd service must grant Mihomo the

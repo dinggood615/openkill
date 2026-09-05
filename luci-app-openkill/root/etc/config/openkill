@@ -80,6 +80,19 @@ config openkill 'config'
 	option geoasn_custom_url 'https://testingcf.jsdelivr.net/gh/xishang0128/geoip@release/GeoLite2-ASN.mmdb'
 	option chnr_custom_url 'https://ispip.clang.cn/all_cn.txt'
 	option chnr6_custom_url 'https://ispip.clang.cn/all_cn_ipv6.txt'
+	# Optional Mihomo capabilities. They are disabled by default so older cores
+	# keep the same generated YAML. Enable a capability only after the status
+	# probe reports support; per-node advanced switches provide a second guard.
+	option feature_h2c '0'
+	option feature_shadowquic '0'
+	option feature_masque '0'
+	option feature_amnezia_wg '0'
+	option feature_anytls_metadata '0'
+	option feature_bbr3 '0'
+	option feature_zerotier '0'
+	option zerotier_network_id ''
+	option zerotier_interface 'zt0'
+	option zerotier_auto_start '0'
 	
 config dns_servers
 	option type 'udp'
