@@ -57,6 +57,18 @@ if grep -Eq '^[[:space:]]*\+ruby-json([[:space:]]|$)' "$ROOT_DIR/luci-app-openki
   fail 'ruby-json is still a hard package dependency'
 fi
 
+# The generated default config keeps external-ui under /usr/share/openkill.
+# Both the standalone preflight and the procd service must grant Mihomo the
+# same path allow-list, otherwise startup is rejected before listeners open.
+if ! grep -Fq 'SAFE_PATHS="/usr/share/openkill:/etc/ssl:/tmp"' \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_validate.sh"; then
+  fail 'Mihomo preflight SAFE_PATHS allow-list is missing'
+fi
+if ! grep -Fq 'procd_set_param env SAFE_PATHS=/usr/share/openkill:/etc/ssl:/tmp' \
+  "$ROOT_DIR/luci-app-openkill/root/etc/init.d/openkill"; then
+  fail 'OpenKill service SAFE_PATHS allow-list is missing'
+fi
+
 if command -v ruby >/dev/null 2>&1; then
   ruby -ryaml -e 'YAML.load_file(ARGV[0]); exit 0' \
     "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/res/default.yaml" \

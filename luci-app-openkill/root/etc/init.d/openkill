@@ -827,7 +827,11 @@ start_run_core()
    fi
    chown root:root "$CLASH"
    procd_open_instance "openkill"
-   procd_set_param env SAFE_PATHS=/usr/share/openkill:/etc/ssl
+   # Keep the core runtime allow-list aligned with the pre-start validator.
+   # Mihomo rejects external-ui paths outside its home directory unless they
+   # are present in SAFE_PATHS.  /tmp is also used for generated configs and
+   # short-lived health-check artifacts on OpenWrt.
+   procd_set_param env SAFE_PATHS=/usr/share/openkill:/etc/ssl:/tmp
    procd_append_param env CLASH_AGE_SECRET_KEY="$SECRET_KEY"
    procd_set_param command /bin/sh -c "exec $CLASH -d $CLASH_CONFIG -f \"$CONFIG_FILE\" >> $LOG_FILE 2>&1"
    procd_set_param user "root"

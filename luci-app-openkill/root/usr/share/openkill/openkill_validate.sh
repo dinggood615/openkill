@@ -28,7 +28,12 @@ fi
 # Mihomo's -t performs the official config validation without opening the
 # listeners.  The installer replaces old cores that do not expose this flag.
 if [ -x "$CORE" ]; then
-   "$CORE" -t -d "$(dirname "$CONFIG_FILE")" -f "$CONFIG_FILE" >/tmp/openkill-config-test.$$.log 2>&1 || {
+   # Match the allow-list used by the procd service.  Without this, Mihomo's
+   # default SAFE_PATHS=/tmp rejects the bundled external-ui directory before
+   # OpenKill can start, even though the same config is valid at runtime.
+   SAFE_PATHS="/usr/share/openkill:/etc/ssl:/tmp" \
+      "$CORE" -t -d "$(dirname "$CONFIG_FILE")" -f "$CONFIG_FILE" \
+      >/tmp/openkill-config-test.$$.log 2>&1 || {
       cat /tmp/openkill-config-test.$$.log >&2
       rm -f /tmp/openkill-config-test.$$.log
       exit 4

@@ -49,7 +49,10 @@ config_test()
 {
    if [ -f "$CLASH" ]; then
       LOG_OUT "Config File Download Successful, Test If There is Any Errors..."
-      test_info=$($CLASH -t -d $CLASH_CONFIG -f "$CFG_FILE" -age-secret-key "$SECRET_KEY")
+      # Subscription validation runs outside the procd service, so pass the
+      # same SAFE_PATHS allow-list that is used by the long-running core.
+      test_info=$(SAFE_PATHS="/usr/share/openkill:/etc/ssl:/tmp" \
+         "$CLASH" -t -d "$CLASH_CONFIG" -f "$CFG_FILE" -age-secret-key "$SECRET_KEY")
       local IFS=$'\n'
       for i in $test_info; do
          if [ -n "$(echo "$i" |grep "configuration file")" ]; then
