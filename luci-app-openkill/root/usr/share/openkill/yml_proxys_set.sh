@@ -519,8 +519,14 @@ if [ "$type" = "vmess" ]; then
       obfs_vmess="network: grpc"
    fi
 
-   if [ "$FEATURE_H2C" = "1" ] && [ "$h2c_enable" = "1" ] && [ "$obfs_vmess" = "network: h2" ]; then
-      tls="false"
+   if [ "$obfs_vmess" = "network: h2" ]; then
+      if [ "$FEATURE_H2C" = "1" ] && [ "$h2c_enable" = "1" ]; then
+         tls="false"
+      elif [ -z "$tls" ] || [ "$tls" = "false" ]; then
+         # H2C is opt-in.  Keep ordinary VMess H2 on TLS when either guard is
+         # disabled, including configurations imported from a YAML file.
+         tls="true"
+      fi
    fi
 
    if [ ! -z "$custom" ]; then
