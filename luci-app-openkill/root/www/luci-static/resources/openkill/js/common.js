@@ -273,21 +273,22 @@ function ocGetDashboardBaseURL(status) {
 		port = status.cn_port;
 		proto = 'http://';
 	}
-	return { host: host, port: port, proto: proto, secret: status.dase || '' };
+	var urlHost = (host && host.indexOf(':') >= 0 && host.charAt(0) !== '[') ? '[' + host + ']' : host;
+	return { host: host, urlHost: urlHost, port: port, proto: proto, secret: status.dase || '' };
 }
 
 function ocBuildDashboardURL(status, uiPath, needsSetup) {
 	var base = ocGetDashboardBaseURL(status);
-	var url = base.proto + base.host + ':' + base.port + '/ui/' + uiPath;
+	var url = base.proto + base.urlHost + ':' + base.port + '/ui/' + uiPath;
 	if (needsSetup) {
-		url += '/#/setup?hostname=' + base.host + '&port=' + base.port;
-		if (base.secret) url += '&secret=' + base.secret;
+		url += '/#/setup?hostname=' + encodeURIComponent(base.host) + '&port=' + encodeURIComponent(base.port);
+		if (base.secret) url += '&secret=' + encodeURIComponent(base.secret);
 	} else if (uiPath === 'yacd') {
-		url += '/?hostname=' + base.host + '&port=' + base.port;
-		if (base.secret) url += '&secret=' + base.secret;
+		url += '/?hostname=' + encodeURIComponent(base.host) + '&port=' + encodeURIComponent(base.port);
+		if (base.secret) url += '&secret=' + encodeURIComponent(base.secret);
 	} else if (uiPath === 'dashboard') {
-		url += '/#/?host=' + base.host + '&port=' + base.port;
-		if (base.secret) url += '&secret=' + base.secret;
+		url += '/#/?host=' + encodeURIComponent(base.host) + '&port=' + encodeURIComponent(base.port);
+		if (base.secret) url += '&secret=' + encodeURIComponent(base.secret);
 	}
 	return url;
 }

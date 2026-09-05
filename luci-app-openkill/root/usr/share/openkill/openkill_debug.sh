@@ -2,6 +2,7 @@
 . /lib/functions.sh
 . /usr/share/openkill/ruby.sh
 . /usr/share/openkill/uci.sh
+. /usr/share/openkill/runtime.sh
 
 set_lock() {
    exec 885>"/tmp/lock/openkill_debug.lock" 2>/dev/null
@@ -234,11 +235,11 @@ cat >> "$DEBUG_LOG" <<-EOF
 | 项目 | 值 |
 |------|----|
 EOF
-if pidof clash >/dev/null; then
+if openkill_core_process_present; then
 cat >> "$DEBUG_LOG" <<-EOF
 | 运行状态 | 运行中 |
 | 运行内核 | $core_type |
-| 进程pid | $(pidof clash) |
+| 进程pid | $(openkill_core_pids) |
 | 运行用户 | $(ps |grep "/etc/openkill/clash" |grep -v grep |awk '{print $2}' 2>/dev/null) |
 EOF
 else
@@ -746,7 +747,7 @@ cat >> "$DEBUG_LOG" <<-EOF
 \`\`\`
 EOF
 
-if pidof clash >/dev/null; then
+if openkill_core_process_present; then
 cat >> "$DEBUG_LOG" <<-EOF
 
 ## Mihomo API 健康检查
@@ -769,7 +770,7 @@ cat >> "$DEBUG_LOG" <<-EOF
 # tail -n 100 /tmp/openkill.log
 EOF
 
-if pidof clash >/dev/null && [ "$log_level" != "debug" ]; then
+if openkill_core_process_present && [ "$log_level" != "debug" ]; then
    curl -SsL -m 3 --retry 2 -H "Content-Type: application/json" -H "Authorization: Bearer ${da_password}" -XPATCH http://${lan_ip}:${cn_port}/configs -d '{"log-level": "debug"}' >/dev/null
    sleep 10
 fi
@@ -780,7 +781,7 @@ cat >> "$DEBUG_LOG" <<-EOF
 \`\`\`
 
 EOF
-if pidof clash >/dev/null && [ "$log_level" != "debug" ]; then
+if openkill_core_process_present && [ "$log_level" != "debug" ]; then
    curl -SsL -m 3 --retry 2 -H "Content-Type: application/json" -H "Authorization: Bearer ${da_password}" -XPATCH http://${lan_ip}:${cn_port}/configs -d '{"log-level": "'"$log_level"'"}' >/dev/null
 fi
 

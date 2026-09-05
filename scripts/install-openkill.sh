@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1061"
+PROJECT_VERSION="2026-1070"
 ACTION=install
 PACKAGE_FILE=""
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
@@ -221,16 +221,27 @@ install_dependency_set(){
 }
 install_dependencies(){
   step "Checking and installing OpenKill runtime dependencies"
+  OPENKILL_REQUIRED_COMMON="bash curl ca-bundle ip-full ruby ruby-yaml lua kmod-tun unzip dnsmasq-full luci-compat"
+  OPENKILL_OPTIONAL_COMMON="ruby-json ruby-base64 ruby-psych ruby-pstore kmod-inet-diag"
+  OPENKILL_REQUIRED_FW4="kmod-nft-tproxy"
+  OPENKILL_REQUIRED_FW3="kmod-ipt-tproxy iptables-mod-tproxy ipset"
+  OPENKILL_OPTIONAL_FW3="kmod-ipt-extra kmod-ipt-nat iptables-mod-extra"
+  if [ -r /usr/share/openkill/dependencies.conf ]; then
+    # Existing installations provide the same manifest that is packaged with
+    # OpenKill.  Fresh installs use the fallback above until the package lands.
+    . /usr/share/openkill/dependencies.conf
+  fi
   if [ "$PM" = opkg ]; then
-    required="bash curl ca-bundle ip-full ruby ruby-yaml lua kmod-tun unzip dnsmasq-full luci-compat"
-    optional="ruby-json ruby-base64 ruby-psych ruby-pstore kmod-inet-diag"
-    if command -v fw4 >/dev/null 2>&1; then required="$required kmod-nft-tproxy"
-    else required="$required kmod-ipt-tproxy iptables-mod-tproxy ipset"; optional="$optional kmod-ipt-extra kmod-ipt-nat iptables-mod-extra"; fi
+    required="$OPENKILL_REQUIRED_COMMON"
+    optional="$OPENKILL_OPTIONAL_COMMON"
+    if command -v fw4 >/dev/null 2>&1; then required="$required $OPENKILL_REQUIRED_FW4"
+    else required="$required $OPENKILL_REQUIRED_FW3"; optional="$optional $OPENKILL_OPTIONAL_FW3"; fi
   else
-    required="bash curl ca-certificates ip-full ruby ruby-yaml lua kmod-tun unzip dnsmasq-full luci-compat"
-    optional="ruby-json ruby-base64 ruby-psych ruby-pstore kmod-inet-diag"
-      if command -v fw4 >/dev/null 2>&1; then required="$required kmod-nft-tproxy"
-      else required="$required ipset iptables-mod-tproxy"; fi
+    required="$OPENKILL_REQUIRED_COMMON"
+    required=$(printf '%s' "$required" | sed 's/ca-bundle/ca-certificates/g')
+    optional="$OPENKILL_OPTIONAL_COMMON"
+    if command -v fw4 >/dev/null 2>&1; then required="$required $OPENKILL_REQUIRED_FW4"
+    else required="$required ipset iptables-mod-tproxy"; fi
   fi
 
   # Repairs and updates normally run on a router that already has the

@@ -3,6 +3,7 @@
 . /lib/functions.sh
 . /usr/share/openkill/openkill_ps.sh
 . /usr/share/openkill/uci.sh
+. /usr/share/openkill/runtime.sh
 
 LOG_FILE="/tmp/openkill.log"
 CLASH="/etc/openkill/clash"
@@ -13,7 +14,7 @@ if ! mkdir "$WATCHDOG_LOCK" 2>/dev/null; then
    exit 0
 fi
 trap 'rmdir "$WATCHDOG_LOCK" 2>/dev/null || true' EXIT INT TERM
-CFG_UPDATE_INT=0
+CFG_UPDATE_LAST=0
 SKIP_PROXY_ADDRESS=1
 SKIP_PROXY_ADDRESS_INTERVAL=30
 UPNP_INT=1
@@ -242,7 +243,7 @@ fi
 
 # Health observation only: procd owns restart policy.  The watchdog records a
 # persistent failure after three cycles but never starts a duplicate core.
-if ! pidof clash >/dev/null 2>&1; then
+if ! openkill_core_process_present; then
    CORE_FAILURES=$(expr "$CORE_FAILURES" + 1)
    if [ "$CORE_FAILURES" -ge 3 ]; then
       LOG_WATCHDOG "Mihomo core is not running; procd restart is pending (no duplicate start)."
@@ -301,7 +302,7 @@ HISTORY_INT=$(expr "$HISTORY_INT" + 1)
 ## Localnetwork 刷新 (periodic; phase-2 CPU/network overhead reduction)
 if [ "$LOCALNETWORK_INT" -eq 1 ] || [ "$(expr "$LOCALNETWORK_INT" % "$LOCALNETWORK_INTERVAL")" -eq 0 ]; then
    wan_ip4s=$(/usr/share/openkill/openkill_get_network.lua "wanip" 2>/dev/null)
-   wan_ip6s=$(ifconfig | grep 'inet6 addr' | awk '{print $3}' 2>/dev/null)
+   wan_ip6s=$(ip -6 addr show scope global 2>/dev/null | awk '/inet6/{split($2,a,"/"); if (a[1] !~ /^fe80:/) print a[1]}' 2>/dev/null)
    lan_ip4s=$(/usr/share/openkill/openkill_get_network.lua "lan_cidr" 2>/dev/null)
    lan_ip6s=$(/usr/share/openkill/openkill_get_network.lua "lan_cidr6" 2>/dev/null)
    if [ -n "$FW4" ]; then
@@ -446,12 +447,17 @@ LOCALNETWORK_INT=$(expr "$LOCALNETWORK_INT" + 1)
       fi
    fi
 
-## 配置文件循环更新
+## 配置文件循环更新（按真实经过时间，而不是 watchdog 周期次数）
    if [ "$cfg_update" -eq 1 ] && [ "$cfg_update_mode" -eq 1 ]; then
-      if [ "$CFG_UPDATE_INT" -ne 0 ]; then
-         [ "$(expr "$CFG_UPDATE_INT" % "$cfg_update_interval")" -eq 0 ] && /usr/share/openkill/openkill.sh
+      now=$(date +%s 2>/dev/null || echo 0)
+      interval_seconds=$((cfg_update_interval * 60))
+      [ "$interval_seconds" -lt 60 ] && interval_seconds=60
+      if [ "$CFG_UPDATE_LAST" -eq 0 ]; then
+         CFG_UPDATE_LAST="$now"
+      elif [ "$now" -ge $((CFG_UPDATE_LAST + interval_seconds)) ]; then
+         /usr/share/openkill/openkill.sh
+         CFG_UPDATE_LAST="$now"
       fi
-      CFG_UPDATE_INT=$(expr "$CFG_UPDATE_INT" + 1)
    fi
 
 ##STREAMING_UNLOCK_CHECK (isolated from the health loop)

@@ -24,6 +24,19 @@ bool = lambda do |key|
 end
 %w[allow-lan ipv6 tcp-concurrent unified-delay].each(&bool)
 
+if config.key?('external-controller')
+  endpoint = config['external-controller'].to_s
+  host, port = endpoint.match?(/^\[[^\]]+\]:\d+$/) ? endpoint.match(/^\[([^\]]+)\]:(\d+)$/).captures : endpoint.match(/^([^:]+):(\d+)$/)&.captures
+  fail.call('external-controller must be host:port or [ipv6]:port') unless host && port
+  fail.call('external-controller port is invalid') unless port.to_i.between?(1, 65535)
+end
+
+cors = config['external-controller-cors']
+if cors.is_a?(Hash)
+  origins = Array(cors['allow-origins'])
+  fail.call('external-controller-cors must not use wildcard origins') if origins.include?('*')
+end
+
 if config.key?('mode')
   fail.call('mode is invalid') unless %w[rule global direct script].include?(config['mode'].to_s)
 end
@@ -108,6 +121,11 @@ if dns
   if respect && Array(dns['proxy-server-nameserver']).empty?
     fail.call('dns.proxy-server-nameserver is required when dns.respect-rules is enabled')
   end
+  fail.call('dns.ipv6 cannot be enabled while top-level ipv6 is disabled') if dns['ipv6'] == true && config['ipv6'] == false
+  if dns['enable'] == true
+    listen = dns['listen'].to_s
+    fail.call('dns.listen is required when DNS is enabled') if listen.empty?
+  end
 end
 
 tun = config['tun']
@@ -116,6 +134,7 @@ if tun
   if tun.key?('stack')
     fail.call('tun.stack is invalid') unless %w[system gvisor mixed].include?(tun['stack'].to_s)
   end
+  warn 'tun.auto-route and tun.auto-redirect are both enabled; ensure Mihomo is the only TUN firewall owner' if tun['auto-route'] == true && tun['auto-redirect'] == true
 end
 
 puts 'semantic validation passed'

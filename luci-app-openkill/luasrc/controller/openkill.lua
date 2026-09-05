@@ -134,7 +134,10 @@ else
 end
 
 local function is_running()
-	return SYS.call("pidof clash >/dev/null") == 0
+	-- A process name is not stable across Mihomo builds (clash, mihomo or
+	-- clash_meta).  Use the shared API health probe so the UI only reports a
+	-- ready core when the controller is actually reachable.
+	return SYS.call("[ -r /usr/share/openkill/runtime.sh ] && . /usr/share/openkill/runtime.sh && openkill_core_ready") == 0
 end
 
 local CONFIG_PATH_PREFIX = "/etc/openkill/config/"
@@ -170,6 +173,20 @@ end
 
 local function db_foward_ssl()
 	return fs.uci_get_config("config", "dashboard_forward_ssl") or 0
+end
+
+local function installed_dashboard()
+	local selected = fs.uci_get_config("config", "default_dashboard")
+	local candidates = { "metacubexd", "zashboard", "yacd", "dashboard" }
+	if selected and fs.isdirectory("/usr/share/openkill/ui/" .. selected) then
+		return selected
+	end
+	for _, name in ipairs(candidates) do
+		if fs.isdirectory("/usr/share/openkill/ui/" .. name) then
+			return name
+		end
+	end
+	return ""
 end
 
 local function coremodel()
@@ -1327,10 +1344,7 @@ end
 function action_dashboard_type()
 	local dashboard_type = fs.uci_get_config("config", "dashboard_type") or "Official"
 	local yacd_type = fs.uci_get_config("config", "yacd_type") or "Official"
-	local default_dashboard = fs.uci_get_config("config", "default_dashboard") or ""
-	if not fs.isdirectory("/usr/share/openkill/ui/" .. default_dashboard) then
-		default_dashboard = ""
-	end
+	local default_dashboard = installed_dashboard()
 	HTTP.prepare_content("application/json")
 	HTTP.write_json({
 		dashboard_type = dashboard_type,
@@ -1459,7 +1473,8 @@ end
 
 function action_conn_status(internal)
 	local data = {
-		clash = uci:get("openkill", "config", "enable") == "1",
+		clash = is_running(),
+		service_enabled = fs.uci_get_config("config", "enable") == "1",
 		daip = daip(),
 		dase = dase(),
 		db_foward_port = db_foward_port(),
@@ -1480,6 +1495,8 @@ function action_status()
 	local result = {
 		-- status fields
 		clash = status_data.clash,
+		core_ready = status_data.clash,
+		service_enabled = status_data.service_enabled,
 		daip = status_data.daip,
 		dase = status_data.dase,
 		db_foward_port = status_data.db_foward_port,
@@ -4213,13 +4230,13 @@ function action_oc_action()
 			return
 		end
 
-		if uci:get("openkill", "config", "config_path") ~= config_path then
+		if fs.uci_get_config("config", "config_path") ~= config_path then
 			uci:set("openkill", "config", "config_path", config_path)
 		end
 	end
 
 	if action == "start" then
-		if uci:get("openkill", "config", "enable") ~= "1" then
+		if fs.uci_get_config("config", "enable") ~= "1" then
 			uci:set("openkill", "config", "enable", "1")
 			uci:commit("openkill")
 		end
@@ -4230,14 +4247,14 @@ function action_oc_action()
 			SYS.call("/etc/init.d/openkill restart >/dev/null 2>&1")
 		end
 	elseif action == "stop" then
-		if uci:get("openkill", "config", "enable") ~= "0" then
+		if fs.uci_get_config("config", "enable") ~= "0" then
 			uci:set("openkill", "config", "enable", "0")
 			uci:commit("openkill")
 		end
 		kill_process()
 		SYS.call("/etc/init.d/openkill stop >/dev/null 2>&1")
 	elseif action == "restart" then
-		if uci:get("openkill", "config", "enable") ~= "1" then
+		if fs.uci_get_config("config", "enable") ~= "1" then
 			uci:set("openkill", "config", "enable", "1")
 			uci:commit("openkill")
 		end

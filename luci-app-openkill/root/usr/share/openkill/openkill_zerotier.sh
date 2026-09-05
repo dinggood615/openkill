@@ -5,10 +5,12 @@
 
 set -u
 
-enabled="$(uci -q get openkill.config.feature_zerotier 2>/dev/null || printf '0')"
-network_id="$(uci -q get openkill.config.zerotier_network_id 2>/dev/null || true)"
-interface_name="$(uci -q get openkill.config.zerotier_interface 2>/dev/null || printf 'zt0')"
-auto_start="$(uci -q get openkill.config.zerotier_auto_start 2>/dev/null || printf '0')"
+. /usr/share/openkill/uci.sh
+
+enabled="$(uci_get_config "feature_zerotier" || printf '0')"
+network_id="$(uci_get_config "zerotier_network_id" || true)"
+interface_name="$(uci_get_config "zerotier_interface" || printf 'zt0')"
+auto_start="$(uci_get_config "zerotier_auto_start" || printf '0')"
 ztcli="$(command -v zerotier-cli 2>/dev/null || true)"
 service="/etc/init.d/zerotier"
 

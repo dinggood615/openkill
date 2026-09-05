@@ -1444,7 +1444,7 @@ o.write = function()
 end
 
 ---- Dashboard Settings
-local cn_port=SYS.exec("uci get openkill.config.cn_port 2>/dev/null |tr -d '\n'")
+local cn_port=fs.uci_get_config("config", "cn_port") or "9090"
 o = s:taboption("dashboard", Value, "cn_port")
 o.title = translate("Dashboard Port")
 o.default = "9090"

@@ -167,16 +167,20 @@ EOF
             ;;
     esac
 
-    output="$($CORE -t -d /etc/openkill -f "$probe_file" 2>&1 || true)"
+    status=0
+    output="$($CORE -t -d /etc/openkill -f "$probe_file" 2>&1)" || status=$?
     rm -f "$probe_file" 2>/dev/null || true
-    # A semantic error (for example a deliberately unreachable endpoint) still
+    # A semantic error (for example a deliberately incomplete endpoint) still
     # proves that the parser understands the field.  Only explicit unknown,
     # unsupported, or unmarshal errors mean that the capability is absent.
     if printf '%s\n' "$output" | grep -Eiq \
         'unknown field|field .* not found|unsupported.*(type|field)|cannot unmarshal|yaml: unmarshal|unknown proxy type'; then
         printf '%s\n' "0"
-    else
+    elif [ "$status" -eq 0 ] || printf '%s\n' "$output" | grep -Eiq \
+        'missing|required|invalid|must be|connect|network|endpoint|private.key|public.key'; then
         printf '%s\n' "1"
+    else
+        printf '%s\n' "0"
     fi
 }
 

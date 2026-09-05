@@ -36,12 +36,21 @@ normalize_bind_address()
       127.0.0.1|0.0.0.0)
          resolved="$requested"
          ;;
+      \[*\])
+         resolved="${requested#\[}"
+         resolved="${resolved%\]}"
+         ;;
+      *:*)
+         # Explicit IPv6 controller addresses are accepted.  The endpoint is
+         # bracketed only when it is written to external-controller below.
+         resolved="$requested"
+         ;;
       *)
          resolved="127.0.0.1"
          ;;
    esac
    case "$resolved" in
-      *[!0-9.]*) resolved="127.0.0.1" ;;
+      *[!0-9.:a-fA-F]*) resolved="127.0.0.1" ;;
    esac
    printf '%s' "$resolved"
 }
@@ -440,6 +449,12 @@ begin
    tun_strict_route = '$tun_strict_route' == '1'
    tun_endpoint_independent_nat = '$tun_endpoint_independent_nat' == '1'
 
+   # IPv6 child options are subordinate to the master switch.
+   unless enable_ipv6
+      ipv6_mode = '0'
+      dns_ipv6 = false
+   end
+
    enable_custom_dns = '$enable_custom_dns' == '1'
    append_wan_dns = '$append_wan_dns' == '1'
    custom_fakeip_filter = '$custom_fakeip_filter' == '1'
@@ -484,7 +499,8 @@ begin
          # exposing every interface.  An explicit 0.0.0.0 remains available
          # for users who need WAN/API access and is validated by the UI.
          Value['allow-lan'] = (dashboard_bind_address != '127.0.0.1')
-         Value['external-controller'] = dashboard_bind_address + ':' + controller_port
+         controller_host = dashboard_bind_address.include?(':') && !dashboard_bind_address.start_with?('[') ? '[' + dashboard_bind_address + ']' : dashboard_bind_address
+         Value['external-controller'] = controller_host + ':' + controller_port
          Value['secret'] = secret
          Value['bind-address'] = dashboard_bind_address
          Value['global-ua'] = global_ua if global_ua != '0'
@@ -524,19 +540,29 @@ begin
           Value['find-process-mode'] = (find_process_mode == '0' ? 'off' : find_process_mode)
 
          (Value['experimental'] ||= {})['quic-go-disable-gso'] = true if quic_gso
+         def origin_variants(origin)
+            raw = origin.to_s.strip
+            return [] if raw.empty? || raw == '0'
+            return [raw] if raw.start_with?('http://', 'https://')
+            ["http://#{raw}", "https://#{raw}"]
+         end
          if cors_origin != '0'
-            (Value['external-controller-cors'] ||= {})['allow-origins'] = [cors_origin]
+            (Value['external-controller-cors'] ||= {})['allow-origins'] = origin_variants(cors_origin)
             Value['external-controller-cors']['allow-private-network'] = true
          else
             # Keep browser dashboards functional on LAN without a wildcard
-            # CORS policy.  The loopback origin is useful for local LuCI.
-            origins = [
-               'http://' + dashboard_bind_address + ':' + controller_port,
-               'http://' + dashboard_bind_address
-            ]
+            # policy.  Include both schemes for HTTP and HTTPS LuCI access.
+            cors_host = dashboard_bind_address.include?(':') && !dashboard_bind_address.start_with?('[') ? '[' + dashboard_bind_address + ']' : dashboard_bind_address
+            origins = []
+            ['http', 'https'].each do |scheme|
+               origins << scheme + '://' + cors_host + ':' + controller_port
+               origins << scheme + '://' + cors_host
+            end
             unless dashboard_bind_address == '127.0.0.1'
-               origins << 'http://127.0.0.1:' + controller_port
-               origins << 'http://127.0.0.1'
+               ['http', 'https'].each do |scheme|
+                  origins << scheme + '://127.0.0.1:' + controller_port
+                  origins << scheme + '://127.0.0.1'
+               end
             end
             (Value['external-controller-cors'] ||= {})['allow-origins'] = origins.uniq
             Value['external-controller-cors']['allow-private-network'] = true
@@ -567,7 +593,6 @@ begin
 
           Value['dns']['enable'] = true
           Value['dns']['ipv6'] = dns_ipv6
-          Value['ipv6'] = true if dns_ipv6
           Value['dns']['prefer-h3'] = false
           Value['dns']['cache-algorithm'] = 'arc'
           Value['dns']['ipv6-timeout'] = 100 if !Value['dns'].key?('ipv6-timeout')
@@ -603,9 +628,11 @@ begin
          end
 
          if en_mode_tun != '0' || ['2', '3'].include?(ipv6_mode)
+            tun_stack = stack_type
+            tun_stack = '${12}' if en_mode_tun == '0' && ['2', '3'].include?(ipv6_mode) && '${12}' != '0' && '${12}' != ''
             Value['tun'] = {
-               'enable' => true, 'stack' => stack_type, 'device' => 'utun',
-               'dns-hijack' => ['127.0.0.1:53'],
+               'enable' => true, 'stack' => tun_stack, 'device' => 'utun',
+               'dns-hijack' => [dns_listen_address + ':' + dns_listen_port],
                'endpoint-independent-nat' => tun_endpoint_independent_nat,
                # auto keeps firewall ownership with OpenKill.  Explicit 1 is
                # offered for installations that delegate routing to Mihomo.

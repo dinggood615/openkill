@@ -6,6 +6,7 @@
 . /lib/functions/procd.sh
 . /usr/share/openkill/openkill_curl.sh
 . /usr/share/openkill/uci.sh
+. /usr/share/openkill/runtime.sh
 
 set_lock() {
    exec 889>"/tmp/lock/openkill_subs.lock" 2>/dev/null
@@ -225,7 +226,7 @@ config_error()
 
 change_dns()
 {
-   if pidof clash >/dev/null; then
+   if openkill_core_process_present; then
       /etc/init.d/openkill reload "restore" >/dev/null 2>&1
       procd_send_signal "openkill" "openkill-watchdog" CONT
    fi
@@ -233,7 +234,7 @@ change_dns()
 
 config_download_direct()
 {
-   if pidof clash >/dev/null && [ "$router_self_proxy" = 1 ]; then
+   if openkill_core_process_present && [ "$router_self_proxy" = 1 ]; then
       kill_streaming_unlock
       procd_send_signal "openkill" "openkill-watchdog" STOP
       /etc/init.d/openkill reload "revert" >/dev/null 2>&1

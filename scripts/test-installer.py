@@ -43,7 +43,10 @@ grep -q -- '-f mirror update' "$WORK_DIR/calls"
 grep -q -- '-f mirror install curl' "$WORK_DIR/calls"
 grep -q -- '-f mirror install local.ipk' "$WORK_DIR/calls"
 """
-        subprocess.run([BASH, "-c", harness], check=True)
+        # Feed the harness through stdin.  Passing the expanded installer
+        # helpers as a Windows command-line argument breaks quoting once the
+        # feed de-duplication logic grows beyond the old short snippet.
+        subprocess.run([BASH], input=harness, text=True, check=True)
 
     def test_vendor_feed_is_never_rewritten(self):
         self.assertIn("dl.openwrt.ai must remain unchanged", SOURCE)
@@ -64,7 +67,7 @@ chosen=$(select_newest_manifest "$WORK_DIR/rows")
 [ "$(printf '%s\n' "$chosen" | sed -n '1p')" = 2 ]
 [ "$(printf '%s\n' "$chosen" | sed -n '2p')" = https://raw.example.invalid ]
 '''
-        subprocess.run([BASH, "-c", harness], check=True)
+        subprocess.run([BASH], input=harness, text=True, check=True)
 
     def test_manifest_resolution_has_cache_busting_and_api_freshness_fallback(self):
         self.assertIn("openkill_cache_bust=", SOURCE)

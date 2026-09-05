@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-openkill
-PKG_VERSION:=2026-1061
+PKG_VERSION:=2026-1070
 PKG_MAINTAINER:=dinggood615 <https://github.com/dinggood615/openkill>
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
@@ -43,7 +43,7 @@ define Package/$(PKG_NAME)
 	TITLE:=LuCI support for OpenKill
 	PKGARCH:=all
 	DEPENDS:=+dnsmasq-full +bash +curl +ca-bundle +ip-full +lua \
-	+ruby +ruby-yaml +luci-compat +kmod-tun +unzip
+	+ruby +ruby-yaml +luci-compat +kmod-tun +kmod-inet-diag +unzip
 	MAINTAINER:=dinggood615
 endef
 
@@ -83,12 +83,17 @@ endef
 
 define Package/$(PKG_NAME)/postinst
 #!/bin/sh
+	if [ -z "$${IPKG_INSTROOT}" ]; then
+		[ -x /usr/share/openkill/openkill_config_normalize.sh ] && /usr/share/openkill/openkill_config_normalize.sh >/dev/null 2>&1 || true
+		rm -f /tmp/openkill.change /tmp/openkill/openkill.change /tmp/openkill/capabilities.env >/dev/null 2>&1 || true
+		rm -rf /tmp/luci-indexcache /tmp/luci-indexcache.* /tmp/luci-modulecache /var/luci-modulecache >/dev/null 2>&1 || true
+	fi
 	exit 0
 endef
 
 define Package/$(PKG_NAME)/prerm
 #!/bin/sh
-	[ -n "$(pidof clash)" ] && /etc/init.d/openkill stop 2>/dev/null
+	[ -x /etc/init.d/openkill ] && /etc/init.d/openkill stop 2>/dev/null || true
 	if [ -f "/etc/config/openkill" ] && [ ! -f "/tmp/openkill.bak" ]; then
 		cp -f "/etc/config/openkill" "/tmp/openkill.bak" >/dev/null 2>&1
 		cp -rf "/etc/openkill" "/tmp/openkill" >/dev/null 2>&1
@@ -123,6 +128,7 @@ define Package/$(PKG_NAME)/postrm
 	rm -rf /www/luci-static/resources/openkill >/dev/null 2>&1
 	rm -rf /tmp/openkill_version_history_* >/dev/null 2>&1
 	rm -rf /tmp/openkill_cdn_info_* >/dev/null 2>&1
+	rm -rf /tmp/openkill >/dev/null 2>&1
 	sed -i '/OpenKill Append/,/OpenKill Append End/d' "/usr/lib/lua/luci/model/network.lua" >/dev/null 2>&1
 	sed -i '/.*kB maximum content size*/c\HTTP_MAX_CONTENT      = 1024*100		-- 100 kB maximum content size' /usr/lib/lua/luci/http.lua >/dev/null 2>&1
 	sed -i '/.*kB maximum content size*/c\export let HTTP_MAX_CONTENT = 1024*100;		// 100 kB maximum content size' /usr/share/ucode/luci/http.uc >/dev/null 2>&1

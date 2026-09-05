@@ -4901,3 +4901,51 @@ msgstr "AmneziaWG j3"
 
 msgid "AmneziaWG itime"
 msgstr "AmneziaWG itime"
+
+msgid "Auto keeps route ownership with OpenKill firewall; enable only when Mihomo should install routes itself."
+msgstr "自动模式由 OpenKill 防火墙负责路由；仅在需要由 Mihomo 自行安装路由时启用。"
+
+msgid "Automatic (OpenKill firewall)"
+msgstr "自动（由 OpenKill 防火墙管理）"
+
+msgid "Mihomo manages routes"
+msgstr "由 Mihomo 管理路由"
+
+msgid "Leave automatic to avoid duplicate firewall redirects on older or vendor firmware."
+msgstr "建议保持自动，避免旧版或厂商固件重复创建防火墙重定向。"
+
+msgid "Mihomo manages redirect"
+msgstr "由 Mihomo 管理重定向"
+
+msgid "Let Mihomo select the active uplink interface; recommended for multi-WAN and IPv6 networks."
+msgstr "让 Mihomo 自动选择当前上行接口；适用于多 WAN 和 IPv6 网络。"
+
+msgid "Drop traffic that cannot be resolved through the TUN route. Keep disabled for maximum compatibility."
+msgstr "丢弃无法通过 TUN 路由解析的流量；为保证兼容性建议关闭。"
+
+msgid "Adds NAT mapping work; enable only when a UDP application requires endpoint-independent mapping."
+msgstr "会增加 NAT 映射开销；仅在 UDP 应用需要端点独立映射时启用。"
+
+msgid "Controller Listen Scope"
+msgstr "控制器监听范围"
+
+msgid "LAN address (recommended)"
+msgstr "LAN 地址（推荐）"
+
+msgid "LAN binds to the router LAN address; loopback keeps the API local. Avoid exposing the controller on WAN."
+msgstr "绑定路由器 LAN 地址；回环地址只允许本机访问。请勿将控制器暴露到 WAN。"
+
+msgid "DNS Listen Address"
+msgstr "DNS 监听地址"
+
+msgid "Keep the Mihomo DNS listener on loopback when dnsmasq redirects local queries."
+msgstr "使用 dnsmasq 重定向本地查询时，建议将 Mihomo DNS 监听保持在回环地址。"
+
+msgid "Local device only (recommended)"
+msgstr "仅本机访问（推荐）"
+
+msgid "Run local-network and IPv6 route maintenance on the first cycle and then at this interval; a larger value lowers background load."
+msgstr "首次运行并按此间隔维护本地网络和 IPv6 路由；间隔越大，后台负载越低。"
+
+msgid "Resolve AAAA records through the configured DNS path. Enable only when the router has a working IPv6 route; the local YAML keeps a short IPv6 fallback window."
+msgstr "通过配置的 DNS 路径解析 AAAA 记录；仅在路由器 IPv6 路由正常时启用，本地 YAML 会保留较短的 IPv6 回退窗口。"

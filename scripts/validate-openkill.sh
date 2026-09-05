@@ -12,6 +12,7 @@ need_file() { [ -f "$ROOT_DIR/$1" ] || fail "missing file: $1"; }
 for file in \
   luci-app-openkill/Makefile \
   scripts/install-openkill.sh \
+  scripts/check-openkill-i18n.sh \
   luci-app-openkill/root/etc/init.d/openkill \
   luci-app-openkill/root/usr/share/openkill/openkill_core.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_update.sh \
@@ -21,6 +22,9 @@ for file in \
   luci-app-openkill/root/usr/share/openkill/openkill_semantic_check.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_capabilities.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_zerotier.sh \
+  luci-app-openkill/root/usr/share/openkill/runtime.sh \
+  luci-app-openkill/root/usr/share/openkill/openkill_config_normalize.sh \
+  luci-app-openkill/root/usr/share/openkill/dependencies.conf \
   luci-app-openkill/root/usr/share/openkill/yml_proxys_get.sh \
   luci-app-openkill/root/usr/share/openkill/yml_proxys_set.sh \
   luci-app-openkill/luasrc/model/cbi/openkill/settings.lua \
@@ -33,6 +37,7 @@ done
 
 for file in \
   "$ROOT_DIR/scripts/install-openkill.sh" \
+  "$ROOT_DIR/scripts/check-openkill-i18n.sh" \
   "$ROOT_DIR/luci-app-openkill/root/etc/init.d/openkill" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_core.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_update.sh" \
@@ -42,11 +47,15 @@ for file in \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_semantic_check.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_capabilities.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_zerotier.sh" \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/runtime.sh" \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_config_normalize.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/yml_proxys_get.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/yml_proxys_set.sh" \
   "$ROOT_DIR/luci-app-openkill/root/etc/uci-defaults/luci-openkill"; do
   sh -n "$file" || fail "shell syntax error: ${file#$ROOT_DIR/}"
 done
+
+sh "$ROOT_DIR/scripts/check-openkill-i18n.sh" >/dev/null || fail 'Chinese UI catalog validation failed'
 
 pkg_version=$(sed -n 's/^PKG_VERSION:=//p' "$ROOT_DIR/luci-app-openkill/Makefile" | head -n 1)
 project_version=$(sed -n 's/^PROJECT_VERSION="\([^"]*\)"/\1/p' "$ROOT_DIR/scripts/install-openkill.sh" | head -n 1)
@@ -69,6 +78,22 @@ done
 if grep -Eq '^[[:space:]]*\+ruby-json([[:space:]]|$)' "$ROOT_DIR/luci-app-openkill/Makefile"; then
   fail 'ruby-json is still a hard package dependency'
 fi
+
+for file in \
+  "$ROOT_DIR/luci-app-openkill/root/etc/init.d/openkill" \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_watchdog.sh" \
+  "$ROOT_DIR/luci-app-openkill/luasrc/controller/openkill.lua"; do
+  if grep -Fq 'pidof clash' "$file"; then
+    fail "legacy clash-only health check remains in ${file#$ROOT_DIR/}"
+  fi
+done
+
+grep -Fq 'openkill_core_ready' "$ROOT_DIR/luci-app-openkill/luasrc/controller/openkill.lua" \
+  || fail 'controller API readiness check is missing'
+grep -Fq 'openkill_config_normalize.sh' "$ROOT_DIR/luci-app-openkill/root/etc/init.d/openkill" \
+  || fail 'UCI normalization hook is missing'
+grep -Fq 'OPENKILL_REQUIRED_COMMON' "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/dependencies.conf" \
+  || fail 'dependency manifest is missing'
 
 # Feed routing and Mihomo delivery must remain both ABI-safe and verifiable.
 if ! grep -Fq 'dl.openwrt.ai must remain unchanged' "$ROOT_DIR/scripts/install-openkill.sh"; then

@@ -3281,12 +3281,17 @@
                         url = 'http://' + window.location.hostname + ':' + currentStatus.cn_port + '/ui/' + panel;
                     }
 
+                    var panelHost = currentStatus.daip && window.location.hostname == currentStatus.daip ? window.location.hostname : (currentStatus.db_foward_domain || window.location.hostname);
+                    var panelPort = currentStatus.daip && window.location.hostname == currentStatus.daip ? currentStatus.cn_port : (currentStatus.db_foward_port || currentStatus.cn_port);
+                    var encodedHost = encodeURIComponent(panelHost);
+                    var encodedPort = encodeURIComponent(panelPort);
+                    var encodedSecret = currentStatus.dase ? '&secret=' + encodeURIComponent(currentStatus.dase) : '';
                     if (panel === 'zashboard' || panel === 'metacubexd') {
-                        url += '/#/setup?hostname=' + (currentStatus.daip && window.location.hostname == currentStatus.daip ? window.location.hostname : (currentStatus.db_foward_domain || window.location.hostname)) + '&port=' + (currentStatus.daip && window.location.hostname == currentStatus.daip ? currentStatus.cn_port : (currentStatus.db_foward_port || currentStatus.cn_port)) + (currentStatus.dase ? '&secret=' + currentStatus.dase : '');
+                        url += '/#/setup?hostname=' + encodedHost + '&port=' + encodedPort + encodedSecret;
                     } else if (panel === 'yacd') {
-                        url += '/?hostname=' + (currentStatus.daip && window.location.hostname == currentStatus.daip ? window.location.hostname : (currentStatus.db_foward_domain || window.location.hostname)) + '&port=' + (currentStatus.daip && window.location.hostname == currentStatus.daip ? currentStatus.cn_port : (currentStatus.db_foward_port || currentStatus.cn_port)) + (currentStatus.dase ? '&secret=' + currentStatus.dase : '');
+                        url += '/?hostname=' + encodedHost + '&port=' + encodedPort + encodedSecret;
                     } else if (panel === 'dashboard') {
-                        url += '/#/?host=' + (currentStatus.daip && window.location.hostname == currentStatus.daip ? window.location.hostname : (currentStatus.db_foward_domain || window.location.hostname)) + '&port=' + (currentStatus.daip && window.location.hostname == currentStatus.daip ? currentStatus.cn_port : (currentStatus.db_foward_port || currentStatus.cn_port)) + (currentStatus.dase ? '&secret=' + currentStatus.dase : '');
+                        url += '/#/?host=' + encodedHost + '&port=' + encodedPort + encodedSecret;
                     }
 
                     ocCopyToClipboard(url, DOMCache.copy_address, '<%:Control panel address copied:%> ', '<%:Copy failed, please copy manually:%>');
