@@ -9,17 +9,30 @@ OpenKill 是基于 OpenClash 源码的 OpenWrt 客户端项目。
 
 许可：本项目遵循 [MIT License](LICENSE)，并保留上游 OpenClash 及相关组件的版权声明。
 
-安装、更新、卸载统一使用下面这一条指令；不带参数时会显示菜单：
+安装、更新、卸载统一使用下面这一条入口；每条命令单独列出，GitHub 代码块右上角可直接复制：
+
+菜单模式（选择安装、更新或卸载）：
 
 ```sh
-# 菜单模式：选择安装、更新或卸载
 curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/scripts/install-openkill.sh | sh
+```
 
-# 自动化模式：同一入口追加操作参数
-curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/scripts/install-openkill.sh | sh -s -- --install   # 安装/修复
-curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/scripts/install-openkill.sh | sh -s -- --update    # 更新软件包和内核
-curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/scripts/install-openkill.sh | sh -s -- --uninstall  # 卸载并清理
+安装或修复：
 
+```sh
+curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/scripts/install-openkill.sh | sh -s -- --install
+```
+
+更新软件包和内核：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/scripts/install-openkill.sh | sh -s -- --update
+```
+
+卸载并清理：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/scripts/install-openkill.sh | sh -s -- --uninstall
 ```
 
 更新统一使用 `--update`，会更新 OpenKill 软件包并安装/更新官方稳定 Meta（Mihomo）内核。
