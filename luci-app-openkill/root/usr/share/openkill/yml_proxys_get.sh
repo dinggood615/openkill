@@ -1532,6 +1532,14 @@ ruby -ryaml -rYAML -I "/usr/share/openkill" -E UTF-8 -e "
 
              if x['type'] == 'masque' then
                threads << Thread.new{
+               #sni
+               if x.key?('sni') then
+                  sni = x['sni'].to_s.gsub(%r{[\x22\x27\x3b\x5c\x60]}, '')
+                  uci_commands << uci_set + 'sni=\"' + sni + '\"'
+               end
+               };
+
+               threads << Thread.new{
                #private-key
                if x.key?('private-key') then
                   uci_commands << uci_set + 'masque_private_key=\"' + x['private-key'].to_s + '\"'

@@ -1879,6 +1879,11 @@ cat >> "$SERVER_FILE" <<-EOF
     server: "$server"
     port: $port
 EOF
+    if [ -n "$sni" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+    sni: "$sni"
+EOF
+    fi
     if [ -n "$masque_private_key" ]; then
 cat >> "$SERVER_FILE" <<-EOF
     private-key: "$masque_private_key"
