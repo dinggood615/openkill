@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1051"
+PROJECT_VERSION="2026-1052"
 ACTION=install
 PACKAGE_FILE=""
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
@@ -397,6 +397,14 @@ select_newest_manifest(){
   ' "$1"
 }
 
+version_greater(){
+  ruby -e '
+    a=ARGV[0].split("-").map(&:to_i)
+    b=ARGV[1].split("-").map(&:to_i)
+    exit(a > b ? 0 : 1)
+  ' "$1" "$2"
+}
+
 resolve_package(){
   step "Resolving the latest published OpenKill $EXT package"
   manifest="$WORK_DIR/latest.json"
@@ -448,12 +456,27 @@ resolve_package(){
   else
     : > "$WORK_DIR/metadata"
   fi
-  # Older package channels may not contain a manifest yet.  Query the release
-  # API as a fallback so a newly published package is installable immediately.
-  if [ ! -s "$WORK_DIR/metadata" ]; then
+  # A valid CDN manifest may still lag behind the package branch.  When the
+  # selected record is older than this installer, query the GitHub Releases API
+  # as an independent freshness check and replace it only when a newer release
+  # is found.  If all API routes are unavailable, the validated manifest remains
+  # a safe offline fallback.
+  manifest_version=""
+  [ ! -s "$WORK_DIR/metadata" ] || manifest_version=$(sed -n '1p' "$WORK_DIR/metadata")
+  query_release_api=0
+  if [ -z "$manifest_version" ] || version_greater "$PROJECT_VERSION" "$manifest_version"; then
+    query_release_api=1
+    [ -z "$manifest_version" ] || detail "Manifest v$manifest_version is behind installer v$PROJECT_VERSION; checking release APIs"
+  fi
+  if [ "$query_release_api" -eq 1 ]; then
     release_json="$WORK_DIR/releases.json"
-    for api in "https://api.github.com/repos/$REPO/releases?per_page=30" "https://ghfast.top/https://api.github.com/repos/$REPO/releases?per_page=30"; do
-      if download "$api" "$release_json" 15 >/dev/null 2>&1; then
+    best_release_version="$manifest_version"
+    for api in \
+      "https://api.github.com/repos/$REPO/releases?per_page=30" \
+      "https://ghfast.top/https://api.github.com/repos/$REPO/releases?per_page=30" \
+      "https://github.dpik.top/https://api.github.com/repos/$REPO/releases?per_page=30" \
+      "https://gh-proxy.com/https://api.github.com/repos/$REPO/releases?per_page=30"; do
+      if download "$api" "$release_json" 10 >/dev/null 2>&1; then
         if ruby -rjson -e '
           begin
             releases=JSON.parse(File.read(ARGV[0]))
@@ -475,10 +498,15 @@ resolve_package(){
             exit 1
           end
         ' "$release_json" "$EXT" > "$WORK_DIR/release-metadata" && [ -s "$WORK_DIR/release-metadata" ]; then
-          # The first line is a normalized package-manager version; expose the
-          # public date-counter version in the same shape as channel manifests.
-          sed -n '2,5p' "$WORK_DIR/release-metadata" > "$WORK_DIR/metadata"
-          break
+          api_version=$(sed -n '2p' "$WORK_DIR/release-metadata")
+          if [ -z "$best_release_version" ] || version_greater "$api_version" "$best_release_version"; then
+            # The first line is a normalized package-manager version; expose the
+            # public date-counter version in the same shape as channel manifests.
+            sed -n '2,5p' "$WORK_DIR/release-metadata" > "$WORK_DIR/metadata"
+            best_release_version="$api_version"
+            manifest_source=""
+            detail "Release API found newer published $EXT version: v$api_version"
+          fi
         fi
       fi
     done

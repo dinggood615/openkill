@@ -64,6 +64,12 @@ chosen=$(select_newest_manifest "$WORK_DIR/rows")
 '''
         subprocess.run([BASH, "-c", harness], check=True)
 
+    def test_manifest_resolution_has_cache_busting_and_api_freshness_fallback(self):
+        self.assertIn("openkill_cache_bust=", SOURCE)
+        self.assertIn("version_greater()", SOURCE)
+        self.assertIn("github.dpik.top/https://api.github.com", SOURCE)
+        self.assertIn("gh-proxy.com/https://api.github.com", SOURCE)
+
     def test_core_uses_release_digest_and_no_invalid_jsdelivr_asset_path(self):
         self.assertIn('a["digest"]', CORE_SOURCE)
         self.assertIn('sha256sum "$PARTIAL_FILE"', CORE_SOURCE)
