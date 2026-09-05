@@ -68,6 +68,19 @@ if grep -Eq '^[[:space:]]*\+ruby-json([[:space:]]|$)' "$ROOT_DIR/luci-app-openki
   fail 'ruby-json is still a hard package dependency'
 fi
 
+# Feed routing and Mihomo delivery must remain both ABI-safe and verifiable.
+if ! grep -Fq 'dl.openwrt.ai must remain unchanged' "$ROOT_DIR/scripts/install-openkill.sh"; then
+  fail 'installer may rewrite vendor firmware feeds'
+fi
+if ! grep -Fq 'sha256sum "$PARTIAL_FILE"' \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_core.sh"; then
+  fail 'official Mihomo archive SHA256 verification is missing'
+fi
+if grep -Fq 'MetaCubeX/mihomo@${CORE_LV}' \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_core.sh"; then
+  fail 'invalid jsDelivr-style Mihomo release asset path remains'
+fi
+
 for needle in \
   'feature_h2c' 'feature_shadowquic' 'feature_masque' 'feature_amnezia_wg' \
   'feature_anytls_metadata' 'feature_bbr3' 'feature_zerotier' \

@@ -4,14 +4,19 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1042"
+PROJECT_VERSION="2026-1050"
 ACTION=install
 PACKAGE_FILE=""
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
 ORIGINAL_ARGS="$#"
 SOURCE_ROOT=""
+TOTAL_STEPS=8
+CURRENT_STEP=0
+INSTALL_LOG=""
 
-log(){ printf '\n==> %s\n' "$*"; }
+log(){ printf '\n==> %s\n' "$*"; [ -z "$INSTALL_LOG" ] || printf '==> %s\n' "$*" >> "$INSTALL_LOG"; }
+detail(){ printf '    %s\n' "$*"; [ -z "$INSTALL_LOG" ] || printf '    %s\n' "$*" >> "$INSTALL_LOG"; }
+step(){ CURRENT_STEP=$((CURRENT_STEP + 1)); printf '\n[%s/%s] %s\n' "$CURRENT_STEP" "$TOTAL_STEPS" "$*"; [ -z "$INSTALL_LOG" ] || printf '[%s/%s] %s\n' "$CURRENT_STEP" "$TOTAL_STEPS" "$*" >> "$INSTALL_LOG"; }
 die(){ printf 'Error: %s\n' "$*" >&2; exit 1; }
 usage(){ cat <<'EOF'
 OpenKill installer
@@ -46,6 +51,12 @@ if [ "$ORIGINAL_ARGS" -eq 0 ]; then
     ACTION=install
   fi
 fi
+if [ "$ACTION" = uninstall ]; then
+  TOTAL_STEPS=1
+elif [ -n "$PACKAGE_FILE" ]; then
+  # A supplied local package skips remote manifest resolution and download.
+  TOTAL_STEPS=6
+fi
 [ "$(id -u)" -eq 0 ] || die "Run as root"
 
 if command -v opkg >/dev/null 2>&1; then PM=opkg; EXT=ipk
@@ -55,6 +66,9 @@ else die "Neither opkg nor apk is available"; fi
 # Keep the selected repository configuration for update AND install.
 WORK_DIR=$(mktemp -d /tmp/openkill-install.XXXXXX)
 trap 'rm -rf "$WORK_DIR"' EXIT
+INSTALL_STAMP=$(date +%Y%m%d-%H%M%S 2>/dev/null || printf '%s' "$$")
+INSTALL_LOG="/tmp/openkill-install-${INSTALL_STAMP}.log"
+: > "$INSTALL_LOG" 2>/dev/null || INSTALL_LOG=""
 FEED_CONFIG=""
 pm_run(){
   if [ "$PM" = opkg ]; then
@@ -107,48 +121,106 @@ prepare_feeds(){
     FEED_CONFIG="$original"
     return 0
   fi
-  # Change only the official host; preserve firmware paths, ABI and custom feeds.
-  for mirror in https://mirrors.pku.edu.cn/openwrt https://mirrors.tuna.tsinghua.edu.cn/openwrt; do
-    candidate="$WORK_DIR/feeds-$(echo "$mirror" | tr '/:' '__')"
-    sed "s#https://downloads.openwrt.org/#$mirror/#g" "$original" > "$candidate"
-    cmp -s "$original" "$candidate" || FEED_CANDIDATES="$FEED_CANDIDATES $candidate"
-  done
+  # Only rewrite the official OpenWrt host. Vendor feeds such as
+  # dl.openwrt.ai must remain unchanged: a generic mirror may return a package
+  # with a different kernel ABI even when the path looks similar.
+  if grep -Eq 'https?://downloads\.openwrt\.org/' "$original"; then
+    for mirror in https://mirrors.pku.edu.cn/openwrt https://mirrors.tuna.tsinghua.edu.cn/openwrt; do
+      candidate="$WORK_DIR/feeds-$(echo "$mirror" | tr '/:' '__')"
+      sed -e "s#https://downloads.openwrt.org/#$mirror/#g" \
+          -e "s#http://downloads.openwrt.org/#$mirror/#g" "$original" > "$candidate"
+      cmp -s "$original" "$candidate" || FEED_CANDIDATES="$FEED_CANDIDATES $candidate"
+    done
+  else
+    detail "Firmware uses a vendor/custom feed; keeping its exact repository for ABI compatibility"
+  fi
   for candidate in $FEED_CANDIDATES; do
     FEED_CONFIG="$candidate"
+    detail "Refreshing dependency indexes: $candidate"
     if pm_run update > "$WORK_DIR/feeds.log" 2>&1; then
-      log "Dependency repository selected: $candidate"
+      [ -z "$INSTALL_LOG" ] || cat "$WORK_DIR/feeds.log" >> "$INSTALL_LOG"
+      log "Verified dependency repository: $candidate"
       return 0
     fi
+    [ -z "$INSTALL_LOG" ] || cat "$WORK_DIR/feeds.log" >> "$INSTALL_LOG"
   done
   cat "$WORK_DIR/feeds.log" >&2
   die "All compatible dependency repositories failed"
 }
-install_dependency(){
+is_installed(){
   dep="$1"
-  # json is bundled with the supported Ruby runtimes on several OpenWrt
-  # releases and has no standalone package there.  Treat the split package as
-  # optional when the interpreter already provides it.
-  if [ "$dep" = "ruby-json" ] && ruby -rjson -e 'exit 0' >/dev/null 2>&1; then return 0; fi
   if [ "$PM" = opkg ]; then
-    opkg status "$dep" 2>/dev/null | grep -q '^Status:.* installed$' && return 0
-    operation=install
+    opkg status "$dep" 2>/dev/null | grep -q '^Status:.* installed$'
   else
-    apk info -e "$dep" >/dev/null 2>&1 && return 0
-    operation=add
+    apk info -e "$dep" >/dev/null 2>&1
   fi
-  if pm_run "$operation" "$dep" > "$WORK_DIR/dependency.log" 2>&1; then return 0; fi
-  # A working index does not guarantee that package downloads work.
+}
+run_pm_transaction(){
+  transaction_log="$WORK_DIR/package-manager.log"
+  if pm_run "$@" >> "$transaction_log" 2>&1; then
+    [ -z "$INSTALL_LOG" ] || cat "$transaction_log" >> "$INSTALL_LOG"
+    return 0
+  fi
+  [ -z "$INSTALL_LOG" ] || cat "$transaction_log" >> "$INSTALL_LOG"
+  return 1
+}
+install_package_batch(){
+  packages="$*"
+  [ -n "$packages" ] || return 0
+  if [ "$PM" = opkg ]; then operation=install; else operation=add; fi
+  : > "$WORK_DIR/package-manager.log"
+  if run_pm_transaction "$operation" $packages; then return 0; fi
+  # A valid index does not guarantee that package archives are reachable. Retry
+  # the complete missing batch on each remaining compatible repository.
   for candidate in $FEED_CANDIDATES; do
     [ "$candidate" != "$FEED_CONFIG" ] || continue
     FEED_CONFIG="$candidate"
-    if pm_run update >> "$WORK_DIR/dependency.log" 2>&1 &&
-       pm_run "$operation" "$dep" >> "$WORK_DIR/dependency.log" 2>&1; then return 0; fi
+    detail "Retrying dependency download with: $candidate"
+    if pm_run update >> "$WORK_DIR/package-manager.log" 2>&1 &&
+       run_pm_transaction "$operation" $packages; then return 0; fi
   done
-  cat "$WORK_DIR/dependency.log" >&2
+  cat "$WORK_DIR/package-manager.log" >&2
   return 1
 }
+package_available(){
+  dep="$1"
+  if [ "$PM" = opkg ]; then
+    pm_run list "$dep" 2>/dev/null | grep -q "^$dep "
+  else
+    pm_run search -x "$dep" >/dev/null 2>&1
+  fi
+}
+install_dependency_set(){
+  set_title="$1"
+  set_required="$2"
+  set_packages="$3"
+  missing_packages=""
+  total_packages=0
+  installed_packages=0
+  for dep in $set_packages; do
+    total_packages=$((total_packages + 1))
+    if is_installed "$dep"; then
+      installed_packages=$((installed_packages + 1))
+    else
+      missing_packages="$missing_packages $dep"
+    fi
+  done
+  detail "$set_title: $installed_packages/$total_packages already available"
+  [ -n "$missing_packages" ] || return 0
+  [ -n "$FEED_CONFIG" ] || prepare_feeds
+  detail "Installing $set_title:$missing_packages"
+  if install_package_batch $missing_packages; then
+    for dep in $missing_packages; do
+      is_installed "$dep" || die "Dependency installation did not complete: $dep"
+    done
+    return 0
+  fi
+  [ "$set_required" = required ] && die "Required dependencies could not be installed:$missing_packages"
+  detail "Optional compatibility packages unavailable:$missing_packages"
+  return 0
+}
 install_dependencies(){
-  log "Installing OpenKill runtime dependencies"
+  step "Checking and installing OpenKill runtime dependencies"
   if [ "$PM" = opkg ]; then
     required="bash curl ca-bundle ip-full ruby ruby-yaml lua kmod-tun unzip dnsmasq-full luci-compat"
     optional="ruby-json ruby-base64 ruby-psych ruby-pstore kmod-inet-diag"
@@ -166,48 +238,50 @@ install_dependencies(){
   # otherwise add minutes before the actual package download starts.
   need_feed=0
   for dep in $required; do
-    if [ "$PM" = opkg ]; then
-      opkg status "$dep" 2>/dev/null | grep -q '^Status:.* installed$' || { need_feed=1; break; }
-    else
-      apk info -e "$dep" >/dev/null 2>&1 || { need_feed=1; break; }
-    fi
+    is_installed "$dep" || { need_feed=1; break; }
   done
   if [ "$need_feed" -eq 1 ]; then
     prepare_feeds
   else
     FEED_CONFIG=""
-    log "Required dependencies already installed; feed refresh skipped"
+    detail "All required dependencies are installed; index refresh skipped"
   fi
-  for dep in $required; do install_dependency "$dep" || die "Required dependency could not be installed: $dep"; done
-  # Split Ruby modules are optional when the interpreter already provides the
-  # feature.  Only query their package names when a required dependency made
-  # a feed refresh necessary.
- if [ "$need_feed" -eq 1 ]; then
-   for dep in $optional; do install_dependency "$dep" || log "Optional dependency unavailable: $dep"; done
- fi
- # YAML and JSON are required for configuration and the release manifest.
+  install_dependency_set "required runtime dependencies" required "$required"
+  # YAML and JSON are required for configuration and the release manifest.
   if ! ruby -ryaml -rjson -e 'exit 0' >/dev/null 2>&1; then
-    # Some firmware splits JSON/Base64/Psych/PStore into optional packages.
-    # Retry those packages only when the interpreter really lacks a module;
-    # this keeps the common already-installed path network-free.
-    [ "$need_feed" -eq 1 ] || prepare_feeds
-    for dep in $optional; do install_dependency "$dep" || log "Optional dependency unavailable: $dep"; done
+    [ -n "$FEED_CONFIG" ] || prepare_feeds
+    available_optional=""
+    for dep in $optional; do
+      if package_available "$dep"; then available_optional="$available_optional $dep"
+      else detail "Compatibility package is not supplied by this firmware: $dep"; fi
+    done
+    install_dependency_set "Ruby and diagnostic compatibility modules" optional "$available_optional"
   fi
   ruby -ryaml -rjson -e 'exit 0' || die "Ruby YAML/JSON runtime is incomplete"
 }
 
 download(){
   case "$1" in https://*) ;; *) die "HTTPS URL required";; esac
-  # Metadata is passed a short timeout by callers; archives get a larger
-  # bounded window.  The speed limit terminates a dead TLS stream promptly.
-  timeout="${3:-120}"
+  download_url="$1"
+  download_path="$2"
+  # Metadata callers pass a short bound; archives receive a longer window so
+  # a healthy but slow domestic connection is not mistaken for a stalled one.
+  timeout="${3:-300}"
+  show_progress="${4:-0}"
+  rm -f "$download_path"
   if command -v curl >/dev/null 2>&1; then
-    curl -fL -sS --retry 1 --connect-timeout 8 --max-time "$timeout" \
-      --speed-time 20 --speed-limit 256 "$1" -o "$2"
+    if [ "$show_progress" = 1 ]; then
+      detail "Downloading $(basename "$download_path") with live progress"
+      curl -fL -# --retry 1 --connect-timeout 8 --max-time "$timeout" \
+        --speed-time 30 --speed-limit 512 "$download_url" -o "$download_path"
+    else
+      curl -fL -sS --retry 1 --connect-timeout 8 --max-time "$timeout" \
+        --speed-time 15 --speed-limit 128 "$download_url" -o "$download_path"
+    fi
   elif command -v uclient-fetch >/dev/null 2>&1; then
-    uclient-fetch -q -T "$timeout" -O "$2" "$1"
+    uclient-fetch -q -T "$timeout" -O "$download_path" "$download_url"
   else
-    wget -q -T "$timeout" -O "$2" "$1"
+    wget -q -T "$timeout" -O "$download_path" "$download_url"
   fi
 }
 
@@ -230,12 +304,15 @@ select_source(){
   scores=/tmp/openkill-source-scores.$$
   : > "$scores"
   for base in $candidates; do
-    if score=$(curl -fsSL -o /dev/null -w '%{time_total}' --connect-timeout 8 --max-time 15 --speed-time 8 --speed-limit 64 "$base/$rel" 2>/dev/null); then
+    detail "Testing package source: $base"
+    if score=$(curl -fsSL -o /dev/null -w '%{time_total}' --connect-timeout 4 --max-time 8 --speed-time 4 --speed-limit 64 "$base/$rel" 2>/dev/null); then
       printf '%s %s\n' "$score" "$base" >> "$scores"
     fi
   done
   SOURCE_ROOT=$(sort -n "$scores" 2>/dev/null | awk 'NR==1{print $2}')
+  source_time=$(sort -n "$scores" 2>/dev/null | awk 'NR==1{print $1}')
   rm -f "$scores"
+  [ -z "$SOURCE_ROOT" ] || detail "Selected fastest valid package source: $SOURCE_ROOT (${source_time}s)"
   [ -n "$SOURCE_ROOT" ]
 }
 
@@ -267,7 +344,7 @@ install_core(){
       log "Detected core architecture: $arch"
     fi
   fi
-  log "Installing the latest official stable Mihomo/Meta core"
+  step "Resolving and installing the latest official stable Mihomo/Meta core"
   "$core" Meta || die "Official Mihomo/Meta core installation failed"
 }
 
@@ -291,6 +368,7 @@ validate_install(){
 }
 
 resolve_package(){
+  step "Resolving the latest published OpenKill $EXT package"
   manifest="$WORK_DIR/latest.json"
   # Probe the manifest itself so the first successful source is also the
   # preferred package download mirror.  A source that returns a fast 404 is
@@ -299,10 +377,11 @@ resolve_package(){
   if select_source "latest-$EXT.json"; then
     manifest_source="$SOURCE_ROOT"
   fi
-  # Authoritative origin first; cached mirrors are only a connectivity fallback.
+  # The measured package source is tried first; every manifest and archive is
+  # still validated before installation.
   for base in "$manifest_source" "https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF" "https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF" "https://fastly.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF"; do
     [ -n "$base" ] || continue
-    if download "$base/latest-$EXT.json" "$manifest" 30 >/dev/null 2>&1 &&
+    if download "$base/latest-$EXT.json" "$manifest" 15 >/dev/null 2>&1 &&
        ruby -rjson -e '
          d=JSON.parse(File.read(ARGV[0]))
          abort unless d["format"]==ARGV[1] && d["architecture"]=="all"
@@ -323,7 +402,7 @@ resolve_package(){
   if [ ! -s "$WORK_DIR/metadata" ]; then
     release_json="$WORK_DIR/releases.json"
     for api in "https://api.github.com/repos/$REPO/releases?per_page=30" "https://ghfast.top/https://api.github.com/repos/$REPO/releases?per_page=30"; do
-      if download "$api" "$release_json" 30 >/dev/null 2>&1; then
+      if download "$api" "$release_json" 15 >/dev/null 2>&1; then
         if ruby -rjson -e '
           begin
             releases=JSON.parse(File.read(ARGV[0]))
@@ -359,6 +438,7 @@ resolve_package(){
   checksum=$(sed -n '3p' "$WORK_DIR/metadata")
   release_url=$(sed -n '4p' "$WORK_DIR/metadata")
   PACKAGE_FILE="$WORK_DIR/$name"
+  detail "Verified published $EXT version: $ver"
   # Prefer the source that returned a valid manifest.  The release asset is
   # kept as a fallback, while mirrors are attempted with a bounded timeout.
   package_urls="$release_url https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF/$name https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF/$name https://fastly.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF/$name"
@@ -366,11 +446,13 @@ resolve_package(){
     package_urls="$manifest_source/$name $package_urls"
   fi
   seen_urls=""
+  step "Downloading and verifying OpenKill $ver"
   for url in $package_urls; do
     [ -n "$url" ] || continue
     case " $seen_urls " in *" $url "*) continue;; esac
     seen_urls="$seen_urls $url"
-    if download "$url" "$PACKAGE_FILE" 120 &&
+    detail "Trying package download: $url"
+    if download "$url" "$PACKAGE_FILE" 300 1 &&
       [ "$(sha256sum "$PACKAGE_FILE" | awk '{print $1}')" = "$checksum" ]; then
       log "Verified published $EXT version: $ver"
       return 0
@@ -388,7 +470,9 @@ uninstall(){
   printf 'OpenKill removed; shared system dependencies were retained.\n'
 }
 
-[ "$ACTION" = uninstall ] && { uninstall; exit 0; }
+[ "$ACTION" = uninstall ] && { step "Removing OpenKill and its runtime data"; uninstall; exit 0; }
+step "Detecting system: package manager=$PM, architecture=$(uname -m 2>/dev/null || echo unknown)"
+detail "Installation log: ${INSTALL_LOG:-unavailable}"
 install_dependencies
 [ -n "$PACKAGE_FILE" ] || resolve_package
 [ -f "$PACKAGE_FILE" ] || die "Package file not found"
@@ -397,8 +481,9 @@ install_dependencies
 # duplicate-src warnings during the package transaction.
 [ -n "$FEED_CONFIG" ] || prepare_feeds no-update
 backup_config
-log "Installing OpenKill ${ver:-local package}"
+step "Installing OpenKill ${ver:-local package}"
 if [ "$PM" = opkg ]; then pm_run install "$PACKAGE_FILE"; else pm_run add --allow-untrusted "$PACKAGE_FILE"; fi
+step "Validating installed service and runtime"
 validate_install
 install_core
 # Remove credentials and generated files left by older oixCloud-based builds.
@@ -422,4 +507,6 @@ if command -v uci >/dev/null 2>&1; then
 fi
 rm -f /tmp/luci-indexcache /tmp/luci-modulecache/*openkill* 2>/dev/null || true
 rm -f "$PACKAGE_FILE"
+step "Completing installation and retaining recovery backup"
+detail "Detailed installation log: ${INSTALL_LOG:-unavailable}"
 printf 'OpenKill %s installation/update complete.\n' "${ver:-local package}"

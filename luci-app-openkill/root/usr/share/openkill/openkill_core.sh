@@ -5,8 +5,18 @@
 . /lib/functions.sh
 . /usr/share/openkill/log.sh
 . /usr/share/openkill/uci.sh
-. /usr/share/openkill/openkill_curl.sh
 . /usr/share/openkill/openkill_ps.sh
+
+report_tip() {
+   LOG_TIP "$1"
+   if [ -t 1 ]; then printf '    %s\n' "$1"; fi
+   return 0
+}
+report_error() {
+   LOG_ERROR "$1"
+   if [ -t 2 ]; then printf 'Error: %s\n' "$1" >&2; fi
+   return 0
+}
 
 set_lock() {
    # Fresh OpenWrt installations may not have the shared lock directory yet.
@@ -21,7 +31,7 @@ del_lock() {
    rm -rf "/tmp/lock/openkill_core.lock" 2>/dev/null
 }
 
-set_lock || { LOG_ERROR "Unable to create OpenKill core lock"; exit 1; }
+set_lock || { report_error "Unable to create OpenKill core lock"; exit 1; }
 inc_job_counter
 trap 'del_lock' EXIT INT TERM
 
@@ -57,7 +67,7 @@ detect_core_model() {
       riscv64) CPU_MODEL="linux-riscv64" ;;
       s390x) CPU_MODEL="linux-s390x" ;;
       loongarch64) CPU_MODEL="linux-loong64-abi2" ;;
-      *) LOG_ERROR "Unsupported CPU architecture: $(uname -m 2>/dev/null)"; return 1 ;;
+      *) report_error "Unsupported CPU architecture: $(uname -m 2>/dev/null)"; return 1 ;;
    esac
    uci -q set openkill.config.core_arch="$CPU_MODEL"
    uci -q commit openkill
@@ -79,9 +89,20 @@ fi
 RELEASE_JSON="/tmp/openkill-mihomo-release.$$.json"
 DOWNLOAD_FILE="/tmp/openkill-mihomo.$$.gz"
 TMP_FILE="${TARGET_CORE_PATH}.new.$$"
+PROBE_FILE="/tmp/openkill-mihomo-probe.$$.bin"
+SCORE_FILE="/tmp/openkill-mihomo-scores.$$.txt"
 CORE_LV=""
 ASSET_URL=""
-cleanup_core_tmp() { rm -f "$RELEASE_JSON" "$DOWNLOAD_FILE" "$TMP_FILE"; }
+ASSET_SHA256=""
+ASSET_SIZE=""
+RELEASE_SOURCE=""
+ORDERED_DOWNLOAD_URLS=""
+FASTEST_CORE_URL=""
+FASTEST_CORE_TIME=""
+cleanup_core_tmp() {
+   rm -f "$RELEASE_JSON" "$DOWNLOAD_FILE" "$TMP_FILE" "$PROBE_FILE" \
+      "$SCORE_FILE" "${SCORE_FILE}.sorted"
+}
 trap 'cleanup_core_tmp; del_lock' EXIT INT TERM
 
 json_value() {
@@ -95,55 +116,148 @@ json_value() {
       end
    ' "$RELEASE_JSON" "$1" 2>/dev/null
 }
-asset_url_from_release() {
+asset_info_from_release() {
    ruby -rjson -e '
       begin
         d = JSON.parse(File.read(ARGV[0]))
         a = (d["assets"] || []).find { |x| x["name"] == ARGV[1] }
-        puts(a["browser_download_url"].to_s) if a
+        abort unless a
+        url = a["browser_download_url"].to_s
+        digest = a["digest"].to_s.sub(/^sha256:/, "")
+        abort unless url.start_with?("https://") && digest.match?(/\A[0-9a-f]{64}\z/)
+        puts url
+        puts digest
+        puts a["size"].to_i
       rescue StandardError
         exit 1
       end
    ' "$RELEASE_JSON" "$1" 2>/dev/null
 }
 
+append_url_once() {
+   candidate_url="$1"
+   case " $CORE_CANDIDATES " in *" $candidate_url "*) ;; *) CORE_CANDIDATES="$CORE_CANDIDATES $candidate_url";; esac
+}
+
+proxy_url() {
+   proxy_base="${1%/}"
+   printf '%s/%s\n' "$proxy_base" "$2"
+}
+
 fetch_release() {
-   local api_urls=""
+   local api_urls="" api seen_api release_info
+   # The direct official API is the authority for the tag and SHA-256 digest.
+   # A user-configured accelerator and bounded transport fallbacks are used only
+   # when direct GitHub is unavailable.
+   api_urls="$META_API"
    case "$github_address_mod" in
-      0|"") ;;
-      https://cdn.jsdelivr.net/|https://fastly.jsdelivr.net/|https://testingcf.jsdelivr.net/) ;;
-      *) api_urls="$github_address_mod$META_API" ;;
+      0|""|https://cdn.jsdelivr.net/|https://fastly.jsdelivr.net/|https://testingcf.jsdelivr.net/) ;;
+      *) api_urls="$api_urls $(proxy_url "$github_address_mod" "$META_API")" ;;
    esac
-   api_urls="$api_urls $META_API https://ghfast.top/$META_API https://github.dpik.top/$META_API https://gh-proxy.com/$META_API"
+   api_urls="$api_urls https://ghfast.top/$META_API https://github.dpik.top/$META_API https://gh-proxy.com/$META_API"
+   seen_api=""
    for api in $api_urls; do
-     rm -f "$RELEASE_JSON"
-      # Keep each API fallback bounded; a filtered endpoint must not delay
-      # the remaining official/mirror endpoints for several minutes.
-      if curl -fsSL --connect-timeout 6 --max-time 20 --speed-time 8 --speed-limit 128 --retry 1 \
+      case " $seen_api " in *" $api "*) continue;; esac
+      seen_api="$seen_api $api"
+      rm -f "$RELEASE_JSON"
+      report_tip "【$CORE_TYPE】Checking release metadata: $api"
+      if curl -fsSL --connect-timeout 4 --max-time 10 --speed-time 6 --speed-limit 128 --retry 0 \
          -H 'Accept: application/vnd.github+json' -H 'User-Agent: OpenKill-installer' \
          "$api" -o "$RELEASE_JSON" 2>/dev/null; then
          CORE_LV=$(json_value tag_name)
          case "$CORE_LV" in v[0-9]*.[0-9]*) ;; *) CORE_LV="";; esac
          if [ -n "$CORE_LV" ]; then
             ASSET_NAME="mihomo-${CPU_MODEL}-${CORE_LV}.gz"
-            ASSET_URL=$(asset_url_from_release "$ASSET_NAME")
-            [ -n "$ASSET_URL" ] && return 0
+            release_info=$(asset_info_from_release "$ASSET_NAME") || release_info=""
+            if [ -n "$release_info" ]; then
+               ASSET_URL=$(printf '%s\n' "$release_info" | sed -n '1p')
+               ASSET_SHA256=$(printf '%s\n' "$release_info" | sed -n '2p')
+               ASSET_SIZE=$(printf '%s\n' "$release_info" | sed -n '3p')
+               case "$ASSET_SHA256" in [0-9a-f][0-9a-f]*) RELEASE_SOURCE="$api"; return 0;; esac
+            fi
          fi
       fi
    done
    return 1
 }
 
+probe_core_url() {
+   probe_url="$1"
+   rm -f "$PROBE_FILE"
+   probe_result=$(curl -fL -sS --range 0-4095 --max-filesize 8192 \
+      --connect-timeout 4 --max-time 8 --speed-time 4 --speed-limit 128 \
+      -o "$PROBE_FILE" -w '%{http_code} %{time_starttransfer}' "$probe_url" 2>/dev/null) || {
+      rm -f "$PROBE_FILE"
+      return 1
+   }
+   probe_code=$(printf '%s\n' "$probe_result" | awk '{print $1}')
+   probe_time=$(printf '%s\n' "$probe_result" | awk '{print $2}')
+   case "$probe_code" in 200|206) ;; *) rm -f "$PROBE_FILE"; return 1;; esac
+   probe_magic=$(dd if="$PROBE_FILE" bs=1 count=2 2>/dev/null | od -An -tx1 | tr -d '[:space:]')
+   rm -f "$PROBE_FILE"
+   [ "$probe_magic" = "1f8b" ] || return 1
+   printf '%s\n' "$probe_time"
+}
+
+rank_core_sources() {
+   sorted_score_file="${SCORE_FILE}.sorted"
+   : > "$SCORE_FILE"
+   CORE_CANDIDATES=""
+   append_url_once "$ASSET_URL"
+   case "$github_address_mod" in
+      0|""|https://cdn.jsdelivr.net/|https://fastly.jsdelivr.net/|https://testingcf.jsdelivr.net/) ;;
+      *) append_url_once "$(proxy_url "$github_address_mod" "$ASSET_URL")" ;;
+   esac
+   # GitHub Release files are not repository files, so jsDelivr must not be
+   # used here. These are transport-only fallbacks for the verified asset.
+   append_url_once "https://ghfast.top/$ASSET_URL"
+   append_url_once "https://github.dpik.top/$ASSET_URL"
+   append_url_once "https://gh-proxy.com/$ASSET_URL"
+   for core_url in $CORE_CANDIDATES; do
+      report_tip "【$CORE_TYPE】Testing core download source: $core_url"
+      if core_score=$(probe_core_url "$core_url"); then
+         printf '%s %s\n' "$core_score" "$core_url" >> "$SCORE_FILE"
+      fi
+   done
+   ORDERED_DOWNLOAD_URLS=""
+   if [ -s "$SCORE_FILE" ]; then
+      sort -n "$SCORE_FILE" > "$sorted_score_file"
+      FASTEST_CORE_TIME=$(awk 'NR==1 {print $1}' "$sorted_score_file")
+      FASTEST_CORE_URL=$(awk 'NR==1 {print $2}' "$sorted_score_file")
+      while IFS=' ' read -r core_score core_url; do
+         ORDERED_DOWNLOAD_URLS="$ORDERED_DOWNLOAD_URLS $core_url"
+      done < "$sorted_score_file"
+   fi
+   for core_url in $CORE_CANDIDATES; do
+      case " $ORDERED_DOWNLOAD_URLS " in *" $core_url "*) ;; *) ORDERED_DOWNLOAD_URLS="$ORDERED_DOWNLOAD_URLS $core_url";; esac
+   done
+   rm -f "$SCORE_FILE" "$sorted_score_file"
+   [ -z "$FASTEST_CORE_URL" ] || report_tip "【$CORE_TYPE】Selected fastest valid core source (${FASTEST_CORE_TIME}s): $FASTEST_CORE_URL"
+}
+
 download_core() {
-  local url="$1"
-  rm -f "$DOWNLOAD_FILE" "$TMP_FILE"
-   # Core archives are large, but a stalled endpoint should fail fast and
-   # let the next mirror take over.  A normal WAN link remains unaffected.
-   OPENKILL_CURL_CONNECT_TIMEOUT=8 OPENKILL_CURL_MAX_TIME=90 \
-   OPENKILL_CURL_SPEED_TIME=15 OPENKILL_CURL_SPEED_LIMIT=1024 \
-   OPENKILL_CURL_RETRIES=0 SHOW_DOWNLOAD_PROGRESS=1 \
-   DOWNLOAD_FILE_CURL "$url" "$DOWNLOAD_FILE" "$TARGET_CORE_PATH"
-   [ "$?" -eq 0 ] || return 1
+   core_url="$1"
+   PARTIAL_FILE="/tmp/openkill-mihomo-${CPU_MODEL}-${CORE_LV}.gz.part"
+   rm -f "$DOWNLOAD_FILE" "$TMP_FILE"
+   if [ -s "$PARTIAL_FILE" ]; then
+      report_tip "【$CORE_TYPE】Resuming interrupted download from $(basename "$PARTIAL_FILE")"
+      curl -fL -# -C - --connect-timeout 8 --max-time 300 --speed-time 30 --speed-limit 512 --retry 0 \
+         "$core_url" -o "$PARTIAL_FILE" || return 1
+   else
+      curl -fL -# --connect-timeout 8 --max-time 300 --speed-time 30 --speed-limit 512 --retry 0 \
+         "$core_url" -o "$PARTIAL_FILE" || return 1
+   fi
+   if [ -n "$ASSET_SHA256" ]; then
+      actual_sha256=$(sha256sum "$PARTIAL_FILE" 2>/dev/null | awk '{print $1}')
+      if [ "$actual_sha256" != "$ASSET_SHA256" ]; then
+         report_error "【$CORE_TYPE】SHA256 verification failed for $core_url"
+         rm -f "$PARTIAL_FILE"
+         return 1
+      fi
+   else
+      report_tip "【$CORE_TYPE】Manual core has no release digest; validating archive and executable only"
+   fi
+   mv -f "$PARTIAL_FILE" "$DOWNLOAD_FILE" || return 1
    gzip -t "$DOWNLOAD_FILE" >/dev/null 2>&1 || return 1
    gzip -dc "$DOWNLOAD_FILE" > "$TMP_FILE" 2>/dev/null || return 1
    chmod 4755 "$TMP_FILE" 2>/dev/null || return 1
@@ -154,37 +268,33 @@ download_core() {
 restart=0
 if [ -n "$DIRECT_CORE_URL" ]; then
    CORE_LV="manual"
-   LOG_TIP "【$CORE_TYPE】Downloading the manually supplied core..."
-   download_core "$DIRECT_CORE_URL" || { LOG_ERROR "【$CORE_TYPE】Manual core validation failed"; dec_job_counter_and_restart "0"; exit 1; }
+   report_tip "【$CORE_TYPE】Downloading the manually supplied core..."
+   download_core "$DIRECT_CORE_URL" || { report_error "【$CORE_TYPE】Manual core validation failed"; dec_job_counter_and_restart "0"; exit 1; }
    restart=1
 else
    if ! fetch_release; then
-      LOG_ERROR "【$CORE_TYPE】Unable to resolve the latest official Mihomo release or architecture asset"
+      report_error "【$CORE_TYPE】Unable to resolve the latest official Mihomo release or architecture asset"
       dec_job_counter_and_restart "0"
       exit 1
    fi
    if [ "$CORE_CV" = "$CORE_LV" ] && [ -x "$TARGET_CORE_PATH" ]; then
-      LOG_TIP "【$CORE_TYPE】Core $CORE_LV is already installed"
+      report_tip "【$CORE_TYPE】Core $CORE_LV is already installed"
       dec_job_counter_and_restart "0"
       exit 0
    fi
-   LOG_TIP "【$CORE_TYPE】Downloading official stable Mihomo $CORE_LV..."
-   DOWNLOAD_URLS="$ASSET_URL"
-   case "$github_address_mod" in
-      0|"") ;;
-      https://cdn.jsdelivr.net/|https://fastly.jsdelivr.net/|https://testingcf.jsdelivr.net/) DOWNLOAD_URLS="${github_address_mod}gh/MetaCubeX/mihomo@${CORE_LV}/${ASSET_NAME} $DOWNLOAD_URLS" ;;
-      *) DOWNLOAD_URLS="$github_address_mod$ASSET_URL $DOWNLOAD_URLS" ;;
-   esac
-   DOWNLOAD_URLS="$DOWNLOAD_URLS https://ghfast.top/$ASSET_URL https://github.dpik.top/$ASSET_URL https://gh-proxy.com/$ASSET_URL"
-  downloaded=0
-   seen_urls=""
-  for url in $DOWNLOAD_URLS; do
-      case " $seen_urls " in *" $url "*) continue;; esac
-      seen_urls="$seen_urls $url"
-      if download_core "$url"; then downloaded=1; break; fi
-   done
+    report_tip "【$CORE_TYPE】Official release metadata: $RELEASE_SOURCE"
+    report_tip "【$CORE_TYPE】Downloading official stable Mihomo $CORE_LV (${ASSET_SIZE:-unknown} bytes)..."
+    rank_core_sources
+    downloaded=0
+    for url in $ORDERED_DOWNLOAD_URLS; do
+       if download_core "$url"; then
+          downloaded=1
+          break
+       fi
+       report_tip "【$CORE_TYPE】Source failed or did not pass validation; trying the next source"
+    done
    if [ "$downloaded" -ne 1 ]; then
-      LOG_ERROR "【$CORE_TYPE】Core download or validation failed; current core was kept"
+      report_error "【$CORE_TYPE】Core download or validation failed; current core was kept"
       dec_job_counter_and_restart "0"
       exit 1
    fi
@@ -192,7 +302,7 @@ else
 fi
 
 if ! mv -f "$TMP_FILE" "$TARGET_CORE_PATH"; then
-   LOG_ERROR "【$CORE_TYPE】Core installation failed; current core was kept"
+   report_error "【$CORE_TYPE】Core installation failed; current core was kept"
    dec_job_counter_and_restart "0"
    exit 1
 fi
@@ -200,6 +310,6 @@ chmod 4755 "$TARGET_CORE_PATH" 2>/dev/null
 chown root:root "$TARGET_CORE_PATH" 2>/dev/null
 uci -q set openkill.config.core_type="Meta"
 uci -q commit openkill
-LOG_TIP "【$CORE_TYPE】Core $CORE_LV installed successfully"
+report_tip "【$CORE_TYPE】Core $CORE_LV installed successfully"
 dec_job_counter_and_restart "$restart"
 exit 0
