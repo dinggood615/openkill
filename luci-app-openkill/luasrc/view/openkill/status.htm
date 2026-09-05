@@ -2862,7 +2862,9 @@
 
     var pluginToggleUserAction = false;
 
-    XHR.poll(5, '<%=luci.dispatcher.build_url("admin", "services", "openkill", "status")%>', null, function(x, status) {
+    // Status changes are not sub-second events; polling every 15 seconds keeps
+    // the dashboard responsive while reducing repeated LuCI requests.
+    XHR.poll(15, '<%=luci.dispatcher.build_url("admin", "services", "openkill", "status")%>', null, function(x, status) {
         if (x && x.status == 200) {
             var updates = [];
 

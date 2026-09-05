@@ -46,7 +46,13 @@ if [ -x "/bin/opkg" ]; then
 elif [ -x "/usr/bin/apk" ]; then
    cpu_model=$(rm -f /lib/apk/db/lock && apk list libc 2>/dev/null|awk '{print $2}')
 fi
-core_meta_version=$(/etc/openkill/core/clash_meta -v 2>/dev/null |awk -F ' ' '{print $3}' |head -1 2>/dev/null)
+# The core version is static between core updates. Cache it briefly so opening
+# the diagnostics page cannot spawn a new Meta process on every refresh.
+CORE_VERSION_CACHE=/tmp/openkill_core_version
+if [ ! -s "$CORE_VERSION_CACHE" ] || [ "$(date +%s)" -gt "$(( $(stat -c %Y "$CORE_VERSION_CACHE" 2>/dev/null || echo 0) + 300 ))" ]; then
+   /etc/openkill/core/clash_meta -v 2>/dev/null |awk -F ' ' '{print $3}' |head -1 > "$CORE_VERSION_CACHE" 2>/dev/null || true
+fi
+core_meta_version=$(cat "$CORE_VERSION_CACHE" 2>/dev/null)
 op_version=$(ipk_v "luci-app-openkill")
 china_ip_route=$(uci_get_config "china_ip_route")
 common_ports=$(uci_get_config "common_ports")
