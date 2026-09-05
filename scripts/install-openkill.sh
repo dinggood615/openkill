@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1050"
+PROJECT_VERSION="2026-1051"
 ACTION=install
 PACKAGE_FILE=""
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
@@ -367,6 +367,36 @@ validate_install(){
   ruby -ryaml -rjson -e 'exit 0' || die "Ruby YAML/JSON runtime is incomplete"
 }
 
+validate_manifest(){
+  manifest_path="$1"
+  ruby -rjson -e '
+    d=JSON.parse(File.read(ARGV[0]))
+    version=d["version"].to_s
+    abort unless d["format"]==ARGV[1] && d["architecture"]=="all"
+    abort unless version.match?(/\A2026-[0-9]+\z/) && d["sha256"].to_s.match?(/\A[0-9a-f]{64}\z/)
+    package_version = ARGV[1] == "apk" ? version.sub("-", ".") : version
+    expected="luci-app-openkill_#{package_version}_all.#{ARGV[1]}"
+    abort unless d["filename"]==expected
+    abort unless d["url"]=="https://github.com/"+ARGV[2]+"/releases/download/v"+version+"-"+ARGV[1]+"/"+expected
+    puts [version,d["filename"],d["sha256"],d["url"]]
+  ' "$manifest_path" "$EXT" "$REPO"
+}
+
+select_newest_manifest(){
+  ruby -e '
+    rows=File.readlines(ARGV[0], chomp: true)
+    best=nil
+    rows.each do |line|
+      version,index,base,file=line.split("\t",4)
+      key=[version.split("-").map(&:to_i), -index.to_i]
+      if best.nil? || key > best[0]
+        best=[key,index,base,file]
+      end
+    end
+    puts [best[1],best[2],best[3]].join("\n") if best
+  ' "$1"
+}
+
 resolve_package(){
   step "Resolving the latest published OpenKill $EXT package"
   manifest="$WORK_DIR/latest.json"
@@ -377,26 +407,47 @@ resolve_package(){
   if select_source "latest-$EXT.json"; then
     manifest_source="$SOURCE_ROOT"
   fi
-  # The measured package source is tried first; every manifest and archive is
-  # still validated before installation.
+  # A CDN can legally return an older cached branch manifest.  Query every
+  # candidate with a cache-busting token, validate each record, and select the
+  # highest published version.  The fastest source is only a tie-breaker and is
+  # still preferred for the package archive after the version is selected.
+  manifest_bases=""
   for base in "$manifest_source" "https://raw.githubusercontent.com/$REPO/package/$PACKAGE_REF" "https://cdn.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF" "https://fastly.jsdelivr.net/gh/$REPO@package/$PACKAGE_REF"; do
     [ -n "$base" ] || continue
-    if download "$base/latest-$EXT.json" "$manifest" 15 >/dev/null 2>&1 &&
-       ruby -rjson -e '
-         d=JSON.parse(File.read(ARGV[0]))
-         abort unless d["format"]==ARGV[1] && d["architecture"]=="all"
-         abort unless d["version"].match?(/\A2026-[0-9]+\z/) && d["sha256"].match?(/\A[0-9a-f]{64}\z/)
-         package_version = ARGV[1] == "apk" ? d["version"].sub("-", ".") : d["version"]
-         expected="luci-app-openkill_#{package_version}_all.#{ARGV[1]}"
-         abort unless d["filename"]==expected
-         abort unless d["url"]=="https://github.com/"+ARGV[2]+"/releases/download/v"+d["version"]+"-"+ARGV[1]+"/"+expected
-        puts [d["version"],d["filename"],d["sha256"],d["url"]]
-       ' "$manifest" "$EXT" "$REPO" > "$WORK_DIR/metadata"; then
-      manifest_source="$base"
-      break
-    fi
-    : > "$WORK_DIR/metadata"
+    case " $manifest_bases " in *" $base "*) continue;; esac
+    manifest_bases="$manifest_bases $base"
   done
+  manifest_rows="$WORK_DIR/manifest-rows"
+  : > "$manifest_rows"
+  manifest_nonce=$(date +%s 2>/dev/null || printf '%s' "$$")
+  manifest_index=0
+  for base in $manifest_bases; do
+    manifest_index=$((manifest_index + 1))
+    candidate_manifest="$WORK_DIR/manifest-${manifest_index}.json"
+    manifest_url="$base/latest-$EXT.json?openkill_cache_bust=${manifest_nonce}_${manifest_index}"
+    detail "Checking package manifest: $base"
+    if download "$manifest_url" "$candidate_manifest" 15 >/dev/null 2>&1; then
+      if candidate_metadata=$(validate_manifest "$candidate_manifest" 2>/dev/null); then
+        candidate_version=$(printf '%s\n' "$candidate_metadata" | sed -n '1p')
+        printf '%s\t%s\t%s\t%s\n' "$candidate_version" "$manifest_index" "$base" "$candidate_manifest" >> "$manifest_rows"
+        detail "Found valid $EXT manifest: v$candidate_version"
+      else
+        detail "Rejected invalid or stale $EXT manifest: $base"
+      fi
+    fi
+  done
+  manifest_source=""
+  if [ -s "$manifest_rows" ]; then
+    chosen_manifest=$(select_newest_manifest "$manifest_rows")
+    manifest_index=$(printf '%s\n' "$chosen_manifest" | sed -n '1p')
+    manifest_source=$(printf '%s\n' "$chosen_manifest" | sed -n '2p')
+    selected_manifest=$(printf '%s\n' "$chosen_manifest" | sed -n '3p')
+    cp "$selected_manifest" "$manifest"
+    validate_manifest "$manifest" > "$WORK_DIR/metadata"
+    detail "Selected newest valid $EXT manifest: v$(sed -n '1p' "$WORK_DIR/metadata") from $manifest_source"
+  else
+    : > "$WORK_DIR/metadata"
+  fi
   # Older package channels may not contain a manifest yet.  Query the release
   # API as a fallback so a newly published package is installable immediately.
   if [ ! -s "$WORK_DIR/metadata" ]; then

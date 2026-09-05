@@ -48,6 +48,22 @@ grep -q -- '-f mirror install local.ipk' "$WORK_DIR/calls"
         self.assertNotIn('s#https://dl.openwrt.ai/', SOURCE)
         self.assertIn('https://downloads.openwrt.org/', SOURCE)
 
+    def test_manifest_selection_prefers_newest_version_over_fastest_stale_cdn(self):
+        if not shutil.which("ruby"):
+            self.skipTest("Ruby is not installed on this host")
+        functions = SOURCE[SOURCE.index("validate_manifest(){"):SOURCE.index("resolve_package(){")]
+        harness = """
+set -eu
+WORK_DIR=$(mktemp -d)
+trap 'rm -rf "$WORK_DIR"' EXIT
+""" + functions + r'''
+printf '%s\n' '2026-1015\t1\thttps://cdn.example.invalid\told.json' '2026-1050\t2\thttps://raw.example.invalid\tnew.json' > "$WORK_DIR/rows"
+chosen=$(select_newest_manifest "$WORK_DIR/rows")
+[ "$(printf '%s\n' "$chosen" | sed -n '1p')" = 2 ]
+[ "$(printf '%s\n' "$chosen" | sed -n '2p')" = https://raw.example.invalid ]
+'''
+        subprocess.run([BASH, "-c", harness], check=True)
+
     def test_core_uses_release_digest_and_no_invalid_jsdelivr_asset_path(self):
         self.assertIn('a["digest"]', CORE_SOURCE)
         self.assertIn('sha256sum "$PARTIAL_FILE"', CORE_SOURCE)
