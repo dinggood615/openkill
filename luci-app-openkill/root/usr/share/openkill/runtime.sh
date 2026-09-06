@@ -3,13 +3,21 @@
 # so LuCI, init and watchdog do not disagree about whether Mihomo is ready.
 
 . /usr/share/openkill/uci.sh 2>/dev/null || true
+. /usr/share/openkill/address.sh
 
 openkill_core_pids() {
-    local name pids
-    for name in clash mihomo clash_meta; do
-        pids="$(pidof "$name" 2>/dev/null || true)"
-        [ -n "$pids" ] && printf '%s\n' "$pids"
-    done | awk '{$1=$1; print}' | tr '\n' ' ' | sed 's/[[:space:]]*$//'
+    local pid expected config args executable
+    expected="$(readlink -f /etc/openkill/clash 2>/dev/null)"
+    config="${CONFIG_FILE:-/etc/openkill/$(basename "$(uci_get_config config_path 2>/dev/null)")}"
+    ubus call service list '{"name":"openkill"}' 2>/dev/null |
+        jsonfilter -e '@.openkill.instances.openkill.pid' 2>/dev/null |
+        while read -r pid; do
+            case "$pid" in ''|*[!0-9]*) continue ;; esac
+            executable="$(readlink -f "/proc/$pid/exe" 2>/dev/null)"
+            [ -n "$expected" ] && [ "$executable" = "$expected" ] || continue
+            args="$(tr '\000' '\n' < "/proc/$pid/cmdline" 2>/dev/null)"
+            printf '%s\n' "$args" | grep -Fxq -- "$config" && printf '%s\n' "$pid"
+        done
 }
 
 openkill_core_process_present() {
@@ -27,19 +35,26 @@ openkill_controller_port() {
 }
 
 openkill_controller_host() {
-    local requested host
+    local requested
     requested="$(uci_get_config "dashboard_bind_address" 2>/dev/null || echo lan)"
-    case "$requested" in
-        lan)
-            host="$(uci -q get network.lan.ipaddr 2>/dev/null | awk -F/ '{print $1}')"
-            [ -n "$host" ] || host=127.0.0.1
-            ;;
-        0.0.0.0) host=127.0.0.1 ;;
-        \[*\]) host="${requested#\[}"; host="${host%\]}" ;;
-        *) host="$requested" ;;
-    esac
-    host="${host%%/*}"
-    printf '%s' "$host"
+    openkill_local_address "$requested"
+}
+
+# Read the actual generated config, including user overrides. Cache within
+# this process only and invalidate on file replacement/modification.
+openkill_load_context() {
+    local file stamp data
+    file="${CONFIG_FILE:-/etc/openkill/$(basename "$(uci_get_config config_path 2>/dev/null)")}"
+    [ -s "$file" ] || return 1
+    stamp="$(stat -c '%i:%Y:%s' "$file" 2>/dev/null)"
+    if [ -n "$stamp" ] && [ "${OPENKILL_CONTEXT_KEY:-}" = "$file:$stamp" ]; then return 0; fi
+    data="$(ruby /usr/share/openkill/runtime_context.rb "$file" 2>/dev/null)" || return 1
+    OPENKILL_API_ENDPOINT="$(printf '%s\n' "$data" | sed -n '1p')"
+    OPENKILL_API_SECRET="$(printf '%s\n' "$data" | sed -n '2p')"
+    OPENKILL_TUN_DEVICE="$(printf '%s\n' "$data" | sed -n '3p')"
+    OPENKILL_TUN_TABLE="$(printf '%s\n' "$data" | sed -n '4p')"
+    OPENKILL_DNS_ENDPOINT="$(printf '%s\n' "$data" | sed -n '5p')"
+    OPENKILL_CONTEXT_KEY="$file:$stamp"
 }
 
 openkill_controller_url() {
@@ -53,15 +68,18 @@ openkill_controller_url() {
 }
 
 openkill_core_api_healthy() {
-    local url secret code
-    url="$(openkill_controller_url)/version"
-    secret="$(uci_get_config "dashboard_password" 2>/dev/null || true)"
+    local url secret code response body
+    openkill_load_context || return 1
+    url="$OPENKILL_API_ENDPOINT/version"
+    secret="$OPENKILL_API_SECRET"
     if [ -n "$secret" ]; then
-        code="$(curl --noproxy '*' -k -sS -m 3 -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $secret" "$url" 2>/dev/null || true)"
+        response="$(curl --noproxy '*' -sS -m 3 --max-filesize 16384 -w '\n%{http_code}' -H "Authorization: Bearer $secret" "$url" 2>/dev/null)" || return 1
     else
-        code="$(curl --noproxy '*' -k -sS -m 3 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true)"
+        response="$(curl --noproxy '*' -sS -m 3 --max-filesize 16384 -w '\n%{http_code}' "$url" 2>/dev/null)" || return 1
     fi
-    [ "$code" = 200 ]
+    code="$(printf '%s\n' "$response" | tail -n 1)"
+    body="$(printf '%s\n' "$response" | sed '$d')"
+    [ "$code" = 200 ] && [ -n "$(printf '%s' "$body" | jsonfilter -e '@.version' 2>/dev/null)" ]
 }
 
 openkill_core_ready() {

@@ -18,6 +18,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  Runtime-Tests:
+    uses: ./.github/workflows/runtime-tests.yml
   Get-Version:
     runs-on: ubuntu-latest
     outputs:
@@ -63,7 +65,7 @@ jobs:
 
   Compile:
     runs-on: ubuntu-latest
-    needs: Get-Version
+    needs: [Get-Version, Runtime-Tests]
     if: ${{ needs.Get-Version.outputs.version != needs.Get-Version.outputs.current_version || github.event_name == 'workflow_dispatch' }}
     timeout-minutes: 90
     strategy:

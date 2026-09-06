@@ -328,15 +328,19 @@ EOF
 
 start_fail()
 {
-   # Restore the last generated configuration when startup or health checks
-   # fail.  The copy is updated only after a successful core health check.
-   if [ -n "$CONFIG_FILE" ] && [ -n "$LAST_GOOD_CONFIG" ] && [ -s "$LAST_GOOD_CONFIG" ]; then
-      cp -f "$LAST_GOOD_CONFIG" "$CONFIG_FILE" >/dev/null 2>&1
-      LOG_WARN "Restored the last known-good OpenKill configuration."
-   fi
+   openkill_current_start || exit 1
    uci -q set openkill.config.last_start_failed=1
    uci -q commit openkill
-   stop
+   if [ "${OPENKILL_RECOVERY:-0}" != 1 ] && [ -s /etc/openkill/.last-good/config.yaml ]; then
+      LOG_WARN "Startup failed; scheduling one verified checkpoint recovery."
+      ( /usr/share/openkill/openkill_recovery.sh restore "$OPENKILL_START_TOKEN" || {
+           LOG_ERROR "Checkpoint recovery could not complete; manual review is required."
+           openkill_current_start && /etc/init.d/openkill stop
+        } ) </dev/null >>"$LOG_FILE" 2>&1 &
+   else
+      LOG_ERROR "Startup stopped: no compatible checkpoint or recovery already attempted."
+      stop
+   fi
    exit 1
 }
 
@@ -525,6 +529,7 @@ write_run_quick()
 #运行模式处理
 do_run_mode()
 {
+   en_mode_tun=""
    en_mode=$(uci_get_config "en_mode")
 
    if [ "$en_mode" = "fake-ip-tun" ]; then
@@ -772,150 +777,99 @@ check_mod()
    LOG_ERROR "【$1】module not found, please check your system depends if something abnormal!"
 } >/dev/null 2>&1
 
+openkill_current_start()
+{
+   [ -z "${OPENKILL_START_TOKEN:-}" ] || [ "$(cat /tmp/openkill-start.token 2>/dev/null)" = "$OPENKILL_START_TOKEN" ]
+}
+
 check_core_status()
 {
-   TUN_WAIT=0
-   TUN_RESTART=1
-   CORE_WAIT=0
-   CORE_HTTP_CODE=0
-
-   while ( ! openkill_core_process_present && [ "$CORE_WAIT" -le 10 ] )
-   do
-      sleep 1
-      let CORE_WAIT++
-   done
-
-   if [ -n "$en_mode_tun" ] || [ "$ipv6_mode" -eq 2 ] || [ "$ipv6_mode" -eq 3 ]; then
-      check_mod "tun"
-
-      if [ -n "$en_mode_tun" ]; then
-         ip_="ip"
-      else
-         ip_="ip -6"
-      fi
-
-      # In OpenKill-owned mode Mihomo deliberately does not install the
-      # policy route.  Wait for the TUN device itself, then install the route
-      # below.  In Mihomo-native mode keep the historical route readiness
-      # check because Mihomo owns table/rule creation there.
-      tun_ready()
-      {
-         if [ "$tun_owner" = "openkill" ]; then
-            ip link show utun >/dev/null 2>&1
-         else
-            # Mihomo auto-route normally uses table 2022 (not the main
-            # table).  Check all tables so a valid native route is not
-            # mistaken for a failed TUN startup.
-            [ -n "$($ip_ route list table all 2>/dev/null | grep -E '(^|[[:space:]])dev[[:space:]]+utun([[:space:]]|$)|utun' | head -n 1)" ]
-         fi
-      }
-
-      # Wait at most 60s for the TUN device before bounded retries.
-      while ( openkill_core_process_present && ! tun_ready && [ "$TUN_WAIT" -le 60 ] )
-      do
-         $ip_ link set utun up
-         let TUN_WAIT++
-         sleep 1
-      done
-
-      if openkill_core_process_present && ! tun_ready && [ "$TUN_WAIT" -gt 60 ]; then
-         while ( openkill_core_process_present && ! tun_ready && [ "$TUN_RESTART" -le 3 ] )
-         do
-            LOG_WARN "TUN Interface Start Failed, Try to Restart Again..."
-            start_run_core
-            let TUN_RESTART++
-            sleep 3
-         done
-         if openkill_core_process_present && ! tun_ready && [ "$TUN_RESTART" -gt 3 ]; then
-            LOG_ERROR "TUN Interface Start Failed, Please Check The Dependence or Try to Restart Again!"
-            LOG_ERROR "Core Initial Configuration Timeout, Please Check The Log Infos!"
-            start_fail
-         fi
-      fi
-
+   local deadline stage last_stage="" now
+   deadline=$(( $(cut -d. -f1 /proc/uptime) + 90 ))
+   # All readiness stages share a monotonic budget. A retry never reuses or
+   # moves the already-consumed temporary configuration.
+   while :; do
+      openkill_current_start || return 0
+      stage=process
       if openkill_core_process_present; then
-         if [ "$tun_owner" = "openkill" ]; then
-            # A few Mihomo builds create utun before marking it UP.  Bring it
-            # up explicitly before installing the owner-managed routes.
-            ip link set utun up 2>/dev/null || true
-            # Remove only the route-table artifacts that OpenKill owns.  Never
-            # delete Mihomo's native table 2022 entries in native mode.
-            while ( openkill_core_process_present && [ -n "$(ip -6 rule show |grep 2022)" ] && [ "$CORE_WAIT" -le 10 ] )
-            do
-               ip -6 rule del oif utun table 2022
-               ip -6 route del default dev utun table 2022
-               let CORE_WAIT++
-            done
-            if [ "$ipv6_mode" -eq 2 ] || [ "$ipv6_mode" -eq 3 ]; then
-               ip -6 route replace default dev utun table "$PROXY_ROUTE_TABLE"
-               ip -6 rule show | grep -q "fwmark $PROXY_FWMARK.*lookup $PROXY_ROUTE_TABLE" || \
-                  ip -6 rule add fwmark "$PROXY_FWMARK" table "$PROXY_ROUTE_TABLE" pref 1888
-            fi
-            if [ -n "$en_mode_tun" ]; then
-               ip route replace default dev utun table "$PROXY_ROUTE_TABLE"
-               ip rule show | grep -q "fwmark $PROXY_FWMARK.*lookup $PROXY_ROUTE_TABLE" || \
-                  ip rule add fwmark "$PROXY_FWMARK" table "$PROXY_ROUTE_TABLE" pref 1888
+         stage=controller
+         if openkill_core_api_healthy; then
+            stage=tun
+            if [ -z "$OPENKILL_TUN_DEVICE" ]; then
+               break
+            elif ip link show dev "$OPENKILL_TUN_DEVICE" >/dev/null 2>&1; then
+               if [ "$tun_owner" = "openkill" ]; then break; fi
+               # A native route must belong to the configured table/device.
+               if ip route show table "$OPENKILL_TUN_TABLE" 2>/dev/null | grep -Eq "dev $OPENKILL_TUN_DEVICE([[:space:]]|$)" ||
+                  ip -6 route show table "$OPENKILL_TUN_TABLE" 2>/dev/null | grep -Eq "dev $OPENKILL_TUN_DEVICE([[:space:]]|$)"; then
+                  if ip rule show | grep -q "lookup $OPENKILL_TUN_TABLE" ||
+                     ip -6 rule show | grep -q "lookup $OPENKILL_TUN_TABLE"; then break; fi
+               fi
             fi
          fi
       fi
-   else
-      while ( openkill_core_process_present && [ "$CORE_HTTP_CODE" != "200" ] && [ "$TUN_WAIT" -le 300 ] )
-      do
-         if openkill_core_api_healthy; then CORE_HTTP_CODE=200; else CORE_HTTP_CODE=000; fi
-         let TUN_WAIT++
-         sleep 1
-      done
-      if openkill_core_process_present && [ "$CORE_HTTP_CODE" != "200" ]; then
-         LOG_ERROR "Core Initial Configuration Timeout, Please Check The Log Infos!"
+      if [ "$stage" != "$last_stage" ]; then
+         LOG_TIP "Startup readiness: waiting for $stage"
+         last_stage="$stage"
+      fi
+      now=$(cut -d. -f1 /proc/uptime)
+      if [ "$now" -ge "$deadline" ]; then
+         LOG_ERROR "Startup readiness failed at $stage (90s total budget); see Mihomo log."
          start_fail
+      fi
+      sleep 1
+   done
+   openkill_current_start || return 0
+
+   if [ "$tun_owner" = "openkill" ] && [ -n "$OPENKILL_TUN_DEVICE" ]; then
+      ip link set dev "$OPENKILL_TUN_DEVICE" up || start_fail
+      # iproute2 prints table numbers in decimal. Use a canonical value when
+      # checking idempotency; 0x162 and 354 designate the same table.
+      if [ -n "$en_mode_tun" ]; then
+         ip route replace default dev "$OPENKILL_TUN_DEVICE" table 354 || start_fail
+         ip rule show | grep -q 'fwmark 0x162.*lookup 354' ||
+            ip rule add fwmark "$PROXY_FWMARK" table 354 pref 1888 || start_fail
+      fi
+      if [ "$ipv6_mode" -eq 2 ] || [ "$ipv6_mode" -eq 3 ]; then
+         ip -6 route replace default dev "$OPENKILL_TUN_DEVICE" table 354 || start_fail
+         ip -6 rule show | grep -q 'fwmark 0x162.*lookup 354' ||
+            ip -6 rule add fwmark "$PROXY_FWMARK" table 354 pref 1888 || start_fail
       fi
    fi
 
-   # A running process is not enough for a usable control panel.  In TUN mode
-   # the route may already exist while the external controller is still
-   # binding; wait for the same API readiness check used by non-TUN mode.
-   if openkill_core_process_present && [ "$CORE_HTTP_CODE" != "200" ]; then
-      CORE_WAIT=0
-      while openkill_core_process_present && [ "$CORE_HTTP_CODE" != "200" ] && [ "$CORE_WAIT" -le 30 ]
-      do
-         if openkill_core_api_healthy; then CORE_HTTP_CODE=200; else CORE_HTTP_CODE=000; fi
-         let CORE_WAIT++
-         [ "$CORE_HTTP_CODE" = "200" ] || sleep 1
-      done
-      if openkill_core_process_present && [ "$CORE_HTTP_CODE" != "200" ]; then
-         LOG_ERROR "Core controller is not ready, please check the Mihomo log and controller bind settings!"
+   openkill_current_start || return 0
+   if [ "$tun_owner" = "openkill" ]; then
+      [ "$1" != start ] || change_dnsmasq "$enable_redirect_dns"
+      set_firewall || start_fail
+   fi
+   openkill_current_start || return 0
+   # DNS is required by the generated OpenKill profile. A listener bind
+   # failure must not be reported as a successful proxy startup.
+   if [ -n "$OPENKILL_DNS_ENDPOINT" ]; then
+      dns_port_check="${OPENKILL_DNS_ENDPOINT##*:}"
+      if ! awk -v port="$dns_port_check" 'BEGIN {p=sprintf(":%04X", port)} $2 ~ p"$" {found=1} END {exit !found}' /proc/net/udp /proc/net/udp6 2>/dev/null; then
+         LOG_ERROR "DNS listener is not ready on the configured port."
          start_fail
       fi
    fi
-   if ! openkill_core_process_present; then
-      LOG_ERROR "Core Start Failed, Please Check The Log Infos!"
-      start_fail
+   if [ "$tun_owner" = openkill ]; then
+      if [ -n "$FW4" ]; then
+         nft list table inet fw4 2>/dev/null | grep -q openkill || start_fail
+      else
+         iptables-save 2>/dev/null | grep -qi openkill || start_fail
+      fi
    fi
-
+   openkill_current_start || return 0
    uci -q delete openkill.config.last_start_failed
    uci -q commit openkill
-
-   # OpenKill-owned mode applies dnsmasq/fw4 integration after the core is
-   # ready.  Mihomo-native mode must leave both untouched, otherwise the two
-   # managers would immediately recreate each other's rules.
-   if [ "$tun_owner" = "openkill" ]; then
-      if [ "$1" == "start" ]; then
-         change_dnsmasq "$enable_redirect_dns"
-         set_firewall
-         [ -s "$CONFIG_FILE" ] && cp -f "$CONFIG_FILE" "$LAST_GOOD_CONFIG" >/dev/null 2>&1
-         LOG_TIP "OpenKill Start Successful!"
-      else
-         set_firewall
-         LOG_TIP "Firewall Reload Successful!"
-      fi
-   else
-      [ -s "$CONFIG_FILE" ] && cp -f "$CONFIG_FILE" "$LAST_GOOD_CONFIG" >/dev/null 2>&1
-      LOG_TIP "Mihomo Native TUN Ownership Start Successful!"
+   if [ "$1" = start ]; then
+      /usr/share/openkill/openkill_recovery.sh save "$CONFIG_FILE" ||
+         LOG_WARN "Readiness passed, but saving the recovery checkpoint failed."
    fi
-
+   LOG_TIP "OpenKill readiness passed: process, controller, TUN/DNS and firewall."
+   printf '%s\n' "$OPENKILL_START_TOKEN" > /tmp/openkill-ready.token
    write_run_quick
 } >/dev/null 2>&1
-
 start_run_core()
 {
    ulimit -SHn 1000000
@@ -3751,16 +3705,28 @@ start_service()
       exit 0
    fi
 
+   OPENKILL_START_TOKEN="$(date +%s)-$$"
+   printf '%s\n' "$OPENKILL_START_TOKEN" > /tmp/openkill-start.token
+   if [ "${OPENKILL_RECOVERY:-0}" != 1 ]; then
+      rmdir /tmp/openkill-recovery.once 2>/dev/null || true
+   fi
+
    LOG_TIP "OpenKill Start Running..."
 
    {
       LOG_OUT "Step 1: Get The Configuration..."
       # Check instead of restart
-      check_run_quick
-      overwrite_file
+      if [ "${OPENKILL_RECOVERY:-0}" != 1 ]; then
+         check_run_quick
+         overwrite_file
+      fi
       get_config
       config_choose
       do_run_mode
+      if [ "$tun_owner" = mihomo ] && [ -z "$en_mode_tun" ]; then
+         LOG_ERROR "Mihomo native ownership requires an IPv4 TUN or mixed mode."
+         start_fail
+      fi
       if [ "$tun_owner" = "openkill" ]; then
          LOG_TIP "TUN ownership: OpenKill (routes and firewall are plugin-managed)"
          # The include must exist before any core or fw4 reload can reference
@@ -3776,6 +3742,11 @@ start_service()
 
       LOG_OUT "Step 2: Check The Components..."
       do_run_file "$RAW_CONFIG_FILE"
+
+      if [ "${OPENKILL_RECOVERY:-0}" = 1 ]; then
+         cp /etc/openkill/.last-good/config.yaml "$CONFIG_FILE" || start_fail
+         QUICK_START=true
+      fi
 
       if ! $QUICK_START; then
          LOG_OUT "Step 3: Modify The Config File..."
@@ -3894,6 +3865,7 @@ start_service()
 
 stop_service()
 {
+   rm -f /tmp/openkill-start.token /tmp/openkill-ready.token
    get_config
 
    LOG_TIP "OpenKill Stoping..."
@@ -3960,6 +3932,10 @@ restart()
 
 start_watchdog()
 {
+   procd_open_instance "openkill-health"
+   procd_set_param command "/usr/share/openkill/openkill_health.sh"
+   procd_set_param respawn 600 5 3
+   procd_close_instance
    procd_open_instance "openkill-watchdog"
    procd_set_param command "/usr/share/openkill/openkill_watchdog.sh"
    # Limit watchdog respawns to prevent a crash loop from repeatedly
@@ -3970,6 +3946,7 @@ start_watchdog()
 
 reload_service()
 {
+   OPENKILL_START_TOKEN="$(cat /tmp/openkill-start.token 2>/dev/null)"
    get_config
    MAX_RELOAD=10
    if openkill_core_process_present && [ "$enable" == "1" ] && [ "$1" == "firewall" ]; then

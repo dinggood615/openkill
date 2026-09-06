@@ -63,9 +63,9 @@ set_default dns_listen_address 127.0.0.1
 set_default cn_port 9090
 
 bind="$(uci -q get openkill.config.dashboard_bind_address 2>/dev/null || echo lan)"
-case "$bind" in lan|127.0.0.1|0.0.0.0|\[*\]|*:* ) ;; *) uci -q set openkill.config.dashboard_bind_address=lan; changed=1 ;; esac
+case "$bind" in lan|*.*.*.*|\[*\]|*:* ) ;; *) uci -q set openkill.config.dashboard_bind_address=lan; changed=1 ;; esac
 dns_bind="$(uci -q get openkill.config.dns_listen_address 2>/dev/null || echo 127.0.0.1)"
-case "$dns_bind" in 127.0.0.1|0.0.0.0|\[*\]|*:* ) ;; *) uci -q set openkill.config.dns_listen_address=127.0.0.1; changed=1 ;; esac
+case "$dns_bind" in *.*.*.*|\[*\]|*:* ) ;; *) uci -q set openkill.config.dns_listen_address=127.0.0.1; changed=1 ;; esac
 
 ipv6_enable="$(uci -q get openkill.config.ipv6_enable 2>/dev/null || echo 0)"
 if [ "$ipv6_enable" != 1 ]; then

@@ -5,6 +5,7 @@
 
 CONFIG_FILE="${1:-}"
 CORE="${2:-/etc/openkill/clash}"
+CORE_HOME="${3:-/etc/openkill}"
 SEMANTIC_CHECK="/usr/share/openkill/openkill_semantic_check.sh"
 
 [ -n "$CONFIG_FILE" ] || {
@@ -19,6 +20,7 @@ SEMANTIC_CHECK="/usr/share/openkill/openkill_semantic_check.sh"
 # Psych is the YAML implementation shipped by the OpenWrt Ruby packages.
 # Loading only (without rewriting) catches malformed YAML before the running
 # core is touched.
+command -v ruby >/dev/null 2>&1 || { echo 'Ruby YAML dependency is missing' >&2; exit 3; }
 if command -v ruby >/dev/null 2>&1; then
    ruby -ryaml -e 'YAML.load_file(ARGV[0]); exit 0' "$CONFIG_FILE" >/dev/null 2>&1 || {
       echo "YAML parse failed: $CONFIG_FILE" >&2
@@ -31,12 +33,13 @@ fi
 
 # Mihomo's -t performs the official config validation without opening the
 # listeners.  The installer replaces old cores that do not expose this flag.
+[ -x "$CORE" ] || { echo 'Mihomo executable is missing' >&2; exit 4; }
 if [ -x "$CORE" ]; then
    # Match the allow-list used by the procd service.  Without this, Mihomo's
    # default SAFE_PATHS=/tmp rejects the bundled external-ui directory before
    # OpenKill can start, even though the same config is valid at runtime.
    SAFE_PATHS="/usr/share/openkill:/etc/ssl:/tmp" \
-      "$CORE" -t -d "$(dirname "$CONFIG_FILE")" -f "$CONFIG_FILE" \
+      "$CORE" -t -d "$CORE_HOME" -f "$CONFIG_FILE" \
       >/tmp/openkill-config-test.$$.log 2>&1 || {
       cat /tmp/openkill-config-test.$$.log >&2
       rm -f /tmp/openkill-config-test.$$.log

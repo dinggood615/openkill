@@ -151,5 +151,5 @@ if tun
   end
 end
 
-puts 'semantic validation passed'
+puts "#{Time.now.strftime('%Y-%m-%d %H:%M:%S')} [Info] semantic validation passed"
 RUBY

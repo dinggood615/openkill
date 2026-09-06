@@ -10,6 +10,10 @@ fail() { printf 'validate-openkill: %s\n' "$*" >&2; exit 1; }
 need_file() { [ -f "$ROOT_DIR/$1" ] || fail "missing file: $1"; }
 
 for file in \
+  luci-app-openkill/root/usr/share/openkill/address.sh \
+  luci-app-openkill/root/usr/share/openkill/runtime_context.rb \
+  luci-app-openkill/root/usr/share/openkill/openkill_recovery.sh \
+  luci-app-openkill/root/usr/share/openkill/openkill_health.sh \
   luci-app-openkill/Makefile \
   scripts/install-openkill.sh \
   scripts/check-openkill-i18n.sh \
@@ -36,6 +40,9 @@ for file in \
 done
 
 for file in \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/address.sh" \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_recovery.sh" \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_health.sh" \
   "$ROOT_DIR/scripts/install-openkill.sh" \
   "$ROOT_DIR/scripts/check-openkill-i18n.sh" \
   "$ROOT_DIR/luci-app-openkill/root/etc/init.d/openkill" \

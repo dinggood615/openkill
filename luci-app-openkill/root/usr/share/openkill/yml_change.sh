@@ -2,6 +2,7 @@
 . /usr/share/openkill/ruby.sh
 . /usr/share/openkill/log.sh
 . /usr/share/openkill/uci.sh
+. /usr/share/openkill/address.sh
 . /lib/functions.sh
 
 LOG_FILE="/tmp/openkill.log"
@@ -27,34 +28,7 @@ dashboard_type=$(uci_get_config "dashboard_type" || echo "Official")
 # snapshot firmware does not expose it yet, loopback is the safe fallback.
 normalize_bind_address()
 {
-   local requested="${1:-lan}" resolved
-   case "$requested" in
-      lan)
-         resolved=$(uci -q get network.lan.ipaddr 2>/dev/null || true)
-         resolved=${resolved%%/*}
-         [ -n "$resolved" ] || resolved="127.0.0.1"
-         ;;
-      127.0.0.1|0.0.0.0)
-         resolved="$requested"
-         ;;
-      \[*\])
-         resolved="${requested#\[}"
-         resolved="${resolved%\]}"
-         resolved=${resolved%%/*}
-         ;;
-      *:*)
-         # Explicit IPv6 controller addresses are accepted.  The endpoint is
-         # bracketed only when it is written to external-controller below.
-         resolved="${requested%%/*}"
-         ;;
-      *)
-         resolved="127.0.0.1"
-         ;;
-   esac
-   case "$resolved" in
-      *[!0-9.:a-fA-F]*) resolved="127.0.0.1" ;;
-   esac
-   printf '%s' "$resolved"
+   openkill_bind_address "$1"
 }
 
 dashboard_bind_address=$(normalize_bind_address "$(uci_get_config "dashboard_bind_address" || echo lan)")
@@ -621,7 +595,8 @@ begin
                Value['dns']['fake-ip-range6'] = fake_ip_range6
             end
          end
-         Value['dns']['listen'] = dns_listen_address + ':' + dns_listen_port
+         dns_endpoint_host = dns_listen_address.include?(':') ? '[' + dns_listen_address + ']' : dns_listen_address
+         Value['dns']['listen'] = dns_endpoint_host + ':' + dns_listen_port
          Value['dns']['respect-rules'] = respect_rules
 
          if enable_sniffer
@@ -647,7 +622,7 @@ begin
             tun_dns_hijack = if tun_owner == 'mihomo'
                ['any:53', 'tcp://any:53']
             else
-               [dns_listen_address + ':' + dns_listen_port]
+               [Value['dns']['listen']]
             end
             Value['tun'] = {
                'enable' => true, 'stack' => tun_stack, 'device' => 'utun',
@@ -678,11 +653,8 @@ begin
          end
          Value.delete('auto-redir')
 
-         (Value['ntp'] ||= {})['enable'] = true
-         Value['ntp']['server'] = 'time.apple.com' if !Value['ntp'].key?('server')
-         Value['ntp']['port'] = 123 if !Value['ntp'].key?('port')
-          Value['ntp']['interval'] = 1800 if !Value['ntp'].key?('interval')
-         Value['ntp']['write-to-system'] = true if !Value['ntp'].key?('write-to-system')
+         # OpenWrt owns system time. Preserve an explicit user NTP section,
+         # but never introduce a second system-clock writer by default.
 
       rescue Exception => e
          YAML.LOG_ERROR('Set General Failed,【%s】' % [e.message])

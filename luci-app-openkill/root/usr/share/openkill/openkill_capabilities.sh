@@ -176,11 +176,15 @@ EOF
     if printf '%s\n' "$output" | grep -Eiq \
         'unknown field|field .* not found|unsupported.*(type|field)|cannot unmarshal|yaml: unmarshal|unknown proxy type'; then
         printf '%s\n' "0"
-    elif [ "$status" -eq 0 ] || printf '%s\n' "$output" | grep -Eiq \
-        'missing|required|invalid|must be|connect|network|endpoint|private.key|public.key'; then
-        printf '%s\n' "1"
+    elif [ "$status" -eq 0 ]; then
+        # Parsing may ignore unknown optional fields. A successful parse is
+        # not sufficient evidence of runtime protocol support.
+        case "$name" in
+            masque|shadowquic|zerotier) printf '%s\n' "1" ;;
+            *) printf '%s\n' "unknown" ;;
+        esac
     else
-        printf '%s\n' "0"
+        printf '%s\n' "unknown"
     fi
 }
 
@@ -227,9 +231,9 @@ ensure_cache() {
 
 status_text() {
     case "$1" in
-        1) printf '%s' "supported" ;;
-        0) printf '%s' "not detected" ;;
-        *) printf '%s' "unknown" ;;
+        1) printf '%s' "配置解析通过（连接能力需实测）" ;;
+        0) printf '%s' "未检测到支持" ;;
+        *) printf '%s' "未验证" ;;
     esac
 }
 

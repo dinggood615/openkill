@@ -1,0 +1,30 @@
+name: Runtime and Mihomo compatibility
+on:
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compatibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        release: [v1.19.30, latest]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install test dependencies
+        run: sudo apt-get update -qq && sudo apt-get install -y ruby python3-yaml lua5.1
+      - name: Runtime and installer behavior tests
+        run: |
+          command -v ruby
+          ruby -c luci-app-openkill/root/usr/share/openkill/runtime_context.rb
+          while IFS= read -r -d '' file; do luac5.1 -p "$file"; done < <(find luci-app-openkill/luasrc -name '*.lua' -print0)
+          sh scripts/validate-openkill.sh
+          python3 scripts/test-runtime.py -v
+          python3 scripts/test-installer.py -v
+      - name: Official stable core compatibility and local proxy smoke test
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/test-core.py --release '${{ matrix.release }}'

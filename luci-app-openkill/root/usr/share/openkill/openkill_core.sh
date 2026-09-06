@@ -301,6 +301,23 @@ else
    restart=1
 fi
 
+# Validate the candidate against the effective runtime configuration before
+# replacing a working core. On first install no runtime file exists yet.
+active_config="/etc/openkill/$(basename "$(uci_get_config config_path 2>/dev/null)")"
+if [ -f "$active_config" ] && [ -s "$active_config" ]; then
+   if ! /usr/share/openkill/openkill_validate.sh "$active_config" "$TMP_FILE" /etc/openkill; then
+      report_error "Candidate core rejected the active configuration; installed core was kept"
+      dec_job_counter_and_restart "0"
+      exit 1
+   fi
+fi
+if [ -s "$TARGET_CORE_PATH" ]; then
+   cp -p "$TARGET_CORE_PATH" "$TARGET_CORE_PATH.previous" || {
+      report_error "Cannot preserve previous core; update cancelled"
+      dec_job_counter_and_restart "0"
+      exit 1
+   }
+fi
 if ! mv -f "$TMP_FILE" "$TARGET_CORE_PATH"; then
    report_error "【$CORE_TYPE】Core installation failed; current core was kept"
    dec_job_counter_and_restart "0"
