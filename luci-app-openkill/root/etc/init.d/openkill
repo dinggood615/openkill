@@ -3908,7 +3908,10 @@ stop_service()
       # Mihomo-native auto-redirect can request an fw4 reload while exiting;
       # deleting the include first recreates the exact startup race we avoid.
       LOG_OUT "Step 2: Stop The OpenKill Core..."
-      procd_kill "openkill"
+      # The package manager may invoke prerm after the service was already
+      # stopped.  procd prints "Command failed: Not found" for that expected
+      # state; suppress it and rely on the bounded running-state check below.
+      procd_kill "openkill" >/dev/null 2>&1 || true
       for i in $(seq 1 10); do
          procd_running "openkill" >/dev/null && sleep 1 || break
       done
