@@ -1,10 +1,1 @@
-{
-  "version": "2026-1082",
-  "format": "ipk",
-  "architecture": "all",
-  "commit": "245587f739aa307cfa95c4a1851f61e4cedfa0f9",
-  "filename": "luci-app-openkill_2026-1082_all.ipk",
-  "sha256": "c2864a340f0e9d4f47cfd749c12d9485e722bb403b7b4d7495928b8f65988629",
-  "url": "https://github.com/dinggood615/openkill/releases/download/v2026-1082-ipk/luci-app-openkill_2026-1082_all.ipk"
-}
-
+{"version": "2026-1086", "format": "ipk", "architecture": "all", "commit": "0df916eb4c4e3b06fa759c9e71bd7b181ca8f230", "filename": "luci-app-openkill_2026-1086_all.ipk", "sha256": "5f83b3f930936f37caf00a5d2a37b75eca22dc79d2a2e8c3d52fadf5b740e4a3", "url": "https://github.com/dinggood615/openkill/releases/download/v2026-1086-ipk/luci-app-openkill_2026-1086_all.ipk"}
