@@ -22,7 +22,11 @@ fi
 gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "$asset" --dir "$stage/verify"
 cmp "$stage/$asset" "$stage/verify/$asset"
 export ASSET="$asset" STAGE="$stage"
-python3 - <<'PY'
+PYTHON_BIN="${PYTHON_BIN:-}"
+if [ -z "$PYTHON_BIN" ]; then
+  command -v python3 >/dev/null 2>&1 && PYTHON_BIN=python3 || PYTHON_BIN=python
+fi
+"$PYTHON_BIN" - <<'PY'
 import os, json, hashlib, pathlib
 p = pathlib.Path(os.environ["STAGE"]) / os.environ["ASSET"]
 data = dict(version=os.environ["RELEASE_VERSION"], format=os.environ["PACKAGE_FORMAT"],
