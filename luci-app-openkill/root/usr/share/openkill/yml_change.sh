@@ -457,7 +457,7 @@ begin
 
    # Give health-check groups bounded, consistent defaults without replacing a
    # user's explicit endpoint or cadence.  This avoids the very long default
-   # probe timeout that can make the dashboard show "no delay" for a usable
+   # probe timeout that can make the dashboard report no delay for a usable
    # node and keeps all groups on the same 204 probe semantics.
    if Value['proxy-groups'].is_a?(Array)
       Value['proxy-groups'].each do |group|
