@@ -253,6 +253,20 @@ jobs:
             find bin -name "luci-app-openkill_*.ipk" -exec cp {} bin/packages/x86_64/base/ \; 2>/dev/null || true
           fi
 
+      - name: Verify packaged IPK UI assets
+        if: ${{ matrix.target.name == 'ipk' }}
+        run: |
+          set -euo pipefail
+          package_file=$(find tmp/${{ matrix.target.sdk_dir }}/bin -type f -name 'luci-app-openkill_*.ipk' | head -n 1)
+          [ -n "$package_file" ] || { echo 'OpenKill IPK was not produced'; exit 1; }
+          data_member=$(ar t "$package_file" | awk '/^data\.tar/ { print; exit }')
+          [ -n "$data_member" ] || { echo 'OpenKill IPK data archive is missing'; exit 1; }
+          ar p "$package_file" "$data_member" | tar -xOzf - ./www/luci-static/resources/openkill/css/oc.css > /tmp/openkill-oc.css
+          grep -Fq -- '--ok-flat-page:' /tmp/openkill-oc.css
+          grep -Fq -- '.oc.openkill-status-page' /tmp/openkill-oc.css
+          echo 'Verified packaged flat UI assets:'
+          sha256sum /tmp/openkill-oc.css
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
