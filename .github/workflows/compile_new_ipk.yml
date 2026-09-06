@@ -43,18 +43,16 @@ jobs:
           case "$version" in *[!0-9-]*) echo "Invalid version: $version"; exit 1;; esac
           echo "version=$version" >> $GITHUB_OUTPUT
 
-      - name: Read published package channel
-        uses: actions/checkout@v6
-        with:
-          ref: package
-          path: package-channel
-          fetch-depth: 1
-
       - name: Current Version
         id: current_version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
         run: |
-          current=$(sed -n 1p package-channel/master/version 2>/dev/null | sed 's/^v//' | tr -d '[:space:]')
-          current=${current:-0}
+          # Read only the version metadata, not the entire binary package branch.
+          current=$(gh api "repos/$RELEASE_REPOSITORY/contents/master/version?ref=package" --jq '.content' | base64 --decode | sed -n '1s/^v//p' | tr -d '[:space:]')
+          [[ "$current" =~ ^2026-[0-9]+$ ]] || { echo 'Invalid published version metadata'; exit 1; }
           echo "version=$current" >> $GITHUB_OUTPUT
 
       - name: Require Version Bump
