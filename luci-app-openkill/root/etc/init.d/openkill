@@ -3766,6 +3766,20 @@ start_service()
          "$lgbm_auto_update" "$lgbm_custom_url" "$lgbm_update_interval" "$smart_collect" "$smart_collect_size"\
          "$fakeip_range6" "$fake_ip_range6_enable" "$global_ua"
 
+         # Validate the rewritten controller context before starting Mihomo.
+         # This catches a broken Shell/Ruby rewrite immediately instead of
+         # waiting for the full readiness timeout with an unprobeable API.
+         if ! controller_context="$(ruby /usr/share/openkill/runtime_context.rb "$TMP_CONFIG_FILE" 2>/dev/null)"; then
+            LOG_ERROR "Generated OpenKill YAML has no valid external-controller; startup aborted before core launch."
+            start_fail
+         fi
+         controller_endpoint="$(printf '%s\n' "$controller_context" | sed -n '1p')"
+         [ -n "$controller_endpoint" ] || {
+            LOG_ERROR "Generated OpenKill YAML controller endpoint is empty; startup aborted."
+            start_fail
+         }
+         LOG_TIP "Controller endpoint validated: ${controller_endpoint#http://}"
+
          /usr/share/openkill/yml_rules_change.sh \
          "$enable_custom_clash_rules" "$TMP_CONFIG_FILE"\
          "$enable_rule_proxy" "$router_self_proxy" "$lan_ip" "$enable_redirect_dns" "$en_mode"\

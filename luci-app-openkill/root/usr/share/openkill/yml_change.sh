@@ -523,7 +523,7 @@ begin
          Value['tcp-concurrent'] = true if tcp_concurrent
          Value['unified-delay'] = true if unified_delay
           # Routers do not have a meaningful process table for every flow;
-          # `off` avoids repeated process lookups and is the Mihomo-recommended
+          # off avoids repeated process lookups and is the Mihomo-recommended
           # low-overhead default.  Keep an explicit user value when supplied.
           Value['find-process-mode'] = (find_process_mode == '0' ? 'off' : find_process_mode)
 

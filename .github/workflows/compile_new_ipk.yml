@@ -9,6 +9,12 @@ on:
       - 'scripts/**'
       - '.github/workflows/compile_new_ipk.yml'
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish the already verified package to GitHub Releases and package branch'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -51,8 +57,15 @@ jobs:
           RELEASE_REPOSITORY: ${{ github.repository }}
         run: |
           # Read only the version metadata, not the entire binary package branch.
-          current=$(gh api "repos/$RELEASE_REPOSITORY/contents/master/version?ref=package" --jq '.content' | base64 --decode | sed -n '1s/^v//p' | tr -d '[:space:]')
-          [[ "$current" =~ ^2026-[0-9]+$ ]] || { echo 'Invalid published version metadata'; exit 1; }
+          current_content=$(gh api "repos/$RELEASE_REPOSITORY/contents/master/version?ref=package" --jq '.content' 2>/dev/null || true)
+          if [ -n "$current_content" ]; then
+            current=$(printf '%s' "$current_content" | base64 --decode | sed -n '1s/^v//p' | tr -d '[:space:]')
+            [[ "$current" =~ ^2026-[0-9]+$ ]] || { echo 'Invalid published version metadata'; exit 1; }
+          else
+            # The package channel may be intentionally empty before the first
+            # locally verified release. Treat it as version zero.
+            current=2026-0000
+          fi
           echo "version=$current" >> $GITHUB_OUTPUT
 
       - name: Require Version Bump
@@ -250,6 +263,7 @@ jobs:
           if-no-files-found: error
 
       - name: Publish this package format independently
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true }}
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ needs.Get-Version.outputs.version }}
