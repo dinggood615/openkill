@@ -111,11 +111,27 @@ def run_tests(core, directory):
                 raise RuntimeError('Controller did not become healthy')
             time.sleep(0.2)
         assert api(control, 'wrong-secret')[0] in (401, 403), 'API accepted an invalid secret'
-        connection = http.client.HTTPConnection('127.0.0.1', mixed, timeout=5)
-        connection.request('GET', f'http://127.0.0.1:{server.server_port}/probe')
-        response = connection.getresponse()
-        assert response.status == 200 and response.read() == b'openkill-proxy-smoke', 'Proxy data path failed'
-        connection.close()
+        # Recent Mihomo releases may report a healthy controller a fraction
+        # before the mixed listener accepts its first connection.  Wait for
+        # the data plane instead of treating that normal startup ordering as
+        # a flaky compatibility failure.
+        proxy_deadline = time.monotonic() + 10
+        proxy_error = None
+        while True:
+            try:
+                connection = http.client.HTTPConnection('127.0.0.1', mixed, timeout=2)
+                connection.request('GET', f'http://127.0.0.1:{server.server_port}/probe')
+                response = connection.getresponse()
+                body = response.read()
+                connection.close()
+                if response.status == 200 and body == b'openkill-proxy-smoke':
+                    break
+                proxy_error = f'HTTP {response.status}'
+            except OSError as error:
+                proxy_error = str(error)
+            if process.poll() is not None or time.monotonic() >= proxy_deadline:
+                raise AssertionError(f'Proxy data path failed: {proxy_error}')
+            time.sleep(0.2)
         name = b'\x05probe\x04test\0'
         query = struct.pack('!6H', 1234, 0x100, 1, 0, 0, 0) + name + struct.pack('!2H', 1, 1)
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
