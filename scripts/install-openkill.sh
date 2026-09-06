@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1085"
+PROJECT_VERSION="2026-1086"
 ACTION=install
 PACKAGE_FILE=""
 LOCAL_PACKAGE_MODE=0
@@ -716,10 +716,14 @@ detail "Installation log: ${INSTALL_LOG:-unavailable}"
 install_dependencies
 [ -n "$PACKAGE_FILE" ] || resolve_package
 [ -f "$PACKAGE_FILE" ] || die "Package file not found"
-# Even when dependencies were already present, install the local package
-# through a deduplicated temporary config so stale system feeds cannot emit
-# duplicate-src warnings during the package transaction.
-[ -n "$FEED_CONFIG" ] || prepare_feeds no-update
+# A local package has already been downloaded and has no feed dependency.
+# Let opkg use its native system configuration in this path; passing a second
+# full feed file makes some opkg builds parse the firmware feeds twice and emit
+# duplicate-src warnings even when the temporary file was deduplicated.  Remote
+# dependency/package resolution still keeps the selected temporary feed file.
+if [ -z "$FEED_CONFIG" ] && [ "$LOCAL_PACKAGE_MODE" -eq 0 ]; then
+  prepare_feeds no-update
+fi
 backup_config
 step "Installing OpenKill ${ver:-local package}"
 if [ "$PM" = opkg ]; then pm_run install "$PACKAGE_FILE"; else pm_run add --allow-untrusted "$PACKAGE_FILE"; fi
