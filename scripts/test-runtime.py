@@ -94,6 +94,7 @@ tun_owner=openkill
 en_mode_tun=''
 ipv6_mode=0
 enable_redirect_dns=1
+ipv6_enable=0
 FW4=yes
 LOG_TIP() { :; }; LOG_WARN() { :; }; LOG_ERROR() { :; }
 sleep() { :; }
@@ -104,7 +105,14 @@ openkill_core_api_healthy() { [ "$scenario" != bad_api ]; }
 start_fail() { exit 9; }
 change_dnsmasq() { :; }
 set_firewall() { [ "$scenario" != bad_firewall ]; }
-nft() { echo openkill; }
+fw4_dns_hijack_ready() { :; }
+nft() {
+  case "$*" in
+    *"list chain inet fw4 dstnat"*) echo 'OpenKill DNS Hijack redirect to :7874' ;;
+    *"list chain inet fw4 openkill_dns_redirect"*) echo 'redirect to :7874' ;;
+    *) echo openkill ;;
+  esac
+}
 uci() { :; }
 snapshot() { echo saved >> "$events"; }
 write_run_quick() { echo ready >> "$events"; }
@@ -132,6 +140,23 @@ write_run_quick() { echo ready >> "$events"; }
         result, events = self.run_case('stale')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(events, '')
+
+
+class FirewallShellCompatibilityTests(unittest.TestCase):
+    def test_direct_nft_sets_are_not_subject_to_bash_brace_expansion(self):
+        source = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        for number, line in enumerate(source.splitlines(), 1):
+            if 'nft ' not in line or "nft '" in line or 'nft "' in line:
+                continue
+            self.assertNotRegex(line, r'(?<![\'\"])\{(?:ipv4|ipv6|tcp,udp)\}(?![\'\"])',
+                                f'unquoted nft set at line {number}: {line}')
+            self.assertNotRegex(line, r'(?<![\'\"])\{\$proxy_port,',
+                                f'unquoted nft port set at line {number}: {line}')
+
+    def test_bash_expansion_fixture_matches_failure_mode(self):
+        result = run_shell("printf '<%s>\\n' {tcp,udp}")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.splitlines(), ['<tcp>', '<udp>'])
 
 
 @unittest.skipIf(os.name == 'nt', 'Recovery filesystem integration runs on Linux CI')

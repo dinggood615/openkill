@@ -943,6 +943,10 @@ check_core_status()
       else
          iptables-save 2>/dev/null | grep -qi openkill || start_fail
       fi
+      if [ -n "$FW4" ] && ! fw4_dns_hijack_ready; then
+         LOG_ERROR "DNS firewall takeover is incomplete; refusing to report OpenKill as ready."
+         start_fail
+      fi
    fi
    openkill_current_start || return 0
    uci -q delete openkill.config.last_start_failed
@@ -1091,6 +1095,44 @@ fw4_has_dns_hijack_rule()
          nft list chain inet fw4 "$chain" 2>/dev/null |grep 'OpenKill DNS Hijack' |grep -Evq 'meta nfproto[[:space:]]+\{?ipv6\}?|meta nfproto[[:space:]]+ipv6|ip6 nexthdr'
       ;;
    esac
+}
+
+# Verify the rule that actually performs DNS redirection, not merely the
+# parent chain or the jump into it.  On systems whose /bin/sh points to bash,
+# an unquoted nft set can fail during startup while leaving the chain behind;
+# treating that empty chain as healthy causes clients to use the ISP DNS and
+# produces intermittent IPv4/IPv6 results.  Keep this check small and
+# portable so it works with both firewall4/nftables and the legacy path.
+fw4_dns_hijack_ready()
+{
+   [ -n "$FW4" ] || return 0
+   [ "$enable_redirect_dns" -eq 0 ] && return 0
+
+   local rules jump
+   if [ "$enable_redirect_dns" -eq 2 ]; then
+      rules="$(nft list chain inet fw4 openkill_dns_redirect 2>/dev/null || true)"
+      printf '%s\n' "$rules" | grep -Eq 'redirect[[:space:]]+to[[:space:]]+(:)?[0-9]+' || return 1
+      jump="$(nft list chain inet fw4 dstnat 2>/dev/null || true)"
+      printf '%s\n' "$jump" | grep -q 'jump openkill_dns_redirect' || return 1
+   else
+      rules="$(nft list chain inet fw4 dstnat 2>/dev/null || true)"
+      printf '%s\n' "$rules" | grep -q 'OpenKill DNS Hijack' || return 1
+      printf '%s\n' "$rules" | grep -Eq 'redirect[[:space:]]+to[[:space:]]+(:)?[0-9]+' || return 1
+   fi
+
+   # IPv6 DNS hijacking is only installed for the IPv6 proxy modes that use
+   # the firewall path.  Do not reject a valid IPv4-only configuration.
+   if [ "$ipv6_enable" -eq 1 ] && { [ "$ipv6_mode" -eq 1 ] || [ "$ipv6_mode" -eq 3 ]; }; then
+      if [ "$enable_redirect_dns" -eq 2 ]; then
+         printf '%s\n' "$rules" | grep -Eq 'meta nfproto[[:space:]]+\{?ipv6\}?|ip6 nexthdr' || {
+            rules="$(nft list chain inet fw4 openkill_dns_redirect 2>/dev/null || true)"
+            printf '%s\n' "$rules" | grep -Eq 'meta nfproto[[:space:]]+\{?ipv6\}?|ip6 nexthdr' || return 1
+         }
+      else
+         printf '%s\n' "$rules" | grep -Eq 'meta nfproto[[:space:]]+\{?ipv6\}?|ip6 nexthdr' || return 1
+      fi
+   fi
+   return 0
 }
 
 firewall_lan_ac_traffic()
@@ -1487,7 +1529,7 @@ if [ -n "$FW4" ]; then
       nft 'add rule inet fw4 openkill_post ip daddr @localnetwork counter return'
       nft 'add rule inet fw4 openkill_post ct direction reply counter return'
       nft 'add rule inet fw4 openkill_post fib saddr type != { local } counter masquerade'
-      nft add rule inet fw4 srcnat meta nfproto {ipv4} counter jump openkill_post comment \"OpenKill Bypass Gateway Compatible\"
+      nft add rule inet fw4 srcnat meta nfproto '{ipv4}' counter jump openkill_post comment \"OpenKill Bypass Gateway Compatible\"
    fi
 
    #intranet allowed
@@ -1505,7 +1547,7 @@ if [ -n "$FW4" ]; then
             #nft delete rule inet fw4 input $(nft -a list chain inet fw4 input |grep "@localnetwork" |awk -F '# ' '{print$2}')
             nft insert rule inet fw4 input position 0 iifname "$wan_int" ip saddr != @localnetwork counter jump openkill_wan_input
          done
-         nft add rule inet fw4 openkill_wan_input th dport {$proxy_port,$tproxy_port,$cn_port,$http_port,$socks_port,$mixed_port,$dns_port} counter reject
+         nft add rule inet fw4 openkill_wan_input th dport "{$proxy_port,$tproxy_port,$cn_port,$http_port,$socks_port,$mixed_port,$dns_port}" counter reject
       else
          LOG_WARN "Can't Settting Only Intranet Allowed Function, Get IPv4 WAN Interfaces error, Please Verify The Firewall's WAN Zone Name is wan, Ignore This IF The Device Does not Have a WAN Interfaces..."
       fi
@@ -1528,15 +1570,15 @@ if [ -n "$FW4" ]; then
                   ACBLACKDNSFILTER="$ACBLACKDNSFILTER ether saddr != @lan_ac_black_macs"
                fi
             fi
-            nft insert rule inet fw4 dstnat position 0 meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ${ACBLACKDNSFILTER} counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
+            nft insert rule inet fw4 dstnat position 0 meta nfproto '{ipv4}' meta l4proto '{tcp,udp}' th dport 53 ${ACBLACKDNSFILTER} counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
          else
-            nft insert rule inet fw4 dstnat position 0 meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ip saddr @lan_ac_white_ips counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
-            nft insert rule inet fw4 dstnat position 0 meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ether saddr @lan_ac_white_macs counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
+            nft insert rule inet fw4 dstnat position 0 meta nfproto '{ipv4}' meta l4proto '{tcp,udp}' th dport 53 ip saddr @lan_ac_white_ips counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
+            nft insert rule inet fw4 dstnat position 0 meta nfproto '{ipv4}' meta l4proto '{tcp,udp}' th dport 53 ether saddr @lan_ac_white_macs counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
          fi
       fi
       if [ "$router_self_proxy" = 1 ]; then
          nft 'add chain inet fw4 nat_output { type nat hook output priority -1; }'
-         nft insert rule inet fw4 nat_output position 0 skgid != 65534 meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ip daddr {127.0.0.1} counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
+         nft insert rule inet fw4 nat_output position 0 skgid != 65534 meta nfproto '{ipv4}' meta l4proto '{tcp,udp}' th dport 53 ip daddr {127.0.0.1} counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
       fi
    elif [ "$enable_redirect_dns" -eq 2 ]; then
       nft 'add chain inet fw4 openkill_dns_redirect'
@@ -1551,15 +1593,15 @@ if [ -n "$FW4" ]; then
                ACBLACKDNSFILTER="$ACBLACKDNSFILTER ether saddr != @lan_ac_black_macs"
             fi
          fi
-         nft add rule inet fw4 openkill_dns_redirect meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ${ACBLACKDNSFILTER} counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
+         nft add rule inet fw4 openkill_dns_redirect meta nfproto '{ipv4}' meta l4proto '{tcp,udp}' th dport 53 ${ACBLACKDNSFILTER} counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
       else
-         nft add rule inet fw4 openkill_dns_redirect meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ip saddr @lan_ac_white_ips counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
-         nft add rule inet fw4 openkill_dns_redirect meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ether saddr @lan_ac_white_macs counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
+         nft add rule inet fw4 openkill_dns_redirect meta nfproto '{ipv4}' meta l4proto '{tcp,udp}' th dport 53 ip saddr @lan_ac_white_ips counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
+         nft add rule inet fw4 openkill_dns_redirect meta nfproto '{ipv4}' meta l4proto '{tcp,udp}' th dport 53 ether saddr @lan_ac_white_macs counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
       fi
       nft 'insert rule inet fw4 dstnat position 0 meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 counter jump openkill_dns_redirect'
       if [ "$router_self_proxy" = 1 ]; then
          nft 'add chain inet fw4 nat_output { type nat hook output priority -1; }'
-         nft insert rule inet fw4 nat_output position 0 meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ip daddr {127.0.0.1} meta skgid != 65534 counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
+         nft insert rule inet fw4 nat_output position 0 meta nfproto '{ipv4}' meta l4proto '{tcp,udp}' th dport 53 ip daddr {127.0.0.1} meta skgid != 65534 counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
       fi
    fi
 
@@ -1746,7 +1788,7 @@ if [ -n "$FW4" ]; then
          nft 'add rule inet fw4 openkill_mangle_output ip daddr @localnetwork counter return'
          nft 'add rule inet fw4 openkill_mangle_output ct direction reply counter return'
          if [ "$en_mode_tun" -eq 1 ]; then
-            nft add rule inet fw4 openkill_mangle_output meta l4proto {tcp,udp} ip daddr { "$fakeip_range" } mark set "$PROXY_FWMARK" counter
+            nft add rule inet fw4 openkill_mangle_output meta l4proto '{tcp,udp}' ip daddr { "$fakeip_range" } mark set "$PROXY_FWMARK" counter
          else
             nft add rule inet fw4 openkill_mangle_output meta l4proto { udp } ip daddr { "$fakeip_range" } mark set "$PROXY_FWMARK" counter
          fi
@@ -1767,7 +1809,7 @@ if [ -n "$FW4" ]; then
             fi
 
             #icmp
-            nft add rule inet fw4  openkill_mangle_output meta nfproto {ipv4} ip protocol icmp icmp type echo-request mark set "$PROXY_FWMARK" counter accept comment \"OpenKill ICMP Mark\"
+             nft add rule inet fw4  openkill_mangle_output meta nfproto '{ipv4}' ip protocol icmp icmp type echo-request mark set "$PROXY_FWMARK" counter accept comment \"OpenKill ICMP Mark\"
 
             if [ "$en_mode_tun" -eq 1 ]; then
                # Keep IPv4 router-self interception compatible with nftables
@@ -1802,7 +1844,7 @@ if [ -n "$FW4" ]; then
       nft 'add rule inet fw4 openkill_mangle ip saddr @lan_ac_black_ips counter return'
       nft 'add rule inet fw4 openkill_mangle ether saddr @lan_ac_black_macs counter return'
       if [ "$en_mode_tun" -eq 1 ]; then
-         nft add rule inet fw4 openkill_mangle meta l4proto {tcp,udp} ip daddr { "$fakeip_range" } mark set "$PROXY_FWMARK" counter
+         nft add rule inet fw4 openkill_mangle meta l4proto '{tcp,udp}' ip daddr { "$fakeip_range" } mark set "$PROXY_FWMARK" counter
       else
          nft add rule inet fw4 openkill_mangle meta l4proto { udp } ip daddr { "$fakeip_range" } mark set "$PROXY_FWMARK" counter
       fi
@@ -1823,7 +1865,7 @@ if [ -n "$FW4" ]; then
       fi
 
       #icmp
-      nft add rule inet fw4 openkill_mangle meta nfproto {ipv4} ip protocol icmp icmp type echo-request mark set "$PROXY_FWMARK" counter accept comment \"OpenKill ICMP Mark\"
+      nft add rule inet fw4 openkill_mangle meta nfproto '{ipv4}' ip protocol icmp icmp type echo-request mark set "$PROXY_FWMARK" counter accept comment \"OpenKill ICMP Mark\"
 
       nft 'add rule inet fw4 openkill_mangle ip protocol udp counter jump openkill_upnp'
 
@@ -1836,10 +1878,10 @@ if [ -n "$FW4" ]; then
       nft 'add rule inet fw4 mangle_prerouting meta nfproto {ipv4} counter jump openkill_mangle'
 
       #TUN FORWORD
-      nft insert rule inet fw4 forward position 0 meta nfproto {ipv4} oifname utun counter accept comment \"OpenKill TUN Forward\"
-      nft insert rule inet fw4 forward position 0 meta nfproto {ipv4} iifname utun counter accept comment \"OpenKill TUN Forward\"
-      nft insert rule inet fw4 input position 0 meta nfproto {ipv4} iifname utun counter accept comment \"OpenKill TUN Input\"
-      nft insert rule inet fw4 srcnat position 0 meta nfproto {ipv4} oifname utun counter return comment \"OpenKill TUN Postrouting\"
+      nft insert rule inet fw4 forward position 0 meta nfproto '{ipv4}' oifname utun counter accept comment \"OpenKill TUN Forward\"
+      nft insert rule inet fw4 forward position 0 meta nfproto '{ipv4}' iifname utun counter accept comment \"OpenKill TUN Forward\"
+      nft insert rule inet fw4 input position 0 meta nfproto '{ipv4}' iifname utun counter accept comment \"OpenKill TUN Input\"
+      nft insert rule inet fw4 srcnat position 0 meta nfproto '{ipv4}' oifname utun counter return comment \"OpenKill TUN Postrouting\"
 
       #quic
       if [ "$disable_udp_quic" -eq 1 ]; then
@@ -1897,14 +1939,14 @@ if [ -n "$FW4" ]; then
                      ACBLACKDNSFILTER="$ACBLACKDNSFILTER ether saddr != @lan_ac_black_macs"
                   fi
                fi
-               nft insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ${ACBLACKDNSFILTER} counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
+               nft insert rule inet fw4 dstnat position 0 meta nfproto '{ipv6}' ip6 nexthdr '{tcp,udp}' th dport 53 ${ACBLACKDNSFILTER} counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
             else
-               nft insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ip6 saddr @lan_ac_white_ipv6s counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
-               nft insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ether saddr @lan_ac_white_macs counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
+               nft insert rule inet fw4 dstnat position 0 meta nfproto '{ipv6}' ip6 nexthdr '{tcp,udp}' th dport 53 ip6 saddr @lan_ac_white_ipv6s counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
+               nft insert rule inet fw4 dstnat position 0 meta nfproto '{ipv6}' ip6 nexthdr '{tcp,udp}' th dport 53 ether saddr @lan_ac_white_macs counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
             fi
             if [ "$router_self_proxy" = 1 ]; then
                nft 'add chain inet fw4 nat_output { type nat hook output priority -1; }'
-               nft insert rule inet fw4 nat_output position 0 skgid != 65534 meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ip6 daddr {::1} counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
+               nft insert rule inet fw4 nat_output position 0 skgid != 65534 meta nfproto '{ipv6}' ip6 nexthdr '{tcp,udp}' th dport 53 ip6 daddr {::1} counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
             fi
          elif [ "$enable_redirect_dns" -eq 2 ]; then
             if [ "$lan_ac_mode" != "1" ]; then
@@ -1917,15 +1959,15 @@ if [ -n "$FW4" ]; then
                      ACBLACKDNSFILTER="$ACBLACKDNSFILTER ether saddr != @lan_ac_black_macs"
                   fi
                fi
-               nft add rule inet fw4 openkill_dns_redirect meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ${ACBLACKDNSFILTER} counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
+               nft add rule inet fw4 openkill_dns_redirect meta nfproto '{ipv6}' ip6 nexthdr '{tcp,udp}' th dport 53 ${ACBLACKDNSFILTER} counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
             else
-               nft add rule inet fw4 openkill_dns_redirect meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ip6 saddr @lan_ac_white_ipv6s counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
-               nft add rule inet fw4 openkill_dns_redirect meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ether saddr @lan_ac_white_macs counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
+               nft add rule inet fw4 openkill_dns_redirect meta nfproto '{ipv6}' ip6 nexthdr '{tcp,udp}' th dport 53 ip6 saddr @lan_ac_white_ipv6s counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
+               nft add rule inet fw4 openkill_dns_redirect meta nfproto '{ipv6}' ip6 nexthdr '{tcp,udp}' th dport 53 ether saddr @lan_ac_white_macs counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
             fi
             nft 'insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 counter jump openkill_dns_redirect'
             if [ "$router_self_proxy" = 1 ]; then
                nft 'add chain inet fw4 nat_output { type nat hook output priority -1; }'
-               nft insert rule inet fw4 nat_output position 0 meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ip6 daddr {::1} meta skgid != 65534 counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
+               nft insert rule inet fw4 nat_output position 0 meta nfproto '{ipv6}' ip6 nexthdr '{tcp,udp}' th dport 53 ip6 daddr {::1} meta skgid != 65534 counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
             fi
          fi
       fi
@@ -2030,7 +2072,7 @@ if [ -n "$FW4" ]; then
 
          #icmpv6
          if [ "$ipv6_mode" -eq 2 ] || [ "$ipv6_mode" -eq 3 ]; then
-            nft add rule inet fw4 openkill_mangle_v6 meta nfproto {ipv6} ip6 nexthdr icmpv6 icmpv6 type echo-request mark set "$PROXY_FWMARK" counter accept comment \"OpenKill ICMPv6 Redirect\"
+             nft add rule inet fw4 openkill_mangle_v6 meta nfproto '{ipv6}' ip6 nexthdr icmpv6 icmpv6 type echo-request mark set "$PROXY_FWMARK" counter accept comment \"OpenKill ICMPv6 Redirect\"
          fi
       fi
 
@@ -2098,7 +2140,7 @@ if [ -n "$FW4" ]; then
          fi
          if ([ "$ipv6_mode" -eq 0 ] && [ "$enable_v6_udp_proxy" -eq 1 ]) || [ "$ipv6_mode" -eq 2 ]; then
             if [ "$en_mode" = "fake-ip" ]; then
-               nft add rule inet fw4 openkill_mangle_output_v6 ip6 nexthdr {tcp,udp} ip6 daddr { "$fakeip_range6" } mark set "$PROXY_FWMARK" counter
+               nft add rule inet fw4 openkill_mangle_output_v6 ip6 nexthdr '{tcp,udp}' ip6 daddr { "$fakeip_range6" } mark set "$PROXY_FWMARK" counter
             fi
          fi
          if [ "$ipv6_mode" -eq 0 ] && [ "$enable_v6_udp_proxy" -ne 1 ]; then
@@ -2124,7 +2166,7 @@ if [ -n "$FW4" ]; then
 
          #icmpv6
          if [ "$ipv6_mode" -eq 2 ] || [ "$ipv6_mode" -eq 3 ]; then
-            nft add rule inet fw4 openkill_mangle_output_v6 meta nfproto {ipv6} ip6 nexthdr icmpv6 icmpv6 type echo-request mark set "$PROXY_FWMARK" counter accept comment \"OpenKill ICMPv6 Redirect\"
+            nft add rule inet fw4 openkill_mangle_output_v6 meta nfproto '{ipv6}' ip6 nexthdr icmpv6 icmpv6 type echo-request mark set "$PROXY_FWMARK" counter accept comment \"OpenKill ICMPv6 Redirect\"
          fi
 
          if ([ "$ipv6_mode" -eq 1 ] && [ "$enable_v6_udp_proxy" -eq 1 ]) || [ "$ipv6_mode" -eq 3 ]; then
@@ -2151,10 +2193,10 @@ if [ -n "$FW4" ]; then
 
       #TUN FORWORD
       if [ "$ipv6_mode" -eq 2 ] || [ "$ipv6_mode" -eq 3 ]; then
-         nft insert rule inet fw4 forward position 0 meta nfproto {ipv6} oifname utun counter accept comment \"OpenKill TUN Forward\"
-         nft insert rule inet fw4 forward position 0 meta nfproto {ipv6} iifname utun counter accept comment \"OpenKill TUN Forward\"
-         nft insert rule inet fw4 input position 0 meta nfproto {ipv6} iifname utun counter accept comment \"OpenKill TUN Input\"
-         nft insert rule inet fw4 srcnat position 0 meta nfproto {ipv6} oifname utun counter return comment \"OpenKill TUN Postrouting\"
+          nft insert rule inet fw4 forward position 0 meta nfproto '{ipv6}' oifname utun counter accept comment \"OpenKill TUN Forward\"
+          nft insert rule inet fw4 forward position 0 meta nfproto '{ipv6}' iifname utun counter accept comment \"OpenKill TUN Forward\"
+          nft insert rule inet fw4 input position 0 meta nfproto '{ipv6}' iifname utun counter accept comment \"OpenKill TUN Input\"
+          nft insert rule inet fw4 srcnat position 0 meta nfproto '{ipv6}' oifname utun counter return comment \"OpenKill TUN Postrouting\"
       fi
 
       #quic
@@ -2182,7 +2224,7 @@ if [ -n "$FW4" ]; then
          nft 'add rule inet fw4 openkill_post_v6 ip6 daddr @localnetwork6 counter return'
          nft 'add rule inet fw4 openkill_post_v6 ct direction reply counter return'
          nft 'add rule inet fw4 openkill_post_v6 fib saddr type != { local } counter masquerade'
-         nft add rule inet fw4 srcnat meta nfproto {ipv6} counter jump openkill_post_v6 comment \"OpenKill Bypass Gateway Compatible\"
+          nft add rule inet fw4 srcnat meta nfproto '{ipv6}' counter jump openkill_post_v6 comment \"OpenKill Bypass Gateway Compatible\"
       fi
 
       #intranet allowed
@@ -2200,7 +2242,7 @@ if [ -n "$FW4" ]; then
                #nft delete rule inet fw4 input $(nft -a list chain inet fw4 input |grep "@localnetwork6" |awk -F '# ' '{print$2}')
                nft insert rule inet fw4 input position 0 iifname "$wan6_int" ip6 saddr != @localnetwork6 counter jump openkill_wan6_input
             done
-            nft add rule inet fw4 openkill_wan6_input ip6 nexthdr {tcp,udp} th dport {$proxy_port,$tproxy_port,$cn_port,$http_port,$socks_port,$mixed_port,$dns_port} counter reject
+            nft add rule inet fw4 openkill_wan6_input ip6 nexthdr '{tcp,udp}' th dport "{$proxy_port,$tproxy_port,$cn_port,$http_port,$socks_port,$mixed_port,$dns_port}" counter reject
          else
             LOG_WARN "Can't Settting Only Intranet Allowed Function, Get IPv6 WAN Interfaces error, Please Verify The Firewall's WAN Zone Name is wan, Ignore This IF The Device Does not Have a WAN Interfaces..."
          fi
