@@ -314,3 +314,16 @@ jobs:
           RELEASE_VERSION: ${{ needs.Get-Version.outputs.version }}
           PACKAGE_FORMAT: ${{ matrix.target.name }}
         run: bash scripts/publish-package.sh
+
+  Prune-Old-Releases:
+    runs-on: ubuntu-latest
+    needs: [Compile, Get-Version]
+    if: ${{ success() && (github.event_name == 'push' || inputs.publish == true) }}
+    steps:
+      - name: Checkout OpenKill Source
+        uses: actions/checkout@v6
+      - name: Remove older published versions
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ needs.Get-Version.outputs.version }}
+        run: bash scripts/prune-published-packages.sh
