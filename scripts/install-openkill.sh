@@ -4,9 +4,10 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1083"
+PROJECT_VERSION="2026-1084"
 ACTION=install
 PACKAGE_FILE=""
+LOCAL_PACKAGE_MODE=0
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
 ORIGINAL_ARGS="$#"
 SOURCE_ROOT=""
@@ -55,7 +56,10 @@ if [ "$ACTION" = uninstall ]; then
   TOTAL_STEPS=1
 elif [ -n "$PACKAGE_FILE" ]; then
   # A supplied local package skips remote manifest resolution and download.
-  TOTAL_STEPS=6
+  LOCAL_PACKAGE_MODE=1
+  TOTAL_STEPS=7
+else
+  TOTAL_STEPS=9
 fi
 [ "$(id -u)" -eq 0 ] || die "Run as root"
 
@@ -258,8 +262,10 @@ install_dependencies(){
     detail "All required dependencies are installed; index refresh skipped"
   fi
   install_dependency_set "required runtime dependencies" required "$required"
-  # YAML and JSON are required for configuration and the release manifest.
-  if ! ruby -ryaml -rjson -e 'exit 0' >/dev/null 2>&1; then
+  # YAML is required by the runtime.  ruby-json is only needed while parsing
+  # a remote package manifest; local package installs must not be blocked by
+  # a missing optional Ruby extension or an unreachable feed.
+  if ! ruby -ryaml -e 'exit 0' >/dev/null 2>&1; then
     [ -n "$FEED_CONFIG" ] || prepare_feeds
     available_optional=""
     for dep in $optional; do
@@ -268,7 +274,19 @@ install_dependencies(){
     done
     install_dependency_set "Ruby and diagnostic compatibility modules" optional "$available_optional"
   fi
-  ruby -ryaml -rjson -e 'exit 0' || die "Ruby YAML/JSON runtime is incomplete"
+  ruby -ryaml -e 'exit 0' || die "Ruby YAML runtime is incomplete"
+  if ! ruby -rjson -e 'exit 0' >/dev/null 2>&1; then
+    if [ "$LOCAL_PACKAGE_MODE" -eq 1 ]; then
+      detail "Ruby JSON extension is unavailable; local package mode does not need remote manifest parsing"
+    else
+      [ -n "$FEED_CONFIG" ] || prepare_feeds
+      json_packages=""
+      if package_available ruby-json; then json_packages="ruby-json"; fi
+      [ -n "$json_packages" ] || die "Ruby JSON extension is required to resolve the published package"
+      install_dependency_set "Ruby JSON manifest module" required "$json_packages"
+      ruby -rjson -e 'exit 0' || die "Ruby JSON runtime is incomplete"
+    fi
+  fi
 }
 
 download(){
@@ -377,7 +395,81 @@ validate_install(){
   sh -n /usr/share/openkill/openkill_watchdog.sh || die "OpenKill watchdog validation failed"
   [ -x /usr/share/openkill/openkill_semantic_check.sh ] || die "OpenKill semantic validator is missing"
   sh -n /usr/share/openkill/openkill_semantic_check.sh || die "OpenKill semantic validator syntax check failed"
-  ruby -ryaml -rjson -e 'exit 0' || die "Ruby YAML/JSON runtime is incomplete"
+  ruby -ryaml -e 'exit 0' || die "Ruby YAML runtime is incomplete"
+}
+
+database_root(){
+  database_dir="/etc/openkill"
+  if command -v uci >/dev/null 2>&1 &&
+     [ "$(uci -q get openkill.config.small_flash_memory 2>/dev/null || true)" = "1" ]; then
+    database_dir="/tmp/etc/openkill"
+  fi
+  mkdir -p "$database_dir"
+  printf '%s\n' "$database_dir"
+}
+
+database_fetch(){
+  database_name="$1"
+  database_path="$2"
+  database_min_size="$3"
+  shift 3
+  database_tmp="$WORK_DIR/database-$database_name"
+  for database_url in "$@"; do
+    detail "Downloading database $database_name: $database_url"
+    if download "$database_url" "$database_tmp" 180 1; then
+      database_size=$(wc -c < "$database_tmp" 2>/dev/null || printf '0')
+      if [ "$database_size" -ge "$database_min_size" ] &&
+         ! head -c 512 "$database_tmp" | grep -qiE '<!doctype|<html|<head|<body'; then
+        mv -f "$database_tmp" "$database_path"
+        detail "Database ready: $database_path (${database_size} bytes)"
+        return 0
+      fi
+      detail "Rejected invalid database response: $database_name"
+    fi
+    rm -f "$database_tmp"
+  done
+  detail "Database download unavailable; retaining the packaged copy: $database_name"
+  return 1
+}
+
+download_databases(){
+  step "Downloading GeoIP, GeoSite, ASN and China route databases"
+  database_dir=$(database_root)
+  database_ok=0
+  database_fetch Country.mmdb "$database_dir/Country.mmdb" 10240 \
+    "https://testingcf.jsdelivr.net/gh/alecthw/mmdb_china_ip_list@release/lite/Country.mmdb" \
+    "https://fastly.jsdelivr.net/gh/alecthw/mmdb_china_ip_list@release/lite/Country.mmdb" \
+    "https://cdn.jsdelivr.net/gh/alecthw/mmdb_china_ip_list@release/lite/Country.mmdb" \
+    "https://raw.githubusercontent.com/alecthw/mmdb_china_ip_list/release/lite/Country.mmdb" && database_ok=$((database_ok + 1)) || true
+  database_fetch GeoSite.dat "$database_dir/GeoSite.dat" 10240 \
+    "https://testingcf.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geosite.dat" \
+    "https://fastly.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geosite.dat" \
+    "https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geosite.dat" \
+    "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat" && database_ok=$((database_ok + 1)) || true
+  database_fetch GeoIP.dat "$database_dir/GeoIP.dat" 10240 \
+    "https://testingcf.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geoip.dat" \
+    "https://fastly.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geoip.dat" \
+    "https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geoip.dat" \
+    "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat" && database_ok=$((database_ok + 1)) || true
+  database_fetch ASN.mmdb "$database_dir/ASN.mmdb" 10240 \
+    "https://testingcf.jsdelivr.net/gh/xishang0128/geoip@release/GeoLite2-ASN.mmdb" \
+    "https://fastly.jsdelivr.net/gh/xishang0128/geoip@release/GeoLite2-ASN.mmdb" \
+    "https://cdn.jsdelivr.net/gh/xishang0128/geoip@release/GeoLite2-ASN.mmdb" \
+    "https://github.com/xishang0128/geoip/releases/latest/download/GeoLite2-ASN.mmdb" && database_ok=$((database_ok + 1)) || true
+
+  # The China CIDR helper already validates and transforms both IPv4 and IPv6
+  # lists for nftables/iptables.  Keep the packaged route sets as a safe
+  # fallback when all external mirrors are temporarily unreachable.
+  if [ -x /usr/share/openkill/openkill_chnroute.sh ]; then
+    detail "Refreshing China IPv4/IPv6 route databases"
+    if ! SHOW_DOWNLOAD_PROGRESS=1 /usr/share/openkill/openkill_chnroute.sh >> "${INSTALL_LOG:-/dev/null}" 2>&1; then
+      detail "China route refresh failed; retaining the packaged route sets"
+    fi
+  fi
+  for database_file in Country.mmdb GeoSite.dat GeoIP.dat ASN.mmdb china_ip_route.ipset china_ip6_route.ipset; do
+    [ -s "$database_dir/$database_file" ] || detail "Database not present after install: $database_file"
+  done
+  detail "Database preparation finished ($database_ok/4 binary databases refreshed)"
 }
 
 validate_manifest(){
@@ -587,7 +679,7 @@ uninstall(){
   [ -x /etc/init.d/openkill ] && /etc/init.d/openkill stop >/dev/null 2>&1 || true
   if [ "$PM" = opkg ]; then opkg remove luci-app-openkill >/dev/null 2>&1 || true
   else apk del openkill luci-app-openkill >/dev/null 2>&1 || true; fi
-  rm -rf /etc/openkill /tmp/etc/openkill /tmp/openkill /tmp/openkill.log
+  rm -rf /etc/openkill /tmp/etc/openkill /tmp/openkill /tmp/openkill.log /tmp/openkill-watchdog.lock /tmp/openkill-proxy-address.lock
   rm -f /etc/config/openkill /tmp/luci-indexcache
   printf 'OpenKill removed; shared system dependencies were retained.\n'
 }
@@ -608,6 +700,7 @@ if [ "$PM" = opkg ]; then pm_run install "$PACKAGE_FILE"; else pm_run add --allo
 step "Validating installed service and runtime"
 validate_install
 install_core
+download_databases
 # Remove credentials and generated files left by older oixCloud-based builds.
 if command -v uci >/dev/null 2>&1; then
   for opt in oix_token oix_email oix_passwd oix_checkin oix_checkin_interval oix_checkin_multiple oix_params oix_default_params oix_show_info_page; do

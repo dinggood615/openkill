@@ -53,6 +53,20 @@ grep -q -- '-f mirror install local.ipk' "$WORK_DIR/calls"
         self.assertNotIn('s#https://dl.openwrt.ai/', SOURCE)
         self.assertIn('https://downloads.openwrt.org/', SOURCE)
 
+    def test_local_package_does_not_require_ruby_json_manifest_module(self):
+        self.assertIn('LOCAL_PACKAGE_MODE=1', SOURCE)
+        self.assertIn('local package mode does not need remote manifest parsing', SOURCE)
+        self.assertIn('ruby -ryaml -e', SOURCE)
+
+    def test_installer_refreshes_databases_with_mirror_fallbacks(self):
+        self.assertIn('download_databases()', SOURCE)
+        self.assertIn('Country.mmdb', SOURCE)
+        self.assertIn('GeoSite.dat', SOURCE)
+        self.assertIn('ASN.mmdb', SOURCE)
+        self.assertIn('openkill_chnroute.sh', SOURCE)
+        self.assertIn('testingcf.jsdelivr.net', SOURCE)
+        self.assertIn('fastly.jsdelivr.net', SOURCE)
+
     def test_manifest_selection_prefers_newest_version_over_fastest_stale_cdn(self):
         if not shutil.which("ruby"):
             self.skipTest("Ruby is not installed on this host")

@@ -101,8 +101,16 @@ grep -Fq 'openkill_config_normalize.sh' "$ROOT_DIR/luci-app-openkill/root/etc/in
   || fail 'UCI normalization hook is missing'
 grep -Fq 'OPENKILL_REQUIRED_COMMON' "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/dependencies.conf" \
   || fail 'dependency manifest is missing'
+grep -Fq 'LOCAL_PACKAGE_MODE=1' "$ROOT_DIR/scripts/install-openkill.sh" \
+  || fail 'local package dependency mode is missing'
+grep -Fq 'download_databases()' "$ROOT_DIR/scripts/install-openkill.sh" \
+  || fail 'installer database refresh is missing'
 grep -Fq 'prepare_openkill_include' "$ROOT_DIR/luci-app-openkill/root/etc/init.d/openkill" \
   || fail 'owner-specific firewall include preparation is missing'
+grep -Fq 'uci_bool_value()' "$ROOT_DIR/luci-app-openkill/root/etc/init.d/openkill" \
+  || fail 'UCI boolean normalization is missing'
+grep -Fq 'WATCHDOG_LOCK_PID' "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_watchdog.sh" \
+  || fail 'watchdog stale-lock recovery is missing'
 grep -Fq 'OPENKILL_TUN_OWNER' "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_semantic_check.sh" \
   || fail 'TUN ownership semantic validation is missing'
 grep -Fq 'tun_owner' "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_watchdog.sh" \

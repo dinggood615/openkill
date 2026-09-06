@@ -10,10 +10,42 @@ CLASH="/etc/openkill/clash"
 # Prevent an overlapping watchdog instance from running expensive discovery
 # or streaming checks after a service reload.
 WATCHDOG_LOCK="/tmp/openkill-watchdog.lock"
+WATCHDOG_LOCK_PID="$WATCHDOG_LOCK/pid"
+WATCHDOG_LOCK_HEARTBEAT="$WATCHDOG_LOCK/heartbeat"
+
+# A SIGKILL or a power loss can leave the old lock directory behind.  The
+# previous implementation treated every leftover directory as an active
+# watchdog and silently exited, so procd could never bring the watchdog back
+# after a restart.  New instances record their PID and heartbeat; an old
+# instance is accepted only while that PID is still a watchdog process.  A
+# legacy empty lock is removed after a short grace period.
+watchdog_process_alive() {
+   watchdog_pid="$1"
+   case "$watchdog_pid" in ''|*[!0-9]*) return 1;; esac
+   [ -d "/proc/$watchdog_pid" ] || return 1
+   tr '\000' ' ' < "/proc/$watchdog_pid/cmdline" 2>/dev/null | grep -q 'openkill_watchdog.sh'
+}
+
 if ! mkdir "$WATCHDOG_LOCK" 2>/dev/null; then
-   exit 0
+   existing_pid=$(cat "$WATCHDOG_LOCK_PID" 2>/dev/null || true)
+   if watchdog_process_alive "$existing_pid"; then
+      exit 0
+   fi
+   now=$(date +%s 2>/dev/null || echo 0)
+   lock_time=$(date -r "$WATCHDOG_LOCK_HEARTBEAT" +%s 2>/dev/null || date -r "$WATCHDOG_LOCK" +%s 2>/dev/null || echo 0)
+   lock_age=$((now - lock_time))
+   # Legacy locks have no PID/heartbeat.  Only clear an old one; an
+   # immediately-created lock is left untouched to avoid two watchdogs.
+   if [ "$lock_age" -ge 120 ] || { [ -z "$existing_pid" ] && [ "$lock_age" -ge 5 ]; }; then
+      rm -rf "$WATCHDOG_LOCK" 2>/dev/null || true
+      mkdir "$WATCHDOG_LOCK" 2>/dev/null || exit 0
+   else
+      exit 0
+   fi
 fi
-trap 'rmdir "$WATCHDOG_LOCK" 2>/dev/null || true' EXIT INT TERM
+printf '%s\n' "$$" > "$WATCHDOG_LOCK_PID"
+touch "$WATCHDOG_LOCK_HEARTBEAT"
+trap 'rm -f "$WATCHDOG_LOCK_PID" "$WATCHDOG_LOCK_HEARTBEAT" 2>/dev/null || true; rmdir "$WATCHDOG_LOCK" 2>/dev/null || true' EXIT INT TERM
 CFG_UPDATE_LAST=0
 SKIP_PROXY_ADDRESS=1
 SKIP_PROXY_ADDRESS_INTERVAL=30
@@ -207,6 +239,7 @@ end" 2>/dev/null >> $LOG_FILE
 
 while :;
 do
+   touch "$WATCHDOG_LOCK_HEARTBEAT" 2>/dev/null || true
    CONFIG_FILE="/etc/openkill/$(uci_get_config "config_path" |awk -F '/' '{print $5}' 2>/dev/null)"
    ipv6_enable=$(valid_bool "$(uci_get_config "ipv6_enable" || echo 0)")
    enable_redirect_dns=$(valid_bool "$(uci_get_config "enable_redirect_dns" || echo 0)")

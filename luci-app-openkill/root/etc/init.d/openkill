@@ -33,23 +33,35 @@ PROXY_ROUTE_TABLE="0x162"
 QUICK_START_CHECK=false
 QUICK_START=true
 
+# UCI values may be absent on a fresh install or after an old configuration
+# is imported. Normalize boolean fields before numeric tests so cron setup
+# never emits "integer expected" and never aborts startup on an empty value.
+uci_bool_value()
+{
+   uci_bool_value_raw="$(uci_get_config "$1" 2>/dev/null || true)"
+   case "$uci_bool_value_raw" in
+      1|true|on|yes) echo 1 ;;
+      *) echo 0 ;;
+   esac
+}
+
 add_cron()
 {
    [ "$(tail -n1 /etc/crontabs/root | wc -l)" -eq 0 ] && [ -n "$(cat /etc/crontabs/root 2>/dev/null)" ] && echo >> /etc/crontabs/root
    [ -z "$(grep "openkill.sh" "$CRON_FILE" 2>/dev/null)" ] && {
-      [ "$(uci_get_config "auto_update")" -eq 1 ] && [ "$(uci_get_config "config_auto_update_mode")" -ne 1 ] && echo "0 $(uci_get_config "auto_update_time" || 1) * * $(uci_get_config "config_update_week_time" || 0) /usr/share/openkill/openkill.sh #openkill-cron-task" >> $CRON_FILE
+      [ "$(uci_bool_value auto_update)" -eq 1 ] && [ "$(uci_bool_value config_auto_update_mode)" -ne 1 ] && echo "0 $(uci_get_config "auto_update_time" || 1) * * $(uci_get_config "config_update_week_time" || 0) /usr/share/openkill/openkill.sh #openkill-cron-task" >> $CRON_FILE
    }
    [ -z "$(grep "openkill_geo.sh" "$CRON_FILE" 2>/dev/null)" ] && {
-      [ "$(uci_get_config "geo_auto_update")" -eq 1 ] && echo "0 $(uci_get_config "geo_update_day_time" || 1) * * $(uci_get_config "geo_update_week_time" || 0) /usr/share/openkill/openkill_geo.sh ipdb #openkill-cron-task" >> $CRON_FILE
-      [ "$(uci_get_config "geosite_auto_update")" -eq 1 ] && echo "0 $(uci_get_config "geosite_update_day_time" || 1) * * $(uci_get_config "geosite_update_week_time" || 0) /usr/share/openkill/openkill_geo.sh geosite #openkill-cron-task" >> $CRON_FILE
-      [ "$(uci_get_config "geoip_auto_update")" -eq 1 ] && echo "0 $(uci_get_config "geoip_update_day_time" || 1) * * $(uci_get_config "geoip_update_week_time" || 0) /usr/share/openkill/openkill_geo.sh geoip #openkill-cron-task" >> $CRON_FILE
-      [ "$(uci_get_config "geoasn_auto_update")" -eq 1 ] && echo "0 $(uci_get_config "geoasn_update_day_time" || 1) * * $(uci_get_config "geoasn_update_week_time" || 0) /usr/share/openkill/openkill_geo.sh geoasn #openkill-cron-task" >> $CRON_FILE
+      [ "$(uci_bool_value geo_auto_update)" -eq 1 ] && echo "0 $(uci_get_config "geo_update_day_time" || 1) * * $(uci_get_config "geo_update_week_time" || 0) /usr/share/openkill/openkill_geo.sh ipdb #openkill-cron-task" >> $CRON_FILE
+      [ "$(uci_bool_value geosite_auto_update)" -eq 1 ] && echo "0 $(uci_get_config "geosite_update_day_time" || 1) * * $(uci_get_config "geosite_update_week_time" || 0) /usr/share/openkill/openkill_geo.sh geosite #openkill-cron-task" >> $CRON_FILE
+      [ "$(uci_bool_value geoip_auto_update)" -eq 1 ] && echo "0 $(uci_get_config "geoip_update_day_time" || 1) * * $(uci_get_config "geoip_update_week_time" || 0) /usr/share/openkill/openkill_geo.sh geoip #openkill-cron-task" >> $CRON_FILE
+      [ "$(uci_bool_value geoasn_auto_update)" -eq 1 ] && echo "0 $(uci_get_config "geoasn_update_day_time" || 1) * * $(uci_get_config "geoasn_update_week_time" || 0) /usr/share/openkill/openkill_geo.sh geoasn #openkill-cron-task" >> $CRON_FILE
    }
    [ -z "$(grep "openkill_chnroute.sh" "$CRON_FILE" 2>/dev/null)" ] && {
-      [ "$(uci_get_config "chnr_auto_update")" -eq 1 ] && echo "0 $(uci_get_config "chnr_update_day_time" || 1) * * $(uci_get_config "chnr_update_week_time" || 0) /usr/share/openkill/openkill_chnroute.sh #openkill-cron-task" >> $CRON_FILE
+      [ "$(uci_bool_value chnr_auto_update)" -eq 1 ] && echo "0 $(uci_get_config "chnr_update_day_time" || 1) * * $(uci_get_config "chnr_update_week_time" || 0) /usr/share/openkill/openkill_chnroute.sh #openkill-cron-task" >> $CRON_FILE
    }
    [ -z "$(grep "/etc/init.d/openkill" "$CRON_FILE" 2>/dev/null)" ] && {
-      [ "$(uci_get_config "auto_restart")" -eq 1 ] && echo "0 $(uci_get_config "auto_restart_day_time" || 1) * * $(uci_get_config "auto_restart_week_time" || 0) /etc/init.d/openkill restart #openkill-cron-task" >> $CRON_FILE
+      [ "$(uci_bool_value auto_restart)" -eq 1 ] && echo "0 $(uci_get_config "auto_restart_day_time" || 1) * * $(uci_get_config "auto_restart_week_time" || 0) /etc/init.d/openkill restart #openkill-cron-task" >> $CRON_FILE
    }
 
    config_load "openkill"
@@ -3900,6 +3912,9 @@ stop_service()
       for i in $(seq 1 10); do
          procd_running "openkill" >/dev/null && sleep 1 || break
       done
+      # procd may terminate watchdog with SIGKILL; remove its private lock
+      # after the service is confirmed stopped so the next start is clean.
+      rm -rf /tmp/openkill-watchdog.lock /tmp/openkill-proxy-address.lock
 
       LOG_OUT "Step 3: Delete OpenKill Firewall Rules..."
       revert_firewall
