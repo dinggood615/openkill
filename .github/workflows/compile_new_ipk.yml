@@ -10,6 +10,11 @@ on:
       - '.github/workflows/compile_new_ipk.yml'
   workflow_dispatch:
     inputs:
+      build_apk:
+        description: 'Also build and publish APK (normally leave disabled)'
+        required: false
+        default: false
+        type: boolean
       publish:
         description: 'Publish the already verified package to GitHub Releases and package branch'
         required: false
@@ -76,7 +81,9 @@ jobs:
   Compile:
     runs-on: ubuntu-latest
     needs: [Get-Version, Runtime-Tests]
-    if: ${{ needs.Get-Version.outputs.version != needs.Get-Version.outputs.current_version || github.event_name == 'workflow_dispatch' }}
+    # Pushes build the lightweight IPK path only. APK is an explicit manual
+    # opt-in so routine UI/core changes do not wait for the snapshot SDK.
+    if: ${{ (needs.Get-Version.outputs.version != needs.Get-Version.outputs.current_version || github.event_name == 'workflow_dispatch') && (matrix.target.name == 'ipk' || (github.event_name == 'workflow_dispatch' && inputs.build_apk == true)) }}
     timeout-minutes: 90
     strategy:
       fail-fast: false
