@@ -8351,3 +8351,243 @@ html[data-darkmode="true"] .oc.openkill-status-page .sub-card:hover {
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
+/* Shared components: upload/editor dialogs, log pages, update page and
+ * diagnostics use the same quiet surfaces as the dashboard. */
+.oc {
+    --primary-color: #6654b6;
+    --btn-primary-hover: #5846a4;
+    --primary-a5: rgba(102, 84, 182, 0.05);
+    --primary-a10: rgba(102, 84, 182, 0.10);
+    --primary-a20: rgba(102, 84, 182, 0.20);
+    --primary-a30: rgba(102, 84, 182, 0.30);
+    --primary-a40: rgba(102, 84, 182, 0.40);
+    --primary-a50: rgba(102, 84, 182, 0.50);
+    --primary-a60: rgba(102, 84, 182, 0.60);
+    --shadow-sm: none;
+    --shadow-md: 0 10px 28px rgba(25, 29, 39, 0.14);
+}
+
+.oc .config-upload-model,
+.oc .config-editor-model,
+.oc .select-popup {
+    border-radius: 8px;
+    border-color: var(--border-light);
+    box-shadow: var(--shadow-md);
+}
+
+.oc .config-upload-header,
+.oc .config-upload-footer,
+.oc .config-editor-header,
+.oc .config-editor-footer,
+.oc .select-popup-header {
+    padding: 14px 16px;
+    border-color: var(--border-light);
+    border-radius: 0;
+    background: var(--bg-white);
+    box-shadow: none;
+}
+
+.oc .config-upload-content,
+.oc .config-editor-content {
+    padding: 16px;
+}
+
+.oc .config-upload-title,
+.oc .config-editor-title {
+    color: var(--text-primary);
+    font-size: 15px;
+    font-weight: 650;
+}
+
+.oc .mode-tabs,
+.oc .radio-button,
+.oc .select-config-section {
+    border: 1px solid var(--border-light);
+    border-radius: 7px;
+    background: var(--bg-gray);
+    box-shadow: none;
+}
+
+.oc .mode-tabs {
+    padding: 3px;
+    gap: 2px;
+}
+
+.oc .mode-tab {
+    min-height: 32px;
+    padding: 8px 12px;
+    border-radius: 5px;
+}
+
+.oc .mode-tab.active {
+    background: var(--primary-color);
+    box-shadow: none;
+}
+
+.oc .config-upload-buttons,
+.oc .config-editor-actions {
+    gap: 8px;
+}
+
+.oc .config-upload-buttons .btn,
+.oc .footer-btn,
+.oc .btn.cbi-button {
+    min-height: 32px;
+    border-radius: 6px;
+    box-shadow: none;
+}
+
+.oc .config-upload-buttons .upload-btn,
+.oc .btn.cbi-button-apply {
+    border-color: var(--primary-color);
+    background: var(--primary-color);
+    color: var(--text-on-primary);
+}
+
+.oc .config-upload-buttons .cancel-btn,
+.oc .footer-btn,
+.oc .btn.cbi-button:not(.cbi-button-apply) {
+    border-color: var(--border-light);
+    background: var(--bg-white);
+    color: var(--text-primary);
+}
+
+.oc .config-upload-buttons .cancel-btn:hover,
+.oc .footer-btn:hover:not(:disabled),
+.oc .btn.cbi-button:not(.cbi-button-apply):hover {
+    border-color: var(--primary-color);
+    background: var(--primary-a10);
+    color: var(--primary-color);
+    box-shadow: none;
+}
+
+/* Log tabs should read like a compact section switcher instead of three
+ * separate action buttons. */
+.oc .oc-tabmenu {
+    gap: 0;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border-light);
+    background: var(--bg-white);
+}
+
+.oc .oc-tabmenu li a {
+    min-height: 42px;
+    padding: 12px 14px 9px;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
+    background: transparent;
+}
+
+.oc .oc-tabmenu li.oc-tab a,
+.oc .oc-tabmenu li.active a {
+    border-bottom-color: var(--primary-color);
+    background: transparent;
+    color: var(--primary-color);
+    box-shadow: none;
+}
+
+.oc .oc-input-textarea,
+.oc #debug-rendered {
+    border-color: var(--border-light);
+    border-radius: 7px;
+    box-shadow: none;
+}
+
+.oc .select-popup-tab {
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.oc .select-popup-tab .select-popup-header,
+.oc .select-popup-tab .select-config-section,
+.oc .select-popup-tab .select-popup-body,
+.oc .select-popup-tab .select-popup-footer {
+    margin: 0 0 12px;
+    border: 1px solid var(--border-light);
+    border-radius: 7px;
+    background: var(--bg-white);
+    box-shadow: none;
+}
+
+.oc .select-popup-tab .select-config-section {
+    padding: 14px;
+}
+
+.oc .select-popup-tab .select-popup-footer {
+    margin-bottom: 0;
+}
+
+.oc .config-item,
+.oc .version-card,
+.oc .addr-row,
+.oc .myip-card-item,
+.oc .myip-ip-section,
+.oc .myip-check-section {
+    border-color: var(--border-light);
+    box-shadow: none;
+}
+
+.oc .addr-row:hover,
+.oc .myip-card-item:hover {
+    border-color: rgba(102, 84, 182, 0.35);
+    box-shadow: none;
+    transform: none;
+}
+
+.oc .myip-main-card,
+.oc .myip-ip-section,
+.oc .myip-check-section {
+    border-radius: 7px;
+}
+
+.oc .myip-section-title,
+.oc .oc-option-title,
+.oc .config-editor-title {
+    color: var(--text-primary);
+}
+
+html[data-darkmode="true"] .oc {
+    --primary-color: #9b8cff;
+    --btn-primary-hover: #ac9fff;
+    --primary-a5: rgba(155, 140, 255, 0.06);
+    --primary-a10: rgba(155, 140, 255, 0.12);
+    --primary-a20: rgba(155, 140, 255, 0.20);
+    --primary-a30: rgba(155, 140, 255, 0.30);
+    --primary-a40: rgba(155, 140, 255, 0.40);
+    --primary-a50: rgba(155, 140, 255, 0.50);
+    --primary-a60: rgba(155, 140, 255, 0.60);
+    --shadow-md: 0 12px 30px rgba(0, 0, 0, 0.32);
+}
+
+@media (max-width: 640px) {
+    .oc .config-upload-model,
+    .oc .config-editor-model,
+    .oc .select-popup {
+        width: calc(100vw - 20px);
+        min-width: 0;
+    }
+
+    .oc .config-upload-header,
+    .oc .config-upload-footer,
+    .oc .config-editor-header,
+    .oc .config-editor-footer,
+    .oc .select-popup-header,
+    .oc .config-upload-content,
+    .oc .config-editor-content {
+        padding: 12px;
+    }
+
+    .oc .oc-tabmenu {
+        overflow-x: auto;
+        padding: 0 8px;
+    }
+
+    .oc .oc-tabmenu li a {
+        white-space: nowrap;
+        padding-right: 10px;
+        padding-left: 10px;
+    }
+}
