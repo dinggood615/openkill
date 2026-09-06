@@ -498,6 +498,15 @@ check_run_quick()
 
    QUICK_START_CHECK=true
 
+   # TUN ownership and Mihomo auto-management are part of the generated
+   # profile. A mode switch must never reuse a profile generated for the
+   # other owner.
+   quick_mode_state="$(uci -q get openkill.config.tun_owner 2>/dev/null || echo openkill)|$(uci -q get openkill.config.tun_auto_route 2>/dev/null || echo 0)|$(uci -q get openkill.config.tun_auto_redirect 2>/dev/null || echo 0)"
+   if [ ! -f /tmp/openkill.tun-mode ] || [ "$(cat /tmp/openkill.tun-mode 2>/dev/null)" != "$quick_mode_state" ]; then
+      LOG_TIP "TUN ownership changed; regenerating the Mihomo profile..."
+      rm -f /tmp/openkill.change
+   fi
+
    cat "/tmp/openkill.change" | while read -r i; do
       file_path=$(echo "$i" |awk -F ' #edited time# ' '{print $1}')
       if [ -z "$(grep "$file_path #edited time# $(date -r "$file_path")$" "/tmp/openkill.change")" ]; then
@@ -515,6 +524,7 @@ check_run_quick()
 write_run_quick()
 {
    : > "/tmp/openkill.change"
+   printf '%s' "$(uci -q get openkill.config.tun_owner 2>/dev/null || echo openkill)|$(uci -q get openkill.config.tun_auto_route 2>/dev/null || echo 0)|$(uci -q get openkill.config.tun_auto_redirect 2>/dev/null || echo 0)" > /tmp/openkill.tun-mode
    add_quick_path() {
       [ -e "$1" ] && echo "$1"
    }
@@ -568,6 +578,30 @@ do_run_mode()
       en_mode_tun="2"
       en_mode="fake-ip"
    fi
+}
+
+sanitize_native_fw4_compat()
+{
+   [ "$tun_owner" = "mihomo" ] || return 0
+   [ -n "$FW4" ] || return 0
+   # Legacy PassWall include sections use reload=1, which fw4 rejects when
+   # Mihomo native auto-redirect asks fw4 to reload. The include itself is
+   # retained; remove only the obsolete fw4-incompatible option.
+   if [ -n "$(uci -q get firewall.passwall.reload 2>/dev/null || true)" ]; then
+      uci -q delete firewall.passwall.reload
+      uci -q commit firewall
+      LOG_WARN "Removed the obsolete PassWall firewall reload option for Mihomo native auto-redirect."
+   fi
+}
+
+native_fw4_ready()
+{
+   [ -n "$FW4" ] || return 0
+   # Mihomo auto-redirect invokes `fw4 reload` internally. Some fw4 builds
+   # report a non-zero result even though syntax checking passes; native mode
+   # cannot safely take ownership in that case.
+   [ -f /var/run/fw4.state ] || "$FW4" start >/dev/null 2>&1 || true
+   "$FW4" reload >/tmp/openkill-fw4-native-check.log 2>&1
 }
 
 do_run_file()
@@ -3760,11 +3794,22 @@ start_service()
          # it.  This removes the startup race seen with Mihomo auto-redirect.
          prepare_openkill_include
       else
-         LOG_WARN "TUN ownership: Mihomo native (OpenKill firewall integration disabled)"
-         # Clear any DNS redirect left by a previous OpenKill-owned run before
-         # Mihomo installs its own auto-redirect rules.
-         revert_dnsmasq
-         remove_openkill_include
+         sanitize_native_fw4_compat
+         if ! native_fw4_ready; then
+            LOG_WARN "Mihomo native auto-redirect is unavailable on this fw4 build; falling back to OpenKill firewall management."
+            tun_owner=openkill
+            uci -q set openkill.config.tun_owner=openkill
+            uci -q set openkill.config.tun_auto_route=0
+            uci -q set openkill.config.tun_auto_redirect=0
+            uci -q commit openkill
+            prepare_openkill_include
+         else
+            LOG_WARN "TUN ownership: Mihomo native (OpenKill firewall integration disabled)"
+            # Clear any DNS redirect left by a previous OpenKill-owned run before
+            # Mihomo installs its own auto-redirect rules.
+            revert_dnsmasq
+            remove_openkill_include
+         fi
       fi
 
       LOG_OUT "Step 2: Check The Components..."
