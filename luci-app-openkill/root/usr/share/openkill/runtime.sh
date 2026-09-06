@@ -38,6 +38,7 @@ openkill_controller_host() {
         \[*\]) host="${requested#\[}"; host="${host%\]}" ;;
         *) host="$requested" ;;
     esac
+    host="${host%%/*}"
     printf '%s' "$host"
 }
 
@@ -56,9 +57,9 @@ openkill_core_api_healthy() {
     url="$(openkill_controller_url)/version"
     secret="$(uci_get_config "dashboard_password" 2>/dev/null || true)"
     if [ -n "$secret" ]; then
-        code="$(curl -k -sS -m 3 -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $secret" "$url" 2>/dev/null || true)"
+        code="$(curl --noproxy '*' -k -sS -m 3 -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $secret" "$url" 2>/dev/null || true)"
     else
-        code="$(curl -k -sS -m 3 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true)"
+        code="$(curl --noproxy '*' -k -sS -m 3 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true)"
     fi
     [ "$code" = 200 ]
 }

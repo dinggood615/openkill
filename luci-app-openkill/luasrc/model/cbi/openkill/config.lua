@@ -158,7 +158,8 @@ if a then
 e[t]={}
 e[t].name=fs.basename(o)
 e[t].mtime=os.date("%Y-%m-%d %H:%M:%S",a.mtime)
-if fs.uci_get_config("config", "config_path") and string.sub(fs.uci_get_config("config", "config_path"), 23, -1) == e[t].name then
+local selected_path = fs.uci_get_config("config", "config_path")
+if selected_path and fs.basename(selected_path) == e[t].name then
 	e[t].state=translate("Enabled")
 else
 	e[t].state=translate("Disabled")

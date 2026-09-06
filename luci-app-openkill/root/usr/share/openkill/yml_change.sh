@@ -31,6 +31,7 @@ normalize_bind_address()
    case "$requested" in
       lan)
          resolved=$(uci -q get network.lan.ipaddr 2>/dev/null || true)
+         resolved=${resolved%%/*}
          [ -n "$resolved" ] || resolved="127.0.0.1"
          ;;
       127.0.0.1|0.0.0.0)
@@ -39,11 +40,12 @@ normalize_bind_address()
       \[*\])
          resolved="${requested#\[}"
          resolved="${resolved%\]}"
+         resolved=${resolved%%/*}
          ;;
       *:*)
          # Explicit IPv6 controller addresses are accepted.  The endpoint is
          # bracketed only when it is written to external-controller below.
-         resolved="$requested"
+         resolved="${requested%%/*}"
          ;;
       *)
          resolved="127.0.0.1"

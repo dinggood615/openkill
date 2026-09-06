@@ -334,10 +334,10 @@ start_fail()
       cp -f "$LAST_GOOD_CONFIG" "$CONFIG_FILE" >/dev/null 2>&1
       LOG_WARN "Restored the last known-good OpenKill configuration."
    fi
-   uci -q set openkill.config.enable=0
+   uci -q set openkill.config.last_start_failed=1
    uci -q commit openkill
    stop
-   exit 0
+   exit 1
 }
 
 sub_info_set()
@@ -803,25 +803,28 @@ check_core_status()
          if [ "$tun_owner" = "openkill" ]; then
             ip link show utun >/dev/null 2>&1
          else
-            [ -n "$($ip_ route list 2>/dev/null | grep utun)" ]
+            # Mihomo auto-route normally uses table 2022 (not the main
+            # table).  Check all tables so a valid native route is not
+            # mistaken for a failed TUN startup.
+            [ -n "$($ip_ route list table all 2>/dev/null | grep -E '(^|[[:space:]])dev[[:space:]]+utun([[:space:]]|$)|utun' | head -n 1)" ]
          fi
       }
 
-      #wait 300s most for core start
-      while ( openkill_core_process_present && ! tun_ready && [ "$TUN_WAIT" -le 300 ] )
+      # Wait at most 60s for the TUN device before bounded retries.
+      while ( openkill_core_process_present && ! tun_ready && [ "$TUN_WAIT" -le 60 ] )
       do
          $ip_ link set utun up
          let TUN_WAIT++
          sleep 1
       done
 
-      if openkill_core_process_present && ! tun_ready && [ "$TUN_WAIT" -gt 300 ]; then
+      if openkill_core_process_present && ! tun_ready && [ "$TUN_WAIT" -gt 60 ]; then
          while ( openkill_core_process_present && ! tun_ready && [ "$TUN_RESTART" -le 3 ] )
          do
             LOG_WARN "TUN Interface Start Failed, Try to Restart Again..."
             start_run_core
             let TUN_RESTART++
-            sleep 300
+            sleep 3
          done
          if openkill_core_process_present && ! tun_ready && [ "$TUN_RESTART" -gt 3 ]; then
             LOG_ERROR "TUN Interface Start Failed, Please Check The Dependence or Try to Restart Again!"
@@ -889,6 +892,9 @@ check_core_status()
       start_fail
    fi
 
+   uci -q delete openkill.config.last_start_failed
+   uci -q commit openkill
+
    # OpenKill-owned mode applies dnsmasq/fw4 integration after the core is
    # ready.  Mihomo-native mode must leave both untouched, otherwise the two
    # managers would immediately recreate each other's rules.
@@ -918,9 +924,8 @@ start_run_core()
 
    if ! $QUICK_START; then
       # Keep a rollback copy until the asynchronous core health check passes.
-      if [ -s "$CONFIG_FILE" ]; then
-         cp -f "$CONFIG_FILE" "$LAST_GOOD_CONFIG" >/dev/null 2>&1
-      fi
+      # Keep LAST_GOOD_CONFIG unchanged until the new configuration passes
+      # all readiness checks; otherwise rollback would restore the failure.
       mv "$TMP_CONFIG_FILE" "$CONFIG_FILE"
       rm -rf "$TMP_CONFIG_FILE"
    fi

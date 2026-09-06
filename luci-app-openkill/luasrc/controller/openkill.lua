@@ -1916,7 +1916,8 @@ function action_refresh_log()
 		for line in oc_raw:gmatch("[^\n]+") do
 			oc_count = oc_count + 1
 			if not string.match(string.sub(line, 1, 19), "%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d") then
-				line = os.date("%Y-%m-%d %H:%M:%S") .. ' [Fatal] ' .. line
+				-- Untimestamped helper/core output is not a fatal error.
+				line = os.date("%Y-%m-%d %H:%M:%S") .. ' [Info] ' .. line
 			end
 			oc_logs[#oc_logs + 1] = trans_line(line)
 		end
