@@ -32,7 +32,19 @@ data = dict(version=os.environ["RELEASE_VERSION"], format=os.environ["PACKAGE_FO
 (p.parent / "latest.json").write_text(json.dumps(data) + "\n")
 PY
 gh auth setup-git
-git clone --filter=blob:none --no-checkout --depth 1 --branch package "https://github.com/$GITHUB_REPOSITORY.git" "$stage/channel"
+channel_url="https://github.com/$GITHUB_REPOSITORY.git"
+if git ls-remote --exit-code --heads "$channel_url" package >/dev/null 2>&1; then
+  git clone --filter=blob:none --no-checkout --depth 1 --branch package "$channel_url" "$stage/channel"
+else
+  # The package channel may be intentionally empty after a release purge.
+  # Create it as an orphan branch so the first verified package can recreate
+  # the channel without requiring a manual placeholder commit.
+  git init "$stage/channel"
+  git -C "$stage/channel" remote add origin "$channel_url"
+  git -C "$stage/channel" checkout --orphan package
+  git -C "$stage/channel" config user.name 'github-actions[bot]'
+  git -C "$stage/channel" config user.email 'github-actions[bot]@users.noreply.github.com'
+fi
 cd "$stage/channel"
 # The channel also contains hundreds of megabytes of historical packages.
 # Only this format's metadata and new asset are needed for publication.
