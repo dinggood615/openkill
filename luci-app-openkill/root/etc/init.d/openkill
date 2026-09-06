@@ -200,7 +200,11 @@ change_dnsmasq() {
    # 第二 DNS 服务
    /usr/share/openkill/openkill_custom_domain_dns.sh
 
-   if [ "$1" -eq 1 ]; then
+   # Both the legacy redirect mode (1) and the fw4 firewall mode (2)
+   # must feed the router's own dnsmasq queries into Mihomo.  Mode 2
+   # redirects LAN DNS packets with nftables, but dnsmasq itself is a
+   # local process and never traverses that LAN redirect chain.
+   if [ "$1" -eq 1 ] || [ "$1" -eq 2 ]; then
       if [ "$(uci_get_config "redirect_dns")" != "1" ]; then
          uci -q del openkill.config.dnsmasq_server
          config_load "dhcp"
