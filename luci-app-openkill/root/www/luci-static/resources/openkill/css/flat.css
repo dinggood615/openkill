@@ -16,12 +16,19 @@
     background: transparent;
 }
 
-.openkill-status-page,
+.oc.openkill-status-page,
 #cbi-openkill.openkill-settings {
     box-sizing: border-box;
     width: 100%;
-    max-width: 1360px;
+    max-width: none;
     margin: 0 auto;
+    padding-left: 12px;
+    padding-right: 12px;
+}
+
+.openkill-status-page,
+#cbi-openkill.openkill-settings {
+    width: 100%;
 }
 
 .openkill-status-page .main-cards-container {
@@ -58,7 +65,8 @@
 }
 
 #cbi-openkill.openkill-settings {
-    padding: 0;
+    padding-top: 0;
+    padding-bottom: 0;
 }
 
 #cbi-openkill.openkill-settings > .cbi-section,
@@ -104,7 +112,6 @@
 @media (max-width: 640px) {
     .openkill-status-page,
     #cbi-openkill.openkill-settings {
-        max-width: none;
         width: 100%;
     }
 
