@@ -17,9 +17,9 @@ del_lock() {
 ipk_v()
 {
    if [ -x "/bin/opkg" ]; then
-      echo $(rm -f /var/lock/opkg.lock && opkg status "$1" 2>/dev/null |grep 'Version' |awk -F ': ' '{print $2}' 2>/dev/null)
+      echo $(opkg status "$1" 2>/dev/null |grep 'Version' |awk -F ': ' '{print $2}' 2>/dev/null)
    elif [ -x "/usr/bin/apk" ]; then
-      echo $(rm -f /lib/apk/db/lock && apk list "$1" 2>/dev/null |grep 'installed' | grep -oE '\d+(\.\d+)*' | head -1)
+      echo $(apk list "$1" 2>/dev/null |grep 'installed' | grep -oE '\d+(\.\d+)*' | head -1)
    fi
 }
 
@@ -43,9 +43,9 @@ RAW_CONFIG_FILE=$(uci_get_config "config_path")
 CONFIG_FILE="/etc/openkill/$(uci_get_config "config_path" |awk -F '/' '{print $5}' 2>/dev/null)"
 core_model=$(uci_get_config "core_version")
 if [ -x "/bin/opkg" ]; then
-   cpu_model=$(rm -f /var/lock/opkg.lock && opkg status libc 2>/dev/null |grep 'Architecture' |awk -F ': ' '{print $2}' 2>/dev/null)
+   cpu_model=$(opkg status libc 2>/dev/null |grep 'Architecture' |awk -F ': ' '{print $2}' 2>/dev/null)
 elif [ -x "/usr/bin/apk" ]; then
-   cpu_model=$(rm -f /lib/apk/db/lock && apk list libc 2>/dev/null|awk '{print $2}')
+   cpu_model=$(apk list libc 2>/dev/null|awk '{print $2}')
 fi
 # The core version is static between core updates. Cache it briefly so opening
 # the diagnostics page cannot spawn a new Meta process on every refresh.

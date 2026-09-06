@@ -51,7 +51,11 @@ if [ -z "$CONFIG_FILE" ] || [ ! -f "$CONFIG_FILE" ]; then
 fi
 
 if openkill_core_process_present && [ -f "$CONFIG_FILE" ]; then
-   if [ "$small_flash_memory" == "1" ] || [ -n "$(echo $core_version |grep mips)" ] || [ -n "$(echo $DISTRIB_ARCH |grep mips)" ] || [ -n "$(rm -f /var/lock/opkg.lock && opkg status libc 2>/dev/null |grep 'Architecture' |awk -F ': ' '{print $2}' |grep mips)" ] || [ -n "$(rm -f /lib/apk/db/lock && apk list libc 2>/dev/null |grep mips)" ]; then
+   # `opkg status`/`apk list` are read-only.  Never delete the package-manager
+   # lock here: this script also runs from a package prerm while opkg itself is
+   # upgrading OpenKill, and removing the lock corrupts that transaction's
+   # cleanup path.
+   if [ "$small_flash_memory" == "1" ] || [ -n "$(echo $core_version |grep mips)" ] || [ -n "$(echo $DISTRIB_ARCH |grep mips)" ] || [ -n "$(opkg status libc 2>/dev/null |grep 'Architecture' |awk -F ': ' '{print $2}' |grep mips)" ] || [ -n "$(apk list libc 2>/dev/null |grep mips)" ]; then
       CACHE_PATH="/tmp/etc/openkill/cache.db"
       if [ -f "$CACHE_PATH" ]; then
          cmp -s "$CACHE_PATH" "$HISTORY_PATH"
