@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1098"
+PROJECT_VERSION="2026-1099"
 ACTION=install
 PACKAGE_FILE=""
 LOCAL_PACKAGE_MODE=0
@@ -391,6 +391,25 @@ backup_config(){
   fi
 }
 
+restore_user_config(){
+  # Restore only user-owned configuration/providers after an upgrade. Never
+  # restore the previous core, databases, cache, or generated runtime YAML.
+  [ -s "$BACKUP_DIR/config.tar.gz" ] || return 0
+  restore_dir="$WORK_DIR/previous-config"
+  rm -rf "$restore_dir"
+  mkdir -p "$restore_dir"
+  tar -xzf "$BACKUP_DIR/config.tar.gz" -C "$restore_dir" 2>/dev/null || return 0
+  [ -f "$restore_dir/etc/config/openkill" ] && cp -f "$restore_dir/etc/config/openkill" /etc/config/openkill
+  mkdir -p /etc/openkill
+  for restore_item in config custom overwrite proxy_provider rule_provider history; do
+    [ -d "$restore_dir/etc/openkill/$restore_item" ] || continue
+    mkdir -p "/etc/openkill/$restore_item"
+    cp -a "$restore_dir/etc/openkill/$restore_item/." "/etc/openkill/$restore_item/" 2>/dev/null || true
+  done
+  rm -rf "$restore_dir"
+  log "Restored user configuration and provider state from the upgrade backup"
+}
+
 validate_install(){
   [ -f /etc/config/openkill ] || die "OpenKill configuration was not installed"
   [ -x /etc/init.d/openkill ] || die "OpenKill service was not installed"
@@ -724,6 +743,7 @@ install_dependencies
 backup_config
 step "Installing OpenKill ${ver:-local package}"
 if [ "$PM" = opkg ]; then pm_run install "$PACKAGE_FILE"; else pm_run add --allow-untrusted "$PACKAGE_FILE"; fi
+restore_user_config
 step "Validating installed service and runtime"
 validate_install
 install_core
