@@ -262,7 +262,11 @@ jobs:
           if-no-files-found: error
 
       - name: Publish this package format independently
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish == true }}
+        # Every version bump from master is a release candidate that has passed
+        # the compatibility matrix above.  Publish each format independently so
+        # the installer never sees a newer source tree with a stale package
+        # manifest.  Manual dispatch remains available for republishing.
+        if: ${{ github.event_name == 'push' || inputs.publish == true }}
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_VERSION: ${{ needs.Get-Version.outputs.version }}
