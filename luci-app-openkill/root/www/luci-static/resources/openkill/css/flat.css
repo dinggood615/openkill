@@ -1,0 +1,121 @@
+/* OpenKill lightweight layout layer.
+ * This file is loaded after oc.css so the page shell is predictable while
+ * leaving LuCI/CBI field names and all runtime controls untouched. */
+:root {
+    --openkill-page-gap: 14px;
+    --openkill-card-gap: 12px;
+}
+
+.cbi-section.openkill-status-section,
+.openkill-settings-page .cbi-section {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.openkill-status-page,
+#cbi-openkill.openkill-settings {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 1360px;
+    margin: 0 auto;
+}
+
+.openkill-status-page .main-cards-container {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    gap: var(--openkill-page-gap);
+}
+
+.openkill-status-page .main-card,
+.openkill-status-page .card-row,
+.openkill-status-page .sub-card {
+    min-width: 0;
+    min-height: 0;
+}
+
+.openkill-status-page .card-row {
+    width: 100%;
+    gap: var(--openkill-card-gap);
+}
+
+.openkill-status-page .card-row.dual-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.openkill-status-page .card-row.stats-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.openkill-status-page .core-status-row .sub-card,
+.openkill-status-page .config-file-content,
+.openkill-status-page .dashboard-container {
+    min-height: 0;
+}
+
+#cbi-openkill.openkill-settings {
+    padding: 0;
+}
+
+#cbi-openkill.openkill-settings > .cbi-section,
+#cbi-openkill.openkill-settings .openkill-settings-tabs,
+#cbi-openkill.openkill-settings .openkill-settings-toolbar,
+#cbi-openkill.openkill-settings .openkill-settings-card-stack {
+    width: 100%;
+    max-width: none;
+    box-sizing: border-box;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-stack {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--openkill-card-gap);
+    margin: var(--openkill-page-gap) 0 0;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card {
+    min-width: 0;
+    margin: 0;
+    contain: layout paint;
+    content-visibility: auto;
+    contain-intrinsic-size: 180px;
+}
+
+/* Do not animate layout on a low-power router. */
+.openkill-status-page *,
+#cbi-openkill.openkill-settings * {
+    scroll-behavior: auto;
+}
+
+@media (max-width: 900px) {
+    .openkill-status-page .card-row.stats-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    #cbi-openkill.openkill-settings .openkill-settings-card-stack {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .openkill-status-page,
+    #cbi-openkill.openkill-settings {
+        max-width: none;
+        width: 100%;
+    }
+
+    .openkill-status-page .card-row,
+    .openkill-status-page .card-row.dual-cards,
+    .openkill-status-page .card-row.stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .openkill-status-page .sub-card {
+        width: 100%;
+        box-sizing: border-box;
+    }
+}
