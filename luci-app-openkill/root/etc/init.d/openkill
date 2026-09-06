@@ -785,7 +785,7 @@ openkill_current_start()
 check_core_status()
 {
    local deadline stage last_stage="" now
-   deadline=$(( $(cut -d. -f1 /proc/uptime) + 90 ))
+   deadline=$(( $(cut -d. -f1 /proc/uptime) + 180 ))
    # All readiness stages share a monotonic budget. A retry never reuses or
    # moves the already-consumed temporary configuration.
    while :; do
@@ -818,7 +818,7 @@ check_core_status()
       fi
       now=$(cut -d. -f1 /proc/uptime)
       if [ "$now" -ge "$deadline" ]; then
-         LOG_ERROR "Startup readiness failed at $stage (90s total budget); see Mihomo log."
+         LOG_ERROR "Startup readiness failed at $stage (180s total budget); see Mihomo log."
          start_fail
       fi
       sleep 1

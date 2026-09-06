@@ -48,6 +48,13 @@ openkill_load_context() {
     [ -s "$file" ] || return 1
     stamp="$(stat -c '%i:%Y:%s' "$file" 2>/dev/null)"
     if [ -n "$stamp" ] && [ "${OPENKILL_CONTEXT_KEY:-}" = "$file:$stamp" ]; then return 0; fi
+    # Never leave a context from a previous configuration in place when a
+    # quick-start file is incomplete or contains a legacy controller value.
+    OPENKILL_API_ENDPOINT=""
+    OPENKILL_API_SECRET=""
+    OPENKILL_TUN_DEVICE=""
+    OPENKILL_TUN_TABLE=""
+    OPENKILL_DNS_ENDPOINT=""
     data="$(ruby /usr/share/openkill/runtime_context.rb "$file" 2>/dev/null)" || return 1
     OPENKILL_API_ENDPOINT="$(printf '%s\n' "$data" | sed -n '1p')"
     OPENKILL_API_SECRET="$(printf '%s\n' "$data" | sed -n '2p')"
@@ -67,19 +74,62 @@ openkill_controller_url() {
     esac
 }
 
+openkill_api_probe() {
+    local base="$1" secret="$2" path response code
+    base="${base%/}"
+    for path in version group; do
+        if [ -n "$secret" ]; then
+            response="$(curl --noproxy '*' -sS -m 3 --max-filesize 16384 -w '\n%{http_code}' \
+                -H "Authorization: Bearer $secret" "$base/$path" 2>/dev/null)" || \
+            response="$(curl -sS -m 3 --max-filesize 16384 -w '\n%{http_code}' \
+                -H "Authorization: Bearer $secret" "$base/$path" 2>/dev/null)" || continue
+        else
+            response="$(curl --noproxy '*' -sS -m 3 --max-filesize 16384 -w '\n%{http_code}' \
+                "$base/$path" 2>/dev/null)" || \
+            response="$(curl -sS -m 3 --max-filesize 16384 -w '\n%{http_code}' \
+                "$base/$path" 2>/dev/null)" || continue
+        fi
+        code="$(printf '%s\n' "$response" | tail -n 1)"
+        # The original OpenClash check only required a successful controller
+        # response.  Do not reject a compatible Mihomo response merely because
+        # its /version JSON shape differs; /group is the legacy fallback.
+        [ "$code" = 200 ] && return 0
+    done
+    return 1
+}
+
+openkill_api_url_for_host() {
+    local host="$1" port="$2"
+    host="${host#[}"; host="${host%]}"
+    case "$host" in
+        *:*) printf 'http://[%s]:%s' "$host" "$port" ;;
+        *) printf 'http://%s:%s' "$host" "$port" ;;
+    esac
+}
+
 openkill_core_api_healthy() {
-    local url secret code response body
-    openkill_load_context || return 1
-    url="$OPENKILL_API_ENDPOINT/version"
-    secret="$OPENKILL_API_SECRET"
-    if [ -n "$secret" ]; then
-        response="$(curl --noproxy '*' -sS -m 3 --max-filesize 16384 -w '\n%{http_code}' -H "Authorization: Bearer $secret" "$url" 2>/dev/null)" || return 1
-    else
-        response="$(curl --noproxy '*' -sS -m 3 --max-filesize 16384 -w '\n%{http_code}' "$url" 2>/dev/null)" || return 1
-    fi
-    code="$(printf '%s\n' "$response" | tail -n 1)"
-    body="$(printf '%s\n' "$response" | sed '$d')"
-    [ "$code" = 200 ] && [ -n "$(printf '%s' "$body" | jsonfilter -e '@.version' 2>/dev/null)" ]
+    local secret port endpoint_port candidate seen="" lan_host
+    # The generated endpoint is authoritative when it is valid, but a legacy
+    # quick-start profile may omit it or retain localhost. Keep the original
+    # OpenClash LAN and loopback probes as compatible fallbacks.
+    openkill_load_context || true
+    secret="${OPENKILL_API_SECRET:-}"
+    port="$(openkill_controller_port)"
+    endpoint_port="${OPENKILL_API_ENDPOINT##*:}"
+    endpoint_port="${endpoint_port%/}"
+    case "$endpoint_port" in ''|*[!0-9]*) ;; *) port="$endpoint_port" ;; esac
+
+    for candidate in \
+        "${OPENKILL_API_ENDPOINT:-}" \
+        "$(openkill_controller_url)" \
+        "$(openkill_api_url_for_host 127.0.0.1 "$port")" \
+        "$(openkill_api_url_for_host "$(openkill_bind_address lan)" "$port")"; do
+        [ -n "$candidate" ] || continue
+        case " $seen " in *" $candidate "*) continue ;; esac
+        seen="$seen $candidate"
+        openkill_api_probe "$candidate" "$secret" && return 0
+    done
+    return 1
 }
 
 openkill_core_ready() {
