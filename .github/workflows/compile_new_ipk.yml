@@ -58,7 +58,7 @@ jobs:
         run: |
           # Read only the version metadata, not the entire binary package branch.
           current_content=$(gh api "repos/$RELEASE_REPOSITORY/contents/master/version?ref=package" --jq '.content' 2>/dev/null || true)
-          if [ -n "$current_content" ]; then
+          if [ -n "$current_content" ] && [ "$current_content" != "null" ]; then
             current=$(printf '%s' "$current_content" | base64 --decode | sed -n '1s/^v//p' | tr -d '[:space:]')
             [[ "$current" =~ ^2026-[0-9]+$ ]] || { echo 'Invalid published version metadata'; exit 1; }
           else
