@@ -85,8 +85,9 @@ chosen=$(select_newest_manifest "$WORK_DIR/rows")
         self.assertNotIn('MetaCubeX/mihomo@${CORE_LV}', CORE_SOURCE)
         self.assertNotIn('cdn.jsdelivr.net/gh/MetaCubeX/mihomo', CORE_SOURCE)
 
-    def test_settings_keep_five_categories_and_ui_helpers(self):
+    def test_settings_keep_five_categories_and_standalone_update(self):
         expected = (
+            's:tab("version_update", translate("Version Update"))',
             's:tab("basic", translate("Runtime & Services"))',
             's:tab("network", translate("Network & Routing"))',
             's:tab("rules", translate("Rules & Subscriptions"))',
@@ -95,13 +96,16 @@ chosen=$(select_newest_manifest "$WORK_DIR/rows")
         )
         for marker in expected:
             self.assertIn(marker, SETTINGS_SOURCE)
-        self.assertEqual(SETTINGS_SOURCE.count('s:tab("'), 5)
+        self.assertEqual(SETTINGS_SOURCE.count('s:tab("'), 6)
+        self.assertIn('version_update = "version_update"', SETTINGS_SOURCE)
         self.assertIn("local native_taboption = s.taboption", SETTINGS_SOURCE)
         self.assertIn("openkill-settings-toolbar", SETTINGS_THEME)
         self.assertIn("openkill-settings-search", SETTINGS_THEME)
         self.assertIn("openkill-advanced-collapsed", SETTINGS_THEME)
         self.assertIn("openkill-settings-card", SETTINGS_THEME)
         self.assertIn("data-openkill-cards-ready", SETTINGS_THEME)
+        self.assertIn("var layoutIndex = 0", SETTINGS_THEME)
+        self.assertIn("select-popup-tab", SETTINGS_THEME)
 
     def test_formats_publish_inside_their_own_job(self):
         data = yaml.safe_load((ROOT / ".github/workflows/compile_new_ipk.yml").read_text(encoding="utf-8"))

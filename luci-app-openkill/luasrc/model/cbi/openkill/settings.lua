@@ -86,13 +86,17 @@ local tab_groups = {
 	mihomo_features = "advanced",
 	zerotier = "advanced",
 	developer = "advanced",
-	version_update = "advanced"
+	-- Keep version updates as a standalone top-level page.  It is intentionally
+	-- not part of the advanced group so the update entry can stay visible and
+	-- easy to reach without expanding maintenance settings.
+	version_update = "version_update"
 }
 local native_taboption = s.taboption
 function s:taboption(tab, ...)
 	return native_taboption(self, tab_groups[tab] or tab, ...)
 end
 
+s:tab("version_update", translate("Version Update"))
 s:tab("basic", translate("Runtime & Services"))
 s:tab("network", translate("Network & Routing"))
 s:tab("rules", translate("Rules & Subscriptions"))

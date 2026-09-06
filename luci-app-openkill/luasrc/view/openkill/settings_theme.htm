@@ -247,10 +247,22 @@
     }
 
     function buildCards(tabItems) {
+        /*
+         * Version Update is a standalone, full-width page.  Do not consume a
+         * CARD_LAYOUTS slot for it: the remaining five settings categories
+         * must keep their existing card layout after the update tab is moved
+         * to the front of the CBI menu.
+         */
+        var layoutIndex = 0;
         tabItems.forEach(function(item, tabIndex) {
             var panel = tabPanel(item);
-            var layout = CARD_LAYOUTS[tabIndex];
-            if (!panel || !layout || panel.getAttribute('data-openkill-cards-ready') === '1') return;
+            if (!panel) return;
+            var updatePanel = panel && (panel.querySelector('.select-popup-tab') ||
+                panel.querySelector('#selectPopup') ||
+                /(版本更新|version update|check update)/i.test(tabLabel(item)));
+            if (updatePanel) return;
+            var layout = CARD_LAYOUTS[layoutIndex++];
+            if (!layout || panel.getAttribute('data-openkill-cards-ready') === '1') return;
             var content = panelContent(panel);
             var fields = directFields(content);
             if (!fields.length) return;
