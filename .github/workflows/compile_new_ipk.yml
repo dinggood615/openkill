@@ -262,8 +262,9 @@ jobs:
           # OpenWrt SDKs produce two valid IPK layouts: traditional ar archives
           # and a gzip-tar wrapper containing data.tar.gz. Support both so the
           # assertion follows the package format instead of the SDK generation.
-          if tar -tzf "$package_file" 2>/dev/null | grep -qx './data.tar.gz'; then
-            tar -xOzf "$package_file" ./data.tar.gz | tar -xOzf - ./www/luci-static/resources/openkill/css/oc.css > /tmp/openkill-oc.css
+          wrapped_data_member=$(tar -tzf "$package_file" 2>/dev/null | awk '/(^|\/)data\.tar\.gz$/ { print; exit }' || true)
+          if [ -n "$wrapped_data_member" ]; then
+            tar -xOzf "$package_file" "$wrapped_data_member" | tar -xOzf - ./www/luci-static/resources/openkill/css/oc.css > /tmp/openkill-oc.css
           else
             data_member=$(ar t "$package_file" | awk '/^data\.tar/ { print; exit }')
             [ -n "$data_member" ] || { echo 'OpenKill IPK data archive is missing'; exit 1; }
