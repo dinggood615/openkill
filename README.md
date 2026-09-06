@@ -2,7 +2,7 @@
 
 OpenKill 是面向 OpenWrt 的轻量化 Mihomo（Meta）客户端 LuCI 插件，基于 OpenClash 兼容架构重构，提供稳定的代理接管、规则分流、双栈 DNS/IPv6 与可回滚运行管理。
 
-当前版本：`2026-1090`
+当前版本：`2026-1091`
 
 ## 一键安装
 
@@ -29,7 +29,7 @@ curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh 
 - 流量接管互斥：统一管理 TUN、路由和防火墙；OpenKill 接管与 Mihomo 原生自动接管不能同时启用，可在界面切换。
 - 规则与订阅管理：支持 GeoIP/GeoSite、大陆白名单、代理组分流、订阅更新、配置检查和安全回滚。
 - 可选协议能力：按内核能力探测启用 H2C/ShadowQUIC、QUIC v2、MASQUE、AmneziaWG、AnyTLS、BBR3 和 ZeroTier 相关字段。
-- LuCI 界面：运行状态、运行与服务、网络与分流、规则与订阅、性能与稳定、系统与维护分类，中文字段、响应式卡片和紧凑布局。
+- LuCI 界面：运行状态、运行与服务、网络与分流、规则与订阅、性能与稳定、系统与维护分类；采用适配 Argon 深浅色模式的扁平卡片、统一间距和低干扰状态提示。
 - 故障保护：缺少路由集合文件时自动创建兼容空集合，健康检查失败不覆盖上一份有效配置，日志记录每个安装与启动阶段。
 
 ## 兼容性

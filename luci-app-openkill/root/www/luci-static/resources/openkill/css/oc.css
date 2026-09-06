@@ -8031,3 +8031,323 @@ html[data-darkmode=true] .oc #addCustomOption:hover {
     #debug-rendered .pre-copy-btn { width: 36px; height: 36px; }
     #debug-rendered .pre-copy-btn svg { width: 18px; height: 18px; }
 }
+
+/* ========================================================================
+ * OpenKill flat Argon shell — option B
+ *
+ * Keep this layer at the end of the stylesheet so it only changes visual
+ * presentation.  It deliberately leaves all CBI names, JS hooks and runtime
+ * controls intact, which makes the UI usable on both older LuCI releases and
+ * current Argon builds.
+ * ======================================================================== */
+.oc.openkill-status-page,
+#cbi-openkill.openkill-settings {
+    --ok-flat-page: #f7f8fb;
+    --ok-flat-surface: #ffffff;
+    --ok-flat-surface-muted: #f5f6fa;
+    --ok-flat-text: #252936;
+    --ok-flat-muted: #6d7483;
+    --ok-flat-border: #e1e5ec;
+    --ok-flat-accent: #6654b6;
+    --ok-flat-accent-soft: rgba(102, 84, 182, 0.11);
+    --ok-flat-success: #18a871;
+    --ok-flat-success-soft: rgba(24, 168, 113, 0.12);
+}
+
+/* The runtime page no longer reserves a banner-sized empty area. */
+.oc.openkill-status-page {
+    max-width: 1360px;
+    padding: 0;
+    color: var(--ok-flat-text);
+}
+
+.oc.openkill-status-page .main-cards-container {
+    gap: 14px;
+    overflow: visible;
+}
+
+.oc.openkill-status-page .main-card {
+    gap: 12px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.oc.openkill-status-page .card-row,
+.oc.openkill-status-page .card-row:nth-child(1),
+.oc.openkill-status-page .card-row:nth-child(2),
+.oc.openkill-status-page .card-row:nth-child(3),
+.oc.openkill-status-page .card-row:nth-child(4) {
+    min-height: 0;
+}
+
+.oc.openkill-status-page .sub-card {
+    gap: 8px;
+    padding: 16px;
+    border: 1px solid var(--ok-flat-border);
+    border-radius: 7px;
+    background: var(--ok-flat-surface);
+    box-shadow: none;
+}
+
+.oc.openkill-status-page .sub-card:hover {
+    border-color: rgba(102, 84, 182, 0.35);
+    background: var(--ok-flat-surface);
+    box-shadow: none;
+    transform: none;
+}
+
+.oc.openkill-status-page .card-title {
+    height: auto;
+    min-height: 20px;
+    margin: 0 0 5px;
+    padding: 0;
+    color: var(--ok-flat-text);
+    font-size: 15px;
+    font-weight: 650;
+    letter-spacing: 0;
+}
+
+.oc.openkill-status-page .core-status-row .sub-card {
+    min-height: 154px;
+    gap: 9px;
+}
+
+.oc.openkill-status-page .version-display-container {
+    top: 15px;
+    right: 15px;
+}
+
+.oc.openkill-status-page .version-display,
+.oc.openkill-status-page .runtime-chip,
+.oc.openkill-status-page .value-indicator {
+    border-color: var(--ok-flat-border);
+    background: var(--ok-flat-surface-muted);
+    color: var(--ok-flat-muted);
+    box-shadow: none;
+}
+
+.oc.openkill-status-page .runtime-profile {
+    margin: 0;
+    padding: 0;
+}
+
+.oc.openkill-status-page .runtime-chip {
+    min-height: 24px;
+    border-radius: 999px;
+    font-size: 11px;
+}
+
+.oc.openkill-status-page .runtime-chip-core {
+    color: var(--ok-flat-accent);
+    border-color: var(--ok-flat-accent-soft);
+    background: var(--ok-flat-accent-soft);
+}
+
+.oc.openkill-status-page .core-main-controls {
+    min-height: 38px;
+}
+
+.oc.openkill-status-page .value-indicator {
+    min-height: 30px;
+    padding: 5px 9px;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.oc.openkill-status-page .core-status-row .value-indicator:not(.oc-hidden) {
+    color: var(--ok-flat-success);
+    border-color: var(--ok-flat-success-soft);
+    background: var(--ok-flat-success-soft);
+}
+
+.oc.openkill-status-page .icon-btn {
+    width: 30px;
+    height: 30px;
+    min-width: 30px;
+    border-color: var(--ok-flat-border);
+    border-radius: 6px;
+    background: var(--ok-flat-surface);
+    color: var(--ok-flat-muted);
+    box-shadow: none;
+}
+
+.oc.openkill-status-page .icon-btn:hover {
+    border-color: var(--ok-flat-accent) !important;
+    background: var(--ok-flat-accent-soft) !important;
+    color: var(--ok-flat-accent) !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+.oc.openkill-status-page .card-row.dual-cards,
+.oc.openkill-status-page .card-row.stats-grid {
+    gap: 12px;
+}
+
+.oc.openkill-status-page .mode-row .sub-card,
+.oc.openkill-status-page .stats-grid .sub-card {
+    min-height: 118px;
+}
+
+.oc.openkill-status-page .cbi-button-group {
+    padding: 3px;
+    border-color: var(--ok-flat-border);
+    border-radius: 6px;
+    background: var(--ok-flat-surface-muted);
+}
+
+.oc.openkill-status-page input[type="radio"]:checked + .cbi-button-option {
+    background: var(--ok-flat-accent);
+    color: #fff;
+    box-shadow: none;
+}
+
+.oc.openkill-status-page .cbi-button-option {
+    color: var(--ok-flat-muted);
+}
+
+.oc.openkill-status-page .dashboard-btn,
+.oc.openkill-status-page input.dashboard-btn {
+    min-height: 34px;
+    border: 1px solid var(--ok-flat-border);
+    border-radius: 6px;
+    background: var(--ok-flat-surface);
+    color: var(--ok-flat-text);
+    box-shadow: none;
+    font-weight: 500;
+}
+
+.oc.openkill-status-page .dashboard-btn:hover,
+.oc.openkill-status-page input.dashboard-btn:hover {
+    border-color: var(--ok-flat-accent);
+    background: var(--ok-flat-accent-soft);
+    color: var(--ok-flat-accent);
+    box-shadow: none;
+}
+
+.oc.openkill-status-page .quick-actions-container {
+    background: var(--ok-flat-surface-muted);
+}
+
+.oc.openkill-status-page .quick-actions-buttons {
+    gap: 8px;
+}
+
+.oc.openkill-status-page .sub-card.stat-item {
+    min-height: 86px;
+    padding: 13px 8px;
+    background: var(--ok-flat-surface);
+}
+
+.oc.openkill-status-page .stat-label {
+    color: var(--ok-flat-muted);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.oc.openkill-status-page .stat-value {
+    color: var(--ok-flat-text);
+    font-size: 16px;
+    font-weight: 650;
+}
+
+.oc.openkill-status-page .config-file-content,
+.oc.openkill-status-page .dashboard-container {
+    min-height: 0;
+}
+
+.oc.openkill-status-page .config-select {
+    border-color: var(--ok-flat-border) !important;
+    border-radius: 6px;
+    background: var(--ok-flat-surface-muted) !important;
+    color: var(--ok-flat-text) !important;
+}
+
+/* Align the five grouped settings views with the same flat Argon language. */
+#cbi-openkill.openkill-settings {
+    --ok-surface: var(--ok-flat-surface);
+    --ok-surface-muted: var(--ok-flat-surface-muted);
+    --ok-text: var(--ok-flat-text);
+    --ok-muted: var(--ok-flat-muted);
+    --ok-border: var(--ok-flat-border);
+    --ok-primary: var(--ok-flat-accent);
+    --ok-primary-soft: var(--ok-flat-accent-soft);
+    --ok-radius: 7px;
+    --ok-shadow: none;
+    max-width: 1360px;
+}
+
+#cbi-openkill.openkill-settings > .cbi-section,
+#cbi-openkill.openkill-settings .openkill-settings-card {
+    box-shadow: none;
+}
+
+#cbi-openkill.openkill-settings .cbi-tabmenu,
+#cbi-openkill.openkill-settings ul.cbi-tabmenu {
+    gap: 0;
+    padding: 0 12px;
+    background: var(--ok-flat-surface);
+}
+
+#cbi-openkill.openkill-settings .cbi-tabmenu li a {
+    min-height: 42px;
+    padding: 12px 14px 9px;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    border-radius: 0;
+}
+
+#cbi-openkill.openkill-settings .cbi-tabmenu li.cbi-tabmenu-tab-active a,
+#cbi-openkill.openkill-settings .cbi-tabmenu li.active a {
+    border-color: var(--ok-flat-accent);
+    background: transparent;
+    color: var(--ok-flat-accent);
+    box-shadow: none;
+}
+
+html[data-darkmode="true"] .oc.openkill-status-page,
+html[data-darkmode="true"] #cbi-openkill.openkill-settings {
+    --ok-flat-page: #1e2025;
+    --ok-flat-surface: #25282e;
+    --ok-flat-surface-muted: #2d3037;
+    --ok-flat-text: #e8eaf0;
+    --ok-flat-muted: #a9afbc;
+    --ok-flat-border: #414650;
+    --ok-flat-accent: #9b8cff;
+    --ok-flat-accent-soft: rgba(155, 140, 255, 0.16);
+    --ok-flat-success: #42c98a;
+    --ok-flat-success-soft: rgba(66, 201, 138, 0.14);
+}
+
+html[data-darkmode="true"] .oc.openkill-status-page .sub-card,
+html[data-darkmode="true"] .oc.openkill-status-page .sub-card:hover {
+    background: var(--ok-flat-surface);
+}
+
+@media (max-width: 1100px) {
+    .oc.openkill-status-page .main-cards-container {
+        grid-template-columns: 1fr;
+    }
+
+    .oc.openkill-status-page .main-card:first-of-type,
+    .oc.openkill-status-page .main-card:last-of-type {
+        grid-column: 1;
+    }
+}
+
+@media (max-width: 640px) {
+    .oc.openkill-status-page .sub-card {
+        padding: 12px;
+    }
+
+    .oc.openkill-status-page .card-row.dual-cards {
+        grid-template-columns: 1fr;
+    }
+
+    .oc.openkill-status-page .card-row.stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
