@@ -96,12 +96,13 @@ function s:taboption(tab, ...)
 	return native_taboption(self, tab_groups[tab] or tab, ...)
 end
 
-s:tab("version_update", translate("Version Update"))
 s:tab("basic", translate("Runtime & Services"))
 s:tab("network", translate("Network & Routing"))
 s:tab("rules", translate("Rules & Subscriptions"))
 s:tab("stability", translate("Performance & Stability"))
 s:tab("advanced", translate("System & Maintenance"))
+-- Keep plugin updates after system maintenance so daily settings stay first.
+s:tab("version_update", translate("Version Update"))
 
 o = s:taboption("op_mode", ListValue, "en_mode", font_red..bold_on..translate("Select Mode")..bold_off..font_off)
 o.description = translate("Select Mode For OpenKill Work, Try Flush DNS Cache If Network Error")
