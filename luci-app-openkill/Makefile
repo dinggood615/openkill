@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-openkill
-PKG_VERSION:=2026-1100
+PKG_VERSION:=2026-1101
 PKG_MAINTAINER:=dinggood615 <https://github.com/dinggood615/openkill>
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
@@ -105,6 +105,9 @@ endef
 
 define Package/$(PKG_NAME)/postrm
 #!/bin/sh
+	if [ -f /etc/openkill/.fw4-optional-include ] && [ ! -s /etc/firewall.include ]; then
+		rm -f /etc/firewall.include
+	fi
 	DEFAULT_DNSMASQ_CFGID="$$(uci -q show "dhcp.@dnsmasq[0]" | awk 'NR==1 {split($0, conf, /[.=]/); print conf[2]}' 2>/dev/null)"
 	if [ -f "/tmp/etc/dnsmasq.conf.$DEFAULT_DNSMASQ_CFGID" ]; then
 	   DNSMASQ_CONF_DIR="$$(awk -F '=' '/^conf-dir=/ {print $2}' "/tmp/etc/dnsmasq.conf.$DEFAULT_DNSMASQ_CFGID" 2>/dev/null)"

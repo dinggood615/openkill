@@ -594,14 +594,44 @@ sanitize_native_fw4_compat()
    fi
 }
 
+ensure_fw4_optional_include()
+{
+   [ -n "$FW4" ] || return 0
+   # Some vendor fw4 builds evaluate the optional /etc/firewall.include test
+   # as the final command of `fw4 reload`. When the file is absent, reload
+   # returns 1 even though nftables compiled successfully. Mihomo treats that
+   # return value as fatal, so create only the empty optional include.
+   if [ ! -f /etc/firewall.include ]; then
+      : > /etc/firewall.include 2>/dev/null || return 1
+      printf '%s\n' 'openkill-created-empty' > /etc/openkill/.fw4-optional-include 2>/dev/null || true
+      LOG_WARN "Created an empty optional fw4 include to normalize reload status."
+   fi
+   return 0
+}
+
 native_fw4_ready()
 {
    [ -n "$FW4" ] || return 0
-   # Mihomo auto-redirect invokes `fw4 reload` internally. Some fw4 builds
-   # report a non-zero result even though syntax checking passes; native mode
-   # cannot safely take ownership in that case.
+   ensure_fw4_optional_include || return 1
+   # Mihomo auto-redirect invokes `fw4 reload` internally. Native mode is
+   # accepted only when fw4's semantic check, its real reload, and the live
+   # nftables table all succeed.
    [ -f /var/run/fw4.state ] || "$FW4" start >/dev/null 2>&1 || true
-   "$FW4" reload >/tmp/openkill-fw4-native-check.log 2>&1
+   "$FW4" check >/tmp/openkill-fw4-native-check.log 2>&1 || {
+      LOG_ERROR "fw4 check failed; Mihomo native auto-redirect is not safe."
+      return 1
+   }
+   "$FW4" reload >>/tmp/openkill-fw4-native-check.log 2>&1 || {
+      LOG_ERROR "fw4 reload failed; Mihomo native auto-redirect is not safe."
+      return 1
+   }
+   if command -v nft >/dev/null 2>&1; then
+      nft list table inet fw4 >/dev/null 2>&1 || {
+         LOG_ERROR "fw4 reload returned success but inet fw4 is unavailable."
+         return 1
+      }
+   fi
+   return 0
 }
 
 do_run_file()
@@ -3795,6 +3825,10 @@ start_service()
          prepare_openkill_include
       else
          sanitize_native_fw4_compat
+         # Remove the previous OpenKill include and DNS hijack before testing
+         # fw4; otherwise the preflight validates a mixed, stale rule set.
+         revert_dnsmasq
+         remove_openkill_include
          if ! native_fw4_ready; then
             LOG_WARN "Mihomo native auto-redirect is unavailable on this fw4 build; falling back to OpenKill firewall management."
             tun_owner=openkill
@@ -3805,10 +3839,7 @@ start_service()
             prepare_openkill_include
          else
             LOG_WARN "TUN ownership: Mihomo native (OpenKill firewall integration disabled)"
-            # Clear any DNS redirect left by a previous OpenKill-owned run before
-            # Mihomo installs its own auto-redirect rules.
-            revert_dnsmasq
-            remove_openkill_include
+            LOG_TIP "Native takeover preflight passed: fw4 check, fw4 reload and nft table validation."
          fi
       fi
 
