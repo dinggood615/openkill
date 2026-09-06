@@ -32,8 +32,12 @@ data = dict(version=os.environ["RELEASE_VERSION"], format=os.environ["PACKAGE_FO
 (p.parent / "latest.json").write_text(json.dumps(data) + "\n")
 PY
 gh auth setup-git
-git clone --depth 1 --branch package "https://github.com/$GITHUB_REPOSITORY.git" "$stage/channel"
+git clone --filter=blob:none --no-checkout --depth 1 --branch package "https://github.com/$GITHUB_REPOSITORY.git" "$stage/channel"
 cd "$stage/channel"
+# The channel also contains hundreds of megabytes of historical packages.
+# Only this format's metadata and new asset are needed for publication.
+git sparse-checkout set --no-cone "/master/latest-$PACKAGE_FORMAT.json" "/master/version" "/master/$asset"
+git checkout
 git config user.name 'github-actions[bot]'
 git config user.email 'github-actions[bot]@users.noreply.github.com'
 mkdir -p master
