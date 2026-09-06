@@ -9,10 +9,10 @@ OpenKill 只使用 [MetaCubeX/Mihomo](https://github.com/MetaCubeX/mihomo) 的�
 - `find-process-mode: off`：关闭逐连接进程查找，减少高并发时的 CPU 消耗。
 - `unified-delay: true`、`tcp-concurrent: true`：统一延迟口径并允许地址竞速；节点组仍以成功的 HTTP 204 检测为准。
 - TUN 默认使用 `stack: mixed`，并通过 UCI 的 `tun_owner` 选择唯一接管方：`openkill`（默认）写入 `auto-route: false`、`auto-redirect: false`，由 OpenKill 负责策略路由、防火墙和 DNS；`mihomo` 才同时写入两个 `true`，并完全停用 OpenKill 的自定义路由、防火墙和 DNS 接管。两种模式不能同时运行，`endpoint-independent-nat: false` 避免额外 NAT 开销。
-- DNS 开启 IPv6，但保留 `ipv6-timeout`、国内/国外 `nameserver-policy` 和 `prefer-h3: false`，避免双栈首连被不可达的 IPv6 上游拖慢。
+- DNS 开启 IPv6，但保留 `ipv6-timeout`、国内/国外 `nameserver-policy` 和 `prefer-h3: false`，避免双栈首连被不可达的 IPv6 上游拖慢；代理节点域名固定使用直连 IPv4 `proxy-server-nameserver`，不与代理规则形成解析回环。
 - 控制器默认绑定 `network.lan.ipaddr`，DNS 默认只监听 `127.0.0.1`；CORS 自动生成 LAN 与回环来源，不再使用 `*`。
 - `geodata-loader: memconservative` 和 `cache-algorithm: arc`，在内存有限的固件上降低 Geo 数据常驻占用。
-- 自动组使用 300 秒周期、50 ms 容差、5 秒单次超时、连续 3 次失败阈值并启用 lazy 检测；只有实际需要的节点会被测量，异常节点不会拖住整个组。
+- 自动组使用 60 秒周期、3 秒单次超时、连续 2 次失败阈值并关闭 lazy 检测；失效节点能及时剔除，避免双栈连接长期卡在不可用节点。
 
 ## 新内核能力的采用原则
 
@@ -32,7 +32,7 @@ ZeroTier 节点的 `network` 必须是 16 位十六进制网络 ID；可选的 `
 
 1. **配置验证、健康检查、回滚和 watchdog 防重启**：生成配置先做 YAML/Mihomo 预检；失败保留 last-good；watchdog 只观察 procd 和内核，不重复启动进程。
 2. **拆分 watchdog、删除冗余功能、降低后台开销**：流媒体自动选择移到独立低频任务；删除 Smart/LightGBM 缓存入口；关闭不必要的进程扫描。
-3. **DNS、IPv6、代理组测速和吞吐**：采用上述双栈 DNS 策略、固定节点地址族、300 秒探测周期、5 秒单次超时和有界失败重试。
+3. **DNS、IPv6、代理组测速和吞吐**：采用上述双栈 DNS 策略、固定代理节点 DNS、本机 IPv4/IPv6 输出接管、60 秒探测周期、3 秒单次超时和有界失败重试。
 4. **官方 Mihomo 特性兼容**：安装器动态跟随官方 stable release，静态校验和版本元数据统一；能力探测、全局/节点双重开关、配置读写、原生 ZeroTier 节点和可选系统服务管理已经落地。
 
 官方参考：

@@ -902,20 +902,19 @@ begin
       if ! default_proxy_servers.any? || default_proxy_servers.all? { |x| x.match?(proxied_server_reg) }
          default_proxy_servers = ['114.114.114.114', '119.29.29.29', '8.8.8.8', '1.1.1.1']
       end
+      # Do not inherit DHCP or link-local IPv6 resolvers here.  They are
+      # suitable for ordinary WAN DNS but can stall proxy-node resolution on
+      # dual-stack routers.  Keep this resolver path deterministic and direct.
+      default_proxy_servers = ['114.114.114.114', '119.29.29.29', '223.5.5.5']
       proxy_server_nameserver_policy = Value.dig('dns', 'proxy-server-nameserver-policy') && !Value['dns']['proxy-server-nameserver-policy'].empty?
 
       if Value.dig('dns', 'proxy-server-nameserver').to_a.empty?
-         all_ns_proxied = Value.dig('dns', 'nameserver').to_a.all? { |x| x.match?(proxied_server_reg) }
-         if respect_rules || Value.dig('dns', 'respect-rules').to_s == 'true' || all_ns_proxied || proxy_server_nameserver_policy
-            Value['dns']['proxy-server-nameserver'] = default_proxy_servers
-            if all_ns_proxied
-               YAML.LOG_TIP('Nameserver Option Maybe All Setted The Proxy Option, Auto Set Proxy-server-nameserver Option to【%s】For Avoiding Proxies Server Resolve Loop...' % [default_proxy_servers.join(', ')])
-            elsif proxy_server_nameserver_policy
-               YAML.LOG_TIP('【Proxy-server-nameserver-policy】Need Proxy-server-nameserver Option Must Be Setted, Auto Set to【%s】' % [default_proxy_servers.join(', ')])
-            else
-               YAML.LOG_TIP('【Respect-rules】Need Proxy-server-nameserver Option Must Be Setted, Auto Set to【%s】' % [default_proxy_servers.join(', ')])
-            end
-         end
+         # Always provide a direct IPv4 resolver for proxy node hostnames.
+         # Without this, a node such as cf.877774.xyz can be resolved through
+         # the policy DNS path and stall before the proxy handshake, even when
+         # ordinary router DNS can resolve it successfully.
+         Value['dns']['proxy-server-nameserver'] = default_proxy_servers
+         YAML.LOG_TIP('Auto set direct proxy-server-nameserver to【%s】 to keep node DNS resolution independent from proxy rules...' % [default_proxy_servers.join(', ')])
       else
          all_psn_proxied = Value.dig('dns', 'proxy-server-nameserver').to_a.all? { |x| x.match?(proxied_server_reg) }
          if all_psn_proxied
