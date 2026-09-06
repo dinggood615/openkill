@@ -106,6 +106,10 @@ cleanup_core_tmp() {
 trap 'cleanup_core_tmp; del_lock' EXIT INT TERM
 
 json_value() {
+   if command -v jsonfilter >/dev/null 2>&1; then
+      jsonfilter -i "$RELEASE_JSON" -e "@.$1" 2>/dev/null
+      return $?
+   fi
    ruby -rjson -e '
       begin
         d = JSON.parse(File.read(ARGV[0]))
@@ -117,6 +121,17 @@ json_value() {
    ' "$RELEASE_JSON" "$1" 2>/dev/null
 }
 asset_info_from_release() {
+   if command -v jsonfilter >/dev/null 2>&1; then
+      asset_name="$1"
+      asset_url=$(jsonfilter -i "$RELEASE_JSON" -e "@.assets[@.name='$asset_name'].browser_download_url" 2>/dev/null | sed -n '1p')
+      asset_digest=$(jsonfilter -i "$RELEASE_JSON" -e "@.assets[@.name='$asset_name'].digest" 2>/dev/null | sed -n '1p' | sed 's/^sha256://')
+      asset_size=$(jsonfilter -i "$RELEASE_JSON" -e "@.assets[@.name='$asset_name'].size" 2>/dev/null | sed -n '1p')
+      case "$asset_url" in https://*) ;; *) return 1;; esac
+      case "$asset_digest" in [0-9a-f][0-9a-f]*) ;; *) return 1;; esac
+      [ -n "$asset_size" ] || return 1
+      printf '%s\n%s\n%s\n' "$asset_url" "$asset_digest" "$asset_size"
+      return 0
+   fi
    ruby -rjson -e '
       begin
         d = JSON.parse(File.read(ARGV[0]))

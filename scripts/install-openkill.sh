@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1084"
+PROJECT_VERSION="2026-1085"
 ACTION=install
 PACKAGE_FILE=""
 LOCAL_PACKAGE_MODE=0
@@ -225,7 +225,11 @@ install_dependency_set(){
 }
 install_dependencies(){
   step "Checking and installing OpenKill runtime dependencies"
-  OPENKILL_REQUIRED_COMMON="bash curl ca-bundle ip-full ruby ruby-yaml lua kmod-tun unzip dnsmasq-full luci-compat"
+  # jsonfilter is part of the OpenWrt base toolchain on current images and is
+  # used as a small, dependency-free fallback when ruby-json is not shipped.
+  # Keeping it required makes remote package/core resolution work on minimal
+  # firmware without forcing the much larger Ruby JSON extension.
+  OPENKILL_REQUIRED_COMMON="bash curl ca-bundle ip-full jsonfilter ruby ruby-yaml lua kmod-tun unzip dnsmasq-full luci-compat"
   OPENKILL_OPTIONAL_COMMON="ruby-json ruby-base64 ruby-psych ruby-pstore kmod-inet-diag"
   OPENKILL_REQUIRED_FW4="kmod-nft-tproxy"
   OPENKILL_REQUIRED_FW3="kmod-ipt-tproxy iptables-mod-tproxy ipset"
@@ -262,9 +266,9 @@ install_dependencies(){
     detail "All required dependencies are installed; index refresh skipped"
   fi
   install_dependency_set "required runtime dependencies" required "$required"
-  # YAML is required by the runtime.  ruby-json is only needed while parsing
-  # a remote package manifest; local package installs must not be blocked by
-  # a missing optional Ruby extension or an unreachable feed.
+  # YAML is required by the runtime.  jsonfilter handles the small JSON
+  # objects used by the installer/core resolver, so ruby-json remains an
+  # optional accelerator rather than a fresh-install blocker.
   if ! ruby -ryaml -e 'exit 0' >/dev/null 2>&1; then
     [ -n "$FEED_CONFIG" ] || prepare_feeds
     available_optional=""
@@ -276,13 +280,15 @@ install_dependencies(){
   fi
   ruby -ryaml -e 'exit 0' || die "Ruby YAML runtime is incomplete"
   if ! ruby -rjson -e 'exit 0' >/dev/null 2>&1; then
-    if [ "$LOCAL_PACKAGE_MODE" -eq 1 ]; then
+    if command -v jsonfilter >/dev/null 2>&1; then
+      detail "Ruby JSON extension unavailable; using OpenWrt jsonfilter for manifest/core metadata"
+    elif [ "$LOCAL_PACKAGE_MODE" -eq 1 ]; then
       detail "Ruby JSON extension is unavailable; local package mode does not need remote manifest parsing"
     else
       [ -n "$FEED_CONFIG" ] || prepare_feeds
       json_packages=""
       if package_available ruby-json; then json_packages="ruby-json"; fi
-      [ -n "$json_packages" ] || die "Ruby JSON extension is required to resolve the published package"
+      [ -n "$json_packages" ] || die "Neither jsonfilter nor Ruby JSON is available for published package resolution"
       install_dependency_set "Ruby JSON manifest module" required "$json_packages"
       ruby -rjson -e 'exit 0' || die "Ruby JSON runtime is incomplete"
     fi
@@ -474,6 +480,26 @@ download_databases(){
 
 validate_manifest(){
   manifest_path="$1"
+  if command -v jsonfilter >/dev/null 2>&1; then
+    manifest_version=$(jsonfilter -i "$manifest_path" -e '@.version' 2>/dev/null | sed -n '1p')
+    manifest_format=$(jsonfilter -i "$manifest_path" -e '@.format' 2>/dev/null | sed -n '1p')
+    manifest_arch=$(jsonfilter -i "$manifest_path" -e '@.architecture' 2>/dev/null | sed -n '1p')
+    manifest_sha=$(jsonfilter -i "$manifest_path" -e '@.sha256' 2>/dev/null | sed -n '1p')
+    manifest_name=$(jsonfilter -i "$manifest_path" -e '@.filename' 2>/dev/null | sed -n '1p')
+    manifest_url=$(jsonfilter -i "$manifest_path" -e '@.url' 2>/dev/null | sed -n '1p')
+    case "$manifest_version" in 2026-[0-9]*) ;; *) return 1;; esac
+    [ "$manifest_format" = "$EXT" ] || return 1
+    [ "$manifest_arch" = all ] || return 1
+    case "$manifest_sha" in [0-9a-f][0-9a-f]*) ;; *) return 1;; esac
+    package_version="$manifest_version"
+    [ "$EXT" = apk ] && package_version=$(printf '%s' "$manifest_version" | sed 's/-/./')
+    expected="luci-app-openkill_${package_version}_all.$EXT"
+    [ "$manifest_name" = "$expected" ] || return 1
+    expected_url="https://github.com/$REPO/releases/download/v${manifest_version}-${EXT}/${expected}"
+    [ "$manifest_url" = "$expected_url" ] || return 1
+    printf '%s\n%s\n%s\n%s\n' "$manifest_version" "$manifest_name" "$manifest_sha" "$manifest_url"
+    return 0
+  fi
   ruby -rjson -e '
     d=JSON.parse(File.read(ARGV[0]))
     version=d["version"].to_s
