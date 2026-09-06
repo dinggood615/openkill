@@ -796,6 +796,10 @@ check_core_status()
          if openkill_core_api_healthy; then
             stage=tun
             if [ -z "$OPENKILL_TUN_DEVICE" ]; then
+               if [ -n "$en_mode_tun" ] || [ "$ipv6_mode" -eq 2 ] || [ "$ipv6_mode" -eq 3 ]; then
+                  LOG_ERROR "Generated config disabled TUN while the selected mode requires it."
+                  start_fail
+               fi
                break
             elif ip link show dev "$OPENKILL_TUN_DEVICE" >/dev/null 2>&1; then
                if [ "$tun_owner" = "openkill" ]; then break; fi
@@ -847,7 +851,7 @@ check_core_status()
    # failure must not be reported as a successful proxy startup.
    if [ -n "$OPENKILL_DNS_ENDPOINT" ]; then
       dns_port_check="${OPENKILL_DNS_ENDPOINT##*:}"
-      if ! awk -v port="$dns_port_check" 'BEGIN {p=sprintf(":%04X", port)} $2 ~ p"$" {found=1} END {exit !found}' /proc/net/udp /proc/net/udp6 2>/dev/null; then
+      if ! openkill_dns_listener_present "$dns_port_check"; then
          LOG_ERROR "DNS listener is not ready on the configured port."
          start_fail
       fi

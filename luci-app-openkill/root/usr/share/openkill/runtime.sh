@@ -83,5 +83,16 @@ openkill_core_api_healthy() {
 }
 
 openkill_core_ready() {
-    openkill_core_api_healthy
+    openkill_core_process_present && openkill_core_api_healthy
+}
+
+openkill_dns_listener_present() {
+    local port="$1" table
+    for table in /proc/net/udp /proc/net/udp6; do
+        [ -r "$table" ] || continue
+        if awk -v port="$port" 'BEGIN {p=sprintf(":%04X", port)} $2 ~ p"$" {found=1} END {exit !found}' "$table"; then
+            return 0
+        fi
+    done
+    return 1
 }

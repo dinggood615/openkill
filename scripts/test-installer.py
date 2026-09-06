@@ -62,7 +62,7 @@ set -eu
 WORK_DIR=$(mktemp -d)
 trap 'rm -rf "$WORK_DIR"' EXIT
 """ + functions + r'''
-printf '%s\n' '2026-1015\t1\thttps://cdn.example.invalid\told.json' '2026-1050\t2\thttps://raw.example.invalid\tnew.json' > "$WORK_DIR/rows"
+printf '%b\n' '2026-1015\t1\thttps://cdn.example.invalid\told.json' '2026-1050\t2\thttps://raw.example.invalid\tnew.json' > "$WORK_DIR/rows"
 chosen=$(select_newest_manifest "$WORK_DIR/rows")
 [ "$(printf '%s\n' "$chosen" | sed -n '1p')" = 2 ]
 [ "$(printf '%s\n' "$chosen" | sed -n '2p')" = https://raw.example.invalid ]
