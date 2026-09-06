@@ -21,8 +21,40 @@ set_default geodata_loader memconservative
 set_default enable_tcp_concurrent 1
 set_default enable_unified_delay 1
 set_default disable_udp_quic 0
-set_default tun_auto_route auto
-set_default tun_auto_redirect auto
+
+# TUN ownership is a single mutually-exclusive mode.  Older installations
+# only have the two boolean-ish legacy fields.  Preserve the one unambiguous
+# legacy choice (both values explicitly enabled means Mihomo-native); every
+# other combination migrates to the safe OpenKill-owned path instead of
+# allowing a split owner.  The old values remain as compatibility fields, but
+# are derived from tun_owner below and are never user-controlled afterwards.
+tun_owner="$(uci -q get openkill.config.tun_owner 2>/dev/null || true)"
+if [ "$tun_owner" != "openkill" ] && [ "$tun_owner" != "mihomo" ]; then
+    legacy_route="$(uci -q get openkill.config.tun_auto_route 2>/dev/null || true)"
+    legacy_redirect="$(uci -q get openkill.config.tun_auto_redirect 2>/dev/null || true)"
+    if [ "$legacy_route" = "1" ] && [ "$legacy_redirect" = "1" ]; then
+        tun_owner=mihomo
+    else
+        tun_owner=openkill
+    fi
+    uci -q set openkill.config.tun_owner="$tun_owner"
+    changed=1
+fi
+if [ "$tun_owner" = "mihomo" ]; then
+    desired_route=1
+    desired_redirect=1
+else
+    desired_route=0
+    desired_redirect=0
+fi
+if [ "$(uci -q get openkill.config.tun_auto_route 2>/dev/null || true)" != "$desired_route" ]; then
+    uci -q set openkill.config.tun_auto_route="$desired_route"
+    changed=1
+fi
+if [ "$(uci -q get openkill.config.tun_auto_redirect 2>/dev/null || true)" != "$desired_redirect" ]; then
+    uci -q set openkill.config.tun_auto_redirect="$desired_redirect"
+    changed=1
+fi
 set_default tun_auto_detect_interface 1
 set_default tun_strict_route 0
 set_default tun_endpoint_independent_nat 0

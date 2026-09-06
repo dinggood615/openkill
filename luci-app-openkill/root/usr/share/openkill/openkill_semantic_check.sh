@@ -134,7 +134,21 @@ if tun
   if tun.key?('stack')
     fail.call('tun.stack is invalid') unless %w[system gvisor mixed].include?(tun['stack'].to_s)
   end
-  warn 'tun.auto-route and tun.auto-redirect are both enabled; ensure Mihomo is the only TUN firewall owner' if tun['auto-route'] == true && tun['auto-redirect'] == true
+  # Routing and transparent firewall programming have one owner.  The shell
+  # service exports the selected UCI mode for this check; standalone callers
+  # can still be validated safely by falling back to the OpenKill-owned mode.
+  tun_owner = ENV['OPENKILL_TUN_OWNER'].to_s
+  if tun_owner.empty? && File.executable?('/sbin/uci')
+    tun_owner = `uci -q get openkill.config.tun_owner 2>/dev/null`.to_s.strip
+  end
+  tun_owner = 'openkill' unless %w[openkill mihomo].include?(tun_owner)
+  auto_route = tun['auto-route'] == true
+  auto_redirect = tun['auto-redirect'] == true
+  if tun_owner == 'openkill'
+    fail.call('OpenKill-owned mode requires tun.auto-route=false and tun.auto-redirect=false') if auto_route || auto_redirect
+  elsif !auto_route || !auto_redirect
+    fail.call('Mihomo-native mode requires tun.auto-route=true and tun.auto-redirect=true')
+  end
 end
 
 puts 'semantic validation passed'

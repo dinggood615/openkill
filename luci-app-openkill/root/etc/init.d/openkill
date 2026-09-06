@@ -462,11 +462,12 @@ validate_generated_config()
    # generated mapping from replacing the last-good configuration.
    if [ "$QUICK_START" = "true" ]; then
       if [ -x /usr/share/openkill/openkill_semantic_check.sh ]; then
-         /usr/share/openkill/openkill_semantic_check.sh "$TMP_CONFIG_FILE" >> "$LOG_FILE" 2>&1 || return 1
+         OPENKILL_TUN_OWNER="$tun_owner" \
+            /usr/share/openkill/openkill_semantic_check.sh "$TMP_CONFIG_FILE" >> "$LOG_FILE" 2>&1 || return 1
       fi
       return 0
    fi
-   if ! /usr/share/openkill/openkill_validate.sh "$TMP_CONFIG_FILE" "$CLASH" >> "$LOG_FILE" 2>&1; then
+   if ! OPENKILL_TUN_OWNER="$tun_owner" /usr/share/openkill/openkill_validate.sh "$TMP_CONFIG_FILE" "$CLASH" >> "$LOG_FILE" 2>&1; then
       LOG_ERROR "Generated configuration failed Mihomo validation; the active configuration was kept."
       return 1
    fi
@@ -793,23 +794,36 @@ check_core_status()
          ip_="ip -6"
       fi
 
+      # In OpenKill-owned mode Mihomo deliberately does not install the
+      # policy route.  Wait for the TUN device itself, then install the route
+      # below.  In Mihomo-native mode keep the historical route readiness
+      # check because Mihomo owns table/rule creation there.
+      tun_ready()
+      {
+         if [ "$tun_owner" = "openkill" ]; then
+            ip link show utun >/dev/null 2>&1
+         else
+            [ -n "$($ip_ route list 2>/dev/null | grep utun)" ]
+         fi
+      }
+
       #wait 300s most for core start
-      while ( openkill_core_process_present && [ -z "$($ip_ route list |grep utun)" ] && [ "$TUN_WAIT" -le 300 ] )
+      while ( openkill_core_process_present && ! tun_ready && [ "$TUN_WAIT" -le 300 ] )
       do
          $ip_ link set utun up
          let TUN_WAIT++
          sleep 1
       done
 
-      if openkill_core_process_present && [ -z "$($ip_ route list |grep utun)" ] && [ "$TUN_WAIT" -gt 300 ]; then
-         while ( openkill_core_process_present && [ -z "$($ip_ route list |grep utun)" ] && [ "$TUN_RESTART" -le 3 ] )
+      if openkill_core_process_present && ! tun_ready && [ "$TUN_WAIT" -gt 300 ]; then
+         while ( openkill_core_process_present && ! tun_ready && [ "$TUN_RESTART" -le 3 ] )
          do
             LOG_WARN "TUN Interface Start Failed, Try to Restart Again..."
             start_run_core
             let TUN_RESTART++
             sleep 300
          done
-         if openkill_core_process_present && [ -z "$($ip_ route list |grep utun)" ] && [ "$TUN_RESTART" -gt 3 ]; then
+         if openkill_core_process_present && ! tun_ready && [ "$TUN_RESTART" -gt 3 ]; then
             LOG_ERROR "TUN Interface Start Failed, Please Check The Dependence or Try to Restart Again!"
             LOG_ERROR "Core Initial Configuration Timeout, Please Check The Log Infos!"
             start_fail
@@ -817,19 +831,28 @@ check_core_status()
       fi
 
       if openkill_core_process_present; then
-         while ( openkill_core_process_present && [ -n "$(ip -6 rule show |grep 2022)" ] && [ "$CORE_WAIT" -le 10 ] )
-         do
-            ip -6 rule del oif utun table 2022
-            ip -6 route del default dev utun table 2022
-            let CORE_WAIT++
-         done
-         if [ "$ipv6_mode" -eq 2 ] || [ "$ipv6_mode" -eq 3 ]; then
-            ip -6 route add default dev utun table "$PROXY_ROUTE_TABLE"
-            ip -6 rule add fwmark "$PROXY_FWMARK" table "$PROXY_ROUTE_TABLE" pref 1888
-         fi
-         if [ -n "$en_mode_tun" ]; then
-            ip route add default dev utun table "$PROXY_ROUTE_TABLE"
-            ip rule add fwmark "$PROXY_FWMARK" table "$PROXY_ROUTE_TABLE" pref 1888
+         if [ "$tun_owner" = "openkill" ]; then
+            # A few Mihomo builds create utun before marking it UP.  Bring it
+            # up explicitly before installing the owner-managed routes.
+            ip link set utun up 2>/dev/null || true
+            # Remove only the route-table artifacts that OpenKill owns.  Never
+            # delete Mihomo's native table 2022 entries in native mode.
+            while ( openkill_core_process_present && [ -n "$(ip -6 rule show |grep 2022)" ] && [ "$CORE_WAIT" -le 10 ] )
+            do
+               ip -6 rule del oif utun table 2022
+               ip -6 route del default dev utun table 2022
+               let CORE_WAIT++
+            done
+            if [ "$ipv6_mode" -eq 2 ] || [ "$ipv6_mode" -eq 3 ]; then
+               ip -6 route replace default dev utun table "$PROXY_ROUTE_TABLE"
+               ip -6 rule show | grep -q "fwmark $PROXY_FWMARK.*lookup $PROXY_ROUTE_TABLE" || \
+                  ip -6 rule add fwmark "$PROXY_FWMARK" table "$PROXY_ROUTE_TABLE" pref 1888
+            fi
+            if [ -n "$en_mode_tun" ]; then
+               ip route replace default dev utun table "$PROXY_ROUTE_TABLE"
+               ip rule show | grep -q "fwmark $PROXY_FWMARK.*lookup $PROXY_ROUTE_TABLE" || \
+                  ip rule add fwmark "$PROXY_FWMARK" table "$PROXY_ROUTE_TABLE" pref 1888
+            fi
          fi
       fi
    else
@@ -866,15 +889,22 @@ check_core_status()
       start_fail
    fi
 
-   # redirect dns setting after core started, prevent core dns lookup failure
-   if [ "$1" == "start" ]; then
-      change_dnsmasq "$enable_redirect_dns"
-      set_firewall
-      [ -s "$CONFIG_FILE" ] && cp -f "$CONFIG_FILE" "$LAST_GOOD_CONFIG" >/dev/null 2>&1
-      LOG_TIP "OpenKill Start Successful!"
+   # OpenKill-owned mode applies dnsmasq/fw4 integration after the core is
+   # ready.  Mihomo-native mode must leave both untouched, otherwise the two
+   # managers would immediately recreate each other's rules.
+   if [ "$tun_owner" = "openkill" ]; then
+      if [ "$1" == "start" ]; then
+         change_dnsmasq "$enable_redirect_dns"
+         set_firewall
+         [ -s "$CONFIG_FILE" ] && cp -f "$CONFIG_FILE" "$LAST_GOOD_CONFIG" >/dev/null 2>&1
+         LOG_TIP "OpenKill Start Successful!"
+      else
+         set_firewall
+         LOG_TIP "Firewall Reload Successful!"
+      fi
    else
-      set_firewall
-      LOG_TIP "Firewall Reload Successful!"
+      [ -s "$CONFIG_FILE" ] && cp -f "$CONFIG_FILE" "$LAST_GOOD_CONFIG" >/dev/null 2>&1
+      LOG_TIP "Mihomo Native TUN Ownership Start Successful!"
    fi
 
    write_run_quick
@@ -1223,26 +1253,48 @@ firewall_lan_ac_traffic()
    fi
 }
 
-set_firewall()
+prepare_openkill_include()
 {
+   [ "$tun_owner" = "mihomo" ] && return 0
 
-if [ -z "$(uci -q get firewall.openkill)" ] || [ -z "$(uci -q get ucitrack.@openkill[-1].init)" ]; then
-   uci -q delete ucitrack.@openkill[-1]
-   uci -q add ucitrack openkill
-   uci -q set ucitrack.@openkill[-1].init=openkill
-   uci -q commit ucitrack
-   uci -q delete firewall.openkill
-   uci -q set firewall.openkill=include
-   uci -q set firewall.openkill.type=script
-   uci -q set firewall.openkill.path=/var/etc/openkill.include
-   [ -n "$FW4" ] || uci -q set firewall.openkill.reload=1
-   uci -q commit firewall
-fi
+   if [ "$(uci -q get firewall.openkill)" != "include" ] || \
+      [ "$(uci -q get firewall.openkill.path)" != "/var/etc/openkill.include" ] || \
+      [ -z "$(uci -q get ucitrack.@openkill[-1].init)" ]; then
+      uci -q delete ucitrack.@openkill[-1]
+      uci -q add ucitrack openkill
+      uci -q set ucitrack.@openkill[-1].init=openkill
+      uci -q commit ucitrack
+      uci -q delete firewall.openkill
+      uci -q set firewall.openkill=include
+      uci -q set firewall.openkill.type=script
+      uci -q set firewall.openkill.path=/var/etc/openkill.include
+      [ -n "$FW4" ] || uci -q set firewall.openkill.reload=1
+      uci -q commit firewall
+   fi
 
-mkdir -p /var/etc
-cat > "/var/etc/openkill.include" <<-EOF
+   mkdir -p /var/etc
+   cat > "/var/etc/openkill.include" <<-EOF
 /etc/init.d/openkill reload "firewall"
 EOF
+}
+
+remove_openkill_include()
+{
+   rm -f /var/etc/openkill.include
+   # Do not leave a fw4 include pointing at a deleted volatile file.  The
+   # previous implementation removed only the file, which made the next
+   # Mihomo auto-redirect reload fail with an unreachable include path.
+   uci -q delete firewall.openkill
+   uci -q commit firewall
+}
+
+set_firewall()
+{
+   # Mihomo-native mode owns all TUN routing and redirect rules.  OpenKill
+   # must not add a second set of nftables/iptables rules in that mode.
+   [ "$tun_owner" = "mihomo" ] && return 0
+
+prepare_openkill_include
 
 #common ports
 if [ -n "$common_ports" ] && [ "$common_ports" != "0" ]; then
@@ -2990,7 +3042,7 @@ fi
 
 revert_firewall()
 {
-   rm -rf /var/etc/openkill.include
+   remove_openkill_include
 
    ip rule del fwmark "$PROXY_FWMARK" table "$PROXY_ROUTE_TABLE"
    ip route del local 0.0.0.0/0 dev lo table "$PROXY_ROUTE_TABLE"
@@ -3619,6 +3671,11 @@ get_config()
    enable_udp_proxy=$(uci_get_config "enable_udp_proxy" || echo 1)
    disable_udp_quic=$(uci_get_config "disable_udp_quic")
    operation_mode=$(uci_get_config "operation_mode")
+   tun_owner=$(uci_get_config "tun_owner" || echo openkill)
+   case "$tun_owner" in
+      openkill|mihomo) ;;
+      *) tun_owner=openkill ;;
+   esac
    lan_ac_mode=$(uci_get_config "lan_ac_mode")
    enable_rule_proxy=$(uci_get_config "enable_rule_proxy")
    stack_type=$(uci_get_config "stack_type" || echo "mixed")
@@ -3699,6 +3756,18 @@ start_service()
       get_config
       config_choose
       do_run_mode
+      if [ "$tun_owner" = "openkill" ]; then
+         LOG_TIP "TUN ownership: OpenKill (routes and firewall are plugin-managed)"
+         # The include must exist before any core or fw4 reload can reference
+         # it.  This removes the startup race seen with Mihomo auto-redirect.
+         prepare_openkill_include
+      else
+         LOG_WARN "TUN ownership: Mihomo native (OpenKill firewall integration disabled)"
+         # Clear any DNS redirect left by a previous OpenKill-owned run before
+         # Mihomo installs its own auto-redirect rules.
+         revert_dnsmasq
+         remove_openkill_include
+      fi
 
       LOG_OUT "Step 2: Check The Components..."
       do_run_file "$RAW_CONFIG_FILE"
@@ -3828,10 +3897,19 @@ stop_service()
    {
       /usr/share/openkill/openkill_history_get.sh
 
-      LOG_OUT "Step 2: Delete OpenKill Firewall Rules..."
+      # Stop the core before removing its owner-specific firewall include.
+      # Mihomo-native auto-redirect can request an fw4 reload while exiting;
+      # deleting the include first recreates the exact startup race we avoid.
+      LOG_OUT "Step 2: Stop The OpenKill Core..."
+      procd_kill "openkill"
+      for i in $(seq 1 10); do
+         procd_running "openkill" >/dev/null && sleep 1 || break
+      done
+
+      LOG_OUT "Step 3: Delete OpenKill Firewall Rules..."
       revert_firewall
 
-      LOG_OUT "Step 3: Close The OpenKill Services..."
+      LOG_OUT "Step 4: Close The OpenKill Services..."
       for process in "openkill_streaming_unlock.lua"; do
          pids=$(unify_ps_pids "$process")
          if [ -n "$pids" ]; then
@@ -3840,13 +3918,8 @@ stop_service()
             done
          fi
       done
-      # prevent respawn during stopping
-      procd_kill "openkill"
-      for i in $(seq 1 10); do
-         procd_running "openkill" >/dev/null && sleep 1 || break
-      done
 
-      LOG_OUT "Step 4: Restart Dnsmasq..."
+      LOG_OUT "Step 5: Restart Dnsmasq..."
       revert_dnsmasq
 
       LOG_OUT "Step 5: Delete OpenKill Residue File..."
@@ -3918,12 +3991,14 @@ reload_service()
       fi
       LOG_OUT "【${CUR_RELOAD_NUM}/$MAX_RELOAD】Reload OpenKill Firewall Rules..."
       revert_firewall
+      [ "$tun_owner" = "openkill" ] && prepare_openkill_include
       do_run_mode
       check_core_status &
    fi
    if openkill_core_process_present && [ "$enable" == "1" ] && [ "$1" == "manual" ]; then
       LOG_OUT "Manually Reload Firewall Rules..."
       revert_firewall
+      [ "$tun_owner" = "openkill" ] && prepare_openkill_include
       do_run_mode
       check_core_status &
    fi

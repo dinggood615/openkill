@@ -94,6 +94,14 @@ grep -Fq 'openkill_config_normalize.sh' "$ROOT_DIR/luci-app-openkill/root/etc/in
   || fail 'UCI normalization hook is missing'
 grep -Fq 'OPENKILL_REQUIRED_COMMON' "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/dependencies.conf" \
   || fail 'dependency manifest is missing'
+grep -Fq 'prepare_openkill_include' "$ROOT_DIR/luci-app-openkill/root/etc/init.d/openkill" \
+  || fail 'owner-specific firewall include preparation is missing'
+grep -Fq 'OPENKILL_TUN_OWNER' "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_semantic_check.sh" \
+  || fail 'TUN ownership semantic validation is missing'
+grep -Fq 'tun_owner' "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_watchdog.sh" \
+  || fail 'watchdog TUN ownership guard is missing'
+grep -Fq "'tun_owner'" "$ROOT_DIR/luci-app-openkill/luasrc/view/openkill/settings_theme.htm" \
+  || fail 'settings card layout still references removed auto-route fields'
 
 # Feed routing and Mihomo delivery must remain both ABI-safe and verifiable.
 if ! grep -Fq 'dl.openwrt.ai must remain unchanged' "$ROOT_DIR/scripts/install-openkill.sh"; then
@@ -151,7 +159,7 @@ if grep -Fq '    - "*"' "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/res
    grep -Fq 'username:password' "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/res/default.yaml"; then
   fail 'wildcard CORS or sample credentials remain in default.yaml'
 fi
-for needle in 'dashboard_bind_address' 'dns_listen_address' 'tun_auto_route' 'tun_auto_redirect' \
+for needle in 'dashboard_bind_address' 'dns_listen_address' 'tun_owner' 'tun_auto_route' 'tun_auto_redirect' \
   'tun_auto_detect_interface' 'tun_strict_route' 'tun_endpoint_independent_nat' 'Config transaction aborted'; do
   grep -Fq "$needle" \
     "$ROOT_DIR/luci-app-openkill/root/etc/config/openkill" \

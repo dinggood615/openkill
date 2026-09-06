@@ -67,11 +67,15 @@ config openkill 'config'
 	option watchdog_firewall_cycles '5'
 	option watchdog_upnp_cycles '60'
 	option watchdog_proxy_cycles '60'
-	# TUN routing is owned by OpenKill's firewall integration by default.  Set
-	# auto-route/auto-redirect to 1 only when the firmware delegates both jobs
-	# to Mihomo.  "auto" deliberately resolves to the safe OpenKill path.
-	option tun_auto_route 'auto'
-	option tun_auto_redirect 'auto'
+	# Exactly one component owns TUN routing and transparent firewall rules.
+	# OpenKill is the safe default because this plugin also manages IPv4/IPv6
+	# policy routing, DNS interception and fw4/iptables compatibility rules.
+	# Select "mihomo" only when Mihomo must own all of those jobs itself.
+	option tun_owner 'openkill'
+	# Legacy values are retained for upgrade compatibility and are normalized
+	# from tun_owner before YAML generation; they are not independent switches.
+	option tun_auto_route '0'
+	option tun_auto_redirect '0'
 	option tun_auto_detect_interface '1'
 	option tun_strict_route '0'
 	option tun_endpoint_independent_nat '0'

@@ -8,7 +8,7 @@ OpenKill 只使用 [MetaCubeX/Mihomo](https://github.com/MetaCubeX/mihomo) 的�
 
 - `find-process-mode: off`：关闭逐连接进程查找，减少高并发时的 CPU 消耗。
 - `unified-delay: true`、`tcp-concurrent: true`：统一延迟口径并允许地址竞速；节点组仍以成功的 HTTP 204 检测为准。
-- TUN 默认使用 `stack: mixed`，但 `auto-route`/`auto-redirect` 由 OpenKill 防火墙统一接管（UCI 为 `auto` 时写入 `false`）；只有显式设为 `1` 才交给 Mihomo，`endpoint-independent-nat: false` 避免额外 NAT 开销。
+- TUN 默认使用 `stack: mixed`，并通过 UCI 的 `tun_owner` 选择唯一接管方：`openkill`（默认）写入 `auto-route: false`、`auto-redirect: false`，由 OpenKill 负责策略路由、防火墙和 DNS；`mihomo` 才同时写入两个 `true`，并完全停用 OpenKill 的自定义路由、防火墙和 DNS 接管。两种模式不能同时运行，`endpoint-independent-nat: false` 避免额外 NAT 开销。
 - DNS 开启 IPv6，但保留 `ipv6-timeout`、国内/国外 `nameserver-policy` 和 `prefer-h3: false`，避免双栈首连被不可达的 IPv6 上游拖慢。
 - 控制器默认绑定 `network.lan.ipaddr`，DNS 默认只监听 `127.0.0.1`；CORS 自动生成 LAN 与回环来源，不再使用 `*`。
 - `geodata-loader: memconservative` 和 `cache-algorithm: arc`，在内存有限的固件上降低 Geo 数据常驻占用。

@@ -215,6 +215,11 @@ do
    log_size=$(valid_cycles "$(uci_get_config "log_size" || echo 1024)" 1024)
    router_self_proxy=$(valid_bool "$(uci_get_config "router_self_proxy" || echo 1)")
    skip_proxy_address=$(valid_bool "$(uci_get_config "skip_proxy_address" || echo 0)")
+   tun_owner=$(uci_get_config "tun_owner" || echo openkill)
+   case "$tun_owner" in
+      openkill|mihomo) ;;
+      *) tun_owner=openkill ;;
+   esac
 
    cfg_update=$(valid_bool "$(uci_get_config "auto_update" || echo 0)")
    cfg_update_mode=$(valid_bool "$(uci_get_config "config_auto_update_mode" || echo 0)")
@@ -268,6 +273,9 @@ HISTORY_INT=$(expr "$HISTORY_INT" + 1)
    fi
 
 ## 防火墙检查（每两分钟，避免每个心跳都遍历完整规则集）
+   # Mihomo-native mode owns fw4/iptables and policy routes.  Do not let the
+   # OpenKill watchdog inspect or reload a second rule set in that mode.
+   if [ "$tun_owner" = "openkill" ]; then
    if [ "$FIREWALL_INT" -eq 1 ] || [ "$(expr "$FIREWALL_INT" % "$FIREWALL_INTERVAL")" -eq 0 ]; then
    if [ "$FIREWALL_RELOAD" -le "$MAX_FIREWALL_RELOAD" ]; then
       if [ -z "$FW4" ]; then
@@ -298,8 +306,10 @@ HISTORY_INT=$(expr "$HISTORY_INT" + 1)
    fi
    fi
    FIREWALL_INT=$(expr "$FIREWALL_INT" + 1)
+   fi
 
 ## Localnetwork 刷新 (periodic; phase-2 CPU/network overhead reduction)
+if [ "$tun_owner" = "openkill" ]; then
 if [ "$LOCALNETWORK_INT" -eq 1 ] || [ "$(expr "$LOCALNETWORK_INT" % "$LOCALNETWORK_INTERVAL")" -eq 0 ]; then
    wan_ip4s=$(/usr/share/openkill/openkill_get_network.lua "wanip" 2>/dev/null)
    wan_ip6s=$(ip -6 addr show scope global 2>/dev/null | awk '/inet6/{split($2,a,"/"); if (a[1] !~ /^fe80:/) print a[1]}' 2>/dev/null)
@@ -355,8 +365,10 @@ if [ "$LOCALNETWORK_INT" -eq 1 ] || [ "$(expr "$LOCALNETWORK_INT" % "$LOCALNETWO
    fi
 fi
 LOCALNETWORK_INT=$(expr "$LOCALNETWORK_INT" + 1)
+fi
 
 ## UPNP
+if [ "$tun_owner" = "openkill" ]; then
    if [ "$UPNP_INT" -eq 1 ] || [ "$(expr "$UPNP_INT" % "$UPNP_INTERVAL")" -eq 0 ]; then
       if [ -f "$upnp_lease_file" ]; then
          #del
@@ -413,9 +425,10 @@ LOCALNETWORK_INT=$(expr "$LOCALNETWORK_INT" + 1)
    else
       let UPNP_INT++
    fi
+   fi
 
 ## Skip Proxies Address
-   if [ "$skip_proxy_address" -eq 1 ]; then
+   if [ "$tun_owner" = "openkill" ] && [ "$skip_proxy_address" -eq 1 ]; then
       if [ "$SKIP_PROXY_ADDRESS" -eq 1 ] || [ "$(expr "$SKIP_PROXY_ADDRESS" % "$SKIP_PROXY_ADDRESS_INTERVAL")" -eq 0 ]; then
          if mkdir /tmp/openkill-proxy-address.lock 2>/dev/null; then
             skip_proxies_address
@@ -428,7 +441,7 @@ LOCALNETWORK_INT=$(expr "$LOCALNETWORK_INT" + 1)
    fi
 
 ## DNS转发劫持
-   if [ "$enable_redirect_dns" = "1" ]; then
+   if [ "$tun_owner" = "openkill" ] && [ "$enable_redirect_dns" = "1" ]; then
       if [ -z "$(uci -q get dhcp.@dnsmasq[0].server |grep "$dns_port")" ] || [ ! -z "$(uci -q get dhcp.@dnsmasq[0].server |awk -F ' ' '{print $2}')" ]; then
          dns_now=$(date +%s 2>/dev/null || echo 0)
          if [ "$DNS_RELOAD_LAST" -eq 0 ] || [ "$dns_now" -ge $((DNS_RELOAD_LAST + DNS_RELOAD_COOLDOWN)) ]; then

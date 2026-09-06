@@ -4926,6 +4926,18 @@ msgstr "丢弃无法通过 TUN 路由解析的流量；为保证兼容性建议�
 msgid "Adds NAT mapping work; enable only when a UDP application requires endpoint-independent mapping."
 msgstr "会增加 NAT 映射开销；仅在 UDP 应用需要端点独立映射时启用。"
 
+msgid "TUN Ownership Mode"
+msgstr "TUN 与透明代理管理方式"
+
+msgid "Select exactly one TUN and transparent firewall owner. The two modes cannot run at the same time; switching requires a service restart."
+msgstr "请选择唯一的 TUN 与透明防火墙接管者。两种模式不能同时运行，切换后需要重启服务。"
+
+msgid "OpenKill unified management (recommended)"
+msgstr "OpenKill 统一管理（推荐）"
+
+msgid "Mihomo native auto-management (advanced)"
+msgstr "Mihomo 原生自动接管（高级）"
+
 msgid "Controller Listen Scope"
 msgstr "控制器监听范围"
 

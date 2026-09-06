@@ -130,21 +130,11 @@ o:value("gvisor", translate("gVisor"))
 o:value("mixed", translate("Mixed"))
 o.default = "mixed"
 
-o = s:taboption("op_mode", ListValue, "tun_auto_route", translate("TUN Auto Route"))
-o.description = translate("Auto keeps route ownership with OpenKill firewall; enable only when Mihomo should install routes itself.")
-o:value("auto", translate("Automatic (OpenKill firewall)"))
-o:value("0", translate("Off"))
-o:value("1", translate("Mihomo manages routes"))
-o.default = "auto"
-o.rmempty = false
-for _, mode in ipairs({"redir-host-tun", "fake-ip-tun", "redir-host-mix", "fake-ip-mix"}) do o:depends("en_mode", mode) end
-
-o = s:taboption("op_mode", ListValue, "tun_auto_redirect", translate("TUN Auto Redirect"))
-o.description = translate("Leave automatic to avoid duplicate firewall redirects on older or vendor firmware.")
-o:value("auto", translate("Automatic (OpenKill firewall)"))
-o:value("0", translate("Off"))
-o:value("1", translate("Mihomo manages redirect"))
-o.default = "auto"
+o = s:taboption("op_mode", ListValue, "tun_owner", translate("TUN Ownership Mode"))
+o.description = translate("Select exactly one TUN and transparent firewall owner. The two modes cannot run at the same time; switching requires a service restart.")
+o:value("openkill", translate("OpenKill unified management (recommended)"))
+o:value("mihomo", translate("Mihomo native auto-management (advanced)"))
+o.default = "openkill"
 o.rmempty = false
 for _, mode in ipairs({"redir-host-tun", "fake-ip-tun", "redir-host-mix", "fake-ip-mix"}) do o:depends("en_mode", mode) end
 

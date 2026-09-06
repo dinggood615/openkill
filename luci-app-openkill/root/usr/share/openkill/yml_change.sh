@@ -57,14 +57,25 @@ normalize_bind_address()
 
 dashboard_bind_address=$(normalize_bind_address "$(uci_get_config "dashboard_bind_address" || echo lan)")
 dns_listen_address=$(normalize_bind_address "$(uci_get_config "dns_listen_address" || echo 127.0.0.1)")
-tun_auto_route=$(uci_get_config "tun_auto_route" || echo auto)
-tun_auto_redirect=$(uci_get_config "tun_auto_redirect" || echo auto)
+tun_owner=$(uci_get_config "tun_owner" || echo openkill)
+case "$tun_owner" in
+   openkill|mihomo) ;;
+   *) tun_owner=openkill ;;
+esac
+# These are derived values, not independent switches.  A single owner avoids
+# duplicate ip-rule/nftables programming and makes the generated YAML match
+# the service's firewall lifecycle.
+if [ "$tun_owner" = "mihomo" ]; then
+   tun_auto_route=1
+   tun_auto_redirect=1
+else
+   tun_auto_route=0
+   tun_auto_redirect=0
+fi
 tun_auto_detect_interface=$(uci_get_config "tun_auto_detect_interface" || echo 1)
 tun_strict_route=$(uci_get_config "tun_strict_route" || echo 0)
 tun_endpoint_independent_nat=$(uci_get_config "tun_endpoint_independent_nat" || echo 0)
 
-case "$tun_auto_route" in 0|1|auto) ;; *) tun_auto_route=auto ;; esac
-case "$tun_auto_redirect" in 0|1|auto) ;; *) tun_auto_redirect=auto ;; esac
 case "$tun_auto_detect_interface" in 0|1) ;; *) tun_auto_detect_interface=1 ;; esac
 case "$tun_strict_route" in 0|1) ;; *) tun_strict_route=0 ;; esac
 case "$tun_endpoint_independent_nat" in 0|1) ;; *) tun_endpoint_independent_nat=0 ;; esac
@@ -443,6 +454,7 @@ begin
    dashboard_type = '$dashboard_type'
    dashboard_bind_address = '$dashboard_bind_address'
    dns_listen_address = '$dns_listen_address'
+   tun_owner = '$tun_owner'
    tun_auto_route = '$tun_auto_route'
    tun_auto_redirect = '$tun_auto_redirect'
    tun_auto_detect_interface = '$tun_auto_detect_interface' == '1'
@@ -630,12 +642,18 @@ begin
          if en_mode_tun != '0' || ['2', '3'].include?(ipv6_mode)
             tun_stack = stack_type
             tun_stack = '${12}' if en_mode_tun == '0' && ['2', '3'].include?(ipv6_mode) && '${12}' != '0' && '${12}' != ''
+            tun_dns_hijack = if tun_owner == 'mihomo'
+               ['any:53', 'tcp://any:53']
+            else
+               [dns_listen_address + ':' + dns_listen_port]
+            end
             Value['tun'] = {
                'enable' => true, 'stack' => tun_stack, 'device' => 'utun',
-               'dns-hijack' => [dns_listen_address + ':' + dns_listen_port],
+               'dns-hijack' => tun_dns_hijack,
                'endpoint-independent-nat' => tun_endpoint_independent_nat,
-               # auto keeps firewall ownership with OpenKill.  Explicit 1 is
-               # offered for installations that delegate routing to Mihomo.
+               # The owner is selected in UCI; do not expose independent
+               # switches that can make both OpenKill and Mihomo program the
+               # same routing/firewall state.
                'auto-route' => (tun_auto_route == '1'),
                'auto-detect-interface' => tun_auto_detect_interface,
                'auto-redirect' => (tun_auto_redirect == '1'),

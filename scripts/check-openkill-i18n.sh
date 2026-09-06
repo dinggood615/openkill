@@ -14,6 +14,10 @@ Mihomo manages redirect
 Let Mihomo select the active uplink interface; recommended for multi-WAN and IPv6 networks.
 Drop traffic that cannot be resolved through the TUN route. Keep disabled for maximum compatibility.
 Adds NAT mapping work; enable only when a UDP application requires endpoint-independent mapping.
+TUN Ownership Mode
+Select exactly one TUN and transparent firewall owner. The two modes cannot run at the same time; switching requires a service restart.
+OpenKill unified management (recommended)
+Mihomo native auto-management (advanced)
 Controller Listen Scope
 LAN address (recommended)
 LAN binds to the router LAN address; loopback keeps the API local. Avoid exposing the controller on WAN.
