@@ -1,0 +1,9 @@
+{
+  "version": "2026-1082",
+  "format": "apk",
+  "architecture": "all",
+  "commit": "245587f739aa307cfa95c4a1851f61e4cedfa0f9",
+  "filename": "luci-app-openkill_2026.1082_all.apk",
+  "sha256": "808845a708dd1af22a537bb275c1510c708bcbec089f6eeff92f21e8a40d03d3",
+  "url": "https://github.com/dinggood615/openkill/releases/download/v2026-1082-apk/luci-app-openkill_2026.1082_all.apk"
+}
