@@ -532,7 +532,7 @@ begin
             raw = origin.to_s.strip
             return [] if raw.empty? || raw == '0'
             return [raw] if raw.start_with?('http://', 'https://')
-            ["http://#{raw}", "https://#{raw}"]
+            ['http://' + raw, 'https://' + raw]
          end
          if cors_origin != '0'
             (Value['external-controller-cors'] ||= {})['allow-origins'] = origin_variants(cors_origin)
