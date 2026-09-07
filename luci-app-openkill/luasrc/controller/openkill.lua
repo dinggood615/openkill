@@ -1509,6 +1509,8 @@ function action_status()
 		zashboard = fs.isdirectory("/usr/share/openkill/ui/zashboard"),
 		core_type = fs.uci_get_config("config", "core_type") or "Meta",
 		compatibility_profile = fs.uci_get_config("config", "compatibility_profile") or "stable",
+		compatibility_fallback = fs.uci_get_config("config", "compatibility_fallback") == "1",
+		compatibility_fallback_reason = fs.uci_get_config("config", "compatibility_fallback_reason") or "",
 		tun_owner = fs.uci_get_config("config", "tun_owner") or "openkill",
 		tun_auto_route = fs.uci_get_config("config", "tun_auto_route") == "1",
 		tun_auto_redirect = fs.uci_get_config("config", "tun_auto_redirect") == "1",

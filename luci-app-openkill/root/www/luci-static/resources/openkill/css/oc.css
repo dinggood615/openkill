@@ -1557,6 +1557,12 @@ html[data-darkmode="true"] .oc svg {
     background: var(--success-a5);
 }
 
+.oc .runtime-chip-warning {
+    color: var(--warning-color);
+    border-color: var(--warning-color);
+    background: var(--warning-a10);
+}
+
 .oc .runtime-chip-muted {
     color: var(--text-secondary);
 }

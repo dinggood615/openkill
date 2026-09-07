@@ -3953,6 +3953,11 @@ start_service()
       fi
       if [ "$tun_owner" = "openkill" ]; then
          LOG_TIP "TUN ownership: OpenKill (routes and firewall are plugin-managed)"
+         # Clear a previous native-preflight fallback once the requested
+         # profile is explicitly OpenKill-owned again.
+         uci -q set openkill.config.compatibility_fallback=0
+         uci -q delete openkill.config.compatibility_fallback_reason
+         uci -q commit openkill
          # The include must exist before any core or fw4 reload can reference
          # it.  This removes the startup race seen with Mihomo auto-redirect.
          prepare_openkill_include
@@ -3968,9 +3973,14 @@ start_service()
             uci -q set openkill.config.tun_owner=openkill
             uci -q set openkill.config.tun_auto_route=0
             uci -q set openkill.config.tun_auto_redirect=0
+            uci -q set openkill.config.compatibility_fallback=1
+            uci -q set openkill.config.compatibility_fallback_reason=fw4-native-unavailable
             uci -q commit openkill
             prepare_openkill_include
          else
+            uci -q set openkill.config.compatibility_fallback=0
+            uci -q delete openkill.config.compatibility_fallback_reason
+            uci -q commit openkill
             LOG_WARN "TUN ownership: Mihomo native (OpenKill firewall integration disabled)"
             LOG_TIP "Native takeover preflight passed: fw4 check, fw4 reload and nft table validation."
          fi

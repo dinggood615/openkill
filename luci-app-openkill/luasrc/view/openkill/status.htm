@@ -391,14 +391,20 @@
             var compatibilityLabel = compatibilityChip.querySelector('span:last-child');
             var profile = status && status.compatibility_profile;
             var owner = status && status.tun_owner;
-            var nativeMode = profile === 'native' || owner === 'mihomo';
-            var performanceMode = profile === 'performance' && !nativeMode;
-            var label = nativeMode ? 'Mihomo 原生接管' : (performanceMode ? '高性能双栈' : '稳定兼容');
+            var requestedNative = profile === 'native';
+            var fallbackMode = !!(status && status.compatibility_fallback) ||
+                (requestedNative && owner !== 'mihomo');
+            var nativeMode = requestedNative && owner === 'mihomo' && !fallbackMode;
+            var performanceMode = profile === 'performance' && owner === 'openkill' && !fallbackMode;
+            var label = fallbackMode ? '稳定兼容（原生回退）' :
+                (nativeMode ? 'Mihomo 原生接管' : (performanceMode ? '高性能双栈' : '稳定兼容'));
             if (compatibilityLabel) compatibilityLabel.textContent = label;
             compatibilityChip.classList.toggle('runtime-chip-success', performanceMode || nativeMode);
-            compatibilityChip.classList.toggle('runtime-chip-muted', !performanceMode && !nativeMode);
-            compatibilityChip.title = nativeMode ? 'Mihomo 管理 TUN、路由和防火墙' :
-                (performanceMode ? 'OpenKill 接管并启用高性能双栈参数' : 'OpenKill 统一管理 TUN、DNS 和防火墙');
+            compatibilityChip.classList.toggle('runtime-chip-warning', fallbackMode);
+            compatibilityChip.classList.toggle('runtime-chip-muted', !performanceMode && !nativeMode && !fallbackMode);
+            compatibilityChip.title = fallbackMode ? 'Mihomo 原生接管预检未通过，已安全回退到 OpenKill 管理；请查看运行日志' :
+                (nativeMode ? 'Mihomo 管理 TUN、路由和防火墙' :
+                (performanceMode ? 'OpenKill 接管并启用高性能双栈参数' : 'OpenKill 统一管理 TUN、DNS 和防火墙'));
         }
 
         var ipv6Chip = DOMCache.runtime_ipv6_chip;

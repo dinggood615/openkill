@@ -63,6 +63,7 @@ set_default dns_listen_address 127.0.0.1
 set_default cn_port 9090
 set_default wan_interface_mode auto
 set_default remote_service_bypass 0
+set_default compatibility_fallback 0
 
 compatibility_profile="$(uci -q get openkill.config.compatibility_profile 2>/dev/null || true)"
 if [ -z "$compatibility_profile" ]; then

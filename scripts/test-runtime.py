@@ -242,15 +242,22 @@ run_case() {
         normalize = (SHARE / 'openkill_config_normalize.sh').read_text(encoding='utf-8')
         controller = (ROOT / 'luci-app-openkill/luasrc/controller/openkill.lua').read_text(encoding='utf-8')
         status = (ROOT / 'luci-app-openkill/luasrc/view/openkill/status.htm').read_text(encoding='utf-8')
-        for marker in ('compatibility_profile', 'tun_owner', 'tun_auto_route', 'tun_auto_redirect'):
+        for marker in ('compatibility_profile', 'compatibility_fallback', 'tun_owner',
+                       'tun_auto_route', 'tun_auto_redirect'):
             self.assertIn(marker, normalize)
+        self.assertIn('compatibility_fallback_reason',
+                      (ROOT / 'luci-app-openkill/root/etc/config/openkill').read_text(encoding='utf-8'))
         self.assertIn('compatibility_profile" = "performance"', normalize)
         for marker in ('enable_tcp_concurrent', 'enable_unified_delay', 'geodata_loader=standard',
                        'tun_strict_route', 'tun_endpoint_independent_nat'):
             self.assertIn(marker, normalize)
-        self.assertIn('compatibility_profile = fs.uci_get_config', controller)
+        for marker in ('compatibility_profile = fs.uci_get_config',
+                       'compatibility_fallback = fs.uci_get_config',
+                       'compatibility_fallback_reason = fs.uci_get_config'):
+            self.assertIn(marker, controller)
         self.assertIn('runtime-compatibility-chip', status)
-        for label in ('稳定兼容', '高性能双栈', 'Mihomo 原生接管'):
+        for label in ('稳定兼容', '稳定兼容（原生回退）', '高性能双栈', 'Mihomo 原生接管',
+                      'runtime-chip-warning'):
             self.assertIn(label, status)
 
 

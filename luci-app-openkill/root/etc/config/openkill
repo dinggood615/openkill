@@ -2,6 +2,11 @@
 config openkill 'config'
 	option remote_service_bypass '0'
 	option compatibility_profile 'stable'
+	# When native Mihomo takeover is requested but fw4 preflight fails, the
+	# service safely falls back to OpenKill ownership and records the effective
+	# mode for the status page instead of reporting a false native takeover.
+	option compatibility_fallback '0'
+	option compatibility_fallback_reason ''
 	option compat_migration_version '2026-1108'
 	option wan_interface_mode 'auto'
 	option wan_interface_name ''
