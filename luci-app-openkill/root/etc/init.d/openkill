@@ -620,9 +620,10 @@ write_openkill_ipv6_diagnostics()
    route_lan_source="not-present"
    [ -n "$lan_source6" ] && route_lan_source=$(ip -6 route get 2606:4700:4700::1111 from "$lan_source6" 2>/dev/null | head -n 1)
    mtu=$(ip link show dev "$iface" 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="mtu"){print $(i+1); exit}}')
-   tcp443_state="unavailable"
-   curl -6 -fsS --interface "$iface" --connect-timeout 4 --max-time 6 \
-      -o /dev/null 'telnet://[2606:4700:4700::1111]:443' >/dev/null 2>&1 && tcp443_state="available"
+   tcp443_state="covered-by-https"
+   if command -v nc >/dev/null 2>&1; then
+      nc -w 4 -z 2606:4700:4700::1111 443 >/dev/null 2>&1 && tcp443_state="available" || tcp443_state="unavailable"
+   fi
    udp_state="not-tested"
    if command -v timeout >/dev/null 2>&1 && command -v nslookup >/dev/null 2>&1; then
       timeout 5 nslookup cloudflare.com 2606:4700:4700::1111 >/dev/null 2>&1 && udp_state="available" || udp_state="unavailable"
@@ -4018,19 +4019,20 @@ start_service()
       # Check instead of restart
       if [ "${OPENKILL_RECOVERY:-0}" != 1 ]; then
          check_run_quick
-         # The generated YAML consumes the effective IPv6 underlay state, so
-         # run the native-path preflight before overwrite_file invokes the
-         # profile generator. Read only the three required UCI values here;
-         # get_config still performs the complete configuration load below.
-         ipv6_enable=$(uci_get_config "ipv6_enable" || echo 0)
-         ipv6_dns=$(uci_get_config "ipv6_dns" || echo 0)
-         tun_owner=$(uci_get_config "tun_owner" || echo openkill)
-         add_openkill_ipv6_fallback_route
          overwrite_file
       fi
-      get_config
+      # Select a real YAML before get_config attempts to read fields from it.
+      # config_path may legitimately be empty after an upgrade or after the
+      # transient overwrite section is rebuilt; config_choose recovers the
+      # first installed profile and persists that choice.
+      RAW_CONFIG_FILE=$(uci_get_config "config_path")
       config_choose
+      get_config
       do_run_mode
+      # yml_change runs later in this startup path and consumes this effective
+      # underlay state, so the preflight remains ahead of YAML generation
+      # without running before configuration selection.
+      add_openkill_ipv6_fallback_route
       if [ "$tun_owner" = mihomo ] && [ -z "$en_mode_tun" ]; then
          LOG_ERROR "Mihomo native ownership requires an IPv4 TUN or mixed mode."
          start_fail

@@ -202,7 +202,9 @@ class DualStackRoutingTests(unittest.TestCase):
         self.assertIn('tcp_443=', source)
         self.assertIn('udp_dns=', source)
         self.assertIn('pmtu_1280=', source)
-        self.assertLess(source.index('add_openkill_ipv6_fallback_route\n         overwrite_file'), source.index('\n      get_config\n'))
+        choose = source.index('RAW_CONFIG_FILE=$(uci_get_config "config_path")\n      config_choose\n      get_config')
+        preflight = source.index('do_run_mode\n      # yml_change runs later')
+        self.assertLess(choose, preflight)
         self.assertIn('source-specific IPv6 defaults', source)
 
     def test_wan_ipv6_dns_and_gateway_are_not_injected(self):
