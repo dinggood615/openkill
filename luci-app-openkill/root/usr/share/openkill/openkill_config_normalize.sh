@@ -55,12 +55,90 @@ if [ "$(uci -q get openkill.config.tun_auto_redirect 2>/dev/null || true)" != "$
     uci -q set openkill.config.tun_auto_redirect="$desired_redirect"
     changed=1
 fi
-set_default tun_auto_detect_interface 1
+set_default tun_auto_detect_interface 0
 set_default tun_strict_route 0
 set_default tun_endpoint_independent_nat 0
 set_default dashboard_bind_address lan
 set_default dns_listen_address 127.0.0.1
 set_default cn_port 9090
+set_default wan_interface_mode auto
+set_default remote_service_bypass 0
+
+compatibility_profile="$(uci -q get openkill.config.compatibility_profile 2>/dev/null || true)"
+if [ -z "$compatibility_profile" ]; then
+    # Preserve an explicitly selected native owner from older releases while
+    # giving all other legacy installations the safer OpenKill-owned default.
+    if [ "$tun_owner" = "mihomo" ]; then
+        compatibility_profile=native
+    else
+        compatibility_profile=stable
+    fi
+    uci -q set openkill.config.compatibility_profile="$compatibility_profile"
+    changed=1
+fi
+case "$compatibility_profile" in
+    stable|performance|native) ;;
+    *) compatibility_profile=stable; uci -q set openkill.config.compatibility_profile=stable; changed=1 ;;
+esac
+case "$compatibility_profile" in
+    native)
+        if [ "$tun_owner" != "mihomo" ]; then
+            tun_owner=mihomo
+            uci -q set openkill.config.tun_owner=mihomo
+            changed=1
+        fi
+        ;;
+    stable|performance)
+        if [ "$tun_owner" != "openkill" ]; then
+            tun_owner=openkill
+            uci -q set openkill.config.tun_owner=openkill
+            changed=1
+        fi
+        ;;
+esac
+
+if [ "$tun_owner" = "mihomo" ]; then
+    desired_route=1
+    desired_redirect=1
+else
+    desired_route=0
+    desired_redirect=0
+fi
+if [ "$(uci -q get openkill.config.tun_auto_route 2>/dev/null || true)" != "$desired_route" ]; then
+    uci -q set openkill.config.tun_auto_route="$desired_route"
+    changed=1
+fi
+if [ "$(uci -q get openkill.config.tun_auto_redirect 2>/dev/null || true)" != "$desired_redirect" ]; then
+    uci -q set openkill.config.tun_auto_redirect="$desired_redirect"
+    changed=1
+fi
+
+# One-time migration for installations created before the centralized
+# compatibility page. The old broad service-port bypass and automatic TUN
+# interface probing are unsafe defaults in an OpenVPN/PPPoE dual-stack setup.
+# Users can re-enable an option explicitly after the migration.
+compat_migration="$(uci -q get openkill.config.compat_migration_version 2>/dev/null || true)"
+if [ "$compat_migration" != "2026-1108" ]; then
+    uci -q set openkill.config.remote_service_bypass=0
+    if [ "$compatibility_profile" = "native" ]; then
+        uci -q set openkill.config.tun_auto_detect_interface=1
+    else
+        uci -q set openkill.config.tun_auto_detect_interface=0
+    fi
+    uci -q set openkill.config.compat_migration_version=2026-1108
+    changed=1
+fi
+
+# OpenKill-owned mode already controls routes and firewall rules. Bind the
+# generated profile to the physical WAN instead of letting Mihomo select a
+# tunnel after OpenVPN/PPPoE changes. Native ownership keeps auto detection.
+if [ "$tun_owner" = "openkill" ] && [ "$(uci -q get openkill.config.tun_auto_detect_interface 2>/dev/null || true)" != "0" ]; then
+    uci -q set openkill.config.tun_auto_detect_interface=0
+    changed=1
+elif [ "$tun_owner" = "mihomo" ] && [ "$(uci -q get openkill.config.tun_auto_detect_interface 2>/dev/null || true)" != "1" ]; then
+    uci -q set openkill.config.tun_auto_detect_interface=1
+    changed=1
+fi
 
 bind="$(uci -q get openkill.config.dashboard_bind_address 2>/dev/null || echo lan)"
 case "$bind" in lan|*.*.*.*|\[*\]|*:* ) ;; *) uci -q set openkill.config.dashboard_bind_address=lan; changed=1 ;; esac

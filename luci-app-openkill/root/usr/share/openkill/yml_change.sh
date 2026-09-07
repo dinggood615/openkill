@@ -3,6 +3,7 @@
 . /usr/share/openkill/log.sh
 . /usr/share/openkill/uci.sh
 . /usr/share/openkill/address.sh
+. /usr/share/openkill/openkill_wan.sh
 . /lib/functions.sh
 
 LOG_FILE="/tmp/openkill.log"
@@ -28,9 +29,7 @@ dashboard_type=$(uci_get_config "dashboard_type" || echo "Official")
 # binding them to the actual WAN interface avoids Mihomo's auto-detection
 # look-back warning on dual-stack OpenWrt systems. This is best-effort so
 # older firmware remains usable.
-dns_wan_interface=$(/usr/share/openkill/openkill_get_network.lua "pppoe" 2>/dev/null | awk 'NF { print; exit }')
-[ -z "$dns_wan_interface" ] && dns_wan_interface=$(/usr/share/openkill/openkill_get_network.lua "dhcp" 2>/dev/null | awk 'NF { print; exit }')
-[ -z "$dns_wan_interface" ] && dns_wan_interface=$(ip -4 route show default 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i == "dev") {print $(i+1); exit}}')
+dns_wan_interface="$(openkill_wan_interface 2>/dev/null || true)"
 
 # Bind addresses are kept explicit and validated here before they are inserted
 # into the generated YAML.  "lan" follows the router LAN address; if a

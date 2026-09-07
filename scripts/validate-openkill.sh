@@ -27,6 +27,7 @@ for file in \
   luci-app-openkill/root/usr/share/openkill/openkill_capabilities.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_zerotier.sh \
   luci-app-openkill/root/usr/share/openkill/runtime.sh \
+  luci-app-openkill/root/usr/share/openkill/openkill_wan.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_config_normalize.sh \
   luci-app-openkill/root/usr/share/openkill/dependencies.conf \
   luci-app-openkill/root/usr/share/openkill/yml_proxys_get.sh \
@@ -55,6 +56,7 @@ for file in \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_capabilities.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_zerotier.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/runtime.sh" \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_wan.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_config_normalize.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/yml_proxys_get.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/yml_proxys_set.sh" \
@@ -107,6 +109,10 @@ grep -Fq 'download_databases()' "$ROOT_DIR/scripts/install-openkill.sh" \
   || fail 'installer database refresh is missing'
 grep -Fq 'prepare_openkill_include' "$ROOT_DIR/luci-app-openkill/root/etc/init.d/openkill" \
   || fail 'owner-specific firewall include preparation is missing'
+grep -Fq 'openkill_wait_wan' "$ROOT_DIR/luci-app-openkill/root/etc/init.d/openkill" \
+  || fail 'physical WAN readiness gate is missing'
+grep -Fq 'compatibility_profile' "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_config_normalize.sh" \
+  || fail 'central compatibility profile normalization is missing'
 grep -Fq 'uci_bool_value()' "$ROOT_DIR/luci-app-openkill/root/etc/init.d/openkill" \
   || fail 'UCI boolean normalization is missing'
 grep -Fq 'WATCHDOG_LOCK_PID' "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_watchdog.sh" \

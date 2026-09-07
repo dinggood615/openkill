@@ -163,9 +163,28 @@ class DualStackRoutingTests(unittest.TestCase):
     def test_dns_bootstrap_is_bound_to_physical_wan(self):
         source = (SHARE / 'yml_change.sh').read_text(encoding='utf-8')
         self.assertIn('dns_wan_interface=', source)
-        self.assertIn('openkill_get_network.lua "pppoe"', source)
+        self.assertIn('. /usr/share/openkill/openkill_wan.sh', source)
+        self.assertIn('openkill_wan_interface', source)
+        self.assertNotIn('ip -4 route show default', source)
         self.assertIn('[ "$group" = "default" ]', source)
         self.assertIn('proxy_dns_interface', source)
+
+    def test_wan_helper_ignores_virtual_interface_in_auto_mode(self):
+        source = (SHARE / 'openkill_wan.sh').read_text(encoding='utf-8')
+        self.assertIn('wan_interface_mode', source)
+        self.assertIn('if [ "$mode" = "fixed" ]', source)
+        for virtual in ('tun*', 'utun*', 'zt*', 'tailscale*', 'docker*'):
+            self.assertIn(virtual, source)
+        self.assertIn('ip -6 route show default', source)
+
+    def test_compatibility_defaults_are_safe(self):
+        config = (ROOT / 'luci-app-openkill/root/etc/config/openkill').read_text(encoding='utf-8')
+        normalize = (SHARE / 'openkill_config_normalize.sh').read_text(encoding='utf-8')
+        self.assertIn("option remote_service_bypass '0'", config)
+        self.assertIn("option compatibility_profile 'stable'", config)
+        self.assertIn('if [ -z "$compatibility_profile" ]', normalize)
+        self.assertIn('set_default remote_service_bypass 0', normalize)
+        self.assertIn('compat_migration_version=2026-1108', normalize)
 
     def test_ipv6_fallback_route_is_safe_and_reversible(self):
         source = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
@@ -214,7 +233,9 @@ run_case() {
     def test_compatibility_page_order_and_fields(self):
         source = (ROOT / 'luci-app-openkill/luasrc/model/cbi/openkill/settings.lua').read_text(encoding='utf-8')
         self.assertLess(source.index('s:tab("compatibility",'), source.index('s:tab("advanced",'))
-        for field in ('remote_service_bypass', 'remote_service_ports', 'wan_ac_black_ips', 'wan_ac_black_ports', 'bypass_gateway_compatible'):
+        for field in ('remote_service_bypass', 'remote_service_ports', 'compatibility_profile',
+                      'wan_interface_mode', 'wan_interface_name', 'wan_ac_black_ips',
+                      'wan_ac_black_ports', 'bypass_gateway_compatible'):
             self.assertRegex(source, r's:taboption\("compatibility", [^,]+, "' + field + '"')
 
 

@@ -110,18 +110,37 @@ o.default = "局域网直连，公网按现有规则分流"
 o.description = "保留 OpenVPN 的默认路由和 DNS 推送；不要把整个 VPN 客户端网段加入来源绕过列表，也不要排除 tun0 的全部流量。"
 
 o = s:taboption("compatibility", Flag, "remote_service_bypass", "旧版服务端口绕过")
-o.default = "1"
+o.default = "0"
 o.rmempty = false
-o.description = "仅用于 OpenKill 统一管理且使用 firewall4 的模式。沿用 1106 的固定端口绕过，可在此关闭；它不是服务自动识别，也不代表 VPN 和远程控制已经通过实机验证。"
+o.description = "默认关闭。仅在 OpenKill 统一管理且 firewall4 需要兼容旧版服务时启用；端口匹配会绕过代理，不是服务自动识别。不要把 RustDesk 的通用端口作为全局绕过。"
 
 o = s:taboption("compatibility", DynamicList, "remote_service_ports", "服务端口绕过列表")
 o.datatype = "port"
 o:depends("remote_service_bypass", "1")
-o.description = "源端口或目标端口匹配时绕过 TCP/UDP 接管。列表为空沿用 1194、9993、21114 至 21119；填写后替换默认列表。优先使用下方目标地址绕过，避免宽泛端口匹配。"
+o.description = "源端口或目标端口匹配时绕过 TCP/UDP 接管。启用后留空才沿用兼容默认值；建议只填写确实需要的服务端口，并优先使用目标地址绕过，避免 RustDesk 等业务被宽泛端口规则分流。"
 
 o = s:taboption("compatibility", DummyValue, "_compat_scope", "生效范围与限制")
 o.default = "保存并应用后重新生成防火墙规则"
 o.description = "目标地址和端口列表使用已有 OpenKill 访问控制功能。Fake-IP 域名需同时在覆写设置中加入 Fake-IP 过滤。当前不自动识别 OpenVPN、不自动生成域名直连规则；原生接管模式不使用这里的旧版服务端口规则。"
+
+o = s:taboption("compatibility", ListValue, "compatibility_profile", "兼容策略")
+o:value("stable", "稳定兼容（推荐）")
+o:value("performance", "高性能双栈")
+o:value("native", "Mihomo 原生接管（高级）")
+o.default = "stable"
+o.rmempty = false
+o.description = "稳定兼容模式由 OpenKill 统一管理 TUN、DNS 和防火墙；原生接管模式由 Mihomo 管理 auto-route/auto-redirect，两者不能同时使用。"
+
+o = s:taboption("compatibility", ListValue, "wan_interface_mode", "代理出口接口")
+o:value("auto", "自动识别物理 WAN（推荐）")
+o:value("fixed", "固定接口")
+o.default = "auto"
+o.rmempty = false
+o.description = "自动模式会排除 tun0、utun、ZeroTier、Docker 等隧道/覆盖接口，并优先选择有默认路由的出口；固定模式填写真实 WAN 设备名，例如 pppoe-wan。二级路由若上游确实走 br-lan，可固定填写 br-lan。"
+
+o = s:taboption("compatibility", Value, "wan_interface_name", "固定 WAN 接口名")
+o:depends("wan_interface_mode", "fixed")
+o.description = "只填写真实出口设备名，不要填写 tun0、utun、ZeroTier 或 Docker 接口；br-lan 仅在它确实是上游默认出口时使用。"
 
 o = s:taboption("op_mode", ListValue, "en_mode", font_red..bold_on..translate("Select Mode")..bold_off..font_off)
 o.description = translate("Select Mode For OpenKill Work, Try Flush DNS Cache If Network Error")

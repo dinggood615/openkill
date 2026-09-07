@@ -11,6 +11,7 @@ USE_PROCD=1
 . $IPKG_INSTROOT/usr/share/openkill/uci.sh
 . $IPKG_INSTROOT/usr/share/openkill/openkill_curl.sh
 . $IPKG_INSTROOT/usr/share/openkill/runtime.sh
+. $IPKG_INSTROOT/usr/share/openkill/openkill_wan.sh
 
 [ -f /etc/openwrt_release ] && {
 FW4=$(command -v fw4)
@@ -3876,6 +3877,17 @@ get_config()
    small_flash_memory=$(uci_get_config "small_flash_memory")
    mixed_port=$(uci_get_config "mixed_port")
    interface_name=$(uci_get_config "interface_name" || echo 0)
+   wan_interface_mode=$(uci_get_config "wan_interface_mode" || echo auto)
+   wan_interface_name=$(uci_get_config "wan_interface_name" || echo "")
+   if [ "$interface_name" = "0" ] && [ "$wan_interface_mode" = "fixed" ] && [ -n "$wan_interface_name" ]; then
+      interface_name="$wan_interface_name"
+   elif [ "$interface_name" = "0" ]; then
+      # Bind the generated profile to the physical WAN, never tun0/utun.
+      interface_name="$(openkill_wan_interface)"
+   fi
+   case "$interface_name" in
+      tun*|utun*|zt*|tailscale*|docker*) interface_name=0 ;;
+   esac
    common_ports=$(uci_get_config "common_ports")
    dns_port=$(uci_get_config "dns_port")
    store_fakeip=$(uci_get_config "store_fakeip" || echo 0)
@@ -3940,6 +3952,15 @@ start_service()
    fi
 
    LOG_TIP "OpenKill Start Running..."
+
+   # Wait for PPPoE/DHCP and its default route before generating the profile.
+   # Otherwise Mihomo can bind bootstrap DNS to a disappearing virtual device.
+   if ! openkill_wait_wan 30; then
+      LOG_ERROR "Physical WAN is not ready; OpenKill startup is deferred."
+      uci -q set openkill.config.last_start_failed=wan-not-ready
+      uci -q commit openkill
+      exit 1
+   fi
 
    {
       LOG_OUT "Step 1: Get The Configuration..."
