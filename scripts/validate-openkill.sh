@@ -30,6 +30,7 @@ for file in \
   luci-app-openkill/root/usr/share/openkill/openkill_wan.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_config_normalize.sh \
   luci-app-openkill/root/usr/share/openkill/dependencies.conf \
+  luci-app-openkill/tools/prune-ui-css.sh \
   luci-app-openkill/root/usr/share/openkill/yml_proxys_get.sh \
   luci-app-openkill/root/usr/share/openkill/yml_proxys_set.sh \
   luci-app-openkill/luasrc/model/cbi/openkill/settings.lua \
@@ -58,6 +59,7 @@ for file in \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/runtime.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_wan.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_config_normalize.sh" \
+  "$ROOT_DIR/luci-app-openkill/tools/prune-ui-css.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/yml_proxys_get.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/yml_proxys_set.sh" \
   "$ROOT_DIR/luci-app-openkill/root/etc/uci-defaults/luci-openkill"; do
@@ -107,6 +109,19 @@ grep -Fq 'LOCAL_PACKAGE_MODE=1' "$ROOT_DIR/scripts/install-openkill.sh" \
   || fail 'local package dependency mode is missing'
 grep -Fq 'download_databases()' "$ROOT_DIR/scripts/install-openkill.sh" \
   || fail 'installer database refresh is missing'
+grep -Fq 'prune-ui-css.sh' "$ROOT_DIR/luci-app-openkill/Makefile" \
+  || fail 'dead UI stylesheet pruning is missing'
+if grep -Eq 'AUTO_SMART_SWITCH|LGBM_AUTO_UPDATE|SMART_COLLECT|SMART_ENABLE_LGBM|SMART_POLICY_PRIORITY|SMART_PREFER_ASN|SMART_TOLERANCE' \
+  "$ROOT_DIR/luci-app-openkill/root/etc/init.d/openkill"; then
+  fail 'retired Smart/LGBM override keys remain in the active whitelist'
+fi
+css_probe=$(mktemp)
+trap 'rm -f "$css_probe"' EXIT HUP INT TERM
+cp "$ROOT_DIR/luci-app-openkill/root/www/luci-static/resources/openkill/css/oc.css" "$css_probe"
+sh "$ROOT_DIR/luci-app-openkill/tools/prune-ui-css.sh" "$css_probe"
+if grep -Eiq 'oixcloud|oixCloud' "$css_probe"; then
+  fail 'retired OixCloud styles remain in the packaged CSS path'
+fi
 grep -Fq 'prepare_openkill_include' "$ROOT_DIR/luci-app-openkill/root/etc/init.d/openkill" \
   || fail 'owner-specific firewall include preparation is missing'
 grep -Fq 'openkill_wait_wan' "$ROOT_DIR/luci-app-openkill/root/etc/init.d/openkill" \

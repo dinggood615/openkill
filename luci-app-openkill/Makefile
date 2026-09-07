@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-openkill
-PKG_VERSION:=2026-1109
+PKG_VERSION:=2026-1110
 PKG_MAINTAINER:=dinggood615 <https://github.com/dinggood615/openkill>
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
@@ -57,6 +57,7 @@ define Build/Prepare
 	# MetaCubeXD is the bundled dashboard.  Zashboard remains available via
 	# the on-demand dashboard downloader but is not shipped in the base IPK.
 	rm -rf $(PKG_BUILD_DIR)/root/usr/share/openkill/ui/zashboard
+	sh $(CURDIR)/tools/prune-ui-css.sh $(PKG_BUILD_DIR)/root/www/luci-static/resources/openkill/css/oc.css
 	$(foreach po,$(wildcard ${CURDIR}/po/zh-cn/*.po), \
 		po2lmo $(po) $(PKG_BUILD_DIR)/$(patsubst %.po,%.lmo,$(notdir $(po)));)
 	chmod 0755 $(PKG_BUILD_DIR)/root/etc/init.d/openkill
