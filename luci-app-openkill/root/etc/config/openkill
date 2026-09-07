@@ -39,7 +39,10 @@ config openkill 'config'
 	# Filled by the first-boot UCI defaults script from the firmware ABI.
 	# Keeping this dynamic is required for arm/mips/rockchip installations.
 	option core_arch '0'
-	option enable_redirect_dns '2'
+	# Keep LAN IPv4/IPv6 DNS on dnsmasq and forward it to Mihomo's loopback
+	# listener.  Firewall-direct DNS requires a non-loopback listener and does
+	# not preserve dnsmasq-backed mainland IP sets, so it is never the default.
+	option enable_redirect_dns '1'
 	option disable_masq_cache '1'
 	option log_level '0'
 	option proxy_mode 'rule'

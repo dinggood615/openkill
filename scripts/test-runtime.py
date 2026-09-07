@@ -226,6 +226,26 @@ class DualStackRoutingTests(unittest.TestCase):
         self.assertIn('Do not reject the valid combination dns.ipv6=true + ipv6=false', semantic)
         self.assertIn('if [ "$ipv6_dns" -eq 1 ]; then', init)
 
+    def test_dnsmasq_forwarding_is_the_safe_default_for_tun_and_dual_stack(self):
+        config = (ROOT / 'luci-app-openkill/root/etc/config/openkill').read_text(encoding='utf-8')
+        normalize = (SHARE / 'openkill_config_normalize.sh').read_text(encoding='utf-8')
+        settings = (ROOT / 'luci-app-openkill/luasrc/model/cbi/openkill/settings.lua').read_text(encoding='utf-8')
+        self.assertIn("option enable_redirect_dns '1'", config)
+        self.assertIn('dns_direct_safe=0', normalize)
+        self.assertIn('*tun*) dns_direct_safe=0', normalize)
+        self.assertIn('Firewall Redirect (Advanced: IPv4 non-TUN only)', settings)
+        self.assertIn('Firewall-direct DNS is only available for an IPv4 non-TUN profile', settings)
+
+    def test_fw4_include_defers_openkill_rule_rebuild_after_interface_change(self):
+        init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        helper = (SHARE / 'openkill_fw4_reload.sh').read_text(encoding='utf-8')
+        self.assertIn('/usr/share/openkill/openkill_fw4_reload.sh', init)
+        self.assertNotIn('/etc/init.d/openkill reload "firewall"\nEOF', init)
+        self.assertIn('firewall-deferred', init)
+        self.assertIn('openkill-fw4-reload.lock', helper)
+        self.assertIn('sleep 3', helper)
+        self.assertIn('/etc/init.d/openkill reload "firewall-deferred"', helper)
+
     def test_dns_fallback_uses_rules_and_health_probes_are_bounded(self):
         source = (SHARE / 'yml_change.sh').read_text(encoding='utf-8')
         self.assertIn("text + '#RULES'", source)

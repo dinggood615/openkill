@@ -211,11 +211,24 @@ switch_mode.template = "openkill/switch_mode"
 
 ---- DNS Settings
 o = s:taboption("dns", ListValue, "enable_redirect_dns", font_red..bold_on..translate("Redirect Local DNS Setting")..bold_off..font_off)
-o.description = translate("Set Local DNS Redirect")
+o.description = translate("Dnsmasq forwarding is the recommended dual-stack mode: firewall intercepts LAN DNS on port 53, dnsmasq then forwards it to Mihomo's local listener. Firewall-direct mode is advanced, skips dnsmasq-assisted mainland IP sets, and is unavailable with TUN or IPv6 DNS.")
 o.default = 1
 o:value("0", translate("Disable"))
 o:value("1", translate("Dnsmasq Redirect"))
-o:value("2", translate("Firewall Redirect"))
+o:value("2", translate("Firewall Redirect (Advanced: IPv4 non-TUN only)"))
+o.validate = function(self, value, section)
+	if value ~= "2" then
+		return value
+	end
+	local selected_mode = HTTP.formvalue("cbid.openkill." .. section .. ".en_mode") or uci:get("openkill", section, "en_mode") or ""
+	local ipv6_enabled = HTTP.formvalue("cbid.openkill." .. section .. ".ipv6_enable") or uci:get("openkill", section, "ipv6_enable") or "0"
+	local ipv6_dns_enabled = HTTP.formvalue("cbid.openkill." .. section .. ".ipv6_dns") or uci:get("openkill", section, "ipv6_dns") or "0"
+	local listener = HTTP.formvalue("cbid.openkill." .. section .. ".dns_listen_address") or uci:get("openkill", section, "dns_listen_address") or "127.0.0.1"
+	if selected_mode:find("tun", 1, true) or ipv6_enabled == "1" or ipv6_dns_enabled == "1" or listener == "127.0.0.1" then
+		return nil, translate("Firewall-direct DNS is only available for an IPv4 non-TUN profile with a LAN-facing Mihomo DNS listener. Use Dnsmasq forwarding for the current profile.")
+	end
+	return value
+end
 
 o = s:taboption("dns", DummyValue, "flush_dns_cache", translate("Flush DNS"))
 o.template = "openkill/flush_dns_cache"

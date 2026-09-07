@@ -1498,7 +1498,7 @@ prepare_openkill_include()
 
    mkdir -p /var/etc
    cat > "/var/etc/openkill.include" <<-EOF
-/etc/init.d/openkill reload "firewall"
+/usr/share/openkill/openkill_fw4_reload.sh
 EOF
 }
 
@@ -4302,7 +4302,7 @@ reload_service()
    OPENKILL_START_TOKEN="$(cat /tmp/openkill-start.token 2>/dev/null)"
    get_config
    MAX_RELOAD=10
-   if openkill_core_process_present && [ "$enable" == "1" ] && [ "$1" == "firewall" ]; then
+   if openkill_core_process_present && [ "$enable" == "1" ] && { [ "$1" == "firewall" ] || [ "$1" == "firewall-deferred" ]; }; then
       #sleep for avoiding system unready
       sleep 5
       NOW_TS=$(date +%s)
