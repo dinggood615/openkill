@@ -140,14 +140,16 @@ yml_dns_custom()
    fi
 }
 
-# 获取DHCP或接口的DNS并追加
+# 获取DHCP或接口的DNS并追加。
+# OPENKILL_IPV6_DNS_GUARD: IPv6 保持启用，但不把 WAN 的链路本地 IPv6 网关或自动 IPv6 DNS
+# 注入 nameserver：这类地址在双栈/TUN 场景下可能被 Mihomo 当作
+# 节点解析出口，导致 auto-detect-interface 告警和 UDP/DNS 超时。
+# IPv6 DNS 如有需要应通过显式的加密 DNS 或带接口标记的配置加入。
 sys_dns_append()
 {
    if [ "$1" = 1 ]; then
       wan_dns=$(/usr/share/openkill/openkill_get_network.lua "dns")
-      wan6_dns=$(/usr/share/openkill/openkill_get_network.lua "dns6")
       wan_gate=$(/usr/share/openkill/openkill_get_network.lua "gateway")
-      wan6_gate=$(/usr/share/openkill/openkill_get_network.lua "gateway6")
       dhcp_iface=$(/usr/share/openkill/openkill_get_network.lua "dhcp")
       pppoe_iface=$(/usr/share/openkill/openkill_get_network.lua "pppoe")
       if [ -z "$dhcp_iface" ] && [ -z "$pppoe_iface" ]; then
@@ -156,19 +158,9 @@ sys_dns_append()
                echo "    - \"$i\"" >>/tmp/yaml_config.namedns.yaml
             done
          fi
-         if [ -n "$wan6_dns" ] && [ "$2" = 1 ]; then
-            for i in $wan6_dns; do
-               echo "    - \"[${i}]:53\"" >>/tmp/yaml_config.namedns.yaml
-            done
-         fi
          if [ -n "$wan_gate" ]; then
             for i in $wan_gate; do
                 echo "    - \"$i\"" >>/tmp/yaml_config.namedns.yaml
-            done
-         fi
-         if [ -n "$wan6_gate" ] && [ "$2" = 1 ]; then
-            for i in $wan6_gate; do
-               echo "    - \"[${i}]:53\"" >>/tmp/yaml_config.namedns.yaml
             done
          fi
       else
@@ -181,22 +173,12 @@ sys_dns_append()
                    echo "    - \"$i\"" >>/tmp/yaml_config.namedns.yaml
                done
             fi
-            if [ -n "$wan6_gate" ] && [ "$2" = 1 ]; then
-               for i in $wan6_gate; do
-                  echo "    - \"[${i}]:53\"" >>/tmp/yaml_config.namedns.yaml
-               done
-            fi
          fi
          if [ -n "$pppoe_iface" ]; then
             if [ -n "$wan_dns" ]; then
                    for i in $wan_dns; do
                       echo "    - \"$i\"" >>/tmp/yaml_config.namedns.yaml
                    done
-               fi
-               if [ -n "$wan6_dns" ] && [ "$2" = 1 ]; then
-                  for i in $wan6_dns; do
-                     echo "    - \"[${i}]:53\"" >>/tmp/yaml_config.namedns.yaml
-                  done
                fi
          fi
       fi

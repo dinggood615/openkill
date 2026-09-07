@@ -175,6 +175,13 @@ class DualStackRoutingTests(unittest.TestCase):
         self.assertIn('OPENKILL_IPV6_ROUTE_MARKER', source)
         self.assertIn('source-specific IPv6 defaults', source)
 
+    def test_wan_ipv6_dns_and_gateway_are_not_injected(self):
+        source = (SHARE / 'yml_change.sh').read_text(encoding='utf-8')
+        block = source.split('sys_dns_append()\n{', 1)[1].split('\n}\n\nPROXY_GROUPS=', 1)[0]
+        self.assertNotIn('wan6_gate', block)
+        self.assertNotIn('wan6_dns', block)
+        self.assertIn('OPENKILL_IPV6_DNS_GUARD', source)
+
 
 @unittest.skipIf(os.name == 'nt', 'Recovery filesystem integration runs on Linux CI')
 class RecoveryTests(unittest.TestCase):
