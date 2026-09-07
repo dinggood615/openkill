@@ -159,17 +159,6 @@
     --peach-pale: #ffc99f;
     --pink-pale: #ffb9b9;
 
-    /* ── Developer Cards ── */
-    --slate-a80: rgba(17, 24, 39, 0.8);
-    --white-a90: rgba(255, 255, 255, 0.9);
-    --black-a10: rgba(0, 0, 0, 0.1);
-
-    /* ── Developer Avatar Gradient ── */
-    --indigo: #667eea;
-    --grape: #764ba2;
-    --pink-light: #f093fb;
-    --coral: #f5576c;
-
     /* ── OixCloud Dark ── */
     --slate-500: #657183;
     --slate-400: #6c83c5;
@@ -840,17 +829,6 @@ html[data-darkmode="true"] .oc {
 
     /* ── CodeMirror ── */
     --cm-placeholder: rgba(255,255,255,0.25);
-
-    /* ── Developer Cards ── */
-    --slate-a80: rgba(249, 250, 251, 0.8);
-    --white-a90: rgba(31, 41, 55, 0.9);
-    --black-a10: rgba(107, 114, 128, 0.3);
-
-    /* ── Developer Avatar Gradient ── */
-    --indigo: #818cf8;
-    --grape: #a78bfa;
-    --pink-light: #f0abfc;
-    --coral: #fb7185;
 
     /* ── Log Highlighting ── */
     --magenta: #c655ff;
@@ -4565,183 +4543,9 @@ html[data-darkmode="true"] .oc .myip-card-icon.ic-youtube { color: #FF4444; }
     color: var(--primary-color, #3b82f6);
 }
 
-/* ==========================================================================
- * SECTION 6: developer.htm
- * ========================================================================== */
-html[data-darkmode="true"] .oc .developer-avatar {
-    border-color: var(--slate-a80);
-    background: linear-gradient(45deg, var(--indigo) 0%, var(--grape) 100%);
-}
-
-html[data-darkmode="true"] .oc .developer-avatar:hover {
-    border-color: rgba(249, 250, 251, 1);
-}
-
-html[data-darkmode="true"] .oc .developer-label {
-    background: var(--white-a90);
-    border-color: var(--black-a10);
-    color: var(--text-primary);
-}
-
-.oc .developer_ {
-    text-align: justify;
-    text-align-last: justify;
-}
-
-.oc .developer-container {
-    background: var(--bg-white);
-    border: 1px solid var(--border-light);
-    border-radius: var(--radius-lg);
-    padding: var(--card-padding);
-    box-shadow: var(--shadow-md);
-    margin: 0;
-    width: 100%;
-    transition: all var(--transition-fast);
-    overflow: hidden;
-    position: relative;
-}
-
-.oc .developer-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px 30px;
-    padding: 0;
-    justify-content: center;
-    align-items: flex-start;
-    position: relative;
-    z-index: 1;
-    min-height: auto;
-    line-height: 1;
-    padding-top: 5px;
-}
-
-.oc .developer-avatar-container {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    flex-shrink: 0;
-    min-width: 50px;
-    width: 50px;
-}
-
-.oc .developer-avatar-container:hover {
-    transform: translateY(-3px);
-}
-
-.oc .developer-avatar {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    cursor: pointer;
-    border-radius: 50%;
-    width: 50px;
-    height: 50px;
-    object-fit: cover;
-    border: 2px solid rgba(255, 255, 255, 0.8);
-    box-shadow: 
-        0 3px 10px rgba(0, 0, 0, 0.1),
-        0 1px 6px rgba(0, 0, 0, 0.08),
-        inset 0 1px 0 rgba(255, 255, 255, 0.4);
-    position: relative;
-    background: linear-gradient(45deg, var(--indigo) 0%, var(--grape) 100%);
-    padding: 1px;
-    overflow: hidden;
-}
-
-.oc .developer-avatar::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    border-radius: 50%;
-    background: conic-gradient(
-        var(--indigo),
-        var(--grape),
-        var(--pink-light),
-        var(--coral),
-        var(--indigo)
-    );
-    filter: blur(4px);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    z-index: -1;
-    animation: rotate 3s linear infinite;
-}
-
-.oc .developer-avatar:hover::before {
-    opacity: 0.6;
-}
-
-.oc .developer-avatar:hover {
-    transform: scale(1.1) rotate(3deg);
-    box-shadow: 
-        0 6px 20px rgba(0, 0, 0, 0.12),
-        0 3px 10px rgba(102, 126, 234, 0.25),
-        inset 0 1px 0 rgba(255, 255, 255, 0.6);
-    border-color: rgba(255, 255, 255, 1);
-}
-
-@keyframes rotate {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-.oc .developer-label {
-    margin-top: 6px;
-    font-size: 11px;
-    font-weight: 400;
-    color: var(--text-secondary);
-    text-align: center;
-    opacity: 0;
-    transform: translateY(6px);
-    transition: all 0.25s ease;
-    background: rgba(255, 255, 255, 0.9);
-    padding: 2px 6px;
-    border-radius: 6px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-    white-space: nowrap;
-}
-
-.oc .developer-avatar-container:hover .developer-label {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.oc .developer-grid > span {
-    animation: fadeInUp 0.6s ease forwards;
-    opacity: 0;
-    transform: translateY(20px);
-}
-
-.oc .developer-grid > span:nth-child(1) { animation-delay: 0.1s; }
-.oc .developer-grid > span:nth-child(2) { animation-delay: 0.15s; }
-.oc .developer-grid > span:nth-child(3) { animation-delay: 0.2s; }
-.oc .developer-grid > span:nth-child(4) { animation-delay: 0.25s; }
-.oc .developer-grid > span:nth-child(5) { animation-delay: 0.3s; }
-.oc .developer-grid > span:nth-child(6) { animation-delay: 0.35s; }
-.oc .developer-grid > span:nth-child(7) { animation-delay: 0.4s; }
-.oc .developer-grid > span:nth-child(8) { animation-delay: 0.45s; }
-.oc .developer-grid > span:nth-child(9) { animation-delay: 0.5s; }
-.oc .developer-grid > span:nth-child(10) { animation-delay: 0.55s; }
-.oc .developer-grid > span:nth-child(11) { animation-delay: 0.6s; }
-.oc .developer-grid > span:nth-child(12) { animation-delay: 0.65s; }
-.oc .developer-grid > span:nth-child(13) { animation-delay: 0.7s; }
-
-@keyframes fadeInUp {
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-/* ==========================================================================
- * SECTION 7: oixcloud.htm
- * ========================================================================== */
+/* ========================================================================== */
+/* SECTION 7: oixcloud.htm */
+/* ========================================================================== */
 
 html[data-darkmode="true"] .oc .card {
     background: linear-gradient(var(--bg-gray), var(--slate-500));
@@ -6774,7 +6578,7 @@ html[data-darkmode=true] .oc .oix-msg-bar svg { color: inherit; }
     display: none;
 }
 
-/* Tab mode: update embedded in the version_update tab (settings.lua) */
+/* Maintenance mode: update embedded in the System Maintenance card. */
 .oc .select-popup-tab {
     position: static !important;
     top: auto !important;
@@ -7811,12 +7615,6 @@ html[data-darkmode=true] .oc #addCustomOption:hover {
     .oc .dl-btn { width: 18px; height: 18px; min-width: 18px; border-radius: 4px; }
     .oc .dl-btn svg { width: 10px; height: 10px; }
 
-    /* developer.htm */
-    .oc .developer-grid { gap: 6px 25px; }
-    .oc .developer-avatar { width: 45px; height: 45px; border-width: 2px; }
-    .oc .developer-avatar-container { min-width: 45px; width: 45px; }
-    .oc .developer-label { font-size: 9px; padding: 2px 4px; margin-top: 6px; }
-
     /* sub_info_show.htm tabs */
     .sub_tab, .sub_tab_show { font-size: 10px; }
     .progress_bar_bg { min-width: 200px; }
@@ -7974,12 +7772,6 @@ html[data-darkmode=true] .oc #addCustomOption:hover {
     }
     .oc .footer-btn { font-size: 11px; padding: 5px 8px; gap: 4px; height: 30px; }
 
-    /* developer.htm */
-    .oc .developer-grid { gap: 3px 15px; }
-    .oc .developer-avatar { width: 35px; height: 35px; }
-    .oc .developer-avatar-container { min-width: 35px; width: 35px; }
-    .oc .developer-label { font-size: 7px; padding: 1px 3px; margin-top: 3px; }
-
     /* sub_info_show.htm tabs */
     .sub_tab, .sub_tab_show { font-size: 9px; }
     .progress_bar_bg { min-width: 180px !important; }
@@ -8002,12 +7794,6 @@ html[data-darkmode=true] .oc #addCustomOption:hover {
     #debug-rendered h5 { font-size: 0.88em; }
     #debug-rendered h6 { font-size: 0.8em; }
     #debug-rendered code { font-size: 0.75em; }
-    /* developer.htm */
-    .oc .developer-grid { gap: 2px 10px; }
-    .oc .developer-avatar { width: 30px; height: 30px; }
-    .oc .developer-avatar-container { min-width: 30px; width: 30px; }
-    .oc .developer-label { font-size: 6px; padding: 1px 2px; margin-top: 3px; }
-
     /* sub_info_show.htm tabs */
     .sub_tab, .sub_tab_show { font-size: 8px; }
     .progress_bar_bg { min-width: 160px !important; }
@@ -8017,14 +7803,6 @@ html[data-darkmode=true] .oc #addCustomOption:hover {
     .sub_provider_item { width: 60px; min-height: 28px; }
     .sub_provider_name { font-size: 8px; }
     .sub_provider_percent { font-size: 8px; }
-}
-
-/* ---- developer.htm: desktop enhancement ---- */
-@media (min-width: 1200px) {
-    .oc .developer-grid { gap: 10px 35px; }
-    .oc .developer-avatar { width: 60px; height: 60px; border-width: 3px; }
-    .oc .developer-avatar-container { min-width: 60px; width: 60px; }
-    .oc .developer-label { font-size: 11px; padding: 3px 8px; margin-top: 6px; }
 }
 
 /* ---- log.htm: device capability detection ---- */

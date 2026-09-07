@@ -192,6 +192,10 @@ class DualStackRoutingTests(unittest.TestCase):
         self.assertIn('remove_openkill_ipv6_fallback_route()', source)
         self.assertIn('metric=2048', source)
         self.assertIn('OPENKILL_IPV6_ROUTE_MARKER', source)
+        self.assertIn('probe_openkill_ipv6_https()', source)
+        self.assertIn('curl -6 -fsS --interface "$iface"', source)
+        self.assertIn('set_openkill_ipv6_state unavailable https-timeout', source)
+        self.assertIn('removed the temporary fallback route', source)
         self.assertIn('source-specific IPv6 defaults', source)
 
     def test_wan_ipv6_dns_and_gateway_are_not_injected(self):
@@ -200,6 +204,27 @@ class DualStackRoutingTests(unittest.TestCase):
         self.assertNotIn('wan6_gate', block)
         self.assertNotIn('wan6_dns', block)
         self.assertIn('OPENKILL_IPV6_DNS_GUARD', source)
+
+    def test_ipv6_dns_is_independent_of_ipv6_traffic_proxy(self):
+        normalize = (SHARE / 'openkill_config_normalize.sh').read_text(encoding='utf-8')
+        change = (SHARE / 'yml_change.sh').read_text(encoding='utf-8')
+        semantic = (SHARE / 'openkill_semantic_check.sh').read_text(encoding='utf-8')
+        init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        self.assertIn('for key in ipv6_mode enable_v6_udp_proxy; do', normalize)
+        self.assertNotIn('for key in ipv6_mode enable_v6_udp_proxy ipv6_dns; do', normalize)
+        self.assertIn('DNS AAAA resolution is deliberately independent', change)
+        self.assertNotIn('dns_ipv6 = false', change)
+        self.assertIn('Do not reject the valid combination dns.ipv6=true + ipv6=false', semantic)
+        self.assertIn('if [ "$ipv6_dns" -eq 1 ]; then', init)
+
+    def test_dns_fallback_uses_rules_and_health_probes_are_bounded(self):
+        source = (SHARE / 'yml_change.sh').read_text(encoding='utf-8')
+        self.assertIn("text + '#RULES'", source)
+        self.assertIn("Value['dns']['fallback-lazy-query'] = true", source)
+        self.assertIn("group['interval'] = 180", source)
+        self.assertIn("group['timeout'] = 3500", source)
+        self.assertIn("group['max-failed-times'] = 2", source)
+        self.assertIn("group['lazy'] = false", source)
 
     def test_vpn_remote_service_ports_bypass_interception(self):
         source = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')

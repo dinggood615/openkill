@@ -93,6 +93,15 @@
     contain-intrinsic-size: 180px;
 }
 
+/* The update panel is a maintenance tool, not a narrow setting field. */
+#cbi-openkill.openkill-settings .openkill-settings-card-version-update {
+    grid-column: 1 / -1;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-version-update .openkill-settings-card-body {
+    padding: 0;
+}
+
 /* Do not animate layout on a low-power router. */
 .openkill-status-page *,
 #cbi-openkill.openkill-settings * {

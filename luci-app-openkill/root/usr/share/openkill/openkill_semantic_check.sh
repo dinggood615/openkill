@@ -121,7 +121,9 @@ if dns
   if respect && Array(dns['proxy-server-nameserver']).empty?
     fail.call('dns.proxy-server-nameserver is required when dns.respect-rules is enabled')
   end
-  fail.call('dns.ipv6 cannot be enabled while top-level ipv6 is disabled') if dns['ipv6'] == true && config['ipv6'] == false
+  # Mihomo intentionally exposes two independent controls: top-level ipv6
+  # governs traffic handling, while dns.ipv6 governs whether AAAA answers are
+  # returned.  Do not reject the valid combination dns.ipv6=true + ipv6=false.
   if dns['enable'] == true
     listen = dns['listen'].to_s
     fail.call('dns.listen is required when DNS is enabled') if listen.empty?

@@ -433,10 +433,12 @@ begin
    tun_strict_route = '$tun_strict_route' == '1'
    tun_endpoint_independent_nat = '$tun_endpoint_independent_nat' == '1'
 
-   # IPv6 child options are subordinate to the master switch.
+   # IPv6 traffic interception options are subordinate to the master switch.
+   # DNS AAAA resolution is deliberately independent (dns.ipv6), so a user
+   # can enable AAAA answers without enabling OpenKill's IPv6 firewall/TUN
+   # interception while the native WAN IPv6 path is being diagnosed.
    unless enable_ipv6
       ipv6_mode = '0'
-      dns_ipv6 = false
    end
 
    enable_custom_dns = '$enable_custom_dns' == '1'
@@ -460,12 +462,25 @@ begin
          next unless group.is_a?(Hash)
          next unless %w[url-test fallback load-balance].include?(group['type'].to_s)
          group['url'] = 'https://www.gstatic.com/generate_204' unless group.key?('url') && !group['url'].to_s.empty?
-         group['interval'] = 300 unless group.key?('interval') && group['interval'].to_i > 0
-         group['timeout'] = 5000 unless group.key?('timeout') && group['timeout'].to_i > 0
-         group['max-failed-times'] = 3 unless group.key?('max-failed-times') && group['max-failed-times'].to_i > 0
+         # Keep probes frequent enough to evict a dead node before it causes a
+         # burst of user-facing timeouts, while retaining conservative values
+         # for low-power OpenWrt devices.
+         group['interval'] = 180 unless group.key?('interval') && group['interval'].to_i > 0
+         group['timeout'] = 3500 unless group.key?('timeout') && group['timeout'].to_i > 0
+         group['max-failed-times'] = 2 unless group.key?('max-failed-times') && group['max-failed-times'].to_i > 0
          group['expected-status'] = 204 unless group.key?('expected-status')
-         group['lazy'] = true unless group.key?('lazy')
+         group['lazy'] = false unless group.key?('lazy')
          group['tolerance'] = 50 if group['type'].to_s == 'url-test' && !group.key?('tolerance')
+         # 2026-1115 wrote the old 300/5000/3/lazy defaults into generated
+         # profiles.  Treat that exact tuple as managed state and migrate it
+         # once; any other explicit user values remain untouched.
+         if group['interval'].to_i == 300 && group['timeout'].to_i == 5000 &&
+            group['max-failed-times'].to_i == 3 && group['lazy'] == true
+            group['interval'] = 180
+            group['timeout'] = 3500
+            group['max-failed-times'] = 2
+            group['lazy'] = false
+         end
       end
    end
    threads = []
@@ -882,6 +897,20 @@ begin
          YAML.LOG_TIP('Detected That The nameserver DNS Option Has No Server Set, Starting To Complete...')
          Value['dns']['nameserver'] = ['114.114.114.114', '119.29.29.29', '8.8.8.8', '1.1.1.1']
          Value['dns']['fallback'] ||= ['https://dns.cloudflare.com/dns-query', 'https://dns.google/dns-query']
+      end
+
+      # Overseas fallback DNS must not be sent directly through a restricted
+      # WAN by default.  Mihomo supports the special #RULES suffix, which
+      # sends the resolver connection through the same routing policy as the
+      # queried domain.  Keep explicit user parameters untouched and leave
+      # direct IPv4 bootstrap resolvers in proxy-server-nameserver to avoid a
+      # proxy-node/DNS chicken-and-egg loop.
+      if Value.dig('dns', 'fallback').is_a?(Array)
+         Value['dns']['fallback'] = Value['dns']['fallback'].map do |server|
+            text = server.to_s
+            text.include?('#') ? text : text + '#RULES'
+         end.uniq
+         Value['dns']['fallback-lazy-query'] = true unless Value['dns'].key?('fallback-lazy-query')
       end
 
       if Value['dns'].key?('default-nameserver') && Value['dns']['default-nameserver'].to_a.empty?

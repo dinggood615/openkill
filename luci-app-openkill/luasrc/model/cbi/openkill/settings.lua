@@ -9,36 +9,12 @@ local uci = require "luci.model.uci".cursor()
 local json = require "luci.jsonc"
 local datatype = require "luci.cbi.datatypes"
 local net = require "luci.model.network".init()
+local ui = require "luci.model.openkill.ui"
 local devices = {}
 for _, iface in ipairs(net:get_interfaces()) do
 	if iface:name() then
 		table.insert(devices, {name = iface:name()})
 	end
-end
-
--- 优化 CBI UI（新版 LuCI 专用）
-local function optimize_cbi_ui()
-	HTTP.write([[
-		<script type="text/javascript">
-			// 修正上移、下移按钮名称
-			document.querySelectorAll("input.btn.cbi-button.cbi-button-up").forEach(function(btn) {
-				btn.value = "]] .. translate("Move up") .. [[";
-			});
-			document.querySelectorAll("input.btn.cbi-button.cbi-button-down").forEach(function(btn) {
-				btn.value = "]] .. translate("Move down") .. [[";
-			});
-			// 删除控件和说明之间的多余换行
-			document.querySelectorAll("div.cbi-value-description").forEach(function(descDiv) {
-				var prev = descDiv.previousSibling;
-				while (prev && prev.nodeType === Node.TEXT_NODE && prev.textContent.trim() === "") {
-					prev = prev.previousSibling;
-				}
-				if (prev && prev.nodeType === Node.ELEMENT_NODE && prev.tagName === "BR") {
-					prev.remove();
-				}
-			});
-		</script>
-	]])
 end
 
 font_green = [[<b style=color:green>]]
@@ -67,7 +43,7 @@ m.description = nil
 s = m:section(TypedSection, "openkill")
 s.anonymous = true
 
--- 将原有并列选项归并为五个逻辑分类。保留旧 taboption 标识，
+-- 将原有并列选项归并为六个逻辑分类。保留旧 taboption 标识，
 -- 由下面的映射统一落到新分类，避免改变 UCI 字段、depends 条件和保存逻辑。
 local tab_groups = {
 	op_mode = "basic",
@@ -85,11 +61,8 @@ local tab_groups = {
 	debug = "stability",
 	mihomo_features = "advanced",
 	zerotier = "advanced",
-	developer = "advanced",
-	-- Keep version updates as a standalone top-level page.  It is intentionally
-	-- not part of the advanced group so the update entry can stay visible and
-	-- easy to reach without expanding maintenance settings.
-	version_update = "version_update"
+	-- The former developer/avatar page was removed. Custom firewall rules are
+	-- now part of the System Maintenance group below.
 }
 local native_taboption = s.taboption
 function s:taboption(tab, ...)
@@ -102,8 +75,6 @@ s:tab("rules", translate("Rules & Subscriptions"))
 s:tab("stability", translate("Performance & Stability"))
 s:tab("compatibility", "兼容设置")
 s:tab("advanced", "系统维护")
--- Keep plugin updates after system maintenance so daily settings stay first.
-s:tab("version_update", translate("Version Update"))
 
 o = s:taboption("compatibility", DummyValue, "_compat_policy", "推荐 VPN 客户端访问策略")
 o.default = "局域网直连，公网按现有规则分流"
@@ -172,14 +143,6 @@ o:value("system", translate("System　"))
 o:value("gvisor", translate("gVisor"))
 o:value("mixed", translate("Mixed"))
 o.default = "mixed"
-
-o = s:taboption("op_mode", ListValue, "tun_owner", translate("TUN Ownership Mode"))
-o.description = translate("Select exactly one TUN and transparent firewall owner. The two modes cannot run at the same time; switching requires a service restart.")
-o:value("openkill", translate("OpenKill unified management (recommended)"))
-o:value("mihomo", translate("Mihomo native auto-management (advanced)"))
-o.default = "openkill"
-o.rmempty = false
-for _, mode in ipairs({"redir-host-tun", "fake-ip-tun", "redir-host-mix", "fake-ip-mix"}) do o:depends("en_mode", mode) end
 
 o = s:taboption("op_mode", Flag, "tun_auto_detect_interface", translate("TUN Auto Detect Interface"))
 o.description = translate("Let Mihomo select the active uplink interface; recommended for multi-WAN and IPv6 networks.")
@@ -387,9 +350,7 @@ s2.addremove = true
 s2.rmempty = false
 s2.render = function(self, ...)
 	Map.render(self, ...)
-	if type(optimize_cbi_ui) == "function" then
-		optimize_cbi_ui()
-	end
+	ui.optimize_cbi_ui()
 end
 
 o = s2:option(Value, "comment", translate("Comment"))
@@ -1555,8 +1516,12 @@ o:depends("ipv6_mode", "1")
 o.default = 1
 
 o = s:taboption("ipv6", Flag, "ipv6_dns", translate("IPv6 DNS Resolve"))
-o.description = translate("Resolve AAAA records through the configured DNS path. Enable only when the router has a working IPv6 route; the local YAML keeps a short IPv6 fallback window.")
+o.description = translate("独立控制 AAAA 解析。开启后允许返回 IPv6 DNS 记录，但不会自动开启 IPv6 流量接管；IPv6 流量代理仍由上面的总开关控制。")
 o.default = 0
+
+o = s:taboption("ipv6", DummyValue, "native_ipv6_state", "原生 IPv6 链路状态")
+o.default = "未检测"
+o.description = "启动时通过 IPv6 HTTPS 验证原生链路。若仅网关可达但 HTTPS 超时，OpenKill 会撤销自己临时添加的默认路由，避免双栈设备长时间等待后才回退 IPv4。"
 
 if op_mode == "fake-ip" then
 o = s:taboption("ipv6", Value, "fakeip_range6", translate("Fake-IP Range").." (IPv6 Cidr)")
@@ -1628,13 +1593,13 @@ function o.write(self, section, value)
 	return true
 end
 
----- version update
-version_update_panel = s:taboption("version_update", DummyValue, "", nil)
+---- system maintenance: version update
+version_update_panel = s:taboption("advanced", DummyValue, "version_update_panel", nil)
 version_update_panel.template = "openkill/update"
 version_update_panel.version_tab = true
 
----- developer
-o = s:taboption("developer", Value, "firewall_custom")
+---- custom firewall rules (kept for compatibility, no developer/avatar page)
+o = s:taboption("advanced", Value, "firewall_custom")
 o.template = "cbi/tvalue"
 o.description = translate("Custom Firewall Rules, Support IPv4 and IPv6, All Rules Will Be Added After Plugin Own Completely")
 o.rows = 30

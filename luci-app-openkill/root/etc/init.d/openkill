@@ -229,8 +229,10 @@ change_dnsmasq() {
       uci -q set openkill.config.cachesize_dns=0
    fi
 
-   if [ "$1" -eq 1 ] && [ "$ipv6_dns" -eq 1 ] && [ -n "$(ip6tables -t mangle -L 2>&1 | grep -o 'Chain')" ]; then
-      #dnsmasq answer ipv6
+   if [ "$ipv6_dns" -eq 1 ]; then
+      # Allow AAAA answers independently of the IPv6 interception mode.  The
+      # previous condition only handled legacy ip6tables + dnsmasq redirect
+      # mode, so firewall redirect mode silently filtered AAAA records.
       uci -q set openkill.config.dnsmasq_filter_aaaa="$(uci -q get dhcp.@dnsmasq[0].filter_aaaa)"
       uci -q set dhcp.@dnsmasq[0].filter_aaaa=0
       uci -q set openkill.config.filter_aaaa_dns=1
@@ -591,6 +593,28 @@ do_run_mode()
 # back to IPv4. Add one low-priority generic default only when it is missing;
 # never replace an existing route and remove only the route we created.
 OPENKILL_IPV6_ROUTE_MARKER="/tmp/openkill-ipv6-default-route"
+OPENKILL_IPV6_STATE_FILE="/tmp/openkill-ipv6-underlay.state"
+
+set_openkill_ipv6_state()
+{
+   local state="$1" reason="$2"
+   printf '%s\n' "$state" > "$OPENKILL_IPV6_STATE_FILE"
+   uci -q set openkill.config.native_ipv6_state="$state"
+   if [ -n "$reason" ]; then
+      uci -q set openkill.config.native_ipv6_reason="$reason"
+   else
+      uci -q delete openkill.config.native_ipv6_reason
+   fi
+   uci -q commit openkill
+}
+
+probe_openkill_ipv6_https()
+{
+   local iface="$1"
+   command -v curl >/dev/null 2>&1 || return 1
+   curl -6 -fsS --interface "$iface" --connect-timeout 4 --max-time 7 \
+      -o /dev/null https://cp.cloudflare.com/generate_204 >/dev/null 2>&1
+}
 
 add_openkill_ipv6_fallback_route()
 {
@@ -606,6 +630,13 @@ add_openkill_ipv6_fallback_route()
       }
       END { if (has && generic) exit 0; exit 1 }
    '; then
+      iface=$(ip -6 route show default 2>/dev/null | awk '$1 == "default" {for (i=1; i<=NF; i++) if ($i == "dev") {print $(i+1); exit}}')
+      if [ -n "$iface" ] && probe_openkill_ipv6_https "$iface"; then
+         set_openkill_ipv6_state available
+      else
+         set_openkill_ipv6_state unavailable https-timeout
+         LOG_WARN "Native IPv6 has a default route but failed the HTTPS readiness probe; IPv4 proxy underlay remains preferred."
+      fi
       return 0
    fi
 
@@ -623,8 +654,17 @@ add_openkill_ipv6_fallback_route()
    metric=2048
    if ip -6 route replace default via "$gateway" dev "$iface" metric "$metric" 2>/dev/null; then
       printf '%s %s %s\n' "$iface" "$gateway" "$metric" > "$OPENKILL_IPV6_ROUTE_MARKER"
-      LOG_TIP "Added low-priority IPv6 default route via ${iface} (${gateway}) for dual-stack fallback."
+      if probe_openkill_ipv6_https "$iface"; then
+         set_openkill_ipv6_state available
+         LOG_TIP "IPv6 HTTPS readiness passed; retained the low-priority fallback route via ${iface}."
+      else
+         ip -6 route del default via "$gateway" dev "$iface" metric "$metric" 2>/dev/null || true
+         rm -f "$OPENKILL_IPV6_ROUTE_MARKER"
+         set_openkill_ipv6_state unavailable https-timeout
+         LOG_WARN "IPv6 gateway is reachable but HTTPS failed; removed the temporary fallback route to prevent dual-stack stalls."
+      fi
    else
+      set_openkill_ipv6_state unavailable route-add-failed
       LOG_WARN "Unable to add the IPv6 fallback route; existing IPv6 routing was left unchanged."
    fi
 }

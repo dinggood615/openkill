@@ -195,7 +195,13 @@ case "$dns_bind" in *.*.*.*|\[*\]|*:* ) ;; *) uci -q set openkill.config.dns_lis
 
 ipv6_enable="$(uci -q get openkill.config.ipv6_enable 2>/dev/null || echo 0)"
 if [ "$ipv6_enable" != 1 ]; then
-    for key in ipv6_mode enable_v6_udp_proxy ipv6_dns; do
+    # IPv6 traffic interception is subordinate to the master switch, but
+    # IPv6 DNS resolution is intentionally independent.  This lets users
+    # request AAAA records while keeping the router's IPv6 forwarding path
+    # outside OpenKill (useful while an ISP's native IPv6 TCP path is being
+    # repaired).  The old loop also cleared ipv6_dns and made the LuCI flag
+    # appear to toggle itself off after every restart.
+    for key in ipv6_mode enable_v6_udp_proxy; do
         value="$(uci -q get openkill.config."$key" 2>/dev/null || true)"
         if [ -n "$value" ] && [ "$value" != 0 ]; then
             uci -q set openkill.config."$key"=0
@@ -203,6 +209,15 @@ if [ "$ipv6_enable" != 1 ]; then
         fi
     done
 fi
+
+# Keep the independent DNS flag a strict boolean without tying it to the
+# IPv6 firewall/TUN owner.  Mihomo treats dns.ipv6 as the AAAA-answer switch;
+# top-level ipv6 controls traffic handling and they are not the same setting.
+ipv6_dns="$(uci -q get openkill.config.ipv6_dns 2>/dev/null || echo 0)"
+case "$ipv6_dns" in
+    0|1) ;;
+    *) uci -q set openkill.config.ipv6_dns=0; changed=1 ;;
+esac
 
 # A deleted panel must never remain selected.  Pick the first installed panel
 # so the status page can always provide a valid dashboard URL.

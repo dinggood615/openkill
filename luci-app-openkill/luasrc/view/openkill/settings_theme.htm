@@ -13,7 +13,7 @@
     var CARD_LAYOUTS = [
         [
             {id: 'runtime-core', title: '<%:Operation & Core%>', keys: [
-                'en_mode', 'enable_udp_proxy', 'stack_type', 'tun_owner',
+                'en_mode', 'enable_udp_proxy', 'stack_type',
                 'tun_auto_detect_interface', 'tun_strict_route',
                 'tun_endpoint_independent_nat', 'proxy_mode', 'delay_start', 'log_size'
             ]},
@@ -32,7 +32,7 @@
             ]},
             {id: 'ipv6-tun', title: '<%:IPv6 & TUN%>', keys: [
                 'ipv6_enable', 'ipv6_mode', 'stack_type_v6', 'enable_v6_udp_proxy',
-                'ipv6_dns', 'fakeip_range6', 'local_network6_pass', 'chnroute6_pass',
+                'ipv6_dns', 'native_ipv6_', 'fakeip_range6', 'local_network6_pass', 'chnroute6_pass',
                 'china_ip6_route'
             ]},
             {id: 'lan-wan', title: '<%:LAN / WAN Access%>', keys: [
@@ -75,8 +75,8 @@
             {id: 'zerotier', title: '<%:ZeroTier%>', keys: [
                 'zerotier_'
             ]},
-            {id: 'version-developer', title: '<%:Version & Developer Tools%>', keys: [
-                'version_', 'version', 'release_', 'developer', 'firewall_custom', 'core_version'
+            {id: 'maintenance-tools', title: '系统维护', keys: [
+                'version_', 'version', 'release_', 'check update', 'firewall_custom', 'core_version'
             ], advanced: true}
         ]
     ];
@@ -242,6 +242,7 @@
         else fields.forEach(function(field) { body.appendChild(field); });
         card.appendChild(header);
         card.appendChild(body);
+        if (definition.id === 'maintenance-tools') card.classList.add('openkill-settings-card-version-update');
         if (host) host.appendChild(card);
         else content.appendChild(card);
 
@@ -253,20 +254,12 @@
     }
 
     function buildCards(tabItems, activeOnly) {
-        /*
-         * Version Update is a standalone, full-width page.  Do not consume a
-         * CARD_LAYOUTS slot for it: the remaining six settings categories
-         * must keep their existing card layout after the update tab is moved
-         * behind System & Maintenance in the CBI menu.
-         */
+        /* The six logical tabs share one stable layout; version updates are
+         * rendered as the first maintenance card instead of a top-level tab. */
         var layoutIndex = 0;
         tabItems.forEach(function(item, tabIndex) {
             var panel = tabPanel(item);
             if (!panel) return;
-            var updatePanel = panel && (panel.querySelector('.select-popup-tab') ||
-                panel.querySelector('#selectPopup') ||
-                /(版本更新|version update|check update)/i.test(tabLabel(item)));
-            if (updatePanel) return;
             var layout = CARD_LAYOUTS[layoutIndex++];
             if (activeOnly && !tabIsActive(item)) return;
             if (!layout || panel.getAttribute('data-openkill-cards-ready') === '1') return;

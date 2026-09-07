@@ -34,6 +34,7 @@ for file in \
   luci-app-openkill/root/usr/share/openkill/yml_proxys_get.sh \
   luci-app-openkill/root/usr/share/openkill/yml_proxys_set.sh \
   luci-app-openkill/luasrc/model/cbi/openkill/settings.lua \
+  luci-app-openkill/luasrc/model/openkill/ui.lua \
   luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua \
   luci-app-openkill/luasrc/view/openkill/server_url.htm \
   luci-app-openkill/root/usr/share/openkill/res/default.yaml \
@@ -136,8 +137,11 @@ grep -Fq 'OPENKILL_TUN_OWNER' "$ROOT_DIR/luci-app-openkill/root/usr/share/openki
   || fail 'TUN ownership semantic validation is missing'
 grep -Fq 'tun_owner' "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_watchdog.sh" \
   || fail 'watchdog TUN ownership guard is missing'
-grep -Fq "'tun_owner'" "$ROOT_DIR/luci-app-openkill/luasrc/view/openkill/settings_theme.htm" \
-  || fail 'settings card layout still references removed auto-route fields'
+if grep -Fq "'tun_owner'" "$ROOT_DIR/luci-app-openkill/luasrc/view/openkill/settings_theme.htm" || \
+   grep -Fq "'tun_auto_route'" "$ROOT_DIR/luci-app-openkill/luasrc/view/openkill/settings_theme.htm" || \
+   grep -Fq "'tun_auto_redirect'" "$ROOT_DIR/luci-app-openkill/luasrc/view/openkill/settings_theme.htm"; then
+  fail 'settings card layout still exposes internal TUN ownership fields'
+fi
 
 # Feed routing and Mihomo delivery must remain both ABI-safe and verifiable.
 if ! grep -Fq 'dl.openwrt.ai must remain unchanged' "$ROOT_DIR/scripts/install-openkill.sh"; then
