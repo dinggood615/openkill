@@ -182,6 +182,16 @@ class DualStackRoutingTests(unittest.TestCase):
         self.assertNotIn('wan6_dns', block)
         self.assertIn('OPENKILL_IPV6_DNS_GUARD', source)
 
+    def test_vpn_remote_service_ports_bypass_interception(self):
+        source = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        self.assertIn('openkill_service_ports', source)
+        self.assertIn('1194, 9993, 21114-21119', source)
+        for chain in ('openkill', 'openkill_mangle', 'openkill_mangle_output',
+                      'openkill_output', 'openkill_v6', 'openkill_mangle_v6',
+                      'openkill_mangle_output_v6'):
+            self.assertIn(f'{chain} th dport @openkill_service_ports', source)
+            self.assertIn(f'{chain} th sport @openkill_service_ports', source)
+
 
 @unittest.skipIf(os.name == 'nt', 'Recovery filesystem integration runs on Linux CI')
 class RecoveryTests(unittest.TestCase):
