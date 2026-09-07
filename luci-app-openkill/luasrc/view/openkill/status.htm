@@ -30,6 +30,10 @@
                                         <svg width="12" height="12"><use href="#oc-icon-cpu"/></svg>
                                         <span>Meta</span>
                                     </span>
+                                    <span class="runtime-chip" id="runtime-compatibility-chip">
+                                        <svg width="12" height="12"><use href="#oc-icon-shield-check"/></svg>
+                                        <span>稳定兼容</span>
+                                    </span>
                                     <span class="runtime-chip" id="runtime-ipv6-chip">
                                         <svg width="12" height="12"><use href="#oc-icon-globe"/></svg>
                                         <span><%:IPv6 disabled%></span>
@@ -360,6 +364,7 @@
         plugin_version_display: document.getElementById('plugin-version-display'),
         plugin_version_text: document.getElementById('plugin-version-text'),
         runtime_core_chip: document.getElementById('runtime-core-chip'),
+        runtime_compatibility_chip: document.getElementById('runtime-compatibility-chip'),
         runtime_ipv6_chip: document.getElementById('runtime-ipv6-chip'),
         runtime_watchdog_chip: document.getElementById('runtime-watchdog-chip')
     };
@@ -379,6 +384,21 @@
             if (coreLabel) {
                 coreLabel.textContent = (status && status.core_type ? status.core_type : 'Meta') + ' <%:Stable%>';
             }
+        }
+
+        var compatibilityChip = DOMCache.runtime_compatibility_chip;
+        if (compatibilityChip) {
+            var compatibilityLabel = compatibilityChip.querySelector('span:last-child');
+            var profile = status && status.compatibility_profile;
+            var owner = status && status.tun_owner;
+            var nativeMode = profile === 'native' || owner === 'mihomo';
+            var performanceMode = profile === 'performance' && !nativeMode;
+            var label = nativeMode ? 'Mihomo 原生接管' : (performanceMode ? '高性能双栈' : '稳定兼容');
+            if (compatibilityLabel) compatibilityLabel.textContent = label;
+            compatibilityChip.classList.toggle('runtime-chip-success', performanceMode || nativeMode);
+            compatibilityChip.classList.toggle('runtime-chip-muted', !performanceMode && !nativeMode);
+            compatibilityChip.title = nativeMode ? 'Mihomo 管理 TUN、路由和防火墙' :
+                (performanceMode ? 'OpenKill 接管并启用高性能双栈参数' : 'OpenKill 统一管理 TUN、DNS 和防火墙');
         }
 
         var ipv6Chip = DOMCache.runtime_ipv6_chip;

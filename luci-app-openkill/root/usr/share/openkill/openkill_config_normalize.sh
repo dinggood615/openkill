@@ -97,6 +97,30 @@ case "$compatibility_profile" in
         ;;
 esac
 
+# The high-performance dual-stack profile remains OpenKill-owned, but applies
+# only safe Mihomo performance defaults.  It intentionally does not enable
+# IPv6, force QUIC, or change the user's routing policy: those choices depend
+# on the ISP and are kept in their dedicated settings.  Standard Geo loading
+# uses more memory, so stable mode remains the low-memory default.
+if [ "$compatibility_profile" = "performance" ]; then
+    for key in enable_tcp_concurrent enable_unified_delay; do
+        if [ "$(uci -q get openkill.config."$key" 2>/dev/null || true)" != "1" ]; then
+            uci -q set openkill.config."$key"=1
+            changed=1
+        fi
+    done
+    if [ "$(uci -q get openkill.config.geodata_loader 2>/dev/null || true)" != "standard" ]; then
+        uci -q set openkill.config.geodata_loader=standard
+        changed=1
+    fi
+    for key in tun_strict_route tun_endpoint_independent_nat; do
+        if [ "$(uci -q get openkill.config."$key" 2>/dev/null || true)" != "0" ]; then
+            uci -q set openkill.config."$key"=0
+            changed=1
+        fi
+    done
+fi
+
 if [ "$tun_owner" = "mihomo" ]; then
     desired_route=1
     desired_redirect=1

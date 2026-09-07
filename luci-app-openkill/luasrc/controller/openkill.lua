@@ -1508,6 +1508,10 @@ function action_status()
 		metacubexd = fs.isdirectory("/usr/share/openkill/ui/metacubexd"),
 		zashboard = fs.isdirectory("/usr/share/openkill/ui/zashboard"),
 		core_type = fs.uci_get_config("config", "core_type") or "Meta",
+		compatibility_profile = fs.uci_get_config("config", "compatibility_profile") or "stable",
+		tun_owner = fs.uci_get_config("config", "tun_owner") or "openkill",
+		tun_auto_route = fs.uci_get_config("config", "tun_auto_route") == "1",
+		tun_auto_redirect = fs.uci_get_config("config", "tun_auto_redirect") == "1",
 		-- Runtime profile exposed to the compact status page.  These values are
 		-- read-only summaries of the four-stage baseline; changing them still
 		-- happens in Plugin Settings / Overwrite Settings.

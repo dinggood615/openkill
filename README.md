@@ -2,7 +2,7 @@
 
 OpenKill 是面向 OpenWrt 的轻量化 Mihomo（Meta）客户端 LuCI 插件，基于 OpenClash 兼容架构重构，提供稳定的代理接管、规则分流、双栈 DNS/IPv6 与可回滚运行管理。
 
-当前版本：`2026-1113`
+当前版本：`2026-1114`
 
 ## 一键安装
 
@@ -26,11 +26,12 @@ curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh 
 - 稳定启动链路：配置语义预检、原子替换、最近可用配置回滚、控制器/TUN/DNS/防火墙健康检查和有限次恢复。
 - 轻量 watchdog：只观察 OpenKill 与 procd 状态，低频维护规则、历史和节点资源；配置采用低频刷新，流媒体自动选择按配置间隔调度，关闭时不再派生后台任务，避免重复拉起核心。
 - 高效双栈网络：DNS、IPv6、Geo 数据、代理组测速使用有界超时和失败重试；稳定兼容模式绑定物理 WAN，避免 OpenVPN/PPPoE 重连后 DNS 误绑虚拟接口。
+- 三档互斥运行策略：稳定兼容、高性能双栈、Mihomo 原生接管；高性能档启用 TCP 并发、统一延迟和标准 Geo 数据加载，原生档才启用 Mihomo `auto-route`/`auto-redirect`。
 - 流量接管互斥：统一管理 TUN、路由和防火墙；OpenKill 接管与 Mihomo 原生自动接管不能同时启用，可在界面切换。
 - 原生接管安全切换：切换到 Mihomo `auto-route`/`auto-redirect` 前先清理 OpenKill 规则，校验 fw4 语义检查、真实重载和 nft 表状态；不满足条件时自动回退并记录原因。
 - 规则与订阅管理：支持 GeoIP/GeoSite、大陆白名单、代理组分流、订阅更新、配置检查和安全回滚。
 - 可选协议能力：按内核能力探测启用 H2C/ShadowQUIC、QUIC v2、MASQUE、AmneziaWG、AnyTLS、BBR3 和 ZeroTier 相关字段。
-- LuCI 界面：运行状态、运行与服务、网络与分流、规则与订阅、性能与稳定、兼容设置、系统维护分类；采用适配 Argon 深浅色模式的扁平卡片、统一间距和低干扰状态提示。
+- LuCI 界面：运行状态页显示当前接管策略；设置页提供运行与服务、网络与分流、规则与订阅、性能与稳定、兼容设置、系统维护分类；采用适配 Argon 深浅色模式的扁平卡片、统一间距和低干扰状态提示。
 - 轻量资源策略：基础包只内置 MetaCubeXD；Zashboard、Yacd 和其他面板保留为按需下载，避免首次安装携带重复前端资源。
 - 构建清理：安装包不再携带已移除的 OixCloud 页面样式和旧 Smart/LGBM 覆写入口，减少无效资源与配置分支。
 - 兼容迁移：旧配置中的 Smart/LightGBM 策略组会自动转换为 Mihomo 原生 `url-test`，废弃的 Smart、LightGBM 与云端凭据字段只执行一次清理，不影响现有订阅节点。

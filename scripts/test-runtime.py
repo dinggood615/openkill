@@ -238,6 +238,21 @@ run_case() {
                       'wan_ac_black_ports', 'bypass_gateway_compatible'):
             self.assertRegex(source, r's:taboption\("compatibility", [^,]+, "' + field + '"')
 
+    def test_profile_modes_apply_safe_performance_defaults_and_are_visible(self):
+        normalize = (SHARE / 'openkill_config_normalize.sh').read_text(encoding='utf-8')
+        controller = (ROOT / 'luci-app-openkill/luasrc/controller/openkill.lua').read_text(encoding='utf-8')
+        status = (ROOT / 'luci-app-openkill/luasrc/view/openkill/status.htm').read_text(encoding='utf-8')
+        for marker in ('compatibility_profile', 'tun_owner', 'tun_auto_route', 'tun_auto_redirect'):
+            self.assertIn(marker, normalize)
+        self.assertIn('compatibility_profile" = "performance"', normalize)
+        for marker in ('enable_tcp_concurrent', 'enable_unified_delay', 'geodata_loader=standard',
+                       'tun_strict_route', 'tun_endpoint_independent_nat'):
+            self.assertIn(marker, normalize)
+        self.assertIn('compatibility_profile = fs.uci_get_config', controller)
+        self.assertIn('runtime-compatibility-chip', status)
+        for label in ('稳定兼容', '高性能双栈', 'Mihomo 原生接管'):
+            self.assertIn(label, status)
+
 
 @unittest.skipIf(os.name == 'nt', 'Recovery filesystem integration runs on Linux CI')
 class RecoveryTests(unittest.TestCase):

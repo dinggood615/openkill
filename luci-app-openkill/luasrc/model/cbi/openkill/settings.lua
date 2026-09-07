@@ -129,7 +129,7 @@ o:value("performance", "高性能双栈")
 o:value("native", "Mihomo 原生接管（高级）")
 o.default = "stable"
 o.rmempty = false
-o.description = "稳定兼容模式由 OpenKill 统一管理 TUN、DNS 和防火墙；原生接管模式由 Mihomo 管理 auto-route/auto-redirect，两者不能同时使用。"
+o.description = "稳定兼容模式由 OpenKill 统一管理 TUN、DNS 和防火墙；高性能双栈会在 OpenKill 接管下启用 TCP 并发、统一延迟和标准 Geo 数据加载；原生接管模式由 Mihomo 管理 auto-route/auto-redirect。三者互斥，切换后需应用设置并重启。低内存设备建议使用稳定兼容。"
 
 o = s:taboption("compatibility", ListValue, "wan_interface_mode", "代理出口接口")
 o:value("auto", "自动识别物理 WAN（推荐）")
