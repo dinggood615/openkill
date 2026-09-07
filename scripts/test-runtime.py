@@ -196,6 +196,13 @@ class DualStackRoutingTests(unittest.TestCase):
         self.assertIn('curl -6 -fsS --interface "$iface"', source)
         self.assertIn('set_openkill_ipv6_state unavailable https-timeout', source)
         self.assertIn('removed the temporary fallback route', source)
+        self.assertIn('write_openkill_ipv6_diagnostics()', source)
+        self.assertIn('route_source=', source)
+        self.assertIn('route_lan_source=', source)
+        self.assertIn('tcp_443=', source)
+        self.assertIn('udp_dns=', source)
+        self.assertIn('pmtu_1280=', source)
+        self.assertLess(source.index('add_openkill_ipv6_fallback_route\n         overwrite_file'), source.index('\n      get_config\n'))
         self.assertIn('source-specific IPv6 defaults', source)
 
     def test_wan_ipv6_dns_and_gateway_are_not_injected(self):
@@ -225,6 +232,9 @@ class DualStackRoutingTests(unittest.TestCase):
         self.assertIn("group['timeout'] = 3500", source)
         self.assertIn("group['max-failed-times'] = 2", source)
         self.assertIn("group['lazy'] = false", source)
+        self.assertIn("proxy['ip-version'] = 'ipv4-prefer'", source)
+        self.assertIn("group['proxies'] = ['REJECT']", source)
+        self.assertIn("Value['dns']['nameserver-policy']['geosite:cn']", source)
 
     def test_vpn_remote_service_ports_bypass_interception(self):
         source = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')

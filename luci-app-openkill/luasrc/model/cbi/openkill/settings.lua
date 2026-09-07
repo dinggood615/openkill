@@ -1520,8 +1520,25 @@ o.description = translate("独立控制 AAAA 解析。开启后允许返回 IPv6
 o.default = 0
 
 o = s:taboption("ipv6", DummyValue, "native_ipv6_state", "原生 IPv6 链路状态")
-o.default = "未检测"
+o.cfgvalue = function()
+	local state = fs.readfile("/tmp/openkill-ipv6-underlay.state") or ""
+	local value, reason = state:match("([^\n]*)\n?([^\n]*)")
+	local labels = { available = "可用", unavailable = "不可用" }
+	if value == "unavailable" and reason and reason ~= "" then
+		return (labels[value] or value) .. "（" .. reason .. "）"
+	end
+	return labels[value] or value or "未检测"
+end
 o.description = "启动时通过 IPv6 HTTPS 验证原生链路。若仅网关可达但 HTTPS 超时，OpenKill 会撤销自己临时添加的默认路由，避免双栈设备长时间等待后才回退 IPv4。"
+
+o = s:taboption("ipv6", DummyValue, "effective_ipv6_mode", "当前实际生效状态")
+o.cfgvalue = function()
+	local requested = fs.uci_get_config("config", "ipv6_enable") == "1"
+	local state = (fs.readfile("/tmp/openkill-ipv6-underlay.state") or ""):match("([^\n]+)")
+	if not requested then return "IPv6 流量接管关闭；AAAA 解析由独立开关决定" end
+	if state == "available" then return "IPv6 流量接管开启；允许原生 IPv6 直连" end
+	return "IPv6 流量接管开启；原生链路不可用，使用 IPv4 底层代理并隔离 IPv6-only 节点"
+end
 
 if op_mode == "fake-ip" then
 o = s:taboption("ipv6", Value, "fakeip_range6", translate("Fake-IP Range").." (IPv6 Cidr)")

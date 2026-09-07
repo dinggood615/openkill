@@ -59,6 +59,8 @@ fi
 tun_auto_detect_interface=$(uci_get_config "tun_auto_detect_interface" || echo 1)
 tun_strict_route=$(uci_get_config "tun_strict_route" || echo 0)
 tun_endpoint_independent_nat=$(uci_get_config "tun_endpoint_independent_nat" || echo 0)
+ipv6_underlay_state=$(sed -n '1p' /tmp/openkill-ipv6-underlay.state 2>/dev/null || true)
+[ "$ipv6_underlay_state" = "available" ] && ipv6_underlay_available=1 || ipv6_underlay_available=0
 
 case "$tun_auto_detect_interface" in 0|1) ;; *) tun_auto_detect_interface=1 ;; esac
 case "$tun_strict_route" in 0|1) ;; *) tun_strict_route=0 ;; esac
@@ -432,6 +434,7 @@ begin
    tun_auto_detect_interface = '$tun_auto_detect_interface' == '1'
    tun_strict_route = '$tun_strict_route' == '1'
    tun_endpoint_independent_nat = '$tun_endpoint_independent_nat' == '1'
+   ipv6_underlay_available = '$ipv6_underlay_available' == '1'
 
    # IPv6 traffic interception options are subordinate to the master switch.
    # DNS AAAA resolution is deliberately independent (dns.ipv6), so a user
@@ -453,6 +456,24 @@ begin
 
    Value['dns'] ||= {}
 
+   # Prefer an IPv4 transport for domain-based proxy servers while the native
+   # IPv6 underlay is unhealthy. Explicit ipv4/ipv6 choices remain untouched.
+   # IPv6-literal nodes cannot use an IPv4 underlay, so automated groups must
+   # not wait on them when the preflight has already failed.
+   ipv6_only_proxy_names = []
+   unless ipv6_underlay_available
+      Array(Value['proxies']).each do |proxy|
+         next unless proxy.is_a?(Hash)
+         server = proxy['server'].to_s
+         name = proxy['name'].to_s
+         if server.include?(':') && server !~ /\A[^:]+:\d+\z/
+            ipv6_only_proxy_names << name unless name.empty?
+         elsif server =~ /[A-Za-z]/ && !proxy.key?('ip-version')
+            proxy['ip-version'] = 'ipv4-prefer'
+         end
+      end
+   end
+
    # Give health-check groups bounded, consistent defaults without replacing a
    # user's explicit endpoint or cadence.  This avoids the very long default
    # probe timeout that can make the dashboard report no delay for a usable
@@ -461,6 +482,16 @@ begin
       Value['proxy-groups'].each do |group|
          next unless group.is_a?(Hash)
          next unless %w[url-test fallback load-balance].include?(group['type'].to_s)
+         if !ipv6_underlay_available && group['proxies'].is_a?(Array)
+            filtered = group['proxies'].reject { |name| ipv6_only_proxy_names.include?(name.to_s) }
+            if filtered.empty? && !group['proxies'].empty?
+               group['proxies'] = ['REJECT']
+               YAML.LOG_WARN('IPv6 underlay is unavailable; automated group【%s】has no usable non-IPv6 nodes.' % group['name'])
+            elsif filtered.length != group['proxies'].length
+               group['proxies'] = filtered
+               YAML.LOG_WARN('IPv6 underlay is unavailable; IPv6-only nodes were excluded from【%s】.' % group['name'])
+            end
+         end
          group['url'] = 'https://www.gstatic.com/generate_204' unless group.key?('url') && !group['url'].to_s.empty?
          # Keep probes frequent enough to evict a dead node before it causes a
          # burst of user-facing timeouts, while retaining conservative values
@@ -595,6 +626,17 @@ begin
           Value['dns']['prefer-h3'] = false
           Value['dns']['cache-algorithm'] = 'arc'
           Value['dns']['ipv6-timeout'] = 100 if !Value['dns'].key?('ipv6-timeout')
+          Value['dns']['fallback-lazy-query'] = true if !Value['dns'].key?('fallback-lazy-query')
+
+          # Keep AAAA available for proxied destinations, but avoid broken
+          # native IPv6 first attempts for mainland direct domains.
+          unless ipv6_underlay_available
+             Value['dns']['nameserver-policy'] ||= {}
+             Value['dns']['nameserver-policy']['geosite:cn'] ||= [
+                '223.5.5.5#disable-ipv6=true',
+                '119.29.29.29#disable-ipv6=true'
+             ]
+          end
 
          if fake_ip_mode == 'redir-host'
             Value['dns']['enhanced-mode'] = 'redir-host'

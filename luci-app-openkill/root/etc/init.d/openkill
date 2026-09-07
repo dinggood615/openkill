@@ -598,14 +598,7 @@ OPENKILL_IPV6_STATE_FILE="/tmp/openkill-ipv6-underlay.state"
 set_openkill_ipv6_state()
 {
    local state="$1" reason="$2"
-   printf '%s\n' "$state" > "$OPENKILL_IPV6_STATE_FILE"
-   uci -q set openkill.config.native_ipv6_state="$state"
-   if [ -n "$reason" ]; then
-      uci -q set openkill.config.native_ipv6_reason="$reason"
-   else
-      uci -q delete openkill.config.native_ipv6_reason
-   fi
-   uci -q commit openkill
+   printf '%s\n%s\n' "$state" "$reason" > "$OPENKILL_IPV6_STATE_FILE"
 }
 
 probe_openkill_ipv6_https()
@@ -616,9 +609,51 @@ probe_openkill_ipv6_https()
       -o /dev/null https://cp.cloudflare.com/generate_204 >/dev/null 2>&1
 }
 
+write_openkill_ipv6_diagnostics()
+{
+   local iface="$1" gateway="$2" source6 lan_source6 route_any route_source route_lan_source tcp443_state udp_state mtu pmtu_state
+   source6=$(ip -6 addr show dev "$iface" scope global 2>/dev/null | awk '/inet6 / {sub(/\/.*/, "", $2); print $2; exit}')
+   lan_source6=$(ip -6 addr show scope global 2>/dev/null | awk -v wan="$source6" '/inet6 / {sub(/\/.*/, "", $2); if ($2 != wan) {print $2; exit}}')
+   route_any=$(ip -6 route get 2606:4700:4700::1111 2>/dev/null | head -n 1)
+   route_source="unavailable"
+   [ -n "$source6" ] && route_source=$(ip -6 route get 2606:4700:4700::1111 from "$source6" 2>/dev/null | head -n 1)
+   route_lan_source="not-present"
+   [ -n "$lan_source6" ] && route_lan_source=$(ip -6 route get 2606:4700:4700::1111 from "$lan_source6" 2>/dev/null | head -n 1)
+   mtu=$(ip link show dev "$iface" 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="mtu"){print $(i+1); exit}}')
+   tcp443_state="unavailable"
+   curl -6 -fsS --interface "$iface" --connect-timeout 4 --max-time 6 \
+      -o /dev/null 'telnet://[2606:4700:4700::1111]:443' >/dev/null 2>&1 && tcp443_state="available"
+   udp_state="not-tested"
+   if command -v timeout >/dev/null 2>&1 && command -v nslookup >/dev/null 2>&1; then
+      timeout 5 nslookup cloudflare.com 2606:4700:4700::1111 >/dev/null 2>&1 && udp_state="available" || udp_state="unavailable"
+   fi
+   pmtu_state="not-tested"
+   if command -v ping >/dev/null 2>&1; then
+      ping -6 -c 1 -W 2 -s 1280 2606:4700:4700::1111 >/dev/null 2>&1 && pmtu_state="available" || pmtu_state="unavailable"
+   fi
+   {
+      printf 'interface=%s\n' "$iface"
+      printf 'global_address=%s\n' "${source6:-missing}"
+      printf 'gateway=%s\n' "${gateway:-missing}"
+      printf 'route_any=%s\n' "${route_any:-missing}"
+      printf 'route_source=%s\n' "${route_source:-missing}"
+      printf 'lan_global_address=%s\n' "${lan_source6:-missing}"
+      printf 'route_lan_source=%s\n' "${route_lan_source:-missing}"
+      printf 'tcp_443=%s\n' "$tcp443_state"
+      printf 'udp_dns=%s\n' "$udp_state"
+      printf 'mtu=%s\n' "${mtu:-unknown}"
+      printf 'pmtu_1280=%s\n' "$pmtu_state"
+   } > /tmp/openkill-ipv6-diagnostics
+}
+
 add_openkill_ipv6_fallback_route()
 {
-   [ "${ipv6_enable:-0}" = "1" ] || return 0
+   local iface gateway metric
+   if [ "${ipv6_enable:-0}" != "1" ] && [ "${ipv6_dns:-0}" != "1" ]; then
+      set_openkill_ipv6_state not-requested
+      rm -f /tmp/openkill-ipv6-diagnostics
+      return 0
+   fi
    [ "${tun_owner:-openkill}" = "openkill" ] || return 0
    command -v ip >/dev/null 2>&1 || return 0
 
@@ -631,6 +666,8 @@ add_openkill_ipv6_fallback_route()
       END { if (has && generic) exit 0; exit 1 }
    '; then
       iface=$(ip -6 route show default 2>/dev/null | awk '$1 == "default" {for (i=1; i<=NF; i++) if ($i == "dev") {print $(i+1); exit}}')
+      gateway=$(ip -6 route show default 2>/dev/null | awk '$1 == "default" {for (i=1; i<=NF; i++) if ($i == "via") {print $(i+1); exit}}')
+      write_openkill_ipv6_diagnostics "$iface" "$gateway"
       if [ -n "$iface" ] && probe_openkill_ipv6_https "$iface"; then
          set_openkill_ipv6_state available
       else
@@ -640,7 +677,6 @@ add_openkill_ipv6_fallback_route()
       return 0
    fi
 
-   local iface gateway metric
    iface=$(/usr/share/openkill/openkill_get_network.lua "pppoe" 2>/dev/null | awk 'NF { print; exit }')
    [ -z "$iface" ] && iface=$(/usr/share/openkill/openkill_get_network.lua "dhcp" 2>/dev/null | awk 'NF { print; exit }')
    [ -z "$iface" ] && iface=$(ip -6 route show default 2>/dev/null | awk '$1 == "default" {for (i=1; i<=NF; i++) if ($i == "dev") {print $(i+1); exit}}')
@@ -653,6 +689,7 @@ add_openkill_ipv6_fallback_route()
 
    metric=2048
    if ip -6 route replace default via "$gateway" dev "$iface" metric "$metric" 2>/dev/null; then
+      write_openkill_ipv6_diagnostics "$iface" "$gateway"
       printf '%s %s %s\n' "$iface" "$gateway" "$metric" > "$OPENKILL_IPV6_ROUTE_MARKER"
       if probe_openkill_ipv6_https "$iface"; then
          set_openkill_ipv6_state available
@@ -3981,12 +4018,19 @@ start_service()
       # Check instead of restart
       if [ "${OPENKILL_RECOVERY:-0}" != 1 ]; then
          check_run_quick
+         # The generated YAML consumes the effective IPv6 underlay state, so
+         # run the native-path preflight before overwrite_file invokes the
+         # profile generator. Read only the three required UCI values here;
+         # get_config still performs the complete configuration load below.
+         ipv6_enable=$(uci_get_config "ipv6_enable" || echo 0)
+         ipv6_dns=$(uci_get_config "ipv6_dns" || echo 0)
+         tun_owner=$(uci_get_config "tun_owner" || echo openkill)
+         add_openkill_ipv6_fallback_route
          overwrite_file
       fi
       get_config
       config_choose
       do_run_mode
-      add_openkill_ipv6_fallback_route
       if [ "$tun_owner" = mihomo ] && [ -z "$en_mode_tun" ]; then
          LOG_ERROR "Mihomo native ownership requires an IPv4 TUN or mixed mode."
          start_fail
