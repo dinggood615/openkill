@@ -252,7 +252,7 @@
         return card;
     }
 
-    function buildCards(tabItems) {
+    function buildCards(tabItems, activeOnly) {
         /*
          * Version Update is a standalone, full-width page.  Do not consume a
          * CARD_LAYOUTS slot for it: the remaining six settings categories
@@ -268,6 +268,7 @@
                 /(版本更新|version update|check update)/i.test(tabLabel(item)));
             if (updatePanel) return;
             var layout = CARD_LAYOUTS[layoutIndex++];
+            if (activeOnly && !tabIsActive(item)) return;
             if (!layout || panel.getAttribute('data-openkill-cards-ready') === '1') return;
             var content = panelContent(panel);
             var fields = directFields(content);
@@ -359,7 +360,17 @@
                 tabItems.push(menu.children[i]);
             }
         }
-        buildCards(tabItems);
+        // Build only the visible category before the first paint.  The CBI
+        // fields remain in their original panels until their tab is needed,
+        // so a slow router does not synchronously rearrange every advanced
+        // option on page load.
+        buildCards(tabItems, true);
+        var deferCards = function() { buildCards(tabItems, false); };
+        if (typeof window.requestIdleCallback === 'function') {
+            window.requestIdleCallback(deferCards, { timeout: 900 });
+        } else {
+            window.setTimeout(deferCards, 120);
+        }
 
         var advancedItems = tabItems.filter(function(item) {
             return /(高级|系统|advanced|maintenance)/i.test(tabLabel(item));
