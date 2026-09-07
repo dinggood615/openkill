@@ -119,20 +119,30 @@ jobs:
           sudo apt-get update
           sudo apt-get -y install curl git tar unzip zstd jq python3 python3-pyelftools python3-setuptools
 
+      - name: Cache fixed IPK SDK
+        if: ${{ matrix.target.name == 'ipk' }}
+        uses: actions/cache@v4
+        with:
+          path: tmp/sdk-cache
+          key: openkill-ipk-sdk-22.03-${{ hashFiles('.github/workflows/compile_new_ipk.yml') }}
+
       - name: Download SDK
         run: |
           mkdir -p tmp
           if [ "${{ matrix.target.name }}" = "ipk" ]; then
-            if ! curl -SLfk --connect-timeout 30 --retry 2 "${{ matrix.target.sdk_url }}" -o "./tmp/${{ matrix.target.sdk_tar }}"; then
-              curl -SLf --connect-timeout 30 --retry 2 "https://downloads.openwrt.org/releases/22.03.0/targets/x86/64/openwrt-sdk-22.03.0-x86-64_gcc-11.2.0_musl.Linux-x86_64.tar.xz" -o "./tmp/${{ matrix.target.sdk_tar }}"
-              cd tmp
-              tar xf ${{ matrix.target.sdk_tar }}
-              mv openwrt-sdk-* ${{ matrix.target.sdk_dir }}
+            mkdir -p tmp/sdk-cache
+            SDK_CACHE="./tmp/sdk-cache/${{ matrix.target.sdk_tar }}"
+            if [ ! -s "$SDK_CACHE" ]; then
+              if ! curl -SLfk --connect-timeout 30 --retry 2 "${{ matrix.target.sdk_url }}" -o "$SDK_CACHE"; then
+                curl -SLf --connect-timeout 30 --retry 2 "https://downloads.openwrt.org/releases/22.03.0/targets/x86/64/openwrt-sdk-22.03.0-x86-64_gcc-11.2.0_musl.Linux-x86_64.tar.xz" -o "$SDK_CACHE"
+              fi
             else
-              cd tmp
-              tar xf ${{ matrix.target.sdk_tar }}
-              mv openwrt-sdk-* ${{ matrix.target.sdk_dir }}
+              echo "Using cached OpenWrt IPK SDK: $SDK_CACHE"
             fi
+            cp "$SDK_CACHE" "./tmp/${{ matrix.target.sdk_tar }}"
+            cd tmp
+            tar xf ${{ matrix.target.sdk_tar }}
+            mv openwrt-sdk-* ${{ matrix.target.sdk_dir }}
           else
             BASE_URL="https://downloads.openwrt.org/snapshots/targets/x86/64/"
             SDK_NAME=$(curl -sf $BASE_URL | grep -oE 'openwrt-sdk-x86-64[^"]+\.tar\.zst' | head -n 1)
