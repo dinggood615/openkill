@@ -584,6 +584,61 @@ do_run_mode()
    fi
 }
 
+# Some OpenWrt dual-stack builds install only source-specific IPv6 defaults.
+# Linux can then reach the gateway but cannot choose a route for an ordinary
+# IPv6 destination, causing a first-connection delay while applications fall
+# back to IPv4. Add one low-priority generic default only when it is missing;
+# never replace an existing route and remove only the route we created.
+OPENKILL_IPV6_ROUTE_MARKER="/tmp/openkill-ipv6-default-route"
+
+add_openkill_ipv6_fallback_route()
+{
+   [ "${ipv6_enable:-0}" = "1" ] || return 0
+   [ "${tun_owner:-openkill}" = "openkill" ] || return 0
+   command -v ip >/dev/null 2>&1 || return 0
+
+   if ip -6 route show default 2>/dev/null | awk '
+      $1 == "default" {
+         has = 1; from = 0
+         for (i = 1; i <= NF; i++) if ($i == "from") from = 1
+         if (!from) generic = 1
+      }
+      END { if (has && generic) exit 0; exit 1 }
+   '; then
+      return 0
+   fi
+
+   local iface gateway metric
+   iface=$(/usr/share/openkill/openkill_get_network.lua "pppoe" 2>/dev/null | awk 'NF { print; exit }')
+   [ -z "$iface" ] && iface=$(/usr/share/openkill/openkill_get_network.lua "dhcp" 2>/dev/null | awk 'NF { print; exit }')
+   [ -z "$iface" ] && iface=$(ip -6 route show default 2>/dev/null | awk '$1 == "default" {for (i=1; i<=NF; i++) if ($i == "dev") {print $(i+1); exit}}')
+   gateway=$(/usr/share/openkill/openkill_get_network.lua "gateway6" 2>/dev/null | awk 'NF { print; exit }')
+   [ -z "$gateway" ] && gateway=$(ip -6 route show default 2>/dev/null | awk '$1 == "default" {for (i=1; i<=NF; i++) if ($i == "via") {print $(i+1); exit}}')
+   [ -n "$iface" ] && [ -n "$gateway" ] || {
+      LOG_WARN "IPv6 is enabled but no WAN IPv6 interface/gateway was found; keeping existing routes."
+      return 0
+   }
+
+   metric=2048
+   if ip -6 route replace default via "$gateway" dev "$iface" metric "$metric" 2>/dev/null; then
+      printf '%s %s %s\n' "$iface" "$gateway" "$metric" > "$OPENKILL_IPV6_ROUTE_MARKER"
+      LOG_TIP "Added low-priority IPv6 default route via ${iface} (${gateway}) for dual-stack fallback."
+   else
+      LOG_WARN "Unable to add the IPv6 fallback route; existing IPv6 routing was left unchanged."
+   fi
+}
+
+remove_openkill_ipv6_fallback_route()
+{
+   [ -r "$OPENKILL_IPV6_ROUTE_MARKER" ] || return 0
+   local iface gateway metric
+   read -r iface gateway metric < "$OPENKILL_IPV6_ROUTE_MARKER"
+   if [ -n "$iface" ] && [ -n "$gateway" ] && [ -n "$metric" ]; then
+      ip -6 route del default via "$gateway" dev "$iface" metric "$metric" 2>/dev/null || true
+   fi
+   rm -f "$OPENKILL_IPV6_ROUTE_MARKER"
+}
+
 sanitize_native_fw4_compat()
 {
    [ "$tun_owner" = "mihomo" ] || return 0
@@ -3860,6 +3915,7 @@ start_service()
       get_config
       config_choose
       do_run_mode
+      add_openkill_ipv6_fallback_route
       if [ "$tun_owner" = mihomo ] && [ -z "$en_mode_tun" ]; then
          LOG_ERROR "Mihomo native ownership requires an IPv4 TUN or mixed mode."
          start_fail
@@ -4036,6 +4092,7 @@ stop_service()
 
    {
       /usr/share/openkill/openkill_history_get.sh
+      remove_openkill_ipv6_fallback_route
 
       # Stop the core before removing its owner-specific firewall include.
       # Mihomo-native auto-redirect can request an fw4 reload while exiting;

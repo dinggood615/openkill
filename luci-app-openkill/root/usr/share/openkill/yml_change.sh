@@ -23,6 +23,15 @@ default_dashboard=$(uci_get_config "default_dashboard" || echo "metacubexd")
 yacd_type=$(uci_get_config "yacd_type" || echo "Official")
 dashboard_type=$(uci_get_config "dashboard_type" || echo "Official")
 
+# Resolve the physical WAN interface once while generating the profile. DNS
+# bootstrap and proxy-node resolution must not be sent through the TUN device;
+# binding them to the actual WAN interface avoids Mihomo's auto-detection
+# look-back warning on dual-stack OpenWrt systems. This is best-effort so
+# older firmware remains usable.
+dns_wan_interface=$(/usr/share/openkill/openkill_get_network.lua "pppoe" 2>/dev/null | awk 'NF { print; exit }')
+[ -z "$dns_wan_interface" ] && dns_wan_interface=$(/usr/share/openkill/openkill_get_network.lua "dhcp" 2>/dev/null | awk 'NF { print; exit }')
+[ -z "$dns_wan_interface" ] && dns_wan_interface=$(ip -4 route show default 2>/dev/null | awk '{for (i=1; i<=NF; i++) if ($i == "dev") {print $(i+1); exit}}')
+
 # Bind addresses are kept explicit and validated here before they are inserted
 # into the generated YAML.  "lan" follows the router LAN address; if a
 # snapshot firmware does not expose it yet, loopback is the safe fallback.
@@ -274,6 +283,15 @@ yml_dns_get()
       specific_group_param=""
    fi
 
+   # Explicit UCI interface choices always win. For direct bootstrap DNS,
+   # nameserver and node-resolution entries, use the detected physical WAN
+   # interface so the resolver never loops back into the TUN device.
+   if [ -z "$interface" ] && [ -n "$dns_wan_interface" ] && {
+      [ "$group" = "default" ] || [ "$group" = "nameserver" ] ||
+      [ "$node_resolve" = "1" ] || [ "$direct_nameserver" = "1" ];
+   }; then
+      interface="$dns_wan_interface"
+   fi
    [ "$interface" != "Disable" ] && [ -n "$interface" ] && interface_param="$interface" || interface_param=""
    [ "$http3" = "1" ] && http3_param="h3=true" || http3_param=""
    [ "$skip_cert_verify" = "1" ] && skip_cert_verify_param="skip-cert-verify=true" || skip_cert_verify_param=""
@@ -906,6 +924,13 @@ begin
       # suitable for ordinary WAN DNS but can stall proxy-node resolution on
       # dual-stack routers.  Keep this resolver path deterministic and direct.
       default_proxy_servers = ['114.114.114.114', '119.29.29.29', '223.5.5.5']
+      # Keep proxy-node DNS on the physical WAN path. Mihomo otherwise tries
+      # to infer an interface for each resolver and can select the TUN device,
+      # producing a look-back loop or an <invalid> interface on IPv6 routers.
+      proxy_dns_interface = '$dns_wan_interface'
+      if ! proxy_dns_interface.empty?
+         default_proxy_servers = default_proxy_servers.map { |server| server + '#' + proxy_dns_interface }
+      end
       proxy_server_nameserver_policy = Value.dig('dns', 'proxy-server-nameserver-policy') && !Value['dns']['proxy-server-nameserver-policy'].empty?
 
       if Value.dig('dns', 'proxy-server-nameserver').to_a.empty?

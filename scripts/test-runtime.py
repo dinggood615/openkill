@@ -159,6 +159,23 @@ class FirewallShellCompatibilityTests(unittest.TestCase):
         self.assertEqual(result.stdout.splitlines(), ['<tcp>', '<udp>'])
 
 
+class DualStackRoutingTests(unittest.TestCase):
+    def test_dns_bootstrap_is_bound_to_physical_wan(self):
+        source = (SHARE / 'yml_change.sh').read_text(encoding='utf-8')
+        self.assertIn('dns_wan_interface=', source)
+        self.assertIn('openkill_get_network.lua "pppoe"', source)
+        self.assertIn('[ "$group" = "default" ]', source)
+        self.assertIn('proxy_dns_interface', source)
+
+    def test_ipv6_fallback_route_is_safe_and_reversible(self):
+        source = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        self.assertIn('add_openkill_ipv6_fallback_route()', source)
+        self.assertIn('remove_openkill_ipv6_fallback_route()', source)
+        self.assertIn('metric=2048', source)
+        self.assertIn('OPENKILL_IPV6_ROUTE_MARKER', source)
+        self.assertIn('source-specific IPv6 defaults', source)
+
+
 @unittest.skipIf(os.name == 'nt', 'Recovery filesystem integration runs on Linux CI')
 class RecoveryTests(unittest.TestCase):
     def test_snapshot_restores_once_and_preserves_pair(self):
