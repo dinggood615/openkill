@@ -3915,21 +3915,6 @@ get_config()
    geosite_custom_url=$(uci_get_config "geosite_custom_url" || echo 0)
    geoasn_custom_url=$(uci_get_config "geoasn_custom_url" || echo 0)
    global_ua=$(uci_get_config "global_ua" || echo 0)
-   # OpenKill is Meta-only.  Keep the legacy positional arguments consumed by
-   # the YAML helpers, but force every removed Smart/LightGBM switch off so old
-   # UCI values can never re-enable the retired code path.
-   auto_smart_switch=0
-   lgbm_auto_update=0
-   lgbm_custom_url=""
-   lgbm_update_interval=0
-   smart_collect=0
-   smart_collect_size=0
-   smart_collect_rate=0
-   smart_policy_priority=""
-   smart_enable_lgbm=0
-   smart_prefer_asn=0
-   smart_tolerance=0
-
    [ -z "$dns_port" ] && dns_port=7874 && uci -q set openkill.config.dns_port=7874
    uci -q commit openkill
 }
@@ -4021,7 +4006,7 @@ start_service()
          "$find_process_mode" "$fakeip_range" "$ipv6_mode" "$stack_type_v6" "$enable_unified_delay"\
          "$enable_respect_rules" "$custom_fakeip_filter_mode" "$iptables_compat" "$disable_quic_go_gso" "$cors_allow"\
          "$geo_custom_url" "$geoip_custom_url" "$geosite_custom_url" "$geoasn_custom_url"\
-         "$lgbm_auto_update" "$lgbm_custom_url" "$lgbm_update_interval" "$smart_collect" "$smart_collect_size"\
+         0 "" 0 0 0\
          "$fakeip_range6" "$fake_ip_range6_enable" "$global_ua"
 
          # Validate the rewritten controller context before starting Mihomo.
@@ -4041,7 +4026,7 @@ start_service()
          /usr/share/openkill/yml_rules_change.sh \
          "$enable_custom_clash_rules" "$TMP_CONFIG_FILE"\
          "$enable_rule_proxy" "$router_self_proxy" "$lan_ip" "$enable_redirect_dns" "$en_mode"\
-         "$auto_smart_switch" "$smart_collect" "$smart_collect_rate" "$smart_policy_priority" "$smart_enable_lgbm" "$smart_prefer_asn" "$smart_tolerance"
+         0 0 0 "" 0 0 0
 
          #Custom overwrite
          if [ -f "/tmp/yaml_overwrite.sh" ]; then

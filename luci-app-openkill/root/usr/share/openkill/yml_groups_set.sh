@@ -199,7 +199,7 @@ set_provider_groups()
 yml_groups_set()
 {
    local section="$1"
-   local enabled config type name disable_udp strategy old_name test_url test_interval tolerance policy_filter uselightgbm collectdata policy_priority other_parameters icon
+   local enabled config type name disable_udp strategy old_name test_url test_interval tolerance policy_filter other_parameters icon
    config_get_bool "enabled" "$section" "enabled" "1"
    config_get "config" "$section" "config" ""
    config_get "type" "$section" "type" ""
@@ -211,9 +211,6 @@ yml_groups_set()
    config_get "test_interval" "$section" "test_interval" ""
    config_get "tolerance" "$section" "tolerance" ""
    config_get "policy_filter" "$section" "policy_filter" ""
-   config_get "uselightgbm" "$section" "uselightgbm" ""
-   config_get "collectdata" "$section" "collectdata" ""
-   config_get "policy_priority" "$section" "policy_priority" ""
    config_get "other_parameters" "$section" "other_parameters" ""
    config_get "icon" "$section" "icon" ""
 
@@ -228,6 +225,10 @@ yml_groups_set()
    if [ -z "$type" ]; then
       return
    fi
+
+   # Smart/LightGBM groups belonged to the retired forked core.  Keep old
+   # UCI entries importable, but emit only the official Meta url-test type.
+   [ "$type" = "smart" ] && type="url-test"
 
    if [ -z "$name" ]; then
       return
@@ -297,18 +298,6 @@ yml_groups_set()
       echo "    routing-mark: \"$routing_mark\"" >>$GROUP_FILE
    }
 
-   if [ "$type" = "smart" ]; then
-      [ -n "$uselightgbm" ] && {
-         echo "    uselightgbm: $uselightgbm" >>$GROUP_FILE
-      }
-      [ -n "$collectdata" ] && {
-         echo "    collectdata: $collectdata" >>$GROUP_FILE
-      }
-      [ -n "$policy_priority" ] && {
-         echo "    policy-priority: \"$policy_priority\"" >>$GROUP_FILE
-      }
-   fi
-
    #icon
    if [ -n "$icon" ]; then
       echo "    icon: $icon" >> "$GROUP_FILE"
@@ -329,4 +318,3 @@ sed -i "s/#delete_//g" "$CONFIG_FILE" 2>/dev/null
 
 /usr/share/openkill/yml_proxys_set.sh "$CONFIG_FILE" >/dev/null 2>&1
 del_lock
-

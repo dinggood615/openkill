@@ -3216,7 +3216,6 @@ function action_cdn_info()
 		if not ok or not parsed or type(parsed) ~= "table" then return nil end
 		if parsed.plugin_ver and not ov.is_valid_version(parsed.plugin_ver) then parsed.plugin_ver = "" end
 		if parsed.core_meta_ver and not ov.is_valid_version(parsed.core_meta_ver) then parsed.core_meta_ver = "" end
-		if parsed.core_smart_ver and not ov.is_valid_version(parsed.core_smart_ver) then parsed.core_smart_ver = "" end
 		return parsed
 	end
 
@@ -3254,9 +3253,7 @@ function action_cdn_info()
 		local cmd = string.format([[
 PLUGIN_VER=""
 CORE_META_VER="%s"
-CORE_SMART_VER=""
 CORE_ERR=""
-OIX_MODE="0"
 LATENCY="null"
 
 PLUGIN_RAW=$(curl -sL -m 5 -w '\n%%{http_code} %%{time_starttransfer}' "%s" 2>/dev/null)
@@ -3277,8 +3274,8 @@ else
 	LATENCY=-2
 fi
 
-printf '{"plugin_ver":"%%s","core_meta_ver":"%%s","core_smart_ver":"%%s","latency":%%s,"core_error":"%%s"}\n' \
-	"$PLUGIN_VER" "$CORE_META_VER" "$CORE_SMART_VER" "${LATENCY:-null}" "$CORE_ERR"
+printf '{"plugin_ver":"%%s","core_meta_ver":"%%s","latency":%%s,"core_error":"%%s"}\n' \
+	"$PLUGIN_VER" "$CORE_META_VER" "${LATENCY:-null}" "$CORE_ERR"
 ]], official_core_ver, plugin_url)
 		local fdi, fdo = nixio.pipe()
 		if fdi and fdo then

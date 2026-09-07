@@ -416,11 +416,8 @@ begin
    geoip_custom_url = '${38}'
    geosite_custom_url = '${39}'
    geoasn_custom_url = '${40}'
-   lgbm_auto_update = '${41}' == '1'
-   lgbm_custom_url = '${42}'
-   lgbm_update_interval = '${43}'
-   smart_collect = '${44}' == '1'
-   smart_collect_size = '${45}'
+   # Positional slots 41-45 are retained for compatibility with older
+   # callers, but Smart/LightGBM values are intentionally ignored.
    fake_ip_range6 = '${46}'
    fake_ip_range6_enable = '${47}' == '1'
    global_ua = '${48}'

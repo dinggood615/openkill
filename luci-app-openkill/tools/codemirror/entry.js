@@ -322,10 +322,6 @@ const mihomoSnippets = [
     snippetCompletion("- name: \"#{1}\"\n  type: load-balance\n  proxies:\n    - \"#{2}\"\n  url: \"#{3}\"\n  interval: #{4}\n  # strategy: consistent-hashing\n#{}", {
         label: "group-load-balance", type: "snippet", detail: "Load-Balance group"
     }),
-    snippetCompletion("- name: \"#{1}\"\n  type: smart\n  proxies:\n    - \"#{2}\"\n  url: \"#{3}\"\n  interval: #{4}\n  # timeout: 5000\n  # max-failed-times: 3\n  # lazy: true\n  # disable-udp: false\n  # filter: \"HK|SG\"\n  # policy-priority: \"\"\n  # uselightgbm: false\n  # collectdata: false\n  # sample-rate: 1.0\n  # prefer-asn: false\n#{}", {
-        label: "group-smart", type: "snippet", detail: "Smart selection group"
-    }),
-
     // --- Rules ---
     snippetCompletion("- DOMAIN-SUFFIX,#{1},#{2}\n#{}", {
         label: "rule-domain-suffix", type: "snippet", detail: "Domain suffix rule"

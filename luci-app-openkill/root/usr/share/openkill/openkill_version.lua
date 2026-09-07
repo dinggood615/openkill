@@ -377,9 +377,9 @@ local function parse_commit_feed(raw, max_count)
 end
 
 function M.fetch_version_history(branch, force, cdn, latest_only)
-	local result = { plugin = {}, core_meta = {}, core_smart = {}, latest = nil, error = nil, schema = 2 }
-	-- OpenKill is Meta-only.  Keep the legacy result fields for old LuCI
-	-- clients, but never query the removed generated `core/` or Smart feeds.
+	local result = { plugin = {}, core_meta = {}, latest = nil, error = nil, schema = 2 }
+	-- OpenKill is Meta-only.  Only plugin history and the official Mihomo
+	-- stable release are queried; retired Smart/core feeds are not retained.
 	local github_address_mod = fs.uci_get_config("config", "github_address_mod") or "0"
 	if cdn and cdn ~= "" then
 		github_address_mod = cdn
@@ -409,14 +409,13 @@ function M.fetch_version_history(branch, force, cdn, latest_only)
 	if latest_only then
 		local plugin_latest = ""
 		local core_meta_latest = latest_mihomo_version()
-		local core_smart_latest = ""
 
 		local plugin_raw = try_fetch(build_fetch_urls(github_address_mod, "package/" .. branch .. "/version"))
 		if plugin_raw and plugin_raw ~= "" then
 			plugin_latest = trim(plugin_raw:match("^[^\n\r]*") or "")
 		end
 
-		result.latest = { plugin = plugin_latest, core_meta = core_meta_latest, core_smart = core_smart_latest }
+		result.latest = { plugin = plugin_latest, core_meta = core_meta_latest }
 		if plugin_latest == "" then
 			result.error = "network_error"
 		end
@@ -432,7 +431,6 @@ function M.fetch_version_history(branch, force, cdn, latest_only)
 			blk.schema = 2
 			blk.plugin = nil
 			blk.core_meta = nil
-			blk.core_smart = nil
 			parsed[branch] = blk
 		end)
 
@@ -472,8 +470,7 @@ function M.fetch_version_history(branch, force, cdn, latest_only)
 	local official_meta = latest_mihomo_version()
 	result.latest = {
 		plugin = (result.plugin[1] and result.plugin[1].version) or "",
-		core_meta = official_meta,
-		core_smart = (result.core_smart[1] and result.core_smart[1].version) or ""
+		core_meta = official_meta
 	}
 
 	local cache_ttl = 300

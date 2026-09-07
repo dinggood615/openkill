@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-openkill
-PKG_VERSION:=2026-1108
+PKG_VERSION:=2026-1109
 PKG_MAINTAINER:=dinggood615 <https://github.com/dinggood615/openkill>
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
@@ -54,6 +54,9 @@ endef
 define Build/Prepare
 	$(CP) $(CURDIR)/root $(PKG_BUILD_DIR)
 	$(CP) $(CURDIR)/luasrc $(PKG_BUILD_DIR)
+	# MetaCubeXD is the bundled dashboard.  Zashboard remains available via
+	# the on-demand dashboard downloader but is not shipped in the base IPK.
+	rm -rf $(PKG_BUILD_DIR)/root/usr/share/openkill/ui/zashboard
 	$(foreach po,$(wildcard ${CURDIR}/po/zh-cn/*.po), \
 		po2lmo $(po) $(PKG_BUILD_DIR)/$(patsubst %.po,%.lmo,$(notdir $(po)));)
 	chmod 0755 $(PKG_BUILD_DIR)/root/etc/init.d/openkill
@@ -84,6 +87,9 @@ endef
 define Package/$(PKG_NAME)/postinst
 #!/bin/sh
 	if [ -z "$${IPKG_INSTROOT}" ]; then
+		# Remove the retired bundled copy before normalization so an old
+		# selection cannot point at a dashboard that is no longer packaged.
+		rm -rf /usr/share/openkill/ui/zashboard >/dev/null 2>&1 || true
 		[ -x /usr/share/openkill/openkill_config_normalize.sh ] && /usr/share/openkill/openkill_config_normalize.sh >/dev/null 2>&1 || true
 		rm -f /tmp/openkill.change /tmp/openkill/openkill.change /tmp/openkill/capabilities.env >/dev/null 2>&1 || true
 		rm -rf /tmp/luci-indexcache /tmp/luci-indexcache.* /tmp/luci-modulecache /var/luci-modulecache >/dev/null 2>&1 || true

@@ -356,7 +356,7 @@ yml_other_set()
                if Value.key?('proxy-groups') and Value['proxy-groups'].is_a?(Array) then
                   Value['proxy-groups'].each{|group|
                      threads << Thread.new {
-                        if ['url-test', 'fallback', 'load-balance', 'smart'].include?(group['type']) then
+                        if ['url-test', 'fallback', 'load-balance'].include?(group['type']) then
                            group['interval'] = ${urltest_interval_mod};
                         end;
                      };
@@ -391,7 +391,7 @@ yml_other_set()
                if Value.key?('proxy-groups') and Value['proxy-groups'].is_a?(Array) then
                   Value['proxy-groups'].each{|group|
                      threads << Thread.new {
-                        if ['url-test', 'fallback', 'load-balance', 'smart'].include?(group['type']) then
+                        if ['url-test', 'fallback', 'load-balance'].include?(group['type']) then
                            group['url'] = '$urltest_address_mod';
                         end;
                      };

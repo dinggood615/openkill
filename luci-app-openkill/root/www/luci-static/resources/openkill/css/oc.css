@@ -8056,9 +8056,17 @@ html[data-darkmode=true] .oc #addCustomOption:hover {
 
 /* The runtime page no longer reserves a banner-sized empty area. */
 .oc.openkill-status-page {
-    max-width: 1360px;
+    /* Follow the Argon content column instead of reserving wide blank
+     * gutters on desktop and ultrawide screens. */
+    width: 100%;
+    max-width: none;
     padding: 0;
     color: var(--ok-flat-text);
+}
+
+#cbi-openkill.openkill-settings {
+    width: 100%;
+    max-width: none;
 }
 
 .oc.openkill-status-page .main-cards-container {

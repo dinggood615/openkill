@@ -171,7 +171,6 @@ jobs:
           }
           CHNR_PATH=tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/root/etc/openkill/china_ip_route.ipset
           CHNR6_PATH=tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/root/etc/openkill/china_ip6_route.ipset
-          ZASHBOARD_PATH=tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/root/usr/share/openkill/ui/zashboard
           METACUBEXD_PATH=tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/root/usr/share/openkill/ui/metacubexd
           GEOSITE_PATH=tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/root/etc/openkill/GeoSite.dat
           COUNTRY_MMDB_PATH=tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/root/etc/openkill/Country.mmdb
@@ -193,22 +192,6 @@ jobs:
           mkdir -p "$METACUBEXD_PATH"
           rm -rf "$METACUBEXD_PATH"/*
           cp -rf "$METACUBEXD_UNZIP_PATH"/* "$METACUBEXD_PATH"
-
-          # 更新 ZashBoard UI
-          mkdir -p tmp/zashboard_zip
-          download https://github.com/Zephyruso/zashboard/releases/latest/download/dist-cdn-fonts.zip tmp/zashboard.zip
-          unzip -q -o tmp/zashboard.zip -d tmp/zashboard_zip
-          mkdir -p "$ZASHBOARD_PATH"
-          rm -rf "$ZASHBOARD_PATH"/*
-          cp -rf tmp/zashboard_zip/dist/* "$ZASHBOARD_PATH"
-
-          # 提取国旗字体
-          FONTS_PATH=tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/root/www/luci-static/resources/openkill/fonts
-          mkdir -p "$FONTS_PATH"
-          TWEMOJI_FONT=$(ls tmp/zashboard_zip/dist/assets/TwemojiMozilla-flags-*.woff2 2>/dev/null | head -1)
-          if [ -n "$TWEMOJI_FONT" ]; then
-            cp "$TWEMOJI_FONT" "$FONTS_PATH/TwemojiMozilla-flags.woff2"
-          fi
 
           # 更新 GeoSite.dat
           RULES_RELEASE=$(curl --fail --silent --show-error --retry 4 --retry-all-errors \

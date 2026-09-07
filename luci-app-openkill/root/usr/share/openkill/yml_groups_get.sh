@@ -92,10 +92,14 @@ ruby -ryaml -rYAML -I "/usr/share/openkill" -E UTF-8 -e "
       threadsp << Thread.new {
       begin
          next unless x['name'] && x['type'];
+         # Import legacy Smart groups as native Meta url-test groups.  The
+         # official core does not understand Smart/LightGBM fields.
+         group_type = x['type'].to_s.downcase;
+         group_type = 'url-test' if group_type == 'smart';
          uci_set='set openkill.' + uci_name_tmp[index] + '.'
          uci_add='add_list openkill.' + uci_name_tmp[index] + '.'
 
-         YAML.LOG('Start Getting【${CONFIG_NAME} - ' + x['type'].to_s + ' - ' + x['name'].to_s + '】Group Setting...');
+         YAML.LOG('Start Getting【${CONFIG_NAME} - ' + group_type + ' - ' + x['name'].to_s + '】Group Setting...');
 
          threads_g << Thread.new {
             #name
@@ -107,7 +111,7 @@ ruby -ryaml -rYAML -I "/usr/share/openkill" -E UTF-8 -e "
          threads_g << Thread.new {
             #type
             if x.key?('type') then
-               uci_commands << uci_set + 'type=\"' + x['type'].to_s + '\"'
+               uci_commands << uci_set + 'type=\"' + group_type + '\"'
             end;
          };
 
@@ -128,34 +132,6 @@ ruby -ryaml -rYAML -I "/usr/share/openkill" -E UTF-8 -e "
          };
 
          threads_g << Thread.new {
-            #strategy-smart
-            if x.key?('strategy') and x['type'] == 'smart' then
-               uci_commands << uci_set + 'strategy_smart=\"' + x['strategy'].to_s + '\"'
-            end;
-         };
-
-         threads_g << Thread.new {
-            #uselightgbm
-            if x.key?('uselightgbm') and x['type'] == 'smart' then
-               uci_commands << uci_set + 'uselightgbm=\"' + x['uselightgbm'].to_s + '\"'
-            end;
-         };
-
-         threads_g << Thread.new {
-            #collectdata
-            if x.key?('collectdata') and x['type'] == 'smart' then
-               uci_commands << uci_set + 'collectdata=\"' + x['collectdata'].to_s + '\"'
-            end;
-         };
-
-         threads_g << Thread.new {
-            #policy_priority
-            if x.key?('policy-priority') and x['type'] == 'smart' then
-               uci_commands << uci_set + 'policy_priority=\"' + x['policy-priority'].to_s + '\"'
-            end;
-         };
-
-         threads_g << Thread.new {
             #disable-udp
             if x.key?('disable-udp') then
                uci_commands << uci_set + 'disable_udp=\"' + x['disable-udp'].to_s + '\"'
@@ -163,7 +139,7 @@ ruby -ryaml -rYAML -I "/usr/share/openkill" -E UTF-8 -e "
          };
 
          threads_g << Thread.new {
-            if x['type'] == 'url-test' or x['type'] == 'fallback' or x['type'] == 'load-balance' or x['type'] == 'smart' then
+            if group_type == 'url-test' or group_type == 'fallback' or group_type == 'load-balance' then
                #test_url
                if x.key?('url') then
                   uci_commands << uci_set + 'test_url=\"' + x['url'].to_s + '\"'
@@ -175,7 +151,7 @@ ruby -ryaml -rYAML -I "/usr/share/openkill" -E UTF-8 -e "
                end;
 
                #test_tolerance
-               if x['type'] == 'url-test' then
+               if group_type == 'url-test' then
                   if x.key?('tolerance') then
                      uci_commands << uci_set + 'tolerance=\"' + x['tolerance'].to_s + '\"'
                   end;

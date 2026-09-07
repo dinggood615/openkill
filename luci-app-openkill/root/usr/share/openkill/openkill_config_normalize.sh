@@ -129,6 +129,29 @@ if [ "$compat_migration" != "2026-1108" ]; then
     changed=1
 fi
 
+# Remove settings that only belonged to the retired Smart/LightGBM and
+# oixCloud integrations. This is a one-time, idempotent UCI migration: the
+# YAML migration above still handles legacy Smart groups, while no obsolete
+# switches remain in the active runtime configuration or LuCI form.
+legacy_cleanup_version="$(uci -q get openkill.config.feature_cleanup_version 2>/dev/null || true)"
+if [ "$legacy_cleanup_version" != "2026-1109" ]; then
+    legacy_keys="smart_enable auto_smart_switch smart_policy_priority smart_prefer_asn smart_enable_lgbm smart_collect smart_collect_size smart_collect_rate smart_tolerance lgbm_auto_update lgbm_custom_url lgbm_update_interval"
+    cleanup_legacy_section() {
+        local section="$1" key
+        for key in $legacy_keys; do
+            if uci -q get "openkill.${section}.${key}" >/dev/null 2>&1; then
+                uci -q delete "openkill.${section}.${key}"
+                changed=1
+            fi
+        done
+    }
+    cleanup_legacy_section config
+    config_load openkill
+    config_foreach cleanup_legacy_section config_overwrite
+    uci -q set openkill.config.feature_cleanup_version=2026-1109
+    changed=1
+fi
+
 # OpenKill-owned mode already controls routes and firewall rules. Bind the
 # generated profile to the physical WAN instead of letting Mihomo select a
 # tunnel after OpenVPN/PPPoE changes. Native ownership keeps auto detection.
