@@ -67,6 +67,8 @@ STREAM_INT=1
 # helper at the configured interval instead of forking it every five watchdog
 # cycles (which used to create a no-op process even when the feature was off).
 STREAM_INTERVAL=1
+CONFIG_REFRESH_INT=1
+CONFIG_REFRESH_INTERVAL=5
 DNS_RELOAD_LAST=0
 DNS_RELOAD_COOLDOWN=300
 FW4=$(command -v fw4)
@@ -89,19 +91,46 @@ HISTORY_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_history_cycles" || e
 FIREWALL_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_firewall_cycles" || echo 5)" 5)
 UPNP_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_upnp_cycles" || echo 60)" 60)
 SKIP_PROXY_ADDRESS_INTERVAL=$(valid_cycles "$(uci_get_config "watchdog_proxy_cycles" || echo 60)" 60)
-STREAM_MINUTES=$(valid_cycles "$(uci_get_config "stream_auto_select_interval" || echo 30)" 30)
-STREAM_SECONDS=$((STREAM_MINUTES * 60))
-if [ "$WATCHDOG_SLEEP" -gt 0 ]; then
-   STREAM_INTERVAL=$(( (STREAM_SECONDS + WATCHDOG_SLEEP - 1) / WATCHDOG_SLEEP ))
-else
-   STREAM_INTERVAL=1
-fi
-[ "$STREAM_INTERVAL" -lt 1 ] && STREAM_INTERVAL=1
 CORE_FAILURES=0
 
+refresh_watchdog_config() {
+   CONFIG_FILE="/etc/openkill/$(uci_get_config "config_path" |awk -F '/' '{print $5}' 2>/dev/null)"
+   ipv6_enable=$(valid_bool "$(uci_get_config "ipv6_enable" || echo 0)")
+   enable_redirect_dns=$(valid_bool "$(uci_get_config "enable_redirect_dns" || echo 0)")
+   dns_port=$(valid_cycles "$(uci_get_config "dns_port" || echo 7874)" 7874)
+   disable_masq_cache=$(valid_bool "$(uci_get_config "disable_masq_cache" || echo 0)")
+   log_size=$(valid_cycles "$(uci_get_config "log_size" || echo 1024)" 1024)
+   router_self_proxy=$(valid_bool "$(uci_get_config "router_self_proxy" || echo 1)")
+   skip_proxy_address=$(valid_bool "$(uci_get_config "skip_proxy_address" || echo 0)")
+   stream_auto_select=$(valid_bool "$(uci_get_config "stream_auto_select" || echo 0)")
+   tun_owner=$(uci_get_config "tun_owner" || echo openkill)
+   case "$tun_owner" in
+      openkill|mihomo) ;;
+      *) tun_owner=openkill ;;
+   esac
+
+   cfg_update=$(valid_bool "$(uci_get_config "auto_update" || echo 0)")
+   cfg_update_mode=$(valid_bool "$(uci_get_config "config_auto_update_mode" || echo 0)")
+   cfg_update_interval=$(uci_get_config "config_update_interval" || echo 60)
+   case "$cfg_update_interval" in ''|*[!0-9]*|0) cfg_update_interval=60 ;; esac
+   upnp_lease_file=$(uci -q get upnpd.config.upnp_lease_file)
+
+   # Recalculate the low-frequency stream schedule when settings are changed.
+   # The stream helper still applies its timestamp gate, so this only controls
+   # how often a background process is created.
+   STREAM_MINUTES=$(valid_cycles "$(uci_get_config "stream_auto_select_interval" || echo 30)" 30)
+   STREAM_SECONDS=$((STREAM_MINUTES * 60))
+   if [ "$WATCHDOG_SLEEP" -gt 0 ]; then
+      STREAM_INTERVAL=$(( (STREAM_SECONDS + WATCHDOG_SLEEP - 1) / WATCHDOG_SLEEP ))
+   else
+      STREAM_INTERVAL=1
+   fi
+   [ "$STREAM_INTERVAL" -lt 1 ] && STREAM_INTERVAL=1
+}
+
 stream_watch_enabled() {
-   [ "$(uci_get_config "stream_auto_select" || echo 0)" = "1" ] || return 1
-   [ "$(uci_get_config "router_self_proxy" || echo 1)" = "1" ] || return 1
+   [ "${stream_auto_select:-0}" = "1" ] || return 1
+   [ "${router_self_proxy:-1}" = "1" ] || return 1
    return 0
 }
 
@@ -257,25 +286,10 @@ end" 2>/dev/null >> $LOG_FILE
 while :;
 do
    touch "$WATCHDOG_LOCK_HEARTBEAT" 2>/dev/null || true
-   CONFIG_FILE="/etc/openkill/$(uci_get_config "config_path" |awk -F '/' '{print $5}' 2>/dev/null)"
-   ipv6_enable=$(valid_bool "$(uci_get_config "ipv6_enable" || echo 0)")
-   enable_redirect_dns=$(valid_bool "$(uci_get_config "enable_redirect_dns" || echo 0)")
-   dns_port=$(valid_cycles "$(uci_get_config "dns_port" || echo 7874)" 7874)
-   disable_masq_cache=$(valid_bool "$(uci_get_config "disable_masq_cache" || echo 0)")
-   log_size=$(valid_cycles "$(uci_get_config "log_size" || echo 1024)" 1024)
-   router_self_proxy=$(valid_bool "$(uci_get_config "router_self_proxy" || echo 1)")
-   skip_proxy_address=$(valid_bool "$(uci_get_config "skip_proxy_address" || echo 0)")
-   tun_owner=$(uci_get_config "tun_owner" || echo openkill)
-   case "$tun_owner" in
-      openkill|mihomo) ;;
-      *) tun_owner=openkill ;;
-   esac
-
-   cfg_update=$(valid_bool "$(uci_get_config "auto_update" || echo 0)")
-   cfg_update_mode=$(valid_bool "$(uci_get_config "config_auto_update_mode" || echo 0)")
-   cfg_update_interval=$(uci_get_config "config_update_interval" || echo 60)
-   case "$cfg_update_interval" in ''|*[!0-9]*|0) cfg_update_interval=60 ;; esac
-   upnp_lease_file=$(uci -q get upnpd.config.upnp_lease_file)
+   if [ "$CONFIG_REFRESH_INT" -eq 1 ] || [ "$(expr "$CONFIG_REFRESH_INT" % "$CONFIG_REFRESH_INTERVAL")" -eq 0 ]; then
+      refresh_watchdog_config
+   fi
+   CONFIG_REFRESH_INT=$(expr "$CONFIG_REFRESH_INT" + 1)
 
 #wait for core start complete
 while ( [ -n "$(unify_ps_pids "/etc/init.d/openkill")" ] )
