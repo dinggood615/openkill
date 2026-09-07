@@ -64,6 +64,11 @@
             ]}
         ],
         [
+            {id: 'vpn-policy', title: 'VPN 访问策略', keys: ['_compat_policy', '_compat_scope']},
+            {id: 'remote-service', title: '远程访问绕过', keys: ['remote_service_', 'wan_ac_']},
+            {id: 'gateway-compatibility', title: '旁路由兼容', keys: ['bypass_gateway_compatible']}
+        ],
+        [
             {id: 'mihomo-capabilities', title: '<%:Mihomo Capabilities%>', keys: [
                 'capability_', 'feature_', 'refresh_capabilities'
             ]},
@@ -250,7 +255,7 @@
     function buildCards(tabItems) {
         /*
          * Version Update is a standalone, full-width page.  Do not consume a
-         * CARD_LAYOUTS slot for it: the remaining five settings categories
+         * CARD_LAYOUTS slot for it: the remaining six settings categories
          * must keep their existing card layout after the update tab is moved
          * behind System & Maintenance in the CBI menu.
          */

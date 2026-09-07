@@ -100,9 +100,28 @@ s:tab("basic", translate("Runtime & Services"))
 s:tab("network", translate("Network & Routing"))
 s:tab("rules", translate("Rules & Subscriptions"))
 s:tab("stability", translate("Performance & Stability"))
-s:tab("advanced", translate("System & Maintenance"))
+s:tab("compatibility", "兼容设置")
+s:tab("advanced", "系统维护")
 -- Keep plugin updates after system maintenance so daily settings stay first.
 s:tab("version_update", translate("Version Update"))
+
+o = s:taboption("compatibility", DummyValue, "_compat_policy", "推荐 VPN 客户端访问策略")
+o.default = "局域网直连，公网按现有规则分流"
+o.description = "保留 OpenVPN 的默认路由和 DNS 推送；不要把整个 VPN 客户端网段加入来源绕过列表，也不要排除 tun0 的全部流量。"
+
+o = s:taboption("compatibility", Flag, "remote_service_bypass", "旧版服务端口绕过")
+o.default = "1"
+o.rmempty = false
+o.description = "仅用于 OpenKill 统一管理且使用 firewall4 的模式。沿用 1106 的固定端口绕过，可在此关闭；它不是服务自动识别，也不代表 VPN 和远程控制已经通过实机验证。"
+
+o = s:taboption("compatibility", DynamicList, "remote_service_ports", "服务端口绕过列表")
+o.datatype = "port"
+o:depends("remote_service_bypass", "1")
+o.description = "源端口或目标端口匹配时绕过 TCP/UDP 接管。列表为空沿用 1194、9993、21114 至 21119；填写后替换默认列表。优先使用下方目标地址绕过，避免宽泛端口匹配。"
+
+o = s:taboption("compatibility", DummyValue, "_compat_scope", "生效范围与限制")
+o.default = "保存并应用后重新生成防火墙规则"
+o.description = "目标地址和端口列表使用已有 OpenKill 访问控制功能。Fake-IP 域名需同时在覆写设置中加入 Fake-IP 过滤。当前不自动识别 OpenVPN、不自动生成域名直连规则；原生接管模式不使用这里的旧版服务端口规则。"
 
 o = s:taboption("op_mode", ListValue, "en_mode", font_red..bold_on..translate("Select Mode")..bold_off..font_off)
 o.description = translate("Select Mode For OpenKill Work, Try Flush DNS Cache If Network Error")
@@ -192,7 +211,7 @@ o:value("0.0.0.0", translate("All LAN interfaces (advanced)"))
 o.default = "127.0.0.1"
 o.rmempty = false
 
-o = s:taboption("op_mode", Flag, "bypass_gateway_compatible", translate("Bypass Gateway Compatible"))
+o = s:taboption("compatibility", Flag, "bypass_gateway_compatible", translate("Bypass Gateway Compatible"))
 o.description = translate("If The Network Cannot be Connected in Bypass Gateway Mode, Please Try to Enable.")..font_red..bold_on..translate("Suggestion: If The Device Does Not Have WLAN, Please Disable The Lan Interface's Bridge Option")..bold_off..font_off
 o.default = 0
 
@@ -331,11 +350,11 @@ mac_w.datatype = "list(macaddr)"
 mac_w.rmempty = true
 mac_w:depends("lan_ac_mode", "1")
 
-o = s:taboption("lan_ac", DynamicList, "wan_ac_black_ips", translate("WAN Bypassed Host List"))
+o = s:taboption("compatibility", DynamicList, "wan_ac_black_ips", "目标地址绕过列表（IPv4 / IPv6）")
 o.datatype = "ipmask"
 o.description = translate("In The Fake-IP Mode, Only Pure IP Requests Are Supported, Please Setting Fake-IP-Filter First If You Need Domain Type Requests")
 
-o = s:taboption("lan_ac", DynamicList, "wan_ac_black_ports", translate("WAN Bypassed Port List"))
+o = s:taboption("compatibility", DynamicList, "wan_ac_black_ports", "目标端口绕过列表")
 o.datatype = "or(port, portrange)"
 o.description = translate("In The Fake-IP Mode, Only Pure IP Requests Are Supported, Please Setting Fake-IP-Filter First If You Need Domain Type Requests")
 

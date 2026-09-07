@@ -1583,7 +1583,18 @@ if [ -n "$FW4" ]; then
    # rendezvous traffic keep their original socket and route.  Traffic from
    # an established OpenVPN tunnel is still handled normally by the TUN rules.
    nft 'add set inet fw4 openkill_service_ports { type inet_service; flags interval; }'
-   nft 'add element inet fw4 openkill_service_ports { 1194, 9993, 21114-21119 }'
+   nft 'flush set inet fw4 openkill_service_ports'
+   if [ "$(uci_get_config remote_service_bypass || echo 1)" != "0" ]; then
+      local service_ports service_port
+      service_ports="$(uci_get_config remote_service_ports)"
+      [ -n "$service_ports" ] || service_ports="1194 9993 21114 21115 21116 21117 21118 21119"
+      for service_port in $service_ports; do
+         case "$service_port" in ''|*[!0-9]*) continue ;; esac
+         [ "${#service_port}" -le 5 ] || continue
+         [ "$service_port" -ge 1 ] && [ "$service_port" -le 65535 ] || continue
+         nft add element inet fw4 openkill_service_ports "{ $service_port }"
+      done
+   fi
 
    #bypass gateway compatible
    if [ "$bypass_gateway_compatible" -eq 1 ]; then
@@ -3244,7 +3255,7 @@ revert_firewall()
          nft delete chain inet fw4 handle ${handle}
       done
 
-      for handle in $(nft -a list sets |grep -E "set localnetwork|china_ip|lan_ac_|wan_ac_black_|common_ports" |awk -F '# handle ' '{print$2}'); do
+      for handle in $(nft -a list sets |grep -E "set localnetwork|china_ip|lan_ac_|wan_ac_black_|common_ports|set openkill_service_ports" |awk -F '# handle ' '{print$2}'); do
          nft delete set inet fw4 handle ${handle}
       done
    else

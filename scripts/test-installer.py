@@ -99,18 +99,19 @@ chosen=$(select_newest_manifest "$WORK_DIR/rows")
         self.assertNotIn('MetaCubeX/mihomo@${CORE_LV}', CORE_SOURCE)
         self.assertNotIn('cdn.jsdelivr.net/gh/MetaCubeX/mihomo', CORE_SOURCE)
 
-    def test_settings_keep_five_categories_and_standalone_update(self):
+    def test_settings_keep_six_categories_and_standalone_update(self):
         expected = (
             's:tab("version_update", translate("Version Update"))',
             's:tab("basic", translate("Runtime & Services"))',
             's:tab("network", translate("Network & Routing"))',
             's:tab("rules", translate("Rules & Subscriptions"))',
             's:tab("stability", translate("Performance & Stability"))',
-            's:tab("advanced", translate("System & Maintenance"))',
+            's:tab("compatibility", "兼容设置")',
+            's:tab("advanced", "系统维护")',
         )
         for marker in expected:
             self.assertIn(marker, SETTINGS_SOURCE)
-        self.assertEqual(SETTINGS_SOURCE.count('s:tab("'), 6)
+        self.assertEqual(SETTINGS_SOURCE.count('s:tab("'), 7)
         self.assertIn('version_update = "version_update"', SETTINGS_SOURCE)
         self.assertIn("local native_taboption = s.taboption", SETTINGS_SOURCE)
         self.assertIn("openkill-settings-toolbar", SETTINGS_THEME)

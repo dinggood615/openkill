@@ -60,7 +60,7 @@ msgid "Performance & Stability"
 msgstr "性能与稳定"
 
 msgid "System & Maintenance"
-msgstr "系统与维护"
+msgstr "系统维护"
 
 msgid "Operation & Core"
 msgstr "运行模式"

@@ -185,12 +185,37 @@ class DualStackRoutingTests(unittest.TestCase):
     def test_vpn_remote_service_ports_bypass_interception(self):
         source = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
         self.assertIn('openkill_service_ports', source)
-        self.assertIn('1194, 9993, 21114-21119', source)
+        self.assertIn('1194 9993 21114 21115 21116 21117 21118 21119', source)
         for chain in ('openkill', 'openkill_mangle', 'openkill_mangle_output',
                       'openkill_output', 'openkill_v6', 'openkill_mangle_v6',
                       'openkill_mangle_output_v6'):
             self.assertIn(f'{chain} th dport @openkill_service_ports', source)
             self.assertIn(f'{chain} th sport @openkill_service_ports', source)
+
+    def test_service_port_controls(self):
+        source = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        block = source.split("   nft 'add set inet fw4 openkill_service_ports", 1)[1]
+        block = "   nft 'add set inet fw4 openkill_service_ports" + block.split('\n   #bypass gateway compatible', 1)[0]
+        for enabled, ports, expected in [
+                ('1', '', ['1194', '9993', '21114', '21115', '21116', '21117', '21118', '21119']),
+                ('0', '', []), ('1', '443 21116', ['443', '21116']),
+                ('1', '0 65536 invalid 1194 999999999999', ['1194'])]:
+            with self.subTest(enabled=enabled, ports=ports):
+                harness = f"enabled='{enabled}'\nports='{ports}'\n" + '''
+uci_get_config() { case "$1" in remote_service_bypass) echo "$enabled" ;; *) echo "$ports" ;; esac; }
+nft() { case "$*" in 'add element '*) echo "$*" ;; esac; }
+run_case() {
+'''
+                result = run_shell(harness + block + '\n}\nrun_case\n')
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.splitlines(),
+                                 ['add element inet fw4 openkill_service_ports { ' + port + ' }' for port in expected])
+
+    def test_compatibility_page_order_and_fields(self):
+        source = (ROOT / 'luci-app-openkill/luasrc/model/cbi/openkill/settings.lua').read_text(encoding='utf-8')
+        self.assertLess(source.index('s:tab("compatibility",'), source.index('s:tab("advanced",'))
+        for field in ('remote_service_bypass', 'remote_service_ports', 'wan_ac_black_ips', 'wan_ac_black_ports', 'bypass_gateway_compatible'):
+            self.assertRegex(source, r's:taboption\("compatibility", [^,]+, "' + field + '"')
 
 
 @unittest.skipIf(os.name == 'nt', 'Recovery filesystem integration runs on Linux CI')
