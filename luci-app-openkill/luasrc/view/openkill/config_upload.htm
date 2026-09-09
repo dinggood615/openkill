@@ -481,7 +481,7 @@ var SubscriptionUrlSetter = {
         for (var i = 0; i < urlList.length; i++) {
             var result = UrlValidator.validateUrl(urlList[i], false);
             if (!result.valid) {
-                alert('<%:Invalid URL on line %> ' + (i + 1) + ':\n' + urlList[i] + '\n\n' + result.reason);
+                alert('<%:Invalid URL on line %d%>'.replace('%d', String(i + 1)) + '\n' + urlList[i] + '\n\n' + result.reason);
                 return;
             }
         }
@@ -1562,14 +1562,14 @@ var ConfigUploader = {
         var nameInput = document.createElement('input');
         nameInput.type = 'text';
         nameInput.className = 'form-input';
-        nameInput.placeholder = 'Header-Name';
+        nameInput.placeholder = '请求头名称';
         nameInput.value = name || '';
         nameInput.style.cssText = 'flex: 1; height: 32px;';
 
         var valueInput = document.createElement('input');
         valueInput.type = 'text';
         valueInput.className = 'form-input';
-        valueInput.placeholder = 'value';
+        valueInput.placeholder = '值';
         valueInput.value = value || '';
         valueInput.style.cssText = 'flex: 1.5; height: 32px;';
 

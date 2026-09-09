@@ -12,15 +12,15 @@
 
 <script src="/luci-static/resources/openkill/js/oc-icons.js?v=<%=plugin_version%>"></script>
 <div class="oc">
-    <div class="sub_div">
-        <span id='<%=idname%>' class="sub_tab"></span>
-        <button type="button" class="sub_setting" title='<%:Refresh%>' alt='<%:Refresh%>' onclick='return sub_info_refresh_<%=idname%>(true)'>
+    <div class="sub_div openkill-subscription-summary">
+        <span id='<%=idname%>' class="sub_tab openkill-subscription-summary-text"></span>
+        <button type="button" class="sub_setting openkill-subscription-summary-action" title='<%:Refresh%>' alt='<%:Refresh%>' onclick='return sub_info_refresh_<%=idname%>(true)'>
             <svg viewBox="0 0 24 24"><use href="#oc-icon-refresh"/></svg>
         </button>
-        <button type="button" class="sub_setting" title='<%:Specify URL%>' alt='<%:Specify URL%>' onclick='return setUrlConfig_<%=idname%>()'>
+        <button type="button" class="sub_setting openkill-subscription-summary-action" title='<%:Specify URL%>' alt='<%:Specify URL%>' onclick='return setUrlConfig_<%=idname%>()'>
             <svg viewBox="0 0 48 48"><use href="#oc-icon-chat"/></svg>
         </button>
-        <button type="button" class="sub_setting" title='<%:Edit Subscription%>' alt='<%:Edit Subscription%>' onclick='return uploadConfig_<%=idname%>()'>
+        <button type="button" class="sub_setting openkill-subscription-summary-action" title='<%:Edit Subscription%>' alt='<%:Edit Subscription%>' onclick='return uploadConfig_<%=idname%>()'>
             <svg width="14" height="14"><use href="#oc-icon-settings"/></svg>
         </button>
     </div>

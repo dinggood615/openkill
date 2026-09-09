@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-openkill
-PKG_VERSION:=2026-1119
+PKG_VERSION:=2026-1120
 PKG_MAINTAINER:=dinggood615 <https://github.com/dinggood615/openkill>
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
@@ -72,6 +72,7 @@ define Build/Compile
 endef
 
 define Package/$(PKG_NAME)/conffiles
+/etc/config/openkill
 endef
 
 define Package/$(PKG_NAME)/preinst
@@ -112,42 +113,15 @@ endef
 
 define Package/$(PKG_NAME)/postrm
 #!/bin/sh
-	if [ -f /etc/openkill/.fw4-optional-include ] && [ ! -s /etc/firewall.include ]; then
-		rm -f /etc/firewall.include
-	fi
-	DEFAULT_DNSMASQ_CFGID="$$(uci -q show "dhcp.@dnsmasq[0]" | awk 'NR==1 {split($0, conf, /[.=]/); print conf[2]}' 2>/dev/null)"
-	if [ -f "/tmp/etc/dnsmasq.conf.$DEFAULT_DNSMASQ_CFGID" ]; then
-	   DNSMASQ_CONF_DIR="$$(awk -F '=' '/^conf-dir=/ {print $2}' "/tmp/etc/dnsmasq.conf.$DEFAULT_DNSMASQ_CFGID" 2>/dev/null)"
-	else
-	   DNSMASQ_CONF_DIR="/tmp/dnsmasq.d"
-	fi
-	DNSMASQ_CONF_DIR=$${DNSMASQ_CONF_DIR%*/}
-	rm -rf /etc/openkill >/dev/null 2>&1
-	rm -rf /etc/config/openkill >/dev/null 2>&1
 	rm -rf /tmp/openkill.log >/dev/null 2>&1
 	rm -rf /tmp/openkill_start.log >/dev/null 2>&1
 	rm -rf /tmp/openkill.change >/dev/null 2>&1
-	rm -rf /usr/share/openkill >/dev/null 2>&1
 	rm -rf /tmp/openkill_version_history.json /tmp/openkill_version_history_openkill.json >/dev/null 2>&1
     rm -rf /tmp/openkill_cdn_info.json >/dev/null 2>&1
-	rm -rf ${DNSMASQ_CONF_DIR}/dnsmasq_openkill_custom_domain.conf >/dev/null 2>&1
-	rm -rf ${DNSMASQ_CONF_DIR}/dnsmasq_openkill_chnroute_pass.conf >/dev/null 2>&1
-	rm -rf ${DNSMASQ_CONF_DIR}/dnsmasq_openkill_chnroute6_pass.conf >/dev/null 2>&1
 	rm -rf /tmp/etc/openkill >/dev/null 2>&1
 	rm -rf /tmp/openkill_announcement >/dev/null 2>&1
-	rm -rf /www/luci-static/resources/openkill >/dev/null 2>&1
 	rm -rf /tmp/openkill_version_history_* >/dev/null 2>&1
 	rm -rf /tmp/openkill_cdn_info_* >/dev/null 2>&1
-	rm -rf /tmp/openkill >/dev/null 2>&1
-	sed -i '/OpenKill Append/,/OpenKill Append End/d' "/usr/lib/lua/luci/model/network.lua" >/dev/null 2>&1
-	sed -i '/.*kB maximum content size*/c\HTTP_MAX_CONTENT      = 1024*100		-- 100 kB maximum content size' /usr/lib/lua/luci/http.lua >/dev/null 2>&1
-	sed -i '/.*kB maximum content size*/c\export let HTTP_MAX_CONTENT = 1024*100;		// 100 kB maximum content size' /usr/share/ucode/luci/http.uc >/dev/null 2>&1
-	uci -q delete firewall.openkill
-	uci -q commit firewall
-	[ -f "/etc/config/ucitrack" ] && {
-	uci -q delete ucitrack.@openkill[-1]
-	uci -q commit ucitrack
-	}
 	rm -rf /tmp/luci-indexcache /tmp/luci-indexcache.* /var/luci-indexcache /var/luci-indexcache.* >/dev/null 2>&1
 	rm -rf /tmp/luci-modulecache /var/luci-modulecache >/dev/null 2>&1
 	exit 0

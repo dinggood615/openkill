@@ -5,21 +5,21 @@
 %>
 <script src="/luci-static/resources/openkill/js/oc-icons.js?v=<%=plugin_version%>"></script>
 <body>
-    <div id="tab" class="oc">
-        <div id="tab-header">
-            <ul class="oc-tabmenu">
+    <div id="tab" class="oc openkill-log-console">
+        <div id="tab-header" class="openkill-log-source-tabs">
+            <ul class="oc-tabmenu openkill-log-tabs">
                 <li name="tab-header" class="oc-tab"><a href="#"><svg width="14" height="14"><use href="#oc-icon-package"/></svg><span><%:Plugin Logs%></span></a></li>
                 <li name="tab-header" class="oc-tab-disabled"><a href="#"><svg width="14" height="14"><use href="#oc-icon-cpu"/></svg><span><%:Core Logs%></span></a></li>
                 <li name="tab-header" class="oc-tab-disabled"><a href="#"><svg width="14" height="14"><use href="#oc-icon-bug"/></svg><span><%:Debug Logs%></span></a></li>
             </ul>
         </div>
-        <div id="tab-content">
-            <div class="dom" style="display: block;">
+        <div id="tab-content" class="openkill-log-console-body">
+            <div class="dom openkill-log-panel openkill-log-panel-plugin" style="display: block;">
                 <textarea id="cbid.openkill.config.clog" class="oc-input-textarea" style="display:inline" data-update="change" rows="32" cols="60" readonly="readonly" ></textarea>
             </div>
-            <div class="dom">
+            <div class="dom openkill-log-panel openkill-log-panel-core">
                 <textarea id="core_log" class="oc-input-textarea" style="display:inline" data-update="change" rows="32" cols="60" readonly="readonly" ></textarea>
-                <div class="radio-button">
+                <div class="radio-button openkill-log-level-controls">
                     <input type="radio" id="info" name="radios" value="info" checked onclick="return switch_log_level(this.value)"/>
                     <label for="info"><%:Info%></label>
                     <input type="radio" id="warning" name="radios" value="warning" onclick="return switch_log_level(this.value)"/>
@@ -32,9 +32,9 @@
                     <label for="silent"><%:Silent%></label>
                 </div>
             </div>
-            <div class="dom">
+            <div class="dom openkill-log-panel openkill-log-panel-debug">
                 <textarea id="debug_log" class="oc-input-textarea oc-hidden" data-update="change" rows="32" cols="60" readonly="readonly" ></textarea>
-                <div id="debug-render-wrapper">
+                <div id="debug-render-wrapper" class="openkill-log-debug-preview">
                     <div id="debug-rendered"></div>
                     <div class="oc-usage-help-float" id="debug-copy-source" onclick="copyDebugSource()" title="<%:Copy Debug%>"><svg width="20" height="20"><use href="#oc-icon-copy"/></svg></div>
                 </div>
@@ -42,13 +42,13 @@
         </div>
     </div>
 
-<div class="oc oc-text-center oc-w100">
-    <div class="select-popup-footer log-footer">
-        <button type="button" class="footer-btn" id="stop_refresh_button" onclick="return stop_refresh()"><svg width="14" height="14"><use href="#oc-icon-player-pause"/></svg><span><%:Stop Refresh%></span></button>
-        <button type="button" class="footer-btn" id="start_refresh_button" onclick="return start_refresh()"><svg width="14" height="14"><use href="#oc-icon-player-play"/></svg><span><%:Start Refresh%></span></button>
-        <button type="button" class="footer-btn" id="del_log_button" onclick="return del_log()"><svg width="14" height="14"><use href="#oc-icon-trash"/></svg><span><%:Clean%></span></button>
-        <button type="button" class="footer-btn" id="down_log_button" onclick="return download_log()"><svg width="14" height="14"><use href="#oc-icon-download"/></svg><span><%:Download Log%></span></button>
-        <button type="button" class="footer-btn" id="gen_debug_button" onclick="return gen_debug_logs()"><svg width="14" height="14"><use href="#oc-icon-play-bugs"/></svg><span><%:Generate Logs%></span></button>
+<div class="oc oc-text-center oc-w100 openkill-log-actions-shell">
+    <div class="select-popup-footer log-footer openkill-log-actions">
+        <button type="button" class="footer-btn openkill-log-action" id="stop_refresh_button" onclick="return stop_refresh()"><svg width="14" height="14"><use href="#oc-icon-player-pause"/></svg><span><%:Stop Refresh%></span></button>
+        <button type="button" class="footer-btn openkill-log-action" id="start_refresh_button" onclick="return start_refresh()"><svg width="14" height="14"><use href="#oc-icon-player-play"/></svg><span><%:Start Refresh%></span></button>
+        <button type="button" class="footer-btn openkill-log-action openkill-log-action-danger" id="del_log_button" onclick="return del_log()"><svg width="14" height="14"><use href="#oc-icon-trash"/></svg><span><%:Clean%></span></button>
+        <button type="button" class="footer-btn openkill-log-action" id="down_log_button" onclick="return download_log()"><svg width="14" height="14"><use href="#oc-icon-download"/></svg><span><%:Download Log%></span></button>
+        <button type="button" class="footer-btn openkill-log-action openkill-log-action-debug" id="gen_debug_button" onclick="return gen_debug_logs()"><svg width="14" height="14"><use href="#oc-icon-play-bugs"/></svg><span><%:Generate Logs%></span></button>
     </div>
 </div>
 </body>

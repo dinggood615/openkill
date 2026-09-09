@@ -38,6 +38,13 @@ end
 ful = SimpleForm("upload", translate("Config Manage"), nil)
 ful.reset = false
 ful.submit = false
+ful.description = "上传、编辑、备份和恢复 OpenKill 配置文件。"
+page_header_title = translate("Config Manage")
+page_header_description = "上传、编辑、备份和恢复 OpenKill 配置文件。"
+local page_header = ful:section(SimpleSection)
+page_header.template = "openkill/page_header"
+page_header.title = translate("Config Manage")
+page_header.description = "上传、编辑、备份和恢复 OpenKill 配置文件。"
 
 sul =ful:section(SimpleSection, "")
 o = sul:option(FileUpload, "")

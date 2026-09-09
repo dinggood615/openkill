@@ -89,9 +89,6 @@ msgstr "Geo 数据库"
 msgid "China Route Lists"
 msgstr "中国路由列表"
 
-msgid "Stream Auto Selection"
-msgstr "流媒体自动选择"
-
 msgid "Watchdog & Auto Restart"
 msgstr "Watchdog 与自动重启"
 
@@ -157,6 +154,9 @@ msgstr "外部控制"
 
 msgid "Enabled"
 msgstr "启用"
+
+msgid "All"
+msgstr "全部"
 
 msgid "Disabled"
 msgstr "停用"
@@ -409,9 +409,6 @@ msgstr "通用设置"
 
 msgid "Config Manage"
 msgstr "配置管理"
-
-msgid "Add Config File"
-msgstr "添加配置文件"
 
 msgid "Upload File Type"
 msgstr "上传文件类型"
@@ -1761,9 +1758,6 @@ msgstr "配置文件格式校验失败，尝试不使用代理下载配置文件
 msgid "Has No Proxy Field, Trying To Download Without Agent..."
 msgstr "节点部分校验失败，尝试不使用代理下载配置文件..."
 
-msgid "Config File"
-msgstr "配置文件"
-
 msgid "Subscribed Failed, Trying to Download Without Agent..."
 msgstr "订阅失败，尝试不使用代理下载配置文件..."
 
@@ -1836,14 +1830,8 @@ msgstr "下载成功，检查数据库是否已更新..."
 msgid "Has Been Updated, Starting To Replace The Old Version..."
 msgstr "有新版本，开始替换旧版本..."
 
-msgid "Update Successful!"
-msgstr "更新成功！"
-
 msgid "No Change, Do Nothing..."
 msgstr "无变化，停止操作..."
-
-msgid "Update Error, Please Try Again Later..."
-msgstr "更新失败，请稍后再试..."
 
 msgid "Start Downloading Database..."
 msgstr "开始下载数据库..."
@@ -1931,9 +1919,6 @@ msgstr "配置文件不存在，您已设置订阅信息，准备开始下载...
 
 msgid "Config Not Found"
 msgstr "缺少配置文件，请上传或更新配置文件！"
-
-msgid "Config File Format Validation Failed..."
-msgstr "配置文件格式校验失败..."
 
 msgid "Detected that the GEOIP Database is not Installed, Ready to Download..."
 msgstr "检测到 GEOIP 数据库文件不存在，准备开始下载..."
@@ -2925,9 +2910,6 @@ msgstr "客户端指纹"
 msgid "Edit Client-fingerprint Failed,"
 msgstr "修改 Client-fingerprint 失败，"
 
-msgid "Edit Client-fingerprint Failed,"
-msgstr "修改 Client-fingerprint 失败，"
-
 msgid "Traffic Control"
 msgstr "流量控制"
 
@@ -3162,17 +3144,11 @@ msgstr "Proxy-server-nameserver 选项可能全部设置了代理选项，插件
 msgid "For Avoiding Proxies Server Resolve Loop..."
 msgstr "以避免代理服务器解析回环..."
 
-msgid "Config File"
-msgstr "配置文件"
-
 msgid "Downloading URL"
 msgstr "订阅的下载链接为"
 
 msgid "Downloading User-Agent"
 msgstr "订阅的 User-Agent 为"
-
-msgid "Option"
-msgstr "选项"
 
 msgid "Option"
 msgstr "选项"
@@ -3506,9 +3482,6 @@ msgstr "文件名包含无效字符"
 
 msgid "Uploading..."
 msgstr "上传中..."
-
-msgid "Generating..."
-msgstr "生成中..."
 
 msgid "Upload completed"
 msgstr "上传完成"
@@ -4043,9 +4016,6 @@ msgstr "请输入配置..."
 
 msgid "Edit original config..."
 msgstr "编辑原始配置..."
-
-msgid "Runtime config (read only)"
-msgstr "运行配置（只读）"
 
 msgid "Set Custom Overwrite Script Failed,"
 msgstr "自定义覆写命令执行失败，"
@@ -4961,3 +4931,714 @@ msgstr "首次运行并按此间隔维护本地网络和 IPv6 路由；间隔越
 
 msgid "Resolve AAAA records through the configured DNS path. Enable only when the router has a working IPv6 route; the local YAML keeps a short IPv6 fallback window."
 msgstr "通过配置的 DNS 路径解析 AAAA 记录；仅在路由器 IPv6 路由正常时启用，本地 YAML 会保留较短的 IPv6 回退窗口。"
+
+msgid "1 file selected"
+msgstr "已选择 1 个文件"
+
+msgid "Backup failed!"
+msgstr "备份失败！"
+
+msgid "Download failed"
+msgstr "下载失败"
+
+msgid "Failed to update enable status"
+msgstr "更新启用状态失败"
+
+msgid "Failed to update subscription config"
+msgstr "更新订阅配置失败"
+
+msgid "Invalid"
+msgstr "无效"
+
+msgid "Move down"
+msgstr "下移"
+
+msgid "Move up"
+msgstr "上移"
+
+msgid "No config files found"
+msgstr "未找到配置文件"
+
+msgid "OpenKill runtime status"
+msgstr "OpenKill 运行状态"
+
+msgid "Operation failed"
+msgstr "操作失败"
+
+msgid "Parse error"
+msgstr "解析失败"
+
+msgid "Please enter subscription config name"
+msgstr "请输入订阅配置名称"
+
+msgid "Proxy Mode switching failed!"
+msgstr "代理模式切换失败！"
+
+msgid "Request Timeout..."
+msgstr "请求超时……"
+
+msgid "Running Mode switching failed!"
+msgstr "运行模式切换失败！"
+
+msgid "Stream Unlock setting failed"
+msgstr "流媒体解锁设置失败"
+
+msgid "Submit"
+msgstr "提交"
+
+msgid "This section contains no values yet"
+msgstr "此部分暂时没有配置项"
+
+msgid "Upload failed"
+msgstr "上传失败"
+
+msgid "OFF"
+msgstr "关闭"
+
+msgid "Long-term"
+msgstr "长期有效"
+
+msgid "TUN Auto Detect Interface"
+msgstr "TUN 自动检测接口"
+
+msgid "TUN Strict Route"
+msgstr "TUN 严格路由"
+
+msgid "TUN Endpoint-Independent NAT"
+msgstr "TUN 端点独立 NAT"
+
+msgid "Local device only"
+msgstr "仅本机"
+
+msgid "All interfaces (advanced)"
+msgstr "所有接口（高级）"
+
+msgid "All LAN interfaces (advanced)"
+msgstr "所有 LAN 接口（高级）"
+
+msgid "Dnsmasq forwarding is the recommended dual-stack mode: firewall intercepts LAN DNS on port 53, dnsmasq then forwards it to Mihomo's local listener. Firewall-direct mode is advanced, skips dnsmasq-assisted mainland IP sets, and is unavailable with TUN or IPv6 DNS."
+msgstr "dnsmasq 转发是推荐的双栈模式：防火墙接管 LAN 的 53 端口 DNS 请求，再由 dnsmasq 转发到 Mihomo 本地监听器。防火墙直转属于高级模式，不使用 dnsmasq 辅助的大陆 IP 集合，并且不能与 TUN 或 IPv6 DNS 同时使用。"
+
+msgid "Firewall Redirect (Advanced: IPv4 non-TUN only)"
+msgstr "防火墙转发（高级：仅 IPv4 非 TUN）"
+
+msgid "Firewall-direct DNS is only available for an IPv4 non-TUN profile with a LAN-facing Mihomo DNS listener. Use Dnsmasq forwarding for the current profile."
+msgstr "防火墙直转 DNS 仅适用于 IPv4 非 TUN 且 Mihomo DNS 监听面向 LAN 的配置。当前配置请使用 dnsmasq 转发。"
+
+msgid "GEOIP Update"
+msgstr "更新 GeoIP"
+
+msgid "GEOIP Dat Update"
+msgstr "更新 GeoIP Dat"
+
+msgid "GEOSITE Update"
+msgstr "更新 GeoSite"
+
+msgid "ASN Update"
+msgstr "更新 GeoASN"
+
+msgid "Chnroute Lists Update"
+msgstr "更新中国路由列表"
+
+msgid "Keep the router as the LAN IPv6 gateway and DNS. OpenKill keeps dual-stack DNS and uses the selected IPv6 proxy mode; if IPv6 is unavailable, keep IPv6 DNS disabled to avoid AAAA first-connection delays."
+msgstr "保持路由器作为 LAN IPv6 网关和 DNS。OpenKill 会维持双栈 DNS 并使用所选的 IPv6 代理模式；如果 IPv6 不可用，请关闭 IPv6 DNS，避免 AAAA 记录造成首次连接延迟。"
+
+msgid "System"
+msgstr "系统"
+
+msgid "Always"
+msgstr "始终"
+
+msgid "strict"
+msgstr "严格"
+
+msgid "NameServer"
+msgstr "名称服务器"
+
+msgid "FallBack"
+msgstr "回落服务器"
+
+msgid "nameserver"
+msgstr "名称服务器"
+
+msgid "fallback"
+msgstr "回落服务器"
+
+msgid "Aead-method"
+msgstr "AEAD 加密方法"
+
+msgid "alpn"
+msgstr "ALPN"
+
+msgid "Alpn"
+msgstr "ALPN"
+
+msgid "AlterId"
+msgstr "Alter ID"
+
+msgid "auth_str"
+msgstr "认证字符串"
+
+msgid "Authenticated-Length"
+msgstr "认证长度"
+
+msgid "ca"
+msgstr "CA 证书"
+
+msgid "ca_str"
+msgstr "CA 证书内容"
+
+msgid "Congestion Controller"
+msgstr "拥塞控制器"
+
+msgid "Dialer-proxy"
+msgstr "拨号代理"
+
+msgid "Disable SNI"
+msgstr "禁用 SNI"
+
+msgid "disable_mtu_discovery"
+msgstr "禁用 MTU 探测"
+
+msgid "DNS"
+msgstr "DNS"
+
+msgid "DSCP"
+msgstr "DSCP"
+
+msgid "early-data-header-name"
+msgstr "Early Data 请求头名称"
+
+msgid "Enable"
+msgstr "启用"
+
+msgid "encryption"
+msgstr "加密方式"
+
+msgid "Fake-IP-Filter"
+msgstr "Fake-IP 过滤"
+
+msgid "Fake-IP-Filter-Mode"
+msgstr "Fake-IP 过滤模式"
+
+msgid "Fallback-Filter"
+msgstr "回落过滤"
+
+msgid "Fast Open"
+msgstr "快速打开"
+
+msgid "Fingerprint"
+msgstr "指纹"
+
+msgid "flow"
+msgstr "流控"
+
+msgid "Global-Padding"
+msgstr "全局填充"
+
+msgid "grpc-service-name"
+msgstr "gRPC 服务名称"
+
+msgid "Headers"
+msgstr "请求头"
+
+msgid "headers"
+msgstr "请求头"
+
+msgid "Health Check"
+msgstr "健康检查"
+
+msgid "Heartbeat Interval"
+msgstr "心跳间隔"
+
+msgid "host"
+msgstr "主机"
+
+msgid "host-key"
+msgstr "主机密钥"
+
+msgid "host-key-algorithms"
+msgstr "主机密钥算法"
+
+msgid "Hosts"
+msgstr "主机映射"
+
+msgid "Http-mask"
+msgstr "HTTP 伪装"
+
+msgid "Icon"
+msgstr "图标"
+
+msgid "idle-session-check-interval"
+msgstr "空闲会话检查间隔"
+
+msgid "idle-session-timeout"
+msgstr "空闲会话超时"
+
+msgid "initial_connection_receive_window"
+msgstr "初始连接接收窗口"
+
+msgid "initial_stream_receive_window"
+msgstr "初始流接收窗口"
+
+msgid "IP"
+msgstr "IP 地址"
+
+msgid "IP Version"
+msgstr "IP 版本"
+
+msgid "keep-alive"
+msgstr "Keep-Alive 保活"
+
+msgid "Key"
+msgstr "密钥"
+
+msgid "Max Open Streams"
+msgstr "最大并发流"
+
+msgid "Max UDP Relay Packet Size"
+msgstr "最大 UDP 中继包大小"
+
+msgid "Max-connections"
+msgstr "最大连接数"
+
+msgid "max-early-data"
+msgstr "最大 Early Data"
+
+msgid "Max-streams"
+msgstr "最大流数"
+
+msgid "max_connection_receive_window"
+msgstr "最大连接接收窗口"
+
+msgid "max_stream_receive_window"
+msgstr "最大流接收窗口"
+
+msgid "min-idle-session"
+msgstr "最小空闲会话数"
+
+msgid "Min-streams"
+msgstr "最小流数"
+
+msgid "MTU"
+msgstr "MTU"
+
+msgid "Multiplex"
+msgstr "多路复用"
+
+msgid "Multiplexing"
+msgstr "多路复用"
+
+msgid "mux"
+msgstr "多路复用"
+
+msgid "Nameserver-Policy"
+msgstr "DNS 服务器策略"
+
+msgid "Only-tcp"
+msgstr "仅 TCP"
+
+msgid "Packet-Addr"
+msgstr "数据包地址"
+
+msgid "Packet-Encoding"
+msgstr "数据包编码"
+
+msgid "Padding"
+msgstr "填充"
+
+msgid "Padding-max"
+msgstr "最大填充"
+
+msgid "Padding-min"
+msgstr "最小填充"
+
+msgid "Password (tuicV5 only)"
+msgstr "密码（仅 tuicV5）"
+
+msgid "path"
+msgstr "路径"
+
+msgid "Path"
+msgstr "路径"
+
+msgid "Preshared Key"
+msgstr "预共享密钥"
+
+msgid "Private Key"
+msgstr "私钥"
+
+msgid "private-key"
+msgstr "私钥"
+
+msgid "private-key-passphrase"
+msgstr "私钥口令"
+
+msgid "Proxy-Server-Nameserver-Policy"
+msgstr "代理服务器 DNS 策略"
+
+msgid "Psk"
+msgstr "PSK"
+
+msgid "public-key"
+msgstr "公钥"
+
+msgid "public-key(reality)"
+msgstr "公钥（Reality）"
+
+msgid "QUIC"
+msgstr "QUIC"
+
+msgid "recv_window"
+msgstr "接收窗口"
+
+msgid "recv_window_conn"
+msgstr "连接接收窗口"
+
+msgid "Reduce RTT"
+msgstr "降低 RTT"
+
+msgid "Remote DNS Resolve"
+msgstr "远程 DNS 解析"
+
+msgid "Request Timeout"
+msgstr "请求超时"
+
+msgid "restls-script"
+msgstr "reTLS 脚本"
+
+msgid "Server IP"
+msgstr "服务器 IP"
+
+msgid "servername"
+msgstr "服务名称"
+
+msgid "short-id(reality)"
+msgstr "Short ID（Reality）"
+
+msgid "sni"
+msgstr "SNI"
+
+msgid "Statistic"
+msgstr "统计"
+
+msgid "Table-type"
+msgstr "表格类型"
+
+msgid "TFO"
+msgstr "TCP 快速打开（TFO）"
+
+msgid "TLS"
+msgstr "TLS"
+
+msgid "Token (tuicV4 only)"
+msgstr "令牌（仅 tuicV4）"
+
+msgid "Transport"
+msgstr "传输方式"
+
+msgid "UDP Relay Mode"
+msgstr "UDP 中继模式"
+
+msgid "udp-over-tcp"
+msgstr "UDP over TCP"
+
+msgid "Username"
+msgstr "用户名"
+
+msgid "UUID"
+msgstr "UUID"
+
+msgid "UUID (tuicV5 only)"
+msgstr "UUID（仅 tuicV5）"
+
+msgid "Version"
+msgstr "版本"
+
+msgid "version-hint"
+msgstr "版本提示"
+
+msgid "ws-opts-headers"
+msgstr "WebSocket 请求头"
+
+msgid "ws-opts-path"
+msgstr "WebSocket 路径"
+
+msgid "xhttp-opts-host"
+msgstr "XHTTP 主机"
+
+msgid "xhttp-opts-path"
+msgstr "XHTTP 路径"
+
+msgid "ACCEPT"
+msgstr "接受"
+
+msgid "Alecthw-lite-github-Version"
+msgstr "Alecthw（GitHub 精简版）"
+
+msgid "Alecthw-lite-testingcf-Version"
+msgstr "Alecthw（TestingCF 精简版）"
+
+msgid "Alecthw-testingcf-Version"
+msgstr "Alecthw（TestingCF 完整版）"
+
+msgid "all"
+msgstr "全部"
+
+msgid "AnyTLS"
+msgstr "AnyTLS"
+
+msgid "Both"
+msgstr "两者"
+
+msgid "Clang-CN"
+msgstr "Clang-CN（中国 IPv4）"
+
+msgid "Clang-CN-CIDR"
+msgstr "Clang-CN（CIDR）"
+
+msgid "Clang-CN-IPV6"
+msgstr "Clang-CN（中国 IPv6）"
+
+msgid "config"
+msgstr "配置"
+
+msgid "default-nameserver"
+msgstr "默认名称服务器"
+
+msgid "Default-NameServer"
+msgstr "默认名称服务器"
+
+msgid "DIRECT"
+msgstr "直连"
+
+msgid "Disable"
+msgstr "停用"
+
+msgid "DROP"
+msgstr "丢弃"
+
+msgid "gVisor"
+msgstr "gVisor"
+
+msgid "grpc"
+msgstr "gRPC"
+
+msgid "h2"
+msgstr "HTTP/2"
+
+msgid "Hackl0us-CN-CIDR-fastly-jsdelivr"
+msgstr "Hackl0us 中国 CIDR（Fastly）"
+
+msgid "Hackl0us-CN-CIDR-testingcf-jsdelivr"
+msgstr "Hackl0us 中国 CIDR（TestingCF）"
+
+msgid "Hackl0us-testingcf-Version"
+msgstr "Hackl0us（TestingCF）"
+
+msgid "http"
+msgstr "HTTP"
+
+msgid "HTTP(S)"
+msgstr "HTTP(S)"
+
+msgid "HTTPS"
+msgstr "HTTPS"
+
+msgid "Hysteria"
+msgstr "Hysteria"
+
+msgid "Hysteria2"
+msgstr "Hysteria2"
+
+msgid "Loyalsoldier-fastly-jsdelivr-Version"
+msgstr "Loyalsoldier（Fastly）"
+
+msgid "Loyalsoldier-github-Version"
+msgstr "Loyalsoldier（GitHub）"
+
+msgid "Loyalsoldier-testingcf-jsdelivr-Version"
+msgstr "Loyalsoldier（TestingCF）"
+
+msgid "MASQUE"
+msgstr "MASQUE"
+
+msgid "Mieru"
+msgstr "Mieru"
+
+msgid "Mixed"
+msgstr "混合"
+
+msgid "RETURN"
+msgstr "返回"
+
+msgid "restls"
+msgstr "reTLS"
+
+msgid "shadow-tls"
+msgstr "ShadowTLS"
+
+msgid "ShadowQUIC"
+msgstr "ShadowQUIC"
+
+msgid "Shadowsocks"
+msgstr "Shadowsocks"
+
+msgid "ShadowsocksR"
+msgstr "ShadowsocksR"
+
+msgid "Snell"
+msgstr "Snell"
+
+msgid "Socks5"
+msgstr "Socks5"
+
+msgid "SSH"
+msgstr "SSH"
+
+msgid "Sudoku"
+msgstr "Sudoku"
+
+msgid "tcp"
+msgstr "TCP"
+
+msgid "TCP"
+msgstr "TCP"
+
+msgid "trojan"
+msgstr "Trojan"
+
+msgid "TrustTunnel"
+msgstr "TrustTunnel"
+
+msgid "Tuic"
+msgstr "TUIC"
+
+msgid "UDP"
+msgstr "UDP"
+
+msgid "Vless"
+msgstr "VLESS"
+
+msgid "Vmess"
+msgstr "VMess"
+
+msgid "websocket (ws)"
+msgstr "WebSocket（WS）"
+
+msgid "WireGuard"
+msgstr "WireGuard"
+
+msgid "xhttp"
+msgstr "XHTTP"
+
+msgid "xishang0128-fastly-jsdelivr-Version"
+msgstr "xishang0128（Fastly）"
+
+msgid "xishang0128-github-Version"
+msgstr "xishang0128（GitHub）"
+
+msgid "xishang0128-testingcf-jsdelivr-Version"
+msgstr "xishang0128（TestingCF）"
+
+msgid "5000 or 1234-2345"
+msgstr "例如 5000 或 1234-2345"
+
+msgid "Enable the explicit client-metadata field for this node. The global AnyTLS metadata switch must also be enabled."
+msgstr "启用此节点的 client-metadata 字段；同时必须启用全局 AnyTLS 元数据开关。"
+
+msgid "QUIC connection receive window"
+msgstr "QUIC 连接接收窗口"
+
+msgid "QUIC stream receive window"
+msgstr "QUIC 流接收窗口"
+
+msgid "Required"
+msgstr "必填"
+
+msgid "Host: v2ray.com"
+msgstr "主机：v2ray.com"
+
+msgid "User-Agent: okhttp/3.11.0 Dalvik/2.1.0 ...... "
+msgstr "用户代理：okhttp/3.11.0 Dalvik/2.1.0 ...... "
+
+msgid "obfs-str"
+msgstr "混淆字符串"
+
+msgid "base64"
+msgstr "Base64"
+
+msgid "your_ipv6"
+msgstr "你的 IPv6 地址"
+
+msgid "yourpassword"
+msgstr "你的密码"
+
+msgid "Amazon Prime Video"
+msgstr "亚马逊 Prime Video"
+
+msgid "Claude"
+msgstr "Claude（AI）"
+
+msgid "DAZN"
+msgstr "DAZN"
+
+msgid "Discovery Plus"
+msgstr "Discovery+"
+
+msgid "Exist"
+msgstr "存在"
+
+msgid "Fake-IP"
+msgstr "Fake-IP"
+
+msgid "Gemini"
+msgstr "Gemini（AI）"
+
+msgid "Go to relevant configuration page"
+msgstr "前往相关配置页面"
+
+msgid "HBO Max"
+msgstr "HBO Max"
+
+msgid "Invalid URL on line %d"
+msgstr "第 %d 行 URL 无效："
+
+msgid "OpenAI"
+msgstr "OpenAI（ChatGPT）"
+
+msgid "Paramount Plus"
+msgstr "Paramount+"
+
+msgid "Redir-Host"
+msgstr "Redir-Host"
+
+msgid "Sec-WebSocket-Protocol"
+msgstr "WebSocket 子协议"
+
+msgid "TUN"
+msgstr "TUN"
+
+msgid "TVB Anywhere+"
+msgstr "TVB Anywhere+"
+
+msgid "Yacd"
+msgstr "Yacd 控制面板"
+
+msgid "YouTube Premium"
+msgstr "YouTube Premium"
+
+msgid "[BASE64]"
+msgstr "[Base64]"
+
+msgid "auth"
+msgstr "认证"
+
+msgid "gaoyifan-github-Version"
+msgstr "gaoyifan（GitHub 版本）"
+
+msgid "yubiyubi"
+msgstr "yubiyubi"
+
+msgid "eg: \"rename=match@replace\" , \"rename=\\\\s+([2-9])[xX]@ (HIGH:$1)\""
+msgstr "例如：\"rename=match@replace\"，\"rename=\\\\s+([2-9])[xX]@ (HIGH:$1)\""

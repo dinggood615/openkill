@@ -331,7 +331,7 @@ html[data-darkmode="true"] #cbi-openkill.openkill-settings {
 }
 
 /* Settings toolbar: search stays lightweight and works with the native CBI
- * markup, while the five tabs act as the page's collapsible setting groups. */
+ * markup, while the six tabs act as the page's collapsible setting groups. */
 #cbi-openkill.openkill-settings .openkill-settings-toolbar {
     display: flex;
     align-items: center;
@@ -470,7 +470,7 @@ html[data-darkmode="true"] #cbi-openkill.openkill-settings {
     border-bottom: 0;
 }
 
-/* The five logical tabs are intentionally split into small cards.  Keeping
+/* The six logical tabs are intentionally split into small cards.  Keeping
  * the native CBI rows inside these cards preserves field names, dependencies
  * and form submission while making long pages scannable. */
 #cbi-openkill.openkill-settings .openkill-settings-card {
@@ -597,13 +597,49 @@ html[data-darkmode="true"] #cbi-openkill.openkill-settings {
 
 #cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value {
     display: grid;
-    grid-template-columns: minmax(190px, 31%) minmax(0, 1fr);
+    grid-template-columns: minmax(160px, 32%) minmax(0, 1fr);
     column-gap: 16px;
     align-items: start;
 }
 
 #cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-title,
 #cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-field {
+    min-width: 0;
+    width: auto;
+    max-width: 100%;
+    margin-left: 0;
+    float: none;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-title {
+    overflow-wrap: anywhere;
+    white-space: normal;
+}
+
+/* LuCI's legacy float/width rules can survive inside a CSS grid item.  Reset
+ * them only for ordinary OpenKill setting rows; TypedSection tables keep
+ * their native column model. */
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-field > input[type="text"],
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-field > input[type="number"],
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-field > input[type="password"],
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-field > input[type="url"],
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-field > input[type="search"],
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-field > input:not([type]),
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-field > select,
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-field > textarea,
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-field > .cbi-dropdown,
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-field > .cbi-input-dynlist {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-field > .cbi-button,
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-field > .cbi-button-group,
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-field input[type="checkbox"],
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value-field input[type="radio"] {
+    max-width: 100%;
     min-width: 0;
 }
 
@@ -673,8 +709,9 @@ html[data-darkmode="true"] #cbi-openkill.openkill-settings {
 }
 
 .oc.openkill-status-page {
+    --ok-layout-content-max: min(1920px, 100%);
     width: 100%;
-    max-width: 1280px;
+    max-width: var(--ok-layout-content-max);
     margin: 0 auto;
     padding: 0;
     border-radius: var(--radius-lg);
@@ -686,7 +723,7 @@ html[data-darkmode="true"] #cbi-openkill.openkill-settings {
     gap: var(--content-gap);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 900px) {
     #cbi-openkill.openkill-settings {
         max-width: 100%;
     }
@@ -8058,7 +8095,7 @@ html[data-darkmode=true] .oc #addCustomOption:hover {
     color: var(--ok-flat-text) !important;
 }
 
-/* Align the five grouped settings views with the same flat Argon language. */
+/* Align the six grouped settings views with the same flat Argon language. */
 #cbi-openkill.openkill-settings {
     --ok-surface: var(--ok-flat-surface);
     --ok-surface-muted: var(--ok-flat-surface-muted);
@@ -8383,3 +8420,1566 @@ html[data-darkmode="true"] .oc {
         padding-left: 10px;
     }
 }
+
+/* ===== OpenKill Design System V1: Start =====
+ * Additive token and component layer.
+ * Existing selectors, DOM hooks and LuCI field names remain unchanged. */
+:root {
+    --ok-color-primary: #3b82f6;
+    --ok-color-primary-hover: #2563eb;
+    --ok-color-primary-active: #1d4ed8;
+    --ok-color-success: #059669;
+    --ok-color-warning: #d97706;
+    --ok-color-danger: #dc2626;
+    --ok-color-info: #2563eb;
+
+    --ok-bg-page: #f8fafc;
+    --ok-bg-surface: #ffffff;
+    --ok-bg-surface-muted: #f1f5f9;
+    --ok-bg-surface-hover: #eef4ff;
+    --ok-bg-overlay: rgba(15, 23, 42, 0.42);
+
+    --ok-text-primary: #1f2937;
+    --ok-text-secondary: #64748b;
+    --ok-text-muted: #94a3b8;
+    --ok-text-on-primary: #ffffff;
+
+    --ok-border-subtle: #e2e8f0;
+    --ok-border-default: #cbd5e1;
+    --ok-border-strong: #94a3b8;
+    --ok-border-focus: #3b82f6;
+
+    --ok-space-1: 4px;
+    --ok-space-2: 8px;
+    --ok-space-3: 12px;
+    --ok-space-4: 16px;
+    --ok-space-5: 20px;
+    --ok-space-6: 24px;
+    --ok-space-8: 32px;
+
+    --ok-radius-sm: 4px;
+    --ok-radius-md: 6px;
+    --ok-radius-lg: 8px;
+    --ok-radius-pill: 999px;
+
+    --ok-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+    --ok-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    --ok-font-size-xs: 12px;
+    --ok-font-size-sm: 13px;
+    --ok-font-size-md: 14px;
+    --ok-font-size-lg: 16px;
+    --ok-font-weight-normal: 400;
+    --ok-font-weight-medium: 500;
+    --ok-font-weight-semibold: 600;
+
+    --ok-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06);
+    --ok-shadow-focus: 0 0 0 3px rgba(59, 130, 246, 0.18);
+
+    --ok-control-min-height: 34px;
+    --ok-control-padding-x: 10px;
+    --ok-control-padding-y: 6px;
+    /* Shared wide-screen content axis for status, IP checks and settings. */
+    --ok-layout-content-max: 1480px;
+    --ok-layout-page-padding: 12px;
+    --ok-layout-section-gap: 14px;
+    --ok-layout-card-gap: 12px;
+
+    --ok-status-success: var(--ok-color-success);
+    --ok-status-warning: var(--ok-color-warning);
+    --ok-status-error: var(--ok-color-danger);
+    --ok-status-info: var(--ok-color-info);
+    --ok-status-muted: var(--ok-text-muted);
+}
+
+/* The new tokens are authoritative; legacy names remain aliases for the
+ * existing OpenKill rules and are intentionally not removed in V1. */
+.oc,
+#cbi-openkill.openkill-settings {
+    --primary-color: var(--ok-color-primary);
+    --success-color: var(--ok-color-success);
+    --info-color: var(--ok-color-info);
+    --error-color: var(--ok-color-danger);
+    --border-light: var(--ok-border-subtle);
+    --border-color: var(--ok-border-default);
+    --text-primary: var(--ok-text-primary);
+    --text-secondary: var(--ok-text-secondary);
+    --text-on-primary: var(--ok-text-on-primary);
+    --bg-white: var(--ok-bg-surface);
+    --bg-light: var(--ok-bg-page);
+    --bg-gray: var(--ok-bg-surface-muted);
+    --radius-sm: var(--ok-radius-sm);
+    --radius-md: var(--ok-radius-md);
+    --radius-lg: var(--ok-radius-lg);
+    font-family: var(--ok-font-sans);
+}
+
+/* Keep the existing LuCI/Argon dark-mode contract.  Only scoped OpenKill
+ * surfaces receive these values; no global theme variables are overwritten. */
+html[data-darkmode="true"] .oc,
+html[data-darkmode="true"] #cbi-openkill.openkill-settings {
+    --ok-bg-page: #111827;
+    --ok-bg-surface: #1f2937;
+    --ok-bg-surface-muted: #273449;
+    --ok-bg-surface-hover: #334155;
+    --ok-text-primary: #f3f4f6;
+    --ok-text-secondary: #cbd5e1;
+    --ok-text-muted: #94a3b8;
+    --ok-border-subtle: #374151;
+    --ok-border-default: #4b5563;
+    --ok-border-strong: #64748b;
+    --ok-color-primary: #60a5fa;
+    --ok-color-primary-hover: #93c5fd;
+    --ok-color-primary-active: #bfdbfe;
+    --ok-color-success: #34d399;
+    --ok-color-warning: #fbbf24;
+    --ok-color-danger: #f87171;
+    --ok-color-info: #60a5fa;
+    --ok-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.24);
+    --ok-shadow-focus: 0 0 0 3px rgba(96, 165, 250, 0.24);
+}
+
+/* Shared surface primitives.  These rules only opt in existing OpenKill
+ * classes; no markup or component structure is introduced here. */
+.oc .main-card,
+.oc .sub-card,
+.oc .myip-main-card,
+.oc .provider-card,
+#cbi-openkill.openkill-settings .openkill-settings-card {
+    box-sizing: border-box;
+    border-radius: var(--ok-radius-lg);
+    border-color: var(--ok-border-subtle);
+    box-shadow: var(--ok-shadow-card);
+}
+
+.oc .cbi-button,
+.oc .btn,
+.oc .dashboard-btn,
+.oc .icon-btn,
+#cbi-openkill.openkill-settings .cbi-button {
+    box-sizing: border-box;
+    min-height: var(--ok-control-min-height);
+    border-radius: var(--ok-radius-md);
+    font-family: var(--ok-font-sans);
+    transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+.oc input[type="text"],
+.oc input[type="number"],
+.oc input[type="password"],
+.oc input[type="url"],
+.oc select,
+.oc textarea,
+#cbi-openkill.openkill-settings input[type="text"],
+#cbi-openkill.openkill-settings input[type="number"],
+#cbi-openkill.openkill-settings input[type="password"],
+#cbi-openkill.openkill-settings select,
+#cbi-openkill.openkill-settings textarea {
+    box-sizing: border-box;
+    min-height: var(--ok-control-min-height);
+    border-radius: var(--ok-radius-md);
+    border-color: var(--ok-border-default);
+    font-family: var(--ok-font-sans);
+}
+
+.oc input[type="text"]:focus,
+.oc input[type="number"]:focus,
+.oc input[type="password"]:focus,
+.oc input[type="url"]:focus,
+.oc select:focus,
+.oc textarea:focus,
+#cbi-openkill.openkill-settings input[type="text"]:focus,
+#cbi-openkill.openkill-settings input[type="number"]:focus,
+#cbi-openkill.openkill-settings input[type="password"]:focus,
+#cbi-openkill.openkill-settings select:focus,
+#cbi-openkill.openkill-settings textarea:focus {
+    border-color: var(--ok-border-focus);
+    box-shadow: var(--ok-shadow-focus);
+    outline: none;
+}
+
+.oc .badge,
+.oc .runtime-chip,
+.oc .status-badge,
+.oc .value-indicator {
+    border-radius: var(--ok-radius-pill);
+    font-size: var(--ok-font-size-xs);
+    font-weight: var(--ok-font-weight-medium);
+}
+
+.oc [disabled],
+.oc .disabled,
+.oc .is-disabled,
+#cbi-openkill.openkill-settings [disabled],
+#cbi-openkill.openkill-settings .disabled,
+#cbi-openkill.openkill-settings .is-disabled {
+    cursor: not-allowed;
+}
+
+.oc .is-loading,
+.oc [aria-busy="true"],
+#cbi-openkill.openkill-settings .is-loading,
+#cbi-openkill.openkill-settings [aria-busy="true"] {
+    cursor: progress;
+}
+
+/* ===== OpenKill Design System V1: End ===== */
+
+/* ===== OpenKill Stage 2: Navigation and Page Header Start =====
+ * Presentation-only layer. LuCI owns routing and active-tab state. */
+.oc .openkill-page-header,
+#cbi-openkill.openkill-settings .openkill-page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--ok-space-4);
+    box-sizing: border-box;
+    color: var(--ok-text-primary);
+}
+
+.oc .openkill-page-header-main,
+#cbi-openkill.openkill-settings .openkill-page-header-main {
+    min-width: 0;
+}
+
+.oc .openkill-page-title,
+#cbi-openkill.openkill-settings .openkill-page-title {
+    margin: 0;
+    color: var(--ok-text-primary);
+    font-family: var(--ok-font-sans);
+    font-size: 22px;
+    font-weight: var(--ok-font-weight-semibold);
+    line-height: 1.35;
+}
+
+.oc .openkill-page-description,
+#cbi-openkill.openkill-settings .openkill-page-description {
+    margin: var(--ok-space-2) 0 0;
+    color: var(--ok-text-secondary);
+    font-size: var(--ok-font-size-sm);
+    line-height: 1.6;
+}
+
+.oc .openkill-page-header-actions,
+#cbi-openkill.openkill-settings .openkill-page-header-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--ok-space-2);
+    flex: 0 0 auto;
+}
+
+#tool_label.openkill-toolbar-actions {
+    box-sizing: border-box;
+    color: var(--ok-text-secondary);
+}
+
+#tool_label.openkill-toolbar-actions .openkill-toolbar-inner {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--ok-space-2);
+    min-width: 0;
+}
+
+#maincontent ul.cbi-tabmenu a[href*="/admin/services/openkill/"],
+#maincontent ul.tabmenu a[href*="/admin/services/openkill/"],
+#maincontent .tabmenu-item a[href*="/admin/services/openkill/"] {
+    transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+#maincontent ul.cbi-tabmenu li.cbi-tab a[href*="/admin/services/openkill/"],
+#maincontent ul.tabmenu li.active a[href*="/admin/services/openkill/"],
+#maincontent .tabmenu-item.active a[href*="/admin/services/openkill/"] {
+    color: var(--ok-color-primary);
+    font-weight: var(--ok-font-weight-semibold);
+}
+
+#maincontent ul.cbi-tabmenu a[href*="/admin/services/openkill/"]:hover,
+#maincontent ul.tabmenu a[href*="/admin/services/openkill/"]:hover,
+#maincontent .tabmenu-item a[href*="/admin/services/openkill/"]:hover {
+    color: var(--ok-color-primary-hover);
+}
+
+/* Native CBI headings remain the source of truth on CBI pages; these rules
+ * only give them the same Header rhythm without creating a second heading. */
+#cbi-openkill > h2,
+#cbi-openkill > .cbi-map-descr,
+#cbi-openkill.openkill-settings > h2,
+#cbi-openkill.openkill-settings > .cbi-map-descr {
+    font-family: var(--ok-font-sans);
+}
+
+/* Hide only the direct native CBI map title/description.  These selectors
+ * stay inside the OpenKill map roots, so section, card, TypedSection and
+ * editor headings are unaffected.  A direct-child selector is used instead
+ * of :has() or data-page matching because those rules were discarded by the
+ * deployed stylesheet parser/minifier. */
+#cbi-openkill > h2,
+#cbi-openkill > .cbi-map-descr,
+#cbi-upload > h2,
+#cbi-upload > .cbi-map-descr {
+    display: none;
+}
+
+html[data-darkmode="true"] #cbi-openkill.openkill-settings select,
+html[data-darkmode="true"] #cbi-upload select,
+html[data-darkmode="true"] .openkill-toolbar-actions select {
+    background: var(--ok-bg-surface-muted);
+    border-color: var(--ok-border-default);
+    color: var(--ok-text-primary);
+}
+
+/* ===== OpenKill Stage 2: Navigation and Page Header End ===== */
+
+/* ===== OpenKill Stage 3: Runtime Dashboard Start =====
+ * Visual hierarchy only. Existing status DOM IDs, classes, event handlers,
+ * polling, WebSocket consumers and LuCI endpoints are intentionally kept. */
+.oc.openkill-status-page .dashboard-v1-layout {
+    align-items: start;
+}
+
+.oc.openkill-status-page .dashboard-v1-layout > .main-card {
+    display: grid;
+    gap: var(--ok-layout-card-gap, 12px);
+    min-width: 0;
+    min-height: 0;
+}
+
+.oc.openkill-status-page .dashboard-v1-layout .dashboard-core-section .sub-card {
+    border-color: var(--ok-color-primary);
+    background: var(--ok-bg-surface);
+    box-shadow: var(--ok-shadow-card);
+}
+
+.oc.openkill-status-page .dashboard-core-section .runtime-profile {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--ok-space-2);
+}
+
+.oc.openkill-status-page .dashboard-core-section .runtime-chip,
+.oc.openkill-status-page .dashboard-core-section .version-display {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.oc.openkill-status-page .dashboard-mode-section .sub-card,
+.oc.openkill-status-page .dashboard-config-section .sub-card {
+    background: var(--ok-bg-surface);
+}
+
+.oc.openkill-status-page .dashboard-mode-section .card-content,
+.oc.openkill-status-page .dashboard-config-section .config-file-content {
+    min-width: 0;
+}
+
+.oc.openkill-status-page .dashboard-settings-section .sub-card,
+.oc.openkill-status-page .dashboard-endpoints-section .sub-card {
+    background: var(--ok-bg-surface-muted);
+}
+
+.oc.openkill-status-page .dashboard-panels-section .dashboard-container,
+.oc.openkill-status-page .dashboard-actions-section .quick-actions-container {
+    background: var(--ok-bg-surface);
+}
+
+.oc.openkill-status-page .dashboard-actions-section .quick-actions-buttons,
+.oc.openkill-status-page .dashboard-panels-section .dashboard-buttons {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--ok-space-2);
+}
+
+/* Status-only panel alignment: the Metacubexd control is the sole action
+ * in its two-column panel, so span the available grid width without
+ * changing any other button group or action semantics. */
+.oc.openkill-status-page .dashboard-panels-section .dashboard-buttons #_webm {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: center;
+}
+
+/* Keep the connectivity block on the same surface hierarchy as Dashboard:
+ * transparent outer wrapper, tokenized panel surface and border. */
+#cbi-openkill > fieldset.cbi-section > table .oc .myip-main-card {
+    background: var(--ok-bg-surface);
+    border-color: var(--ok-border-subtle);
+    box-shadow: none;
+}
+
+.oc.openkill-status-page .myip-content-grid {
+    background: var(--ok-bg-surface);
+    border-color: var(--ok-border-default);
+    box-shadow: var(--ok-shadow-card);
+}
+
+.oc.openkill-status-page .dashboard-actions-section .dashboard-btn,
+.oc.openkill-status-page .dashboard-panels-section .dashboard-btn {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.oc.openkill-status-page .dashboard-metrics-section .stat-item {
+    min-height: 78px;
+    padding: var(--ok-space-3) var(--ok-space-2);
+    background: var(--ok-bg-surface);
+}
+
+.oc.openkill-status-page .dashboard-metrics-section .stat-label {
+    color: var(--ok-text-secondary);
+    font-size: var(--ok-font-size-xs);
+}
+
+.oc.openkill-status-page .dashboard-metrics-section .stat-value {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--ok-text-primary);
+    font-size: var(--ok-font-size-md);
+    font-weight: var(--ok-font-weight-semibold);
+}
+
+/* Keep status, compatibility, IPv6 and Watchdog as compact chips rather than
+ * creating additional cards for values that already come from status API. */
+.oc.openkill-status-page .runtime-chip-success {
+    color: var(--ok-status-success);
+    border-color: var(--ok-border-default);
+}
+
+.oc.openkill-status-page .runtime-chip-warning {
+    color: var(--ok-status-warning);
+    border-color: var(--ok-border-default);
+}
+
+@media (max-width: 640px) {
+    .oc.openkill-status-page .dashboard-core-section .core-main-controls {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .oc.openkill-status-page .dashboard-core-section .core-status-toggle,
+    .oc.openkill-status-page .dashboard-core-section .core-control-buttons {
+        width: 100%;
+    }
+
+    .oc.openkill-status-page .dashboard-actions-section .quick-actions-buttons,
+    .oc.openkill-status-page .dashboard-panels-section .dashboard-buttons {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== OpenKill Stage 3: Runtime Dashboard End ===== */
+
+/* ===== OpenKill Stage 4: Settings Cards Start =====
+ * Component visuals only.  CBI owns the inputs, names, ids, depends and
+ * validation; this layer never creates a second control instance. */
+#cbi-openkill.openkill-settings .openkill-settings-card-full-width {
+    border-color: var(--ok-border-default);
+    background: var(--ok-bg-surface);
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-full-width .cbi-value {
+    min-width: 0;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-full-width textarea,
+#cbi-openkill.openkill-settings .openkill-settings-card-full-width textarea.cbi-input-textarea {
+    width: 100%;
+    min-height: 150px;
+    box-sizing: border-box;
+    font-family: var(--ok-font-mono);
+    line-height: 1.5;
+    resize: vertical;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-validation-error {
+    border-color: var(--ok-status-error);
+    box-shadow: 0 0 0 1px var(--ok-status-error), var(--ok-shadow-card);
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-validation-error .openkill-settings-card-count {
+    color: var(--ok-status-error);
+}
+
+#cbi-openkill.openkill-settings .openkill-network-only-section {
+    box-sizing: border-box;
+    border: 1px solid var(--ok-border-subtle);
+    border-radius: var(--ok-radius-lg);
+    background: var(--ok-bg-surface);
+    box-shadow: var(--ok-shadow-card);
+}
+
+#cbi-openkill.openkill-settings .openkill-network-only-section .cbi-section-title,
+#cbi-openkill.openkill-settings .openkill-network-only-section .cbi-section-descr {
+    color: var(--ok-text-primary);
+}
+
+#cbi-openkill.openkill-settings .openkill-network-only-section .cbi-section-table {
+    min-width: 720px;
+}
+
+#cbi-openkill.openkill-settings .openkill-network-only-section .cbi-section-node {
+    overflow-x: auto;
+}
+
+@media (max-width: 640px) {
+    #cbi-openkill.openkill-settings .openkill-settings-card-full-width textarea,
+    #cbi-openkill.openkill-settings .openkill-settings-card-full-width textarea.cbi-input-textarea {
+        min-height: 120px;
+    }
+}
+
+/* ===== OpenKill Stage 4: Settings Cards End ===== */
+
+/* ===== OpenKill Stage 5: Overwrite Components Start =====
+ * Presentation-only layer for the native overwrite CBI page.
+ * Native tabs, field ids/names, TypedSections, editors and save handlers are
+ * intentionally untouched.  Do not move or clone controls from this layer. */
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill {
+    color: var(--ok-text-primary);
+}
+
+/* The overwrite CBI map does not opt into .oc or .openkill-settings.  Keep
+ * the shared tokens local to this page so native CBI/Argon pages are not
+ * affected while all Stage 5 components consume the same design tokens. */
+html[data-darkmode="true"] body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill,
+html[data-darkmode="true"] body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill,
+html[data-darkmode="true"] body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-dns_servers,
+html[data-darkmode="true"] body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-authentication {
+    --ok-bg-page: #111827;
+    --ok-bg-surface: #1f2937;
+    --ok-bg-surface-muted: #273449;
+    --ok-bg-surface-hover: #334155;
+    --ok-text-primary: #f3f4f6;
+    --ok-text-secondary: #cbd5e1;
+    --ok-text-muted: #94a3b8;
+    --ok-border-subtle: #374151;
+    --ok-border-default: #4b5563;
+    --ok-border-strong: #64748b;
+    --ok-color-primary: #60a5fa;
+    --ok-color-primary-hover: #93c5fd;
+    --ok-color-primary-active: #bfdbfe;
+    --ok-color-success: #34d399;
+    --ok-color-warning: #fbbf24;
+    --ok-color-danger: #f87171;
+    --ok-color-info: #60a5fa;
+    --ok-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.24);
+    --ok-shadow-focus: 0 0 0 3px rgba(96, 165, 250, 0.24);
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > ul.cbi-tabmenu {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ok-space-2, 8px);
+    margin: 0 0 var(--ok-space-4, 16px);
+    padding: var(--ok-space-2, 8px);
+    border: 1px solid var(--ok-border-subtle);
+    border-radius: var(--ok-radius-lg);
+    background: var(--ok-bg-surface-muted);
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > ul.cbi-tabmenu li {
+    margin: 0;
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > ul.cbi-tabmenu li a {
+    display: block;
+    min-height: var(--ok-control-min-height, 34px);
+    box-sizing: border-box;
+    padding: var(--ok-control-padding-y, 6px) var(--ok-space-4, 16px);
+    border: 1px solid transparent;
+    border-radius: var(--ok-radius-md);
+    color: var(--ok-text-secondary);
+    font-size: var(--ok-font-size-sm);
+    line-height: 1.5;
+    transition: color 120ms ease, background-color 120ms ease, border-color 120ms ease;
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > ul.cbi-tabmenu li.cbi-tab a,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > ul.cbi-tabmenu li.active a {
+    border-color: var(--ok-color-primary);
+    background: var(--ok-bg-surface);
+    color: var(--ok-color-primary);
+    font-weight: var(--ok-font-weight-semibold);
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > ul.cbi-tabmenu li a:hover,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > ul.cbi-tabmenu li a:focus-visible {
+    border-color: var(--ok-border-focus);
+    background: var(--ok-bg-surface-hover);
+    color: var(--ok-color-primary-hover);
+}
+
+/* Each native CBI section is a visual card; its original form rows remain
+ * untouched so depends(), validation and form submission continue to work. */
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill {
+    box-sizing: border-box;
+    margin: 0 0 var(--ok-space-4, 16px);
+    padding: var(--ok-space-4, 16px);
+    border: 1px solid var(--ok-border-subtle);
+    border-radius: var(--ok-radius-lg);
+    background: var(--ok-bg-surface);
+    box-shadow: var(--ok-shadow-card);
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > .cbi-section-node {
+    min-width: 0;
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > .cbi-section-node > .cbi-value,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > .cbi-section-node > .cbi-value-title,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > .cbi-section-node > .cbi-value-field {
+    min-width: 0;
+}
+
+/* Native value rows flow into two columns without changing their display
+ * mode, ids, names or CBI visibility rules. */
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > .cbi-section-node > .cbi-tabcontainer {
+    flex-flow: row wrap;
+    align-items: stretch;
+    gap: var(--ok-layout-card-gap, 12px);
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > .cbi-section-node > .cbi-tabcontainer > .cbi-value {
+    box-sizing: border-box;
+    flex: 1 1 calc(50% - var(--ok-layout-card-gap, 12px));
+    min-width: min(100%, 420px);
+    margin: 0;
+    padding: var(--ok-space-4, 16px);
+    border: 1px solid var(--ok-border-subtle);
+    border-radius: var(--ok-radius-lg);
+    background: var(--ok-bg-surface);
+    box-shadow: var(--ok-shadow-card);
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > .cbi-section-node > .cbi-tabcontainer > .cbi-value-title,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > .cbi-section-node > .cbi-tabcontainer > .cbi-value-field {
+    min-width: 0;
+}
+
+/* File-backed Value/tvalue fields and rule/script text areas stay full width. */
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > .cbi-section-node > .cbi-tabcontainer > #cbi-openkill-config-custom_fallback_fil,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > .cbi-section-node > .cbi-tabcontainer > #cbi-openkill-config-custom_fake_filter,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > .cbi-section-node > .cbi-tabcontainer > #cbi-openkill-config-custom_domain_dns_core,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > .cbi-section-node > .cbi-tabcontainer > #cbi-openkill-config-custom_proxy_server_dns_policy,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > .cbi-section-node > .cbi-tabcontainer > #cbi-openkill-config-custom_hosts,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > .cbi-section-node > .cbi-tabcontainer > #cbi-openkill-config-sniffer_custom,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > .cbi-section-node > .cbi-tabcontainer > #cbi-openkill-config-custom_rules,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > .cbi-section-node > .cbi-tabcontainer > #cbi-openkill-config-custom_rules_2 {
+    flex-basis: 100%;
+    min-width: 100%;
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill textarea,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill textarea.cbi-input-textarea,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill .cbi-value-field textarea {
+    width: 100%;
+    min-height: 150px;
+    box-sizing: border-box;
+    font-family: var(--ok-font-mono);
+    line-height: 1.5;
+    resize: vertical;
+}
+
+/* TypedSections are deliberately kept as tables.  These rules only provide
+ * a readable full-width surface and horizontal scrolling on narrow screens. */
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-dns_servers,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-authentication {
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0 0 var(--ok-space-4, 16px);
+    padding: var(--ok-space-4, 16px);
+    border: 1px solid var(--ok-border-subtle);
+    border-radius: var(--ok-radius-lg);
+    background: var(--ok-bg-surface);
+    box-shadow: var(--ok-shadow-card);
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-dns_servers .cbi-section-node,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-authentication .cbi-section-node {
+    overflow-x: auto;
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-dns_servers table,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-authentication table {
+    min-width: 720px;
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-authentication table {
+    min-width: 560px;
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-table-table {
+    box-sizing: border-box;
+    width: 100%;
+    margin-top: var(--ok-space-4, 16px);
+    padding: var(--ok-space-3, 12px);
+    border: 1px solid var(--ok-border-subtle);
+    border-radius: var(--ok-radius-lg);
+    background: var(--ok-bg-surface-muted);
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-table-table .cbi-button,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-table-table button {
+    min-height: var(--ok-control-min-height, 34px);
+    border-radius: var(--ok-radius-md);
+}
+
+/* The shared editor remains one instance.  This only gives it a consistent
+ * surface, spacing and readable monospace area. */
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill .config-editor-model,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill .config-editor-content,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill .config-editor-footer,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #overwrite-card-bar {
+    box-sizing: border-box;
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill .config-editor-content {
+    min-width: 0;
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill .config-editor-content .cm-editor,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill .config-editor-content textarea {
+    max-width: 100%;
+    font-family: var(--ok-font-mono);
+}
+
+html[data-darkmode="true"] body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill,
+html[data-darkmode="true"] body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-dns_servers,
+html[data-darkmode="true"] body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-authentication {
+    background: var(--ok-bg-surface);
+    border-color: var(--ok-border-subtle);
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill .cbi-value-title {
+    color: var(--ok-text-primary);
+    overflow-wrap: anywhere;
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill .cbi-value-description,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill .cbi-section-descr {
+    color: var(--ok-text-secondary);
+    overflow-wrap: anywhere;
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill .cbi-value-field {
+    color: var(--ok-text-primary);
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill .cbi-value-field input:not([type="checkbox"]):not([type="radio"]),
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill .cbi-value-field select,
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill .cbi-value-field textarea {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+    width: 100%;
+    color: var(--ok-text-primary);
+    background: var(--ok-bg-surface-muted);
+    border-color: var(--ok-border-default);
+}
+
+body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill a {
+    color: var(--ok-color-primary);
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+    body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > .cbi-section-node > .cbi-tabcontainer > .cbi-value {
+        flex-basis: 100%;
+        min-width: 100%;
+    }
+}
+
+@media (max-width: 640px) {
+    body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > ul.cbi-tabmenu {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: thin;
+    }
+
+    body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill > ul.cbi-tabmenu li {
+        flex: 0 0 auto;
+    }
+
+    body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-openkill,
+    body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-dns_servers,
+    body[data-page="admin-services-openkill-config-overwrite"] #cbi-openkill #cbi-openkill-authentication {
+        padding: var(--ok-space-3, 12px);
+    }
+}
+
+/* ===== OpenKill Stage 5: Overwrite Components End ===== */
+
+/* ===== OpenKill Stage 6: Subscription Presentation Start =====
+ * Presentation-only rules for the native config_subscribe TypedSection.
+ * The CBI row, input, name, id and update handler remain the sole source of
+ * truth.  No duplicate controls or alternate subscription data are created. */
+#cbi-openkill-config_subscribe,
+#cbi-openkill [id*="config_subscribe"] {
+    box-sizing: border-box;
+    min-width: 0;
+}
+
+#cbi-openkill-config_subscribe .cbi-section-node,
+#cbi-openkill [id*="config_subscribe"] .cbi-section-node {
+    min-width: 0;
+}
+
+#cbi-openkill-config_subscribe .cbi-section-table,
+#cbi-openkill [id*="config_subscribe"] .cbi-section-table {
+    width: 100%;
+    min-width: 0;
+    border-spacing: 0 var(--ok-space-2);
+    border-collapse: separate;
+}
+
+#cbi-openkill-config_subscribe .cbi-section-table th,
+#cbi-openkill-config_subscribe .cbi-section-table td,
+#cbi-openkill [id*="config_subscribe"] .cbi-section-table th,
+#cbi-openkill [id*="config_subscribe"] .cbi-section-table td {
+    box-sizing: border-box;
+    vertical-align: middle;
+}
+
+#cbi-openkill-config_subscribe .cbi-section-table tbody tr,
+#cbi-openkill [id*="config_subscribe"] .cbi-section-table tbody tr {
+    background: var(--ok-bg-surface);
+    box-shadow: var(--ok-shadow-card);
+}
+
+#cbi-openkill-config_subscribe .cbi-section-table tbody td:first-child,
+#cbi-openkill [id*="config_subscribe"] .cbi-section-table tbody td:first-child {
+    border-radius: var(--ok-radius-md) 0 0 var(--ok-radius-md);
+}
+
+#cbi-openkill-config_subscribe .cbi-section-table tbody td:last-child,
+#cbi-openkill [id*="config_subscribe"] .cbi-section-table tbody td:last-child {
+    border-radius: 0 var(--ok-radius-md) var(--ok-radius-md) 0;
+}
+
+#cbi-openkill-config_subscribe .cbi-section-table textarea.cbi-input-textarea,
+#cbi-openkill [id*="config_subscribe"] .cbi-section-table textarea.cbi-input-textarea {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: var(--ok-control-min-height);
+    max-height: var(--ok-control-min-height);
+    overflow: hidden;
+    resize: none;
+    color: transparent;
+    caret-color: transparent;
+    text-shadow: none;
+    background: var(--ok-bg-surface-muted);
+    border-color: var(--ok-border-subtle);
+}
+
+/* The native CBI value remains available to its existing edit/submit flow,
+ * but the list does not render a full token-bearing URL.  The replacement
+ * text is intentionally generic and contains no derived or sensitive data. */
+#cbi-openkill-config_subscribe .cbi-section-table .cbi-value-field:has(> textarea.cbi-input-textarea)::after,
+#cbi-openkill [id*="config_subscribe"] .cbi-section-table .cbi-value-field:has(> textarea.cbi-input-textarea)::after {
+    display: block;
+    margin-top: calc(var(--ok-space-1) * -1);
+    color: var(--ok-text-secondary);
+    content: "订阅地址已隐藏，进入编辑查看";
+    font-size: var(--ok-font-size-xs);
+    line-height: 1.3;
+    pointer-events: none;
+}
+
+#cbi-openkill-config_subscribe .openkill-subscription-update,
+#cbi-openkill [id*="config_subscribe"] .openkill-subscription-update {
+    min-width: 72px;
+    border-radius: var(--ok-radius-md);
+}
+
+#cbi-openkill-config_subscribe .openkill-subscription-update[disabled],
+#cbi-openkill [id*="config_subscribe"] .openkill-subscription-update[disabled] {
+    opacity: .72;
+}
+
+.oc .openkill-subscription-summary {
+    display: flex;
+    align-items: center;
+    gap: var(--ok-space-2);
+    min-width: 0;
+    width: 100%;
+}
+
+.oc .openkill-subscription-summary-text {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.oc .openkill-subscription-summary-action {
+    flex: 0 0 auto;
+    border-radius: var(--ok-radius-md);
+}
+
+html[data-darkmode="true"] #cbi-openkill-config_subscribe .cbi-section-table tbody tr,
+html[data-darkmode="true"] #cbi-openkill [id*="config_subscribe"] .cbi-section-table tbody tr {
+    background: var(--ok-bg-surface);
+}
+
+/* ===== OpenKill Stage 6: Subscription Presentation End ===== */
+
+/* ===== OpenKill Stage 7: Configuration Management Presentation Start =====
+ * Presentation-only rules.  The native CBI table, editor controls, file
+ * names, IDs, names and action handlers remain the sole source of truth. */
+#cbi-config_file_list {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    margin-top: var(--ok-layout-section-gap, 14px);
+    padding: var(--ok-space-4, 16px);
+    border: 1px solid var(--ok-border-subtle);
+    border-radius: var(--ok-radius-lg);
+    background: var(--ok-bg-surface);
+    box-shadow: var(--ok-shadow-card);
+}
+
+#cbi-config_file_list > h2,
+#cbi-config_file_list > .cbi-map-descr {
+    color: var(--ok-text-primary);
+    font-family: var(--ok-font-sans);
+}
+
+#cbi-config_file_list .cbi-section-table {
+    width: 100%;
+    min-width: 860px;
+    border-collapse: separate;
+    border-spacing: 0 var(--ok-space-2, 8px);
+    table-layout: auto;
+}
+
+#cbi-config_file_list .cbi-section-table th,
+#cbi-config_file_list .cbi-section-table td {
+    box-sizing: border-box;
+    min-width: 0;
+    padding: var(--ok-space-3, 12px) var(--ok-space-2, 8px);
+    vertical-align: middle;
+    overflow-wrap: anywhere;
+}
+
+#cbi-config_file_list .cbi-section-table thead th {
+    border-bottom: 1px solid var(--ok-border-subtle);
+    color: var(--ok-text-secondary);
+    font-size: var(--ok-font-size-xs);
+    font-weight: var(--ok-font-weight-semibold);
+    letter-spacing: .02em;
+    text-align: left;
+}
+
+#cbi-config_file_list .cbi-section-table tbody tr {
+    background: var(--ok-bg-surface-muted);
+    box-shadow: var(--ok-shadow-card);
+}
+
+#cbi-config_file_list .cbi-section-table tbody tr:hover {
+    background: var(--ok-bg-surface-hover);
+}
+
+#cbi-config_file_list .cbi-section-table tbody td:first-child {
+    border-radius: var(--ok-radius-md) 0 0 var(--ok-radius-md);
+}
+
+#cbi-config_file_list .cbi-section-table tbody td:last-child {
+    border-radius: 0 var(--ok-radius-md) var(--ok-radius-md) 0;
+}
+
+#cbi-config_file_list .cbi-section-table td .cbi-value-field,
+#cbi-config_file_list .cbi-section-table td .cbi-value-field > *,
+#cbi-config_file_list .cbi-section-table td .cbi-button,
+#cbi-config_file_list .cbi-section-table td select {
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+#cbi-config_file_list .cbi-section-table td:first-child .oc {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 2px 8px;
+    border: 1px solid var(--ok-border-subtle);
+    border-radius: var(--ok-radius-pill);
+    background: var(--ok-bg-surface);
+    font-size: var(--ok-font-size-xs);
+}
+
+#cbi-config_file_list .cbi-section-table td:nth-child(2) {
+    min-width: 150px;
+    color: var(--ok-text-primary);
+    font-family: var(--ok-font-mono);
+    font-weight: var(--ok-font-weight-medium);
+}
+
+#cbi-config_file_list .cbi-section-table td:nth-child(3) {
+    min-width: 180px;
+    color: var(--ok-text-secondary);
+    font-size: var(--ok-font-size-xs);
+}
+
+#cbi-config_file_list .cbi-section-table td:nth-child(n+6) {
+    white-space: nowrap;
+}
+
+#cbi-config_file_list .cbi-section-table td:nth-child(n+6) .cbi-button,
+#cbi-config_file_list .cbi-section-table td:nth-child(n+6) select {
+    min-height: var(--ok-control-min-height, 34px);
+    border-radius: var(--ok-radius-md);
+}
+
+#cbi-config_file_list .cbi-section-table td:nth-child(6) .cbi-button,
+#cbi-config_file_list .cbi-section-table td:nth-child(7) .cbi-button {
+    border-color: var(--ok-border-focus);
+}
+
+#cbi-config_file_list .cbi-section-table td:nth-child(10) .cbi-button,
+#cbi-config_file_list .cbi-section-table td .cbi-button-remove,
+#cbi-config_file_list .cbi-section-table td [class*="remove"] {
+    border-color: var(--ok-color-danger);
+    color: var(--ok-color-danger);
+}
+
+#cbi-config_file_list .cbi-section-table td:nth-child(10) .cbi-button:hover,
+#cbi-config_file_list .cbi-section-table td .cbi-button-remove:hover,
+#cbi-config_file_list .cbi-section-table td [class*="remove"]:hover {
+    background: rgba(220, 38, 38, 0.08);
+}
+
+/* The upload and backup toolbar stays separate from the file list. */
+.oc .openkill-config-tool-section {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--ok-space-3, 12px);
+    box-sizing: border-box;
+    padding: var(--ok-space-3, 12px);
+    border: 1px solid var(--ok-border-subtle);
+    border-radius: var(--ok-radius-lg);
+    background: var(--ok-bg-surface-muted);
+}
+
+.oc .openkill-config-tool-note {
+    margin-top: var(--ok-space-2, 8px);
+    color: var(--ok-text-secondary);
+    font-size: var(--ok-font-size-xs);
+}
+
+/* Existing full-screen editor: only surface and readable file identity are
+ * adjusted; ConfigEditor and CodeMirror initialization remain untouched. */
+.oc #config-editor-model,
+.oc #config-upload-model {
+    box-sizing: border-box;
+    max-width: min(1360px, 96vw);
+    border: 1px solid var(--ok-border-default);
+    border-radius: var(--ok-radius-lg);
+    box-shadow: var(--ok-shadow-card);
+}
+
+.oc #config-editor-model .config-editor-title,
+.oc #config-upload-model .config-upload-title {
+    min-width: 0;
+    color: var(--ok-text-primary);
+    font-family: var(--ok-font-sans);
+    font-weight: var(--ok-font-weight-semibold);
+}
+
+.oc #config-editor-model #config-file-name {
+    display: inline-block;
+    max-width: min(68vw, 760px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: bottom;
+    white-space: nowrap;
+}
+
+.oc #config-editor-model .config-editor-content,
+.oc #config-upload-model .config-upload-content {
+    min-width: 0;
+}
+
+.oc #config-editor-model .cm-editor,
+.oc #config-editor-model textarea,
+.oc #config-upload-model textarea {
+    max-width: 100%;
+}
+
+html[data-darkmode="true"] #cbi-config_file_list,
+html[data-darkmode="true"] #cbi-config_file_list .cbi-section-table tbody tr,
+html[data-darkmode="true"] .oc .openkill-config-tool-section {
+    background: var(--ok-bg-surface);
+    border-color: var(--ok-border-subtle);
+}
+
+/* ===== OpenKill Stage 7: Configuration Management Presentation End ===== */
+
+/* ===== OpenKill Stage 8: LogConsole Component Start =====
+ * Presentation-only layer. Existing log IDs, tab class values, editors,
+ * callbacks and transport lifecycles remain unchanged. */
+.oc.openkill-log-console {
+    box-sizing: border-box;
+    color: var(--ok-text-primary);
+    background: var(--ok-bg-surface);
+    border-color: var(--ok-border-subtle);
+    box-shadow: var(--ok-shadow-card);
+}
+
+.oc.openkill-log-console .openkill-log-source-tabs {
+    display: flex;
+    align-items: center;
+    gap: var(--ok-space-3);
+    padding: var(--ok-space-3) var(--ok-space-4);
+    background: var(--ok-bg-surface-muted);
+    border-bottom: 1px solid var(--ok-border-subtle);
+}
+
+.oc.openkill-log-console .openkill-log-tabs {
+    min-width: 0;
+}
+
+.oc.openkill-log-console .openkill-log-tabs li {
+    min-height: var(--ok-control-min-height);
+}
+
+.oc.openkill-log-console .openkill-log-tabs li a {
+    min-width: 0;
+}
+
+.oc.openkill-log-console .openkill-log-console-body {
+    min-width: 0;
+    padding: var(--ok-space-4);
+    background: var(--ok-bg-surface);
+}
+
+.oc.openkill-log-console .openkill-log-panel {
+    min-width: 0;
+}
+
+.oc.openkill-log-console .openkill-log-panel > .oc-input-textarea,
+.oc.openkill-log-console .openkill-log-panel > .cm-editor,
+.oc.openkill-log-console .openkill-log-panel .cm-editor {
+    display: block;
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: clamp(320px, 58vh, 720px);
+    max-height: 72vh;
+    border: 1px solid var(--ok-border-default);
+    border-radius: var(--ok-radius-md);
+    background: var(--ok-bg-page);
+    color: var(--ok-text-primary);
+    font-family: var(--ok-font-mono);
+    font-size: var(--ok-font-size-sm);
+    line-height: 1.55;
+}
+
+.oc.openkill-log-console .openkill-log-panel > textarea.oc-input-textarea {
+    overflow: auto;
+    padding: var(--ok-space-3);
+    resize: vertical;
+}
+
+.oc.openkill-log-console .openkill-log-level-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--ok-space-2);
+    margin-top: var(--ok-space-3);
+    padding: var(--ok-space-3);
+    border: 1px solid var(--ok-border-subtle);
+    border-radius: var(--ok-radius-md);
+    background: var(--ok-bg-surface-muted);
+}
+
+.oc.openkill-log-console .openkill-log-level-controls input[type="radio"] {
+    margin: 0;
+}
+
+.oc.openkill-log-console .openkill-log-level-controls label {
+    margin: 0;
+    color: var(--ok-text-secondary);
+    font-size: var(--ok-font-size-sm);
+    line-height: 1.4;
+}
+
+.oc.openkill-log-console .openkill-log-debug-preview {
+    min-width: 0;
+}
+
+.oc.openkill-log-console .openkill-log-debug-preview #debug-rendered {
+    box-sizing: border-box;
+    min-height: clamp(320px, 58vh, 720px);
+    max-height: 72vh;
+    overflow: auto;
+    background: var(--ok-bg-page);
+    border-color: var(--ok-border-default);
+    color: var(--ok-text-primary);
+    font-family: var(--ok-font-sans);
+}
+
+.oc.openkill-log-console .openkill-log-actions-shell {
+    box-sizing: border-box;
+    margin-top: var(--ok-space-4);
+}
+
+.oc.openkill-log-console + .openkill-log-actions-shell,
+.openkill-log-actions-shell {
+    color: var(--ok-text-primary);
+}
+
+.openkill-log-actions-shell .openkill-log-actions {
+    border-color: var(--ok-border-subtle);
+    background: var(--ok-bg-surface-muted);
+    box-shadow: var(--ok-shadow-card);
+}
+
+.openkill-log-actions-shell .openkill-log-action {
+    min-height: var(--ok-control-min-height);
+    border-color: var(--ok-color-primary);
+    background: var(--ok-color-primary);
+    color: var(--ok-text-on-primary);
+}
+
+.openkill-log-actions-shell .openkill-log-action:hover:not(:disabled) {
+    background: var(--ok-color-primary-hover);
+    border-color: var(--ok-color-primary-hover);
+}
+
+.openkill-log-actions-shell .openkill-log-action-danger {
+    border-color: var(--ok-color-danger);
+    background: var(--ok-color-danger);
+}
+
+.openkill-log-actions-shell .openkill-log-action-danger:hover:not(:disabled) {
+    filter: brightness(0.94);
+}
+
+.openkill-log-actions-shell .openkill-log-action-debug {
+    border-color: var(--ok-color-info);
+    background: var(--ok-color-info);
+}
+
+html[data-darkmode="true"] .oc.openkill-log-console,
+html[data-darkmode="true"] .openkill-log-actions-shell {
+    color: var(--ok-text-primary);
+}
+
+html[data-darkmode="true"] .oc.openkill-log-console .openkill-log-panel > .oc-input-textarea,
+html[data-darkmode="true"] .oc.openkill-log-console .openkill-log-panel > .cm-editor,
+html[data-darkmode="true"] .oc.openkill-log-console .openkill-log-panel .cm-editor,
+html[data-darkmode="true"] .oc.openkill-log-console .openkill-log-debug-preview #debug-rendered {
+    background: var(--ok-bg-page);
+    border-color: var(--ok-border-default);
+    color: var(--ok-text-primary);
+}
+
+/* ===== OpenKill Stage 8: LogConsole Component End ===== */
+
+/* ===== OpenKill Stage 9: Current Config and Switch Start =====
+ * Presentation-only layer. The existing ConfigFileManager, switchConfig(),
+ * toolbar switch_config(), DOM ids and request parameters remain unchanged. */
+.oc.openkill-status-page .current-config-card {
+    min-width: 0;
+}
+
+.oc.openkill-status-page .config-section-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--ok-space-3);
+    min-width: 0;
+}
+
+.oc.openkill-status-page .config-source-badge {
+    flex: 0 0 auto;
+    padding: 3px 8px;
+    border: 1px solid var(--ok-border-subtle);
+    border-radius: var(--ok-radius-pill);
+    color: var(--ok-text-secondary);
+    font-size: var(--ok-font-size-xs);
+    font-weight: var(--ok-font-weight-medium);
+    line-height: 1.3;
+}
+
+.oc.openkill-status-page .subscription-info-header {
+    min-width: 0;
+}
+
+.oc.openkill-status-page .config-file-name-wrapper {
+    min-width: 0;
+}
+
+.oc.openkill-status-page .config-file-name-label {
+    flex: 0 0 auto;
+    color: var(--ok-text-secondary);
+    font-size: var(--ok-font-size-xs);
+    font-weight: var(--ok-font-weight-medium);
+    white-space: nowrap;
+}
+
+.oc.openkill-status-page .config-file-name {
+    min-width: 0;
+    max-width: min(52vw, 520px);
+}
+
+.oc.openkill-status-page .config-switch-note {
+    margin-top: var(--ok-space-2);
+    color: var(--ok-text-muted);
+    font-size: var(--ok-font-size-xs);
+    line-height: 1.5;
+}
+
+.oc.openkill-status-page .config-file-empty-state {
+    min-width: 0;
+    border: 1px dashed var(--ok-border-default);
+    border-radius: var(--ok-radius-md);
+    background: var(--ok-bg-surface-muted);
+}
+
+.oc.openkill-status-page .config-file-content.empty-state .config-switch-note {
+    display: none;
+}
+
+#tool_label.openkill-toolbar-actions .openkill-toolbar-label {
+    flex: 0 0 auto;
+    color: var(--ok-text-secondary);
+    font-size: var(--ok-font-size-sm);
+    font-weight: var(--ok-font-weight-medium);
+    white-space: nowrap;
+}
+
+#tool_label.openkill-toolbar-actions .openkill-toolbar-switch {
+    flex: 0 0 auto;
+    min-width: 68px;
+}
+
+/* Reserved state hook for a future safe invalid-reference marker. It is not
+ * enabled by CSS alone because the current JS does not expose that state. */
+.oc.openkill-status-page .config-reference-invalid {
+    display: none;
+    color: var(--ok-status-error);
+}
+
+.oc.openkill-status-page .config-reference-invalid.is-visible {
+    display: flex;
+}
+
+/* ===== OpenKill Stage 9: Current Config and Switch End ===== */
+
+/* ===== OpenKill Subscription Visual Closeout =====
+ * Presentation-only styling for the native subscription CBI page. */
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill-config-auto_update,
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill [id*="auto_update_mode"],
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill [id*="update_week_time"],
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill [id*="auto_update_time"],
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill [id*="update_interval"] {
+    box-sizing: border-box;
+    min-width: 0;
+    border: 1px solid var(--ok-border-subtle);
+    border-radius: var(--ok-radius-lg);
+    background: var(--ok-bg-surface);
+    box-shadow: var(--ok-shadow-card);
+}
+
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill-config-auto_update {
+    padding: var(--ok-space-4, 16px);
+    margin-bottom: var(--ok-layout-section-gap, 14px);
+}
+
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill-config-auto_update .cbi-value-title,
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill [id*="auto_update_mode"] .cbi-value-title,
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill [id*="update_week_time"] .cbi-value-title,
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill [id*="auto_update_time"] .cbi-value-title,
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill [id*="update_interval"] .cbi-value-title {
+    color: var(--ok-text-primary);
+}
+
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill-config_subscribe {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    padding: var(--ok-space-4, 16px);
+    border: 1px solid var(--ok-border-subtle);
+    border-radius: var(--ok-radius-lg);
+    background: var(--ok-bg-surface);
+    box-shadow: var(--ok-shadow-card);
+}
+
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill-config_subscribe > h2,
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill-config_subscribe > .cbi-section-descr {
+    color: var(--ok-text-primary);
+}
+
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill-config_subscribe .cbi-section-table thead th {
+    color: var(--ok-text-secondary);
+    background: var(--ok-bg-surface-muted);
+    border-color: var(--ok-border-subtle);
+}
+
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill-config_subscribe .cbi-section-table tbody tr:has(> td:only-child) {
+    min-height: 112px;
+    color: var(--ok-text-secondary);
+    text-align: center;
+}
+
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill-config_subscribe .cbi-section-table tbody tr:has(> td:only-child) td {
+    padding: var(--ok-space-6, 24px);
+    color: var(--ok-text-secondary);
+    text-align: center;
+}
+
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill-config_subscribe .cbi-button-add,
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill-config_subscribe .cbi-button-edit,
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill-config_subscribe .openkill-subscription-update {
+    border-radius: var(--ok-radius-md);
+}
+
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill-config_subscribe .cbi-button-remove,
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill-config_subscribe .cbi-button-delete {
+    color: var(--ok-color-danger);
+}
+
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill > #cbi-table-1,
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill #cbi-table-1 {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    margin-top: var(--ok-layout-section-gap, 14px);
+    padding: var(--ok-space-3, 12px) var(--ok-space-4, 16px);
+    border: 1px solid var(--ok-border-subtle);
+    border-radius: var(--ok-radius-lg);
+    background: var(--ok-bg-surface);
+    box-shadow: var(--ok-shadow-card);
+}
+
+body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill #cbi-table-1 .cbi-button {
+    border-radius: var(--ok-radius-md);
+}
+
+html[data-darkmode="true"] body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill-config-auto_update,
+html[data-darkmode="true"] body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill-config_subscribe,
+html[data-darkmode="true"] body[data-page="admin-services-openkill-config-subscribe"] #cbi-openkill #cbi-table-1 {
+    --ok-bg-page: #111827;
+    --ok-bg-surface: #1f2937;
+    --ok-bg-surface-muted: #273449;
+    --ok-bg-surface-hover: #334155;
+    --ok-text-primary: #f3f4f6;
+    --ok-text-secondary: #cbd5e1;
+    --ok-text-muted: #94a3b8;
+    --ok-border-subtle: #374151;
+    --ok-border-default: #4b5563;
+    --ok-color-primary: #60a5fa;
+    --ok-color-success: #34d399;
+    --ok-color-warning: #fbbf24;
+    --ok-color-danger: #f87171;
+    --ok-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.24);
+    background: var(--ok-bg-surface);
+    border-color: var(--ok-border-subtle);
+}
+
+/* ===== OpenKill Subscription Visual Closeout End ===== */
+
+/* ===== OpenKill Configuration Management Visual Closeout ===== */
+body[data-page="admin-services-openkill-config"] #cbi-upload,
+body[data-page="admin-services-openkill-config"] #cbi-config_file_list,
+body[data-page="admin-services-openkill-config"] #cbi-provider_file_manage,
+body[data-page="admin-services-openkill-config"] #cbi-openkill {
+    --ok-bg-page: #f8fafc;
+    --ok-bg-surface: #ffffff;
+    --ok-bg-surface-muted: #f1f5f9;
+    --ok-bg-surface-hover: #eef4ff;
+    --ok-text-primary: #1f2937;
+    --ok-text-secondary: #64748b;
+    --ok-text-muted: #94a3b8;
+    --ok-border-subtle: #e2e8f0;
+    --ok-border-default: #cbd5e1;
+    --ok-color-primary: #3b82f6;
+    --ok-color-danger: #dc2626;
+    --ok-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+html[data-darkmode="true"] body[data-page="admin-services-openkill-config"] #cbi-upload,
+html[data-darkmode="true"] body[data-page="admin-services-openkill-config"] #cbi-config_file_list,
+html[data-darkmode="true"] body[data-page="admin-services-openkill-config"] #cbi-provider_file_manage,
+html[data-darkmode="true"] body[data-page="admin-services-openkill-config"] #cbi-openkill {
+    --ok-bg-page: #111827;
+    --ok-bg-surface: #1f2937;
+    --ok-bg-surface-muted: #273449;
+    --ok-bg-surface-hover: #334155;
+    --ok-text-primary: #f3f4f6;
+    --ok-text-secondary: #cbd5e1;
+    --ok-text-muted: #94a3b8;
+    --ok-border-subtle: #374151;
+    --ok-border-default: #4b5563;
+    --ok-color-primary: #60a5fa;
+    --ok-color-danger: #f87171;
+    --ok-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.24);
+}
+
+body[data-page="admin-services-openkill-config"] #cbi-config_file_list,
+body[data-page="admin-services-openkill-config"] #cbi-provider_file_manage > .cbi-section,
+body[data-page="admin-services-openkill-config"] #cbi-openkill > .cbi-section-card,
+body[data-page="admin-services-openkill-config"] #cbi-upload > .cbi-section {
+    box-sizing: border-box;
+    border: 1px solid var(--ok-border-subtle);
+    border-radius: var(--ok-radius-lg);
+    background: var(--ok-bg-surface);
+    box-shadow: var(--ok-shadow-card);
+}
+
+body[data-page="admin-services-openkill-config"] #cbi-config_file_list,
+body[data-page="admin-services-openkill-config"] #cbi-provider_file_manage > .cbi-section,
+body[data-page="admin-services-openkill-config"] #cbi-openkill > .cbi-section-card {
+    color: var(--ok-text-primary);
+}
+
+body[data-page="admin-services-openkill-config"] #cbi-config_file_list > h2,
+body[data-page="admin-services-openkill-config"] #cbi-provider_file_manage > h2,
+body[data-page="admin-services-openkill-config"] #cbi-openkill > .cbi-section-card > h2 {
+    box-sizing: border-box;
+    margin: 0;
+    padding: var(--ok-space-3, 12px) var(--ok-space-4, 16px);
+    border-radius: var(--ok-radius-md);
+    color: var(--ok-text-primary);
+    background: var(--ok-bg-surface-muted);
+}
+
+body[data-page="admin-services-openkill-config"] #cbi-config_file_list .cbi-section-table thead th {
+    color: var(--ok-text-secondary);
+    background: var(--ok-bg-surface-muted);
+    border-color: var(--ok-border-subtle);
+}
+
+body[data-page="admin-services-openkill-config"] #cbi-config_file_list .cbi-section-table tbody tr {
+    background: var(--ok-bg-surface-muted);
+}
+
+body[data-page="admin-services-openkill-config"] #cbi-config_file_list .cbi-section-table tbody tr:has(> td:only-child) td {
+    padding: var(--ok-space-6, 24px);
+    color: var(--ok-text-secondary);
+    text-align: center;
+}
+
+body[data-page="admin-services-openkill-config"] #cbi-provider_file_manage > .cbi-section,
+body[data-page="admin-services-openkill-config"] #cbi-upload > .cbi-section {
+    color: var(--ok-text-primary);
+}
+
+body[data-page="admin-services-openkill-config"] #cbi-provider_file_manage .cbi-button,
+body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button,
+body[data-page="admin-services-openkill-config"] #cbi-openkill > .cbi-section-card .cbi-button {
+    border-radius: var(--ok-radius-md);
+}
+
+body[data-page="admin-services-openkill-config"] #cbi-provider_file_manage .cbi-button,
+body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
+    color: var(--ok-text-primary);
+}
+
+/* ===== OpenKill Configuration Management Visual Closeout End ===== */

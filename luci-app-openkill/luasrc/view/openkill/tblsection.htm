@@ -268,15 +268,15 @@ local sectiontype = "_"..self.config.."_"..string.match(self.sectiontype, "[%w_]
                 -%>
                         <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab" data-group="<%=tab.name%>"><a title="<%=tab.name%>"><%=tab.name%></a></li>
                     <%- elseif not cfg_name and tab.name == "all" then -%>
-                        <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab" data-group="<%=tab.name%>"><a title="All">ALL</a></li>
+                        <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab" data-group="<%=tab.name%>"><a title="<%:All%>"><%:All%></a></li>
                     <%- elseif tab.name == "all" then -%>
-                        <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab-disabled" data-group="<%=tab.name%>"><a title="All">ALL</a></li>
+                <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab-disabled" data-group="<%=tab.name%>"><a title="<%:All%>"><%:All%></a></li>
                     <%- else -%>
                         <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab-disabled" data-group="<%=tab.name%>"><a title="<%=tab.name%>"><%=tab.name%></a></li>
                     <%- end -%>
                 <%- end -%>
             <%- else -%>
-                <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab" data-group="all"><a title="All">ALL</a></li>
+                <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab" data-group="all"><a title="<%:All%>"><%:All%></a></li>
             <%- end -%>
         </ul>
     </div>
@@ -376,8 +376,8 @@ local sectiontype = "_"..self.config.."_"..string.match(self.sectiontype, "[%w_]
                             -%>
                             <%- if self.sortable then -%>
                                 <td class="tdcbi-section-table-cell">
-                                    <input class="cbi-button cbi-button-up" type="button" value="<%:∧%>"  onclick="return cbi_row_swap(this, true, 'cbi.sts.<%=self.config%>.<%=self.sectiontype%>')" alt="<%:Move up%>" title="<%:Move up%>" />
-                                    <input class="cbi-button cbi-button-down" type="button" value="<%:∨%>"  onclick="return cbi_row_swap(this, false, 'cbi.sts.<%=self.config%>.<%=self.sectiontype%>')" alt="<%:Move down%>" title="<%:Move down%>" />
+                                    <input class="cbi-button cbi-button-up" type="button" value="∧"  onclick="return cbi_row_swap(this, true, 'cbi.sts.<%=self.config%>.<%=self.sectiontype%>')" alt="<%:Move up%>" title="<%:Move up%>" />
+                                    <input class="cbi-button cbi-button-down" type="button" value="∨"  onclick="return cbi_row_swap(this, false, 'cbi.sts.<%=self.config%>.<%=self.sectiontype%>')" alt="<%:Move down%>" title="<%:Move down%>" />
                                 </td>
                             <%- end -%>
 

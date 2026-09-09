@@ -29,8 +29,8 @@ s.addremove = false
 ---- group
 o = s:option(ListValue, "group", translate("DNS Server Group"))
 o.description = font_red..bold_on..translate("NameServer Group Must Be Set")..bold_off..font_off
-o:value("nameserver", translate("NameServer "))
-o:value("fallback", translate("FallBack "))
+o:value("nameserver", translate("NameServer"))
+o:value("fallback", translate("FallBack"))
 o:value("default", translate("Default-NameServer"))
 o.default = "nameserver"
 o.rempty = false

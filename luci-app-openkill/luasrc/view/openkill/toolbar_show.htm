@@ -4,15 +4,15 @@
 %>
 <head>
 <script src="/luci-static/resources/openkill/js/common.js?v=<%=plugin_version%>"></script>
-<link rel="stylesheet" href="/luci-static/resources/openkill/css/oc.css?v=<%=plugin_version%>">
+<link rel="stylesheet" href="/luci-static/resources/openkill/css/oc.css?v=2026-1120">
 </head>
 
-<li id="tool_label" class="tool_label">
-	<span class="tool_label_span">
-	&nbsp;&nbsp;<%:Current Config%>:&nbsp;
+<li id="tool_label" class="tool_label openkill-toolbar-actions" data-openkill-toolbar="1">
+	<span class="tool_label_span openkill-toolbar-inner">
+	<span class="openkill-toolbar-label"><%:Current Config%></span>
 	<select class="tool_label_select" id="cfg_name">
 	</select>&nbsp;&nbsp;
-	<input type="button" class="btn cbi-button cbi-button-apply" value="<%:SwiTch%>" onclick="return switch_config(this)" />
+	<input type="button" class="btn cbi-button cbi-button-apply openkill-toolbar-switch" value="<%:SwiTch%>" aria-label="切换配置（将重新加载 OpenKill）" onclick="return switch_config(this)" />
 	&nbsp;
 	</span>
 </li>

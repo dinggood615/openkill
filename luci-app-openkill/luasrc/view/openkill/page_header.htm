@@ -1,0 +1,15 @@
+<%
+    local title = page_header_title or translate("OpenKill")
+    local description = page_header_description or ""
+    if self and self.title and self.title ~= "" then title = self.title end
+    if self and self.description and self.description ~= "" then description = self.description end
+%>
+<section class="openkill-page-header" aria-labelledby="openkill-page-title">
+    <div class="openkill-page-header-main">
+        <h1 id="openkill-page-title" class="openkill-page-title"><%=title%></h1>
+        <% if description ~= "" then %>
+        <p class="openkill-page-description"><%=description%></p>
+        <% end %>
+    </div>
+    <div class="openkill-page-header-actions" data-openkill-header-actions="1"></div>
+</section>

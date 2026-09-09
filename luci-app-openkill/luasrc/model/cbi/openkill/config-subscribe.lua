@@ -17,6 +17,13 @@ bold_off = [[</strong>]]
 
 m = Map("openkill", translate("Config Subscribe"))
 m.pageaction = false
+m.description = "管理配置订阅、自动更新和订阅信息。"
+page_header_title = translate("Config Subscribe")
+page_header_description = "管理配置订阅、自动更新和订阅信息。"
+local page_header = m:section(SimpleSection)
+page_header.template = "openkill/page_header"
+page_header.title = translate("Config Subscribe")
+page_header.description = "管理配置订阅、自动更新和订阅信息。"
 
 s = m:section(TypedSection, "openkill")
 s.anonymous = true

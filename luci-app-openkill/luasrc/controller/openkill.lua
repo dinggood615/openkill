@@ -44,8 +44,6 @@ function index()
 	entry({"admin", "services", "openkill", "switch_config"}, call("action_switch_config"))
 	entry({"admin", "services", "openkill", "toolbar_show"}, call("action_toolbar_show"))
 	entry({"admin", "services", "openkill", "toolbar_show_sys"}, call("action_toolbar_show_sys"))
-	entry({"admin", "services", "openkill", "diag_connection"}, call("action_diag_connection"))
-	entry({"admin", "services", "openkill", "diag_dns"}, call("action_diag_dns"))
 	entry({"admin", "services", "openkill", "gen_debug_logs"}, call("action_gen_debug_logs"))
 	entry({"admin", "services", "openkill", "get_debug_logs"}, call("action_get_debug_logs"))
 	entry({"admin", "services", "openkill", "log_level"}, call("action_log_level"))
@@ -60,8 +58,6 @@ function index()
 	entry({"admin", "services", "openkill", "get_run_mode"}, call("action_get_run_mode"))
 	entry({"admin", "services", "openkill", "create_file"}, call("create_file"))
 	entry({"admin", "services", "openkill", "rename_file"}, call("rename_file"))
-	entry({"admin", "services", "openkill", "manual_stream_unlock_test"}, call("manual_stream_unlock_test"))
-	entry({"admin", "services", "openkill", "all_proxies_stream_test"}, call("all_proxies_stream_test"))
 	entry({"admin", "services", "openkill", "set_subinfo_url"}, call("set_subinfo_url"))
 	entry({"admin", "services", "openkill", "check_core"}, call("action_check_core"))
 	entry({"admin", "services", "openkill", "core_download"}, call("core_download"))
@@ -1991,44 +1987,6 @@ function action_del_start_log()
 	fs.writefile("/tmp/openkill_start.log", "")
 end
 
-function action_diag_connection()
-	local addr = HTTP.formvalue("addr")
-	if addr and (datatype.hostname(addr) or datatype.ipaddr(addr)) then
-		local cmd = string.format("/usr/share/openkill/openkill_debug_getcon.lua %s", addr)
-		HTTP.prepare_content("text/plain")
-		local util = io.popen(cmd)
-		if util and util ~= "" then
-			while true do
-				local ln = util:read("*l")
-				if not ln then break end
-				write_padded(ln)
-			end
-			util:close()
-		end
-		return
-	end
-	HTTP.status(500, "Bad address")
-end
-
-function action_diag_dns()
-	local addr = HTTP.formvalue("addr")
-	if addr and datatype.hostname(addr)then
-		local cmd = string.format("/usr/share/openkill/openkill_debug_dns.lua %s", addr)
-		HTTP.prepare_content("text/plain")
-		local util = io.popen(cmd)
-		if util and util ~= "" then
-			while true do
-				local ln = util:read("*l")
-				if not ln then break end
-				write_padded(ln)
-			end
-			util:close()
-		end
-		return
-	end
-	HTTP.status(500, "Bad address")
-end
-
 function action_gen_debug_logs()
 	HTTP.prepare_content("text/plain; charset=utf-8")
 	local logfile = "/tmp/openkill_debug.log"
@@ -2263,50 +2221,6 @@ function rename_file()
 		HTTP.status(500, "Rename File Failed")
 	end
 	return
-end
-
-function manual_stream_unlock_test()
-	local type = HTTP.formvalue("type")
-	local cmd = string.format('/usr/share/openkill/openkill_streaming_unlock.lua "%s"', type)
-	HTTP.prepare_content("text/plain; charset=utf-8")
-	local util = io.popen(cmd)
-	if util and util ~= "" then
-		while true do
-			local ln = util:read("*l")
-			if not ln then break end
-			if ln ~= "" then
-				write_padded(trans_line(ln))
-			end
-			if not process_status("openkill_streaming_unlock.lua "..type) or not process_status("openkill_streaming_unlock.lua ") then
-				break
-			end
-		end
-		util:close()
-		return
-	end
-	HTTP.status(500, "Something Wrong While Testing...")
-end
-
-function all_proxies_stream_test()
-	local type = HTTP.formvalue("type")
-	local cmd = string.format('/usr/share/openkill/openkill_streaming_unlock.lua "%s" "%s"', type, "all")
-	HTTP.prepare_content("text/plain; charset=utf-8")
-	local util = io.popen(cmd)
-	if util and util ~= "" then
-		while true do
-			local ln = util:read("*l")
-			if not ln then break end
-			if ln ~= "" then
-				write_padded(trans_line(ln))
-			end
-			if not process_status("openkill_streaming_unlock.lua "..type) or not process_status("openkill_streaming_unlock.lua ") then
-				break
-			end
-		end
-		util:close()
-		return
-	end
-	HTTP.status(500, "Something Wrong While Testing...")
 end
 
 function action_announcement()

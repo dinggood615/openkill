@@ -5,7 +5,7 @@
 %>
 <script src="/luci-static/resources/openkill/js/common.js?v=<%=plugin_version%>"></script>
 <div class="oc">
-<div class="upload-bar">
+<div class="upload-bar openkill-config-tool-section">
 	<label for="file_type"><%:Upload File Type%>:</label>
 	<div class="form-select-wrapper oc-w-auto">
 		<select name="file_type" id="file_type" class="form-select">
@@ -31,7 +31,7 @@
 <%
 	local msg = self:cfgvalue(section) or ""
 %>
-<div class="upload-note" id="upload-note">
+<div class="upload-note openkill-config-tool-note" id="upload-note">
 	<div class="upload-note-default" id="upload-note-default"><%:Note: Please Upload File According To File Type, File Will Be Saved To The Prompt Path%></div>
 	<% if msg and msg ~= "" then %>
 	<div class="upload-result" id="upload-result"><%=pcdata(msg)%></div>

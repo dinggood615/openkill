@@ -1,18 +1,21 @@
 <%
     local fs = require "luci.openkill"
     local plugin_version = fs.oc_version()
+    page_header_title = translate("Running Status")
+    page_header_description = "查看 OpenKill 核心、网络和系统资源运行状态。"
 %>
 <html>
 <head>
 <script src="/luci-static/resources/openkill/js/common.js?v=<%=plugin_version%>"></script>
-<link rel="stylesheet" href="/luci-static/resources/openkill/css/oc.css?v=<%=plugin_version%>">
-<link rel="stylesheet" href="/luci-static/resources/openkill/css/flat.css?v=<%=plugin_version%>">
+<link rel="stylesheet" href="/luci-static/resources/openkill/css/oc.css?v=2026-1120">
+<link rel="stylesheet" href="/luci-static/resources/openkill/css/flat.css?v=2026-1120">
 </head>
 <div class="oc openkill-status-page" role="region" aria-label="<%:OpenKill runtime status%>">
-                <div class="main-cards-container">
-                    <div class="main-card">
+                <%+openkill/page_header%>
+<div class="main-cards-container dashboard-v1-layout">
+                    <div class="main-card dashboard-primary-column">
                         <!-- Row 1: Running Status -->
-                        <div class="card-row full-width core-status-row">
+                        <div class="card-row full-width core-status-row dashboard-core-section">
                             <div class="sub-card">
                                 <div class="card-title"><%:Running Status%></div>
                                 <div class="version-display-container">
@@ -72,14 +75,14 @@
                                     </button>
                                     <button type="button" class="icon-btn action-btn" id="logo_btn" title="Mihomo" onclick="return winOpen('https://www.github.com/metacubex/mihomo');">
                                         <img id="_logo" src="/luci-static/resources/openkill/img/logo.png?v=<%=plugin_version%>" loading="lazy" width="14px" height="14px" alt="OpenKill"/>
-                                        <span class="logo-text">Powered by <span class="mihomo-link">Mihomo</span></span>
+                                        <span class="logo-text">技术支持：<span class="mihomo-link">Mihomo</span></span>
                                     </button>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Row 2: Running Mode & Proxy Mode -->
-                        <div class="card-row dual-cards mode-row">
+                        <div class="card-row dual-cards mode-row dashboard-mode-section">
                             <div class="sub-card">
                                 <div class="card-title"><%:Running Mode%></div>
                                 <div class="card-content">
@@ -108,7 +111,7 @@
                         </div>
 
                         <!-- Row 3: Settings -->
-                        <div class="card-row stats-grid">
+                        <div class="card-row stats-grid dashboard-settings-section">
                             <div class="sub-card">
                                 <div class="card-title"><%:Area Bypass%><div class="help-link" title="<%:Bypass Specified Regions Network Flows, Improve Performance, If Inaccessibility on Bypass Gateway, Try to Enable Bypass Gateway Compatible Option%>"><svg width="12" height="12"><use href="#oc-icon-help"/></svg></div></div>
                                 <div class="card-content">
@@ -157,9 +160,12 @@
                         </div>
 
                         <!-- Row 4: Config File -->
-                        <div class="card-row full-width">
-                            <div class="sub-card">
-                                <div class="card-title"><%:Config File%></div>
+                        <div class="card-row full-width dashboard-config-section">
+                            <div class="sub-card current-config-card" data-openkill-config-summary="1">
+                                <div class="card-title config-section-title">
+                                    <span><%:Config File%></span>
+                                    <span class="config-source-badge">用户配置源</span>
+                                </div>
                                 <div class="config-file-content">
                                     <div id="subscription-info-display" class="subscription-info-container oc-hidden">
                                         <div class="subscription-nav-arrow left" id="subscription-prev-arrow" onclick="switchToPreviousConfig()" title="<%:Previous%>"></div>
@@ -167,6 +173,7 @@
                                         <div class="subscription-info-main">
                                             <div class="subscription-info-header">
                                                 <div class="config-file-name-wrapper">
+                                                    <span class="config-file-name-label">当前选择配置</span>
                                                     <div class="config-file-name" id="current-config-name"><%:No Config Selected%></div>
                                                     <span id="age-file-icon" class="age-file-icon oc-hidden"></span>
                                                 </div>
@@ -209,21 +216,22 @@
                                             <select id="config_file_select" class="config-select"><option value=""><%:Collecting data...%></option></select>
                                         </div>
                                         <div class="card-actions">
-                                            <button type="button" class="icon-btn action-btn" id="switch_config" title="<%:SwiTch%>" onclick="return switchConfig()"><svg width="14" height="14"><use href="#oc-icon-switch"/></svg></button>
+                                            <button type="button" class="icon-btn action-btn" id="switch_config" title="<%:SwiTch%>" aria-label="切换配置（将重新加载 OpenKill）" onclick="return switchConfig()"><svg width="14" height="14"><use href="#oc-icon-switch"/></svg></button>
                                             <button type="button" class="icon-btn action-btn" id="update_config" title="<%:Update%>" onclick="return updateConfig()"><svg width="14" height="14"><use href="#oc-icon-update"/></svg></button>
                                             <button type="button" class="icon-btn action-btn" id="edit_config" title="<%:Edit%>" onclick="return editConfig()"><svg width="14" height="14"><use href="#oc-icon-edit"/></svg></button>
                                             <button type="button" class="icon-btn action-btn" id="edit_subscribe" title="<%:Edit Subscription%>" onclick="return editSubscribe()"><svg width="14" height="14"><use href="#oc-icon-settings"/></svg></button>
                                             <button type="button" class="icon-btn action-btn" id="upload_config" title="<%:Add%>" onclick="return uploadConfig()"><svg width="14" height="14"><use href="#oc-icon-add"/></svg></button>
                                         </div>
                                     </div>
+                                    <div class="config-switch-note" role="note">切换后 OpenKill 将重新加载配置，运行中的连接可能短暂中断。</div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="main-card">
+                    <div class="main-card dashboard-secondary-column">
                         <!-- Row 1: Control Panel & Mix Proxy -->
-                        <div class="card-row dual-cards">
+                        <div class="card-row dual-cards dashboard-endpoints-section">
                             <div class="sub-card">
                                 <div class="card-title"><%:Control Panel%></div>
                                 <div class="card-content">
@@ -252,7 +260,7 @@
                         </div>
 
                         <!-- Row 2: Dashboards -->
-                        <div class="card-row full-width">
+                        <div class="card-row full-width dashboard-panels-section">
                             <div class="sub-card dashboard-container">
                                 <div class="card-title"><%:Control Panel%><div class="help-link" title="<%:If the control panel does not open properly, please try going to Plugin Settings - Dashboard Settings to reset the panel%>"><svg width="12" height="12"><use href="#oc-icon-help"/></svg></div></div>
                                 <div class="dashboard-buttons">
@@ -265,7 +273,7 @@
                         </div>
 
                         <!-- Row 3: Quick Actions -->
-                        <div class="card-row full-width">
+                        <div class="card-row full-width dashboard-actions-section">
                             <div class="sub-card quick-actions-container">
                                 <div class="card-title"><%:Quick Action%></div>
                                 <div class="quick-actions-buttons">
@@ -278,7 +286,7 @@
                         </div>
 
                         <!-- Row 4: Statistics -->
-                        <div class="card-row stats-grid">
+                        <div class="card-row stats-grid dashboard-metrics-section">
                             <div class="sub-card stat-item"><span class="stat-label"><%:Up%></span><span id="upload_" class="stat-value">0 KB/S</span></div>
                             <div class="sub-card stat-item"><span class="stat-label"><%:Down%></span><span id="download_" class="stat-value">0 KB/S</span></div>
                             <div class="sub-card stat-item"><span class="stat-label"><%:Up Total%></span><span id="uploadtotal_" class="stat-value">0 KB</span></div>

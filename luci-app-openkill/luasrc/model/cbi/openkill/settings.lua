@@ -28,7 +28,13 @@ if not op_mode then op_mode = "redir-host" end
 local lan_ip = fs.lanip() or "192.168.1.1"
 m = Map("openkill", translate("Plugin Settings"))
 m.pageaction = false
-m.description = nil
+m.description = "配置 OpenKill 的运行模式、网络分流、规则、性能和兼容选项。"
+page_header_title = translate("Plugin Settings")
+page_header_description = "配置 OpenKill 的运行模式、网络分流、规则、性能和兼容选项。"
+local page_header = m:section(SimpleSection)
+page_header.template = "openkill/page_header"
+page_header.title = translate("Plugin Settings")
+page_header.description = "配置 OpenKill 的运行模式、网络分流、规则、性能和兼容选项。"
 --[[ Legacy page description intentionally hidden.
 "<br/>"..translate("Note: It is not recommended to enable IPv6 and related services for routing. Most of the network connection problems reported so far are related to it")..
 "<br/>"..font_green..translate("Note: Turning on secure DNS in the browser will cause abnormal shunting, please be careful to turn it off")..font_off..
@@ -52,13 +58,11 @@ local tab_groups = {
 	dns = "network",
 	ipv6 = "network",
 	lan_ac = "network",
-	stream_enhance = "stability",
 	rules_update = "rules",
 	geo_update = "rules",
 	chnr_update = "rules",
 	auto_restart = "stability",
 	health = "stability",
-	debug = "stability",
 	mihomo_features = "advanced",
 	zerotier = "advanced",
 	-- The former developer/avatar page was removed. Custom firewall rules are
@@ -139,7 +143,7 @@ o:depends("en_mode", "redir-host-tun")
 o:depends("en_mode", "fake-ip-tun")
 o:depends("en_mode", "redir-host-mix")
 o:depends("en_mode", "fake-ip-mix")
-o:value("system", translate("System　"))
+o:value("system", translate("System"))
 o:value("gvisor", translate("gVisor"))
 o:value("mixed", translate("Mixed"))
 o.default = "mixed"
@@ -551,7 +555,7 @@ end
 
 ---- Traffic Control
 o = s:taboption("traffic_control", Flag, "router_self_proxy", font_red..bold_on..translate("Router-Self Proxy")..bold_off..font_off)
-o.description = translate("Only Supported for Rule Mode")..", "..font_red..bold_on..translate("ALL Functions In Stream Enhance Tag Will Not Work After Disable")..bold_off..font_off
+o.description = translate("Only Supported for Rule Mode")..", "..font_red..bold_on.."关闭后仅保留基础规则分流，不启用流媒体自动检测功能"..bold_off..font_off
 o.default = 1
 
 o = s:taboption("traffic_control", Flag, "disable_udp_quic", font_red..bold_on..translate("Disable QUIC")..bold_off..font_off)
@@ -640,6 +644,9 @@ function o.write(self, section, value)
 	return true
 end
 
+-- Stream unlock auto-selection and per-service test controls are retired from
+-- the UI. Keep legacy UCI fields readable for migration compatibility.
+--[[
 --Stream Enhance
 o = s:taboption("stream_enhance", Flag, "stream_auto_select", font_red..bold_on..translate("Auto Select Unlock Proxy")..bold_off..font_off)
 o.description = translate("Auto Select Proxy For Streaming Unlock, Support Netflix, Disney Plus, HBO And YouTube Premium, etc")
@@ -1065,6 +1072,7 @@ o.rawhtml = true
 o.template = "openkill/other_stream_option"
 o.value = "Gemini"
 o:depends("stream_auto_select_gemini", "1")
+]]
 
 ---- update Settings
 o = s:taboption("geo_update", Flag, "geo_auto_update", font_red..bold_on..translate("Auto Update GeoIP MMDB")..bold_off..font_off)
@@ -1517,7 +1525,7 @@ o:depends({ipv6_mode= "2", en_mode = "redir-host"})
 o:depends({ipv6_mode= "2", en_mode = "fake-ip"})
 o:depends({ipv6_mode= "3", en_mode = "redir-host"})
 o:depends({ipv6_mode= "3", en_mode = "fake-ip"})
-o:value("system", translate("System　"))
+o:value("system", translate("System"))
 o:value("gvisor", translate("gVisor"))
 o:value("mixed", translate("Mixed"))
 o.default = "mixed"
@@ -1529,7 +1537,7 @@ o:depends("ipv6_mode", "1")
 o.default = 1
 
 o = s:taboption("ipv6", Flag, "ipv6_dns", translate("IPv6 DNS Resolve"))
-o.description = translate("独立控制 AAAA 解析。开启后允许返回 IPv6 DNS 记录，但不会自动开启 IPv6 流量接管；IPv6 流量代理仍由上面的总开关控制。")
+o.description = "独立控制 AAAA 解析。开启后允许返回 IPv6 DNS 记录，但不会自动开启 IPv6 流量接管；IPv6 流量代理仍由上面的总开关控制。"
 o.default = 0
 
 o = s:taboption("ipv6", DummyValue, "native_ipv6_state", "原生 IPv6 链路状态")
@@ -1648,10 +1656,6 @@ function o.write(self, section, value)
 	end
 	return true
 end
-
----- debug
-o = s:taboption("debug", DummyValue, "", nil)
-o.template = "openkill/debug"
 
 local t = {
 	{Commit, Apply}

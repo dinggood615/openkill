@@ -2,16 +2,19 @@
     local fs = require "luci.openkill"
     local plugin_version = fs.oc_version()
 %>
-<link rel="stylesheet" href="/luci-static/resources/openkill/css/oc.css?v=<%=plugin_version%>">
-<link rel="stylesheet" href="/luci-static/resources/openkill/css/flat.css?v=<%=plugin_version%>">
+<link rel="stylesheet" href="/luci-static/resources/openkill/css/oc.css?v=2026-1120">
+<link rel="stylesheet" href="/luci-static/resources/openkill/css/flat.css?v=2026-1120">
 <script type="text/javascript">
 (function() {
     var SEARCH_HINT = '<%:Search settings by name or description%>';
     var NO_MATCH = '<%:No matching settings%>';
     var SHOW_ADVANCED = '<%:Show advanced settings%>';
     var HIDE_ADVANCED = '<%:Hide advanced settings%>';
-    var CARD_LAYOUTS = [
-        [
+    /* Stage 4 keeps category identity independent from tab order.  The
+     * labels are only used to resolve the native CBI tab to a stable key;
+     * field ownership below is always an explicit key list. */
+    var CARD_LAYOUTS = {
+        basic: [
             {id: 'runtime-core', title: '<%:Operation & Core%>', keys: [
                 'en_mode', 'enable_udp_proxy', 'stack_type',
                 'tun_auto_detect_interface', 'tun_strict_route',
@@ -19,24 +22,25 @@
             ]},
             {id: 'controller-dashboard', title: '<%:Controller & Dashboard%>', keys: [
                 'dashboard_bind_address', 'cn_port', 'dashboard_password',
-                'dashboard_forward_', 'yacd', 'metacubexd', 'zashboard'
-            ]},
-            {id: 'device-compatibility', title: '<%:Device Compatibility%>', keys: [
-                'bypass_gateway_compatible', 'disable_quic_go_gso', 'small_flash_memory'
+                'dashboard_forward_domain', 'dashboard_forward_port',
+                'dashboard_forward_ssl', 'Dashboard', 'Yacd', 'Metacubexd', 'Zashboard'
             ]}
         ],
-        [
-            {id: 'dns-local', title: '<%:DNS & Local Resolution%>', keys: [
+        network: [
+            {id: 'dns-local', title: '<%:DNS & Local Resolution%>', fullWidth: true, keys: [
                 'dns_listen_address', 'enable_redirect_dns', 'flush_dns_cache', 'dnsmasq_fix',
                 'enable_custom_domain_dns_server', 'custom_domain_dns_server', 'custom_domain_dns'
             ]},
             {id: 'ipv6-tun', title: '<%:IPv6 & TUN%>', keys: [
                 'ipv6_enable', 'ipv6_mode', 'stack_type_v6', 'enable_v6_udp_proxy',
-                'ipv6_dns', 'native_ipv6_', 'effective_ipv6_', 'fakeip_range6', 'local_network6_pass', 'chnroute6_pass',
+                'ipv6_dns', 'native_ipv6_state', 'effective_ipv6_mode', 'fakeip_range6',
+                'local_network6_pass', 'chnroute6_pass',
                 'china_ip6_route'
             ]},
             {id: 'lan-wan', title: '<%:LAN / WAN Access%>', keys: [
-                'lan_ac_', 'wan_ac_', 'lan_interface_name', 'intranet_allowed',
+                'lan_ac_mode', 'lan_ac_black_ips', 'lan_ac_black_macs',
+                'lan_ac_white_ips', 'lan_ac_white_macs', 'wan_ac_black_ips',
+                'wan_ac_black_ports', 'lan_interface_name', 'intranet_allowed',
                 'intranet_allowed_wan_name', 'local_network_pass'
             ]},
             {id: 'traffic-routing', title: '<%:Traffic Routing%>', keys: [
@@ -44,41 +48,78 @@
                 'common_ports', 'china_ip_route', 'chnroute_pass'
             ]}
         ],
-        [
-            {id: 'geo-databases', title: '<%:Geo Databases%>', keys: [
-                'geo_', 'geoip_', 'geosite_', 'geoasn_'
+        rules: [
+            {id: 'geo-databases', title: '<%:Geo Databases%>', fullWidth: true, keys: [
+                'geo_auto_update', 'geo_update_week_time', 'geo_update_day_time',
+                'geo_custom_url', 'GEOIP Update', '更新 GeoIP',
+                'geoip_auto_update', 'geoip_update_week_time', 'geoip_update_day_time',
+                'geoip_custom_url', 'GEOIP Dat Update', '更新 GeoIP Dat',
+                'geosite_auto_update', 'geosite_update_week_time', 'geosite_update_day_time',
+                'geosite_custom_url', 'GEOSITE Update', '更新 GeoSite',
+                'geoasn_auto_update', 'geoasn_update_week_time', 'geoasn_update_day_time',
+                'geoasn_custom_url', 'ASN Update', '更新 GeoASN'
             ]},
-            {id: 'china-routes', title: '<%:China Route Lists%>', keys: [
-                'chnr_', 'chnroute', 'china_ip'
+            {id: 'china-routes', title: '<%:China Route Lists%>', fullWidth: true, keys: [
+                'chnr_auto_update', 'chnr_update_week_time', 'chnr_update_day_time',
+                'chnr_custom_url', 'chnr6_custom_url', 'Chnroute Lists Update', '更新中国路由列表'
             ]}
         ],
-        [
-            {id: 'stream-selection', title: '<%:Stream Auto Selection%>', keys: [
-                'stream_', 'flush unlock'
-            ]},
-            {id: 'watchdog-restart', title: '<%:Watchdog & Auto Restart%>', keys: [
-                'auto_restart', 'watchdog_', 'health_'
-            ]},
-            {id: 'logs-diagnostics', title: '<%:Logs & Diagnostics%>', keys: [
-                'debug', 'log_', 'diagnostic'
+        stability: [
+            {id: 'watchdog-restart', title: '<%:Watchdog & Auto Restart%>', fullWidth: true, keys: [
+                'auto_restart', 'auto_restart_week_time', 'auto_restart_day_time',
+                'health_profile', 'watchdog_interval', 'watchdog_network_cycles',
+                'watchdog_history_cycles', 'watchdog_firewall_cycles',
+                'watchdog_upnp_cycles', 'watchdog_proxy_cycles'
             ]}
         ],
-        [
+        compatibility: [
             {id: 'vpn-policy', title: 'VPN 访问策略', keys: ['_compat_policy', '_compat_scope', 'compatibility_profile']},
-            {id: 'remote-service', title: '远程访问绕过', keys: ['remote_service_', 'wan_ac_', 'wan_interface_']},
+            {id: 'remote-service', title: '远程访问绕过', keys: [
+                'remote_service_bypass', 'remote_service_ports', 'wan_ac_black_ips',
+                'wan_ac_black_ports', 'wan_interface_mode', 'wan_interface_name'
+            ]},
+            {id: 'device-compatibility', title: '<%:Device Compatibility%>', keys: [
+                'disable_quic_go_gso', 'small_flash_memory'
+            ]},
             {id: 'gateway-compatibility', title: '旁路由兼容', keys: ['bypass_gateway_compatible']}
         ],
-        [
+        advanced: [
             {id: 'mihomo-capabilities', title: '<%:Mihomo Capabilities%>', keys: [
-                'capability_', 'feature_', 'refresh_capabilities'
+                'capability_summary', 'refresh_capabilities', 'feature_h2c',
+                'feature_shadowquic', 'feature_masque', 'feature_amnezia_wg',
+                'feature_anytls_metadata', 'feature_bbr3'
             ]},
             {id: 'zerotier', title: '<%:ZeroTier%>', keys: [
-                'zerotier_'
+                'zerotier_status', 'feature_zerotier', 'zerotier_network_id',
+                'zerotier_interface', 'zerotier_auto_start', 'zerotier_apply'
             ]},
             {id: 'maintenance-tools', title: '系统维护', keys: [
-                'version_', 'version', 'release_', 'check update', 'firewall_custom', 'core_version'
+                'version_update_panel', 'firewall_custom'
             ], advanced: true}
         ]
+    };
+
+    var TAB_CATEGORY_ALIASES = {
+        basic: /运行与服务|运行和服务|Operation\s*&\s*Services|Runtime\s*&\s*Services/i,
+        network: /网络与分流|Network\s*&\s*Routing/i,
+        rules: /规则与订阅|Rules\s*&\s*Subscriptions/i,
+        stability: /性能与稳定|Performance\s*&\s*Stability/i,
+        compatibility: /兼容设置|Compatibility/i,
+        advanced: /系统维护|System\s*Maintenance|Advanced/i
+    };
+
+    var FULL_WIDTH_KEYS = {
+        custom_domain_dns: true,
+        local_network_pass: true,
+        chnroute_pass: true,
+        local_network6_pass: true,
+        chnroute6_pass: true,
+        firewall_custom: true
+    };
+
+    var DEVICE_COMPATIBILITY_KEYS = [
+        'disable_quic_go_gso',
+        'small_flash_memory'
     ];
 
     function addClass(el, name, enabled) {
@@ -95,8 +136,13 @@
         var link = item && item.querySelector('a[href]');
         if (!link) return null;
         var href = link.getAttribute('href') || '';
-        if (href.charAt(0) !== '#') return null;
-        return document.getElementById(href.substring(1));
+        if (href.charAt(0) === '#' && href.length > 1) {
+            return document.getElementById(href.substring(1));
+        }
+        /* LuCI 25.x uses href="#" and keeps the actual tab target in a
+         * sibling container.openkill.config.<category> node. */
+        var category = tabCategory(item);
+        return category ? document.getElementById('container.openkill.config.' + category) : null;
     }
 
     function tabIsActive(item) {
@@ -116,12 +162,62 @@
         return text.toLowerCase();
     }
 
+    function addFieldKey(keys, value) {
+        value = String(value || '').trim();
+        if (!value) return;
+        keys[value] = true;
+        keys[value.toLowerCase()] = true;
+        var match = value.match(/(?:cbid\.openkill\.config\.|cbi-openkill-config-)(.+)$/i);
+        if (match && match[1]) {
+            keys[match[1]] = true;
+            keys[match[1].toLowerCase()] = true;
+        }
+        var last = value.match(/\.([^\.]+)$/);
+        if (last && last[1]) {
+            keys[last[1]] = true;
+            keys[last[1].toLowerCase()] = true;
+        }
+    }
+
+    function fieldKeys(field) {
+        var keys = {};
+        var controls = field.querySelectorAll('input, select, textarea, button');
+        for (var i = 0; i < controls.length; i++) {
+            addFieldKey(keys, controls[i].name);
+            addFieldKey(keys, controls[i].id);
+            addFieldKey(keys, controls[i].getAttribute('data-name'));
+        }
+        addFieldKey(keys, field.id);
+        addFieldKey(keys, field.getAttribute('data-name'));
+        addFieldKey(keys, field.getAttribute('data-option'));
+        return keys;
+    }
+
     function matchesKeys(field, keys) {
-        var text = fieldSearchText(field);
+        var available = fieldKeys(field);
         for (var i = 0; i < keys.length; i++) {
-            if (text.indexOf(String(keys[i]).toLowerCase()) !== -1) return true;
+            var key = String(keys[i]);
+            if (available[key] || available[key.toLowerCase()]) return true;
         }
         return false;
+    }
+
+    function hasFullWidthField(fields) {
+        return fields.some(function(field) {
+            var keys = fieldKeys(field);
+            for (var key in FULL_WIDTH_KEYS) {
+                if (FULL_WIDTH_KEYS[key] && (keys[key] || keys[key.toLowerCase()])) return true;
+            }
+            return false;
+        });
+    }
+
+    function tabCategory(item) {
+        var label = tabLabel(item);
+        for (var key in TAB_CATEGORY_ALIASES) {
+            if (TAB_CATEGORY_ALIASES[key].test(label)) return key;
+        }
+        return null;
     }
 
     function panelContent(panel) {
@@ -148,71 +244,15 @@
         toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
     }
 
-    var STREAM_GROUPS = [
-        {key: 'netflix', title: 'Netflix'},
-        {key: 'disney', title: 'Disney Plus'},
-        {key: 'ytb', title: 'YouTube Premium', aliases: ['ytb', 'youtube']},
-        {key: 'prime_video', title: 'Amazon Prime Video'},
-        {key: 'hbo_max', title: 'HBO Max'},
-        {key: 'tvb_anywhere', title: 'TVB Anywhere+'},
-        {key: 'dazn', title: 'DAZN'},
-        {key: 'paramount_plus', title: 'Paramount Plus'},
-        {key: 'discovery_plus', title: 'Discovery Plus'},
-        {key: 'bilibili', title: 'Bilibili'},
-        {key: 'google_not_cn', title: 'Google', aliases: ['google_not_cn', 'google']},
-        {key: 'openai', title: 'OpenAI'},
-        {key: 'claude', title: 'Claude'},
-        {key: 'gemini', title: 'Gemini'}
-    ];
-
-    function appendStreamFields(body, fields) {
-        var groups = {};
-        var general = [];
-        fields.forEach(function(field) {
-            var text = fieldSearchText(field);
-            var group = null;
-            for (var i = 0; i < STREAM_GROUPS.length; i++) {
-                var aliases = STREAM_GROUPS[i].aliases || [STREAM_GROUPS[i].key];
-                if (aliases.some(function(alias) { return text.indexOf(alias) !== -1; })) {
-                    group = STREAM_GROUPS[i];
-                    break;
-                }
-            }
-            if (!group) {
-                general.push(field);
-                return;
-            }
-            if (!groups[group.key]) groups[group.key] = {definition: group, fields: []};
-            groups[group.key].fields.push(field);
-        });
-        general.forEach(function(field) { body.appendChild(field); });
-        STREAM_GROUPS.forEach(function(group) {
-            var item = groups[group.key];
-            if (!item) return;
-            var section = document.createElement('section');
-            section.className = 'openkill-stream-group';
-            var heading = document.createElement('div');
-            heading.className = 'openkill-stream-group-title';
-            heading.textContent = item.definition.title;
-            var count = document.createElement('span');
-            count.className = 'openkill-stream-group-count';
-            count.textContent = String(item.fields.length);
-            heading.appendChild(count);
-            var content = document.createElement('div');
-            content.className = 'openkill-stream-group-body';
-            item.fields.forEach(function(field) { content.appendChild(field); });
-            section.appendChild(heading);
-            section.appendChild(content);
-            body.appendChild(section);
-        });
-    }
-
     function createCard(content, definition, fields, index, host) {
         if (!fields.length) return null;
         var card = document.createElement('section');
         card.className = 'openkill-settings-card';
         card.setAttribute('data-openkill-card', definition.id);
         if (definition.advanced) card.classList.add('openkill-settings-card-advanced');
+        if (definition.fullWidth || hasFullWidthField(fields)) {
+            card.classList.add('openkill-settings-card-full-width');
+        }
 
         var header = document.createElement('div');
         header.className = 'openkill-settings-card-header';
@@ -238,8 +278,7 @@
         var body = document.createElement('div');
         body.className = 'openkill-settings-card-body';
         body.id = 'openkill-settings-card-body-' + index;
-        if (definition.id === 'stream-selection') appendStreamFields(body, fields);
-        else fields.forEach(function(field) { body.appendChild(field); });
+        fields.forEach(function(field) { body.appendChild(field); });
         card.appendChild(header);
         card.appendChild(body);
         if (definition.id === 'maintenance-tools') card.classList.add('openkill-settings-card-version-update');
@@ -253,14 +292,96 @@
         return card;
     }
 
+    /* Move the original CBI rows once, before any category is cardified.  The
+     * controls remain single-instance and keep their original id/name, while
+     * the compatibility tab owns their presentation card. */
+    function moveExplicitFieldsToCategory(map, tabItems, targetCategory, keys) {
+        var targetPanel = null;
+        for (var i = 0; i < tabItems.length; i++) {
+            if (tabCategory(tabItems[i]) === targetCategory) {
+                targetPanel = tabPanel(tabItems[i]);
+                break;
+            }
+        }
+        if (!targetPanel) return;
+        var destination = panelContent(targetPanel);
+        if (!destination) return;
+        var fields = map.querySelectorAll('.cbi-value');
+        for (var j = 0; j < fields.length; j++) {
+            var field = fields[j];
+            if (field.closest('.openkill-settings-card')) continue;
+            if (!matchesKeys(field, keys)) continue;
+            field.classList.add('openkill-device-compatibility-field');
+            if (field.parentNode !== destination) destination.appendChild(field);
+        }
+    }
+
+    function validationSelector() {
+        return '.cbi-value-error, .cbi-error, .cbi-input-invalid, [aria-invalid="true"]';
+    }
+
+    function expandValidationErrors(root) {
+        if (!root) return;
+        var invalid = root.querySelectorAll(validationSelector());
+        for (var i = 0; i < invalid.length; i++) {
+            var card = invalid[i].closest('.openkill-settings-card');
+            if (card) {
+                card.classList.add('openkill-settings-card-validation-error');
+                setCardExpanded(card, true);
+            }
+        }
+    }
+
+    function isSourceTrafficSection(section) {
+        if (!section) return false;
+        var id = String(section.id || '').toLowerCase();
+        var sectionType = String(section.getAttribute('data-section-type') || '').toLowerCase();
+        if (id.indexOf('lan_ac_traffic') !== -1 || sectionType === 'lan_ac_traffic') return true;
+        var title = section.querySelector('.cbi-section-title, .cbi-section-descr, h3, legend');
+        var text = title ? (title.textContent || '') : '';
+        return /来源流量访问控制|lan traffic access list/i.test(text);
+    }
+
+    function keepSourceTrafficInNetwork(map, tabItems) {
+        var networkPanel = null;
+        for (var i = 0; i < tabItems.length; i++) {
+            if (/网络与分流|Network\s*&\s*Routing/i.test(tabLabel(tabItems[i]))) {
+                networkPanel = tabPanel(tabItems[i]);
+                break;
+            }
+        }
+        if (!networkPanel) return;
+
+        var sections = [];
+        var candidates = map.querySelectorAll('.cbi-section, [id*="lan_ac_traffic"]');
+        for (var j = 0; j < candidates.length; j++) {
+            if (isSourceTrafficSection(candidates[j]) && sections.indexOf(candidates[j]) === -1) {
+                sections.push(candidates[j]);
+            }
+        }
+        if (!sections.length) return;
+
+        var target = sections[0];
+        var destination = panelContent(networkPanel);
+        if (destination && target.parentNode !== destination) destination.appendChild(target);
+        target.classList.add('openkill-network-only-section');
+        target.hidden = false;
+        target.removeAttribute('aria-hidden');
+
+        for (var k = 1; k < sections.length; k++) {
+            sections[k].hidden = true;
+            sections[k].setAttribute('aria-hidden', 'true');
+        }
+    }
+
     function buildCards(tabItems, activeOnly) {
         /* The six logical tabs share one stable layout; version updates are
          * rendered as the first maintenance card instead of a top-level tab. */
-        var layoutIndex = 0;
         tabItems.forEach(function(item, tabIndex) {
             var panel = tabPanel(item);
             if (!panel) return;
-            var layout = CARD_LAYOUTS[layoutIndex++];
+            var category = tabCategory(item);
+            var layout = category ? CARD_LAYOUTS[category] : null;
             if (activeOnly && !tabIsActive(item)) return;
             if (!layout || panel.getAttribute('data-openkill-cards-ready') === '1') return;
             var content = panelContent(panel);
@@ -286,11 +407,12 @@
             });
             if (remaining.length) {
                 createCard(content, {
-                    id: 'other-' + tabIndex,
+                    id: 'other-' + (category || tabIndex),
                     title: '<%:Other Settings%>',
                     keys: []
                 }, remaining, tabIndex + '-other', stack);
             }
+            expandValidationErrors(panel);
         });
     }
 
@@ -301,11 +423,18 @@
         map.setAttribute('data-openkill-ui-ready', '1');
         map.classList.add('openkill-settings');
         document.body.classList.add('openkill-settings-page');
-        var tabs = map.querySelector('.cbi-section-tabbed');
+        /* LuCI 24/25 uses cbi-section-node-tabbed; keep the older class as
+         * a compatibility fallback for older Argon/LuCI installations. */
+        var tabs = map.querySelector('.cbi-section-tabbed, .cbi-section-node-tabbed');
         if (!tabs) return;
         tabs.classList.add('openkill-settings-tabs');
 
-        var menu = tabs.querySelector('ul.cbi-tabmenu') || tabs.querySelector('.cbi-tabmenu');
+        /* Newer LuCI renders the tab list beside the tabbed section node;
+         * older releases nest it below the wrapper.  Keep both layouts. */
+        var menu = tabs.querySelector('ul.cbi-tabmenu') ||
+            tabs.querySelector('.cbi-tabmenu') ||
+            map.querySelector('ul.cbi-tabmenu') ||
+            map.querySelector('.cbi-tabmenu');
         if (!menu) return;
 
         var toolbar = document.createElement('div');
@@ -353,12 +482,21 @@
                 tabItems.push(menu.children[i]);
             }
         }
+        moveExplicitFieldsToCategory(map, tabItems, 'compatibility', DEVICE_COMPATIBILITY_KEYS);
+        keepSourceTrafficInNetwork(map, tabItems);
         // Build only the visible category before the first paint.  The CBI
         // fields remain in their original panels until their tab is needed,
         // so a slow router does not synchronously rearrange every advanced
         // option on page load.
         buildCards(tabItems, true);
-        var deferCards = function() { buildCards(tabItems, false); };
+        var deferCards = function() {
+            buildCards(tabItems, false);
+            var deferredErrors = map.querySelectorAll(validationSelector());
+            if (deferredErrors.length && advancedItems.some(function(item) {
+                return item.querySelector(validationSelector());
+            })) setAdvancedVisible(true);
+            expandValidationErrors(map);
+        };
         if (typeof window.requestIdleCallback === 'function') {
             window.requestIdleCallback(deferCards, { timeout: 900 });
         } else {
@@ -470,6 +608,24 @@
         var savedAdvanced = false;
         try { savedAdvanced = localStorage.getItem('openkill.settings.advanced') === '1'; } catch (ignore) {}
         setAdvancedVisible(savedAdvanced || activeAdvanced);
+        if (map.querySelector(validationSelector())) {
+            if (advancedItems.some(function(item) { return item.querySelector(validationSelector()); })) {
+                setAdvancedVisible(true);
+            }
+            expandValidationErrors(map);
+        }
+
+        var form = map.closest('form');
+        if (form) {
+            form.addEventListener('invalid', function(event) {
+                var field = event.target && event.target.closest('.cbi-value');
+                var card = field && field.closest('.openkill-settings-card');
+                if (card) {
+                    card.classList.add('openkill-settings-card-validation-error');
+                    setCardExpanded(card, true);
+                }
+            }, true);
+        }
     }
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initOpenKillSettingsTheme);

@@ -21,7 +21,13 @@ if not op_mode then op_mode = "redir-host" end
 local lan_ip = fs.lanip()
 m = Map("openkill", translate("Overwrite Settings"))
 m.pageaction = false
-m.description = nil
+m.description = "管理 DNS、规则、脚本和其他配置覆写。"
+page_header_title = translate("Overwrite Settings")
+page_header_description = "管理 DNS、规则、脚本和其他配置覆写。"
+local page_header = m:section(SimpleSection)
+page_header.template = "openkill/page_header"
+page_header.title = translate("Overwrite Settings")
+page_header.description = "管理 DNS、规则、脚本和其他配置覆写。"
 
 s = m:section(TypedSection, "openkill")
 s.anonymous = true
@@ -320,9 +326,9 @@ o.default = "0"
 o = s:taboption("meta", ListValue, "find_process_mode", translate("Enable Process Rule"))
 o.description = translate("Whether to Enable Process Rules, Only Works on Routerself, If You Are Not Sure, Please Choose off Which Useful in Router Environment, Depend on kmod-inet-diag")
 o:value("0", translate("Disable"))
-o:value("off", translate("OFF　"))
-o:value("always", translate("Always　"))
-o:value("strict", translate("strict　"))
+o:value("off", translate("OFF"))
+o:value("always", translate("Always"))
+o:value("strict", translate("strict"))
 o.default = "0"
 
 o = s:taboption("meta", ListValue, "geodata_loader", translate("Geodata Loader Mode"))
@@ -449,8 +455,8 @@ end
 
 ---- group
 o = ds:option(ListValue, "group", translate("DNS Server Group"))
-o:value("nameserver", translate("nameserver "))
-o:value("fallback", translate("fallback "))
+o:value("nameserver", translate("nameserver"))
+o:value("fallback", translate("fallback"))
 o:value("default", translate("default-nameserver"))
 o.default = "nameserver"
 o.rempty = false
