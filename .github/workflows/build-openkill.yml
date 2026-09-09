@@ -113,6 +113,13 @@ jobs:
           cp -a "$GITHUB_WORKSPACE/luci-app-openkill" package/luci-app-openkill
 
           make defconfig
+          for symbol in CONFIG_ALL CONFIG_ALL_KMODS; do
+            if grep -q "^${symbol}=" .config; then
+              sed -i "s/^${symbol}=.*/# ${symbol} is not set/" .config
+            elif ! grep -q "^# ${symbol} is not set$" .config; then
+              printf '# %s is not set\n' "$symbol" >> .config
+            fi
+          done
           if grep -q '^CONFIG_ALL=y' .config || grep -q '^CONFIG_ALL_KMODS=y' .config; then
             echo 'Refusing a broad CONFIG_ALL/CONFIG_ALL_KMODS build.' >&2
             exit 1
