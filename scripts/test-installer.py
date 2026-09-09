@@ -11,6 +11,7 @@ SOURCE = (ROOT / "scripts/install-openkill.sh").read_text(encoding="utf-8")
 CORE_SOURCE = (ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_core.sh").read_text(encoding="utf-8")
 SETTINGS_SOURCE = (ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua").read_text(encoding="utf-8")
 SETTINGS_THEME = (ROOT / "luci-app-openkill/luasrc/view/openkill/settings_theme.htm").read_text(encoding="utf-8")
+VERSION_BUMP_CHECK = ROOT / "scripts/check-version-bump.sh"
 
 class InstallerTests(unittest.TestCase):
     def test_repository_is_reused_after_download_failure(self):
@@ -119,18 +120,62 @@ chosen=$(select_newest_manifest "$WORK_DIR/rows")
         self.assertIn("openkill-advanced-collapsed", SETTINGS_THEME)
         self.assertIn("openkill-settings-card", SETTINGS_THEME)
         self.assertIn("data-openkill-cards-ready", SETTINGS_THEME)
-        self.assertIn("var layoutIndex = 0", SETTINGS_THEME)
-        self.assertIn("native_ipv6_", SETTINGS_THEME)
+        self.assertIn("var CARD_LAYOUTS = {", SETTINGS_THEME)
+        self.assertIn("var TAB_CATEGORY_ALIASES = {", SETTINGS_THEME)
+        for category in ("basic", "network", "rules", "stability", "compatibility", "advanced"):
+            self.assertIn(f"{category}: [", SETTINGS_THEME)
+        self.assertIn("function buildCards(tabItems, activeOnly)", SETTINGS_THEME)
+        self.assertIn("var layout = category ? CARD_LAYOUTS[category] : null;", SETTINGS_THEME)
+        self.assertIn("panel.setAttribute('data-openkill-cards-ready', '1')", SETTINGS_THEME)
+        self.assertIn("id: 'ipv6-tun'", SETTINGS_THEME)
+        self.assertIn("'native_ipv6_state'", SETTINGS_THEME)
+        self.assertIn("id: 'maintenance-tools'", SETTINGS_THEME)
+        self.assertIn("'version_update_panel', 'firewall_custom'", SETTINGS_THEME)
+        self.assertIn("openkill-settings-card-version-update", SETTINGS_THEME)
 
-    def test_formats_publish_inside_their_own_job(self):
+    def test_release_pipeline_wires_outputs_and_checks_version_bump(self):
         data = yaml.safe_load((ROOT / ".github/workflows/compile_new_ipk.yml").read_text(encoding="utf-8"))
-        job = data["jobs"]["Compile"]
-        self.assertFalse(job["strategy"]["fail-fast"])
-        self.assertTrue(any(s.get("run") == "bash scripts/publish-package.sh" for s in job["steps"]))
+        version_job = data["jobs"]["Get-Version"]
+        matrix_job = data["jobs"]["Prepare-Matrix"]
+        compile_job = data["jobs"]["Compile"]
+        self.assertEqual(version_job["outputs"]["current_version"], "${{ steps.current_version.outputs.version }}")
+        new_version_step = next(step for step in version_job["steps"] if step.get("id") == "version")
+        self.assertIn("expected YYYY-NNNN", new_version_step["run"])
+        current_step = next(step for step in version_job["steps"] if step.get("id") == "current_version")
+        self.assertIn("Package channel version is missing even though IPK releases exist.", current_step["run"])
+        self.assertNotIn("|| true", current_step["run"])
+        bump_step = next(step for step in matrix_job["steps"] if step["name"] == "Require Source Version Bump")
+        self.assertEqual(bump_step["run"], 'sh scripts/check-version-bump.sh "$SOURCE_VERSION" "$RELEASED_VERSION"')
+        self.assertEqual(bump_step["env"]["SOURCE_VERSION"], "${{ needs.Get-Version.outputs.version }}")
+        self.assertEqual(bump_step["env"]["RELEASED_VERSION"], "${{ needs.Get-Version.outputs.current_version }}")
+        self.assertEqual(matrix_job["needs"], "Get-Version")
+        self.assertEqual(set(compile_job["needs"]), {"Get-Version", "Runtime-Tests", "Prepare-Matrix"})
+        self.assertNotIn("if", compile_job)
+        self.assertFalse(compile_job["strategy"]["fail-fast"])
+        self.assertTrue(any(step.get("run") == "bash scripts/publish-package.sh" for step in compile_job["steps"]))
         self.assertNotIn("Post-Process", data["jobs"])
 
+        for released, source, expected_returncode in (
+            ("2026-1119", "2026-1120", 0),
+            ("2026-1120", "2026-1120", 1),
+            ("2026-1120", "2026-1119", 1),
+            ("2026-9999", "2027-0001", 0),
+        ):
+            with self.subTest(released=released, source=source):
+                result = subprocess.run(
+                    [BASH, str(VERSION_BUMP_CHECK), source, released],
+                    text=True, capture_output=True, check=False,
+                )
+                self.assertEqual(result.returncode, expected_returncode, result.stderr)
+                expected_message = (
+                    f"Source version {source} is greater than released version {released}"
+                    if expected_returncode == 0 else
+                    f"Source version {source} must be greater than released version {released}"
+                )
+                self.assertIn(expected_message, result.stdout + result.stderr)
+
     def test_shell_syntax(self):
-        for name in ("install-openkill.sh", "publish-package.sh"):
+        for name in ("install-openkill.sh", "check-version-bump.sh", "publish-package.sh"):
             subprocess.run([BASH, "-n", str(ROOT / "scripts" / name)], check=True)
         subprocess.run([BASH, "-n", str(ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_core.sh")], check=True)
 

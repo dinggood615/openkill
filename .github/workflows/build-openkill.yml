@@ -1,10 +1,9 @@
 name: Build OpenKill 2026-1120 (OpenWrt SDK)
 
 on:
+  # This is an opt-in SDK audit build. The release workflow owns master pushes
+  # and already performs the package build required for publication.
   workflow_dispatch:
-  push:
-    branches:
-      - master
 
 permissions:
   contents: read

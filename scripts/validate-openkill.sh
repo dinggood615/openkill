@@ -16,6 +16,7 @@ for file in \
   luci-app-openkill/root/usr/share/openkill/openkill_health.sh \
   luci-app-openkill/Makefile \
   scripts/install-openkill.sh \
+  scripts/check-version-bump.sh \
   scripts/check-openkill-i18n.sh \
   luci-app-openkill/root/etc/init.d/openkill \
   luci-app-openkill/root/usr/share/openkill/openkill_core.sh \
@@ -47,6 +48,7 @@ for file in \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_recovery.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_health.sh" \
   "$ROOT_DIR/scripts/install-openkill.sh" \
+  "$ROOT_DIR/scripts/check-version-bump.sh" \
   "$ROOT_DIR/scripts/check-openkill-i18n.sh" \
   "$ROOT_DIR/luci-app-openkill/root/etc/init.d/openkill" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_core.sh" \
@@ -72,7 +74,10 @@ sh "$ROOT_DIR/scripts/check-openkill-i18n.sh" >/dev/null || fail 'Chinese UI cat
 pkg_version=$(sed -n 's/^PKG_VERSION:=//p' "$ROOT_DIR/luci-app-openkill/Makefile" | head -n 1)
 project_version=$(sed -n 's/^PROJECT_VERSION="\([^"]*\)"/\1/p' "$ROOT_DIR/scripts/install-openkill.sh" | head -n 1)
 readme_version=$(sed -n 's/^当前版本：`\([^`]*\)`.*/\1/p' "$ROOT_DIR/README.md" | head -n 1)
-case "$pkg_version" in 2026-[0-9][0-9][0-9][0-9]) ;; *) fail "invalid package version: $pkg_version" ;; esac
+case "$pkg_version" in
+  [0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]) ;;
+  *) fail "invalid package version (expected YYYY-NNNN): $pkg_version" ;;
+esac
 [ "$pkg_version" = "$project_version" ] || fail "installer/package version mismatch"
 [ "$pkg_version" = "$readme_version" ] || fail "README/package version mismatch"
 

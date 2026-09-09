@@ -1,6 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 : "${RELEASE_VERSION:?}" "${PACKAGE_FORMAT:?}" "${GITHUB_REPOSITORY:?}" "${GITHUB_SHA:?}"
+case "$RELEASE_VERSION" in
+  [0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]) ;;
+  *) echo "Invalid release version (expected YYYY-NNNN): $RELEASE_VERSION" >&2; exit 1 ;;
+esac
 case "$PACKAGE_FORMAT" in ipk|apk) ;; *) exit 1;; esac
 mapfile -t packages < <(find tmp/SDK/bin -type f -name "luci-app-openkill*.$PACKAGE_FORMAT")
 [ "${#packages[@]}" -eq 1 ] || { echo "Expected exactly one package"; exit 1; }
@@ -8,16 +12,43 @@ mapfile -t packages < <(find tmp/SDK/bin -type f -name "luci-app-openkill*.$PACK
 # OpenKill version unchanged in the release manifest.
 package_version="$RELEASE_VERSION"
 [ "$PACKAGE_FORMAT" = apk ] && package_version="${RELEASE_VERSION/-/.}"
-asset="luci-app-openkill_${package_version}_all.$PACKAGE_FORMAT"
+if [ "$PACKAGE_FORMAT" = apk ]; then
+  asset="luci-app-openkill-${package_version}.apk"
+else
+  asset="luci-app-openkill_${package_version}_all.ipk"
+fi
+package_name=$(basename "${packages[0]}")
+[ "$package_name" = "$asset" ] || {
+  echo "Package filename mismatch: expected $asset, found $package_name" >&2
+  exit 1
+}
 stage=$(mktemp -d)
+release_error=$(mktemp)
+tag_error=$(mktemp)
+trap 'rm -rf "$stage" "$release_error" "$tag_error"' EXIT
 cp "${packages[0]}" "$stage/$asset"
 tag="v${RELEASE_VERSION}-$PACKAGE_FORMAT"
-if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" >/dev/null 2>"$release_error"; then
   # Published artifacts are immutable; a retry must reproduce the same bytes.
   gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "$asset" --dir "$stage/existing"
   cmp "$stage/$asset" "$stage/existing/$asset"
-else
+elif grep -Eq 'HTTP 404' "$release_error"; then
+  # A missing release is publishable only when its tag is also absent.  Any
+  # other API result is an indeterminate state and must not be treated as a
+  # first publication.
+  if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>"$tag_error"; then
+    echo "Tag $tag already exists without a release; refusing to attach a new asset blindly." >&2
+    exit 1
+  elif ! grep -Eq 'HTTP 404' "$tag_error"; then
+    cat "$tag_error" >&2
+    echo "Could not determine whether tag $tag exists." >&2
+    exit 1
+  fi
   gh release create "$tag" "$stage/$asset" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest=false --title "OpenKill $RELEASE_VERSION ($PACKAGE_FORMAT)" --notes "Source: $GITHUB_SHA. Independently verified $PACKAGE_FORMAT build."
+else
+  cat "$release_error" >&2
+  echo "Could not determine whether release $tag exists." >&2
+  exit 1
 fi
 gh release download "$tag" --repo "$GITHUB_REPOSITORY" --pattern "$asset" --dir "$stage/verify"
 cmp "$stage/$asset" "$stage/verify/$asset"

@@ -16,7 +16,7 @@ on:
         default: false
         type: boolean
       publish:
-        description: 'Publish the already verified package to GitHub Releases and package branch'
+        description: 'Publish the newly versioned package to GitHub Releases and package branch'
         required: false
         default: false
         type: boolean
@@ -51,8 +51,61 @@ jobs:
           [ -n "$version" ] || { echo 'PKG_VERSION is empty'; exit 1; }
           [ "$version" = "$project" ] || { echo "Version mismatch: Makefile=$version installer=$project"; exit 1; }
           [ "$version" = "$readme" ] || { echo "Version mismatch: Makefile=$version README=$readme"; exit 1; }
-          case "$version" in *[!0-9-]*) echo "Invalid version: $version"; exit 1;; esac
+          case "$version" in
+            [0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]) ;;
+            *) echo "Invalid version: $version (expected YYYY-NNNN)"; exit 1 ;;
+          esac
           echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Current Published Version
+        id: current_version
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -Eeuo pipefail
+          metadata_file=$(mktemp)
+          metadata_error_file=$(mktemp)
+          release_tags_file=$(mktemp)
+          release_error_file=$(mktemp)
+          trap 'rm -f "$metadata_file" "$metadata_error_file" "$release_tags_file" "$release_error_file"' EXIT
+
+          # The package channel is the installer's source of truth. A missing
+          # version is valid only before the first IPK release has been made.
+          if gh api "repos/$RELEASE_REPOSITORY/contents/master/version?ref=package" --jq '.content' > "$metadata_file" 2> "$metadata_error_file"; then
+            current_content=$(cat "$metadata_file")
+            [ -n "$current_content" ] || {
+              echo '::error::Published package channel version is empty.' >&2
+              exit 1
+            }
+            if ! decoded_content=$(printf '%s' "$current_content" | base64 --decode); then
+              echo '::error::Published package channel version is not valid base64.' >&2
+              exit 1
+            fi
+            current=$(printf '%s\n' "$decoded_content" | sed -n '1s/^v//p' | tr -d '[:space:]')
+            case "$current" in
+              [0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]) ;;
+              *) echo "::error::Published package channel version is invalid: $current" >&2; exit 1 ;;
+            esac
+          elif grep -q 'HTTP 404' "$metadata_error_file"; then
+            if ! gh api --paginate "repos/$RELEASE_REPOSITORY/releases?per_page=100" --jq '.[].tag_name' > "$release_tags_file" 2> "$release_error_file"; then
+              cat "$release_error_file" >&2
+              echo '::error::Could not determine whether this is the first IPK release.' >&2
+              exit 1
+            fi
+            if grep -Eq '^v[0-9]{4}-[0-9]{4}-ipk$' "$release_tags_file"; then
+              echo '::error::Package channel version is missing even though IPK releases exist.' >&2
+              exit 1
+            fi
+            current=0000-0000
+            echo 'No published IPK version was found; treating this as the first release.'
+          else
+            cat "$metadata_error_file" >&2
+            echo '::error::Could not read published package channel version.' >&2
+            exit 1
+          fi
+          echo "version=$current" >> "$GITHUB_OUTPUT"
 
   Prepare-Matrix:
     runs-on: ubuntu-latest
@@ -60,6 +113,18 @@ jobs:
     outputs:
       targets: ${{ steps.targets.outputs.targets }}
     steps:
+      - name: Checkout OpenKill Source
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Require Source Version Bump
+        shell: bash
+        env:
+          SOURCE_VERSION: ${{ needs.Get-Version.outputs.version }}
+          RELEASED_VERSION: ${{ needs.Get-Version.outputs.current_version }}
+        run: sh scripts/check-version-bump.sh "$SOURCE_VERSION" "$RELEASED_VERSION"
+
       - id: targets
         shell: bash
         run: |
@@ -71,36 +136,12 @@ jobs:
           fi
           echo "targets=$targets" >> "$GITHUB_OUTPUT"
 
-      - name: Current Version
-        id: current_version
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_REPOSITORY: ${{ github.repository }}
-        run: |
-          # Read only the version metadata, not the entire binary package branch.
-          current_content=$(gh api "repos/$RELEASE_REPOSITORY/contents/master/version?ref=package" --jq '.content' 2>/dev/null || true)
-          decoded_content=$(printf '%s' "$current_content" | base64 --decode 2>/dev/null || true)
-          current=$(printf '%s\n' "$decoded_content" | sed -n '1s/^v//p' | tr -d '[:space:]')
-          if ! [[ "$current" =~ ^2026-[0-9]+$ ]]; then
-            # The package channel may be intentionally empty before the first
-            # locally verified release. Treat it as version zero.
-            current=2026-0000
-          fi
-          echo "version=$current" >> $GITHUB_OUTPUT
-
-      - name: Require Version Bump
-        if: ${{ steps.version.outputs.version == steps.current_version.outputs.version && github.event_name != 'workflow_dispatch' }}
-        run: |
-          echo "::error::Source changes require a version bump. Update PKG_VERSION and PROJECT_VERSION before publishing."
-          exit 1
-
   Compile:
     runs-on: ubuntu-latest
     needs: [Get-Version, Runtime-Tests, Prepare-Matrix]
+    # Get-Version fails before this job when the source version is not newer.
     # Pushes build the lightweight IPK path only. APK is added to the matrix
     # by Prepare-Matrix only when explicitly requested by manual dispatch.
-    if: ${{ needs.Get-Version.outputs.version != needs.Get-Version.outputs.current_version || github.event_name == 'workflow_dispatch' }}
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -166,7 +207,7 @@ jobs:
           cp -rf ./luci-app-openkill/. tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/
           if [ "${{ matrix.target.name }}" = "apk" ]; then
             # apk accepts dotted numeric versions, not the project's date-counter separator.
-            sed -i 's/^PKG_VERSION:=2026-/PKG_VERSION:=2026./' tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/Makefile
+            sed -Ei 's/^(PKG_VERSION:=[0-9]{4})-/\1./' tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/Makefile
             find tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill -type f -name "Makefile" -exec sed -i 's/DEPENDS:=+dnsmasq-full/DEPENDS:=+dnsmasq-full +luci-compat/g' {} \;
           fi
 
@@ -300,7 +341,8 @@ jobs:
         # Every version bump from master is a release candidate that has passed
         # the compatibility matrix above.  Publish each format independently so
         # the installer never sees a newer source tree with a stale package
-        # manifest.  Manual dispatch remains available for republishing.
+        # manifest. Manual dispatch can publish a newly versioned build when
+        # the publish input is enabled.
         if: ${{ github.event_name == 'push' || inputs.publish == true }}
         env:
           GH_TOKEN: ${{ github.token }}

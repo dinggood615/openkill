@@ -5,6 +5,15 @@ on:
     - cron: "0 18 * * 3"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
+concurrency:
+  # This workflow force-pushes the package branch; never overlap it with a
+  # package publication or cancel an already running publication.
+  group: openkill-package-release
+  cancel-in-progress: false
+
 jobs:
   trim:
     runs-on: ubuntu-latest

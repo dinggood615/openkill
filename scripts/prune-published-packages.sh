@@ -29,7 +29,7 @@ if [ -d master ]; then
     base=$(basename "$file")
     keep=0
     case "$base" in
-      "luci-app-openkill_${RELEASE_VERSION}_all.ipk"|"luci-app-openkill_${RELEASE_VERSION/-/.}_all.apk") keep=1 ;;
+      "luci-app-openkill_${RELEASE_VERSION}_all.ipk"|"luci-app-openkill-${RELEASE_VERSION/-/.}.apk") keep=1 ;;
       latest-ipk.json|version) keep=1 ;;
       latest-apk.json)
         if jq -e --arg v "$RELEASE_VERSION" '.version == $v and .format == "apk"' "$file" >/dev/null 2>&1; then keep=1; fi

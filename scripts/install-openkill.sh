@@ -487,13 +487,17 @@ validate_manifest(){
     manifest_sha=$(jsonfilter -i "$manifest_path" -e '@.sha256' 2>/dev/null | sed -n '1p')
     manifest_name=$(jsonfilter -i "$manifest_path" -e '@.filename' 2>/dev/null | sed -n '1p')
     manifest_url=$(jsonfilter -i "$manifest_path" -e '@.url' 2>/dev/null | sed -n '1p')
-    case "$manifest_version" in 2026-[0-9]*) ;; *) return 1;; esac
+    case "$manifest_version" in [0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]) ;; *) return 1;; esac
     [ "$manifest_format" = "$EXT" ] || return 1
     [ "$manifest_arch" = all ] || return 1
     case "$manifest_sha" in [0-9a-f][0-9a-f]*) ;; *) return 1;; esac
     package_version="$manifest_version"
     [ "$EXT" = apk ] && package_version=$(printf '%s' "$manifest_version" | sed 's/-/./')
-    expected="luci-app-openkill_${package_version}_all.$EXT"
+    if [ "$EXT" = apk ]; then
+      expected="luci-app-openkill-${package_version}.apk"
+    else
+      expected="luci-app-openkill_${package_version}_all.ipk"
+    fi
     [ "$manifest_name" = "$expected" ] || return 1
     expected_url="https://github.com/$REPO/releases/download/v${manifest_version}-${EXT}/${expected}"
     [ "$manifest_url" = "$expected_url" ] || return 1
@@ -504,9 +508,9 @@ validate_manifest(){
     d=JSON.parse(File.read(ARGV[0]))
     version=d["version"].to_s
     abort unless d["format"]==ARGV[1] && d["architecture"]=="all"
-    abort unless version.match?(/\A2026-[0-9]+\z/) && d["sha256"].to_s.match?(/\A[0-9a-f]{64}\z/)
+    abort unless version.match?(/\A[0-9]{4}-[0-9]{4}\z/) && d["sha256"].to_s.match?(/\A[0-9a-f]{64}\z/)
     package_version = ARGV[1] == "apk" ? version.sub("-", ".") : version
-    expected="luci-app-openkill_#{package_version}_all.#{ARGV[1]}"
+    expected = ARGV[1] == "apk" ? "luci-app-openkill-#{package_version}.apk" : "luci-app-openkill_#{package_version}_all.ipk"
     abort unless d["filename"]==expected
     abort unless d["url"]=="https://github.com/"+ARGV[2]+"/releases/download/v"+version+"-"+ARGV[1]+"/"+expected
     puts [version,d["filename"],d["sha256"],d["url"]]
@@ -645,9 +649,10 @@ resolve_package(){
             rows=[]
             releases.each do |rel|
               tag=rel["tag_name"].to_s
-              m=tag.match(/\Av(2026-[0-9]+)-#{Regexp.escape(ext)}\z/)
+              m=tag.match(/\Av([0-9]{4}-[0-9]{4})-#{Regexp.escape(ext)}\z/)
               next unless m
-              asset=(rel["assets"]||[]).find{|a| a["name"].to_s.end_with?("."+ext) && a["name"].to_s.start_with?("luci-app-openkill_")}
+              prefix = ext == "apk" ? "luci-app-openkill-" : "luci-app-openkill_"
+              asset=(rel["assets"]||[]).find{|a| a["name"].to_s.end_with?("."+ext) && a["name"].to_s.start_with?(prefix)}
               next unless asset
               digest=asset["digest"].to_s.sub(/^sha256:/,"")
               next unless digest.match?(/\A[0-9a-f]{64}\z/)
