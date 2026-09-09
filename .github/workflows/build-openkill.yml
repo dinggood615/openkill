@@ -91,7 +91,9 @@ jobs:
             *) echo 'Unsupported SDK archive format.' >&2; exit 1 ;;
           esac
 
-          sdk_dir="$GITHUB_WORKSPACE/sdk-download/$(tar -tf "$sdk_archive" | awk -F/ 'NF { print $1; exit }')"
+          sdk_top="$(tar -tf "$sdk_archive" | sed -n '1s#/.*##p')"
+          test -n "$sdk_top"
+          sdk_dir="$GITHUB_WORKSPACE/sdk-download/$sdk_top"
           test -d "$sdk_dir"
           test -f "$sdk_dir/Makefile"
           test -d "$sdk_dir/scripts"
