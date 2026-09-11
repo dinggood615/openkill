@@ -204,7 +204,8 @@ class DualStackRoutingTests(unittest.TestCase):
         for forbidden in ('mapfile', 'sysctl -w', 'uci -q set',
                           'uci set', 'nft add', 'nft delete', 'nft flush',
                           'ip route add', 'ip route replace', 'ip route del',
-                          'ip -6 route add', 'ip -6 route replace', 'ip -6 route del'):
+                          'ip -6 route add', 'ip -6 route replace', 'ip -6 route del',
+                          "tr -cd '[:print:]'"):
             self.assertNotIn(forbidden, source)
 
     def test_dns_bootstrap_is_bound_to_physical_wan(self):

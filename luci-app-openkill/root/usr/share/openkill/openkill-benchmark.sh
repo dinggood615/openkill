@@ -95,7 +95,10 @@ run_bounded() {
 
 sanitize() {
     # Remove control characters and JSON delimiters from captured text.
-    printf '%s' "$1" | tr '\r\n\t' '   ' | tr -cd '[:print:]' | tr '"' "'" | tr '\\' '/'
+    # BusyBox tr does not implement the POSIX [:print:] class reliably and
+    # can delete ordinary ASCII characters.  sed handles the class correctly
+    # on the OpenWrt ash/BusyBox combinations we support.
+    printf '%s' "$1" | tr '\r\n\t' '   ' | sed 's/[^[:print:]]//g' | tr '"' "'" | tr '\\' '/'
 }
 
 json_value() {
