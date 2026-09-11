@@ -180,6 +180,12 @@ jobs:
             sed -i -E "/^${symbol}=.*$/d; /^# ${symbol} is not set$/d" .config
             printf '# %s is not set\n' "$symbol" >> .config
           done
+          # The project's published channel and version format are IPK based
+          # (2026-1120).  OpenWrt 25.12 defaults to APK, whose version parser
+          # rejects that historical format, so this smoke job explicitly
+          # selects the compatible IPK packager.
+          sed -i -E '/^CONFIG_USE_APK=.*$/d; /^# CONFIG_USE_APK is not set$/d' .config
+          printf '# CONFIG_USE_APK is not set\n' >> .config
           printf 'CONFIG_PACKAGE_luci-app-openkill=m\n' >> .config
           grep -Eq '^CONFIG_PACKAGE_luci-app-openkill=[my]$' .config
           {
@@ -192,6 +198,8 @@ jobs:
             grep -E '^CONFIG_(PACKAGE_(luci-app-openkill|firewall4|kmod-(nft|ipt)-|iptables|dnsmasq_full_|ipset|rust|llvm|clang|nft|openssl|gmp)|ALL|ALL_KMODS|ALL_NONSHARED|DEVEL|BUILDBOT)=' .config || true
             echo 'Final selected package symbols:'
             grep -E '^CONFIG_PACKAGE_(luci-app-openkill|firewall4|kmod-(nft|ipt)-|iptables|dnsmasq_full_|ipset|rust|llvm|clang|nft|openssl|gmp)=[my]$' .config || true
+            echo 'Package format selector:'
+            grep -E '^CONFIG_USE_APK=|^# CONFIG_USE_APK is not set$' .config || true
           } | tee "$GITHUB_WORKSPACE/artifact/config-diagnostics.txt"
 
       - name: Build only luci-app-openkill
