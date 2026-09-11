@@ -105,6 +105,7 @@ openkill_core_api_healthy() { [ "$scenario" != bad_api ]; }
 start_fail() { exit 9; }
 change_dnsmasq() { :; }
 set_firewall() { [ "$scenario" != bad_firewall ]; }
+ensure_fw4_dns_hijack() { :; }
 fw4_dns_hijack_ready() { :; }
 nft() {
   case "$*" in
