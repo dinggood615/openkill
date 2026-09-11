@@ -158,6 +158,18 @@ class FirewallShellCompatibilityTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.splitlines(), ['<tcp>', '<udp>'])
 
+    def test_dns_hijack_rules_keep_the_nft_comment_quoted(self):
+        source = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        rules = [line for line in source.splitlines()
+                 if 'comment \\"OpenKill DNS Hijack\\"' in line]
+        self.assertTrue(rules, 'expected nft DNS hijack rules')
+        for line in rules:
+            self.assertRegex(
+                line,
+                r'^\s*nft ".*comment \\"OpenKill DNS Hijack\\""$',
+                f'nft DNS rule must be a single quoted expression: {line}',
+            )
+
 
 class DualStackRoutingTests(unittest.TestCase):
     def test_tun_stack_argument_mapping_matrix(self):
@@ -292,6 +304,21 @@ class DualStackRoutingTests(unittest.TestCase):
         self.assertIn('openkill-fw4-reload.lock', helper)
         self.assertIn('sleep 3', helper)
         self.assertIn('/etc/init.d/openkill reload "firewall-deferred"', helper)
+        self.assertIn('/tmp/openkill-start.token', helper)
+        self.assertIn('/tmp/openkill-ready.token', helper)
+        self.assertIn('Do not let that include\'s own reload interrupt the start', helper)
+        self.assertIn('Keep firewall include setup independent from ucitrack', init)
+        self.assertIn('if uci -q show ucitrack >/dev/null 2>&1', init)
+        self.assertIn('rm -f /tmp/openkill-ready.token', init)
+        self.assertIn('fw4_reload_active()', init)
+        self.assertIn('wait_for_fw4_settle()', init)
+        self.assertIn('wait_for_fw4_settle\n      set_firewall', init)
+        self.assertIn('ensure_fw4_dns_hijack || start_fail', init)
+        self.assertIn('fw4 removed OpenKill DNS rules during startup; rebuilding', init)
+        self.assertIn('[ "$1" = "keep-include" ] || remove_openkill_include', init)
+        self.assertGreaterEqual(init.count('revert_firewall keep-include'), 2)
+        self.assertIn('OPENKILL_KEEP_INCLUDE=1 stop_service', init)
+        self.assertIn('OPENKILL_KEEP_INCLUDE=1 /etc/init.d/openkill stop', init)
         self.assertIn('for attempt in 1 2 3', helper)
         self.assertIn('uci -q get openkill.config.enable', helper)
         self.assertIn('/etc/init.d/openkill start', helper)

@@ -17,6 +17,14 @@ mkdir "$LOCK_DIR" 2>/dev/null || exit 0
     sleep 3
     if [ -f "$PENDING_FILE" ]; then
         rm -f "$PENDING_FILE"
+        # A fresh OpenKill start creates this token before it prepares the fw4
+        # include.  Do not let that include's own reload interrupt the start
+        # that created it; it would remove just-installed DNS/TUN rules before
+        # readiness can inspect them.
+        if [ -s /tmp/openkill-start.token ] && [ ! -s /tmp/openkill-ready.token ]; then
+            rmdir "$LOCK_DIR" 2>/dev/null || true
+            exit 0
+        fi
         # fw4 may still be settling after an interface transaction. Retry the
         # lightweight rule reconcile a bounded number of times; never leave a
         # previously enabled service stopped merely because one reload raced.

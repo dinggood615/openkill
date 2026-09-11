@@ -354,11 +354,11 @@ start_fail()
       LOG_WARN "Startup failed; scheduling one verified checkpoint recovery."
       ( /usr/share/openkill/openkill_recovery.sh restore "$OPENKILL_START_TOKEN" || {
            LOG_ERROR "Checkpoint recovery could not complete; manual review is required."
-           openkill_current_start && /etc/init.d/openkill stop
+           openkill_current_start && OPENKILL_KEEP_INCLUDE=1 /etc/init.d/openkill stop
         } ) </dev/null >>"$LOG_FILE" 2>&1 &
    else
       LOG_ERROR "Startup stopped: no compatible checkpoint or recovery already attempted."
-      stop
+      OPENKILL_KEEP_INCLUDE=1 stop_service
    fi
    exit 1
 }
@@ -1063,7 +1063,9 @@ check_core_status()
    openkill_current_start || return 0
    if [ "$tun_owner" = "openkill" ]; then
       [ "$1" != start ] || change_dnsmasq "$enable_redirect_dns"
+      wait_for_fw4_settle
       set_firewall || start_fail
+      ensure_fw4_dns_hijack || start_fail
    fi
    openkill_current_start || return 0
    # DNS is required by the generated OpenKill profile. A listener bind
@@ -1270,6 +1272,62 @@ fw4_dns_hijack_ready()
          printf '%s\n' "$rules" | grep -Eq 'meta nfproto[[:space:]]+\{?ipv6\}?|ip6 nexthdr' || return 1
       fi
    fi
+   return 0
+}
+
+# A dnsmasq or firewall configuration change can schedule an asynchronous fw4
+# reload. Direct nft rules added during that transaction are discarded when
+# fw4 installs its generated ruleset, so wait for the bounded transition before
+# installing OpenKill's DNS and TUN rules.
+fw4_reload_active()
+{
+   local proc cmdline
+   for proc in /proc/[0-9]*; do
+      [ -r "$proc/cmdline" ] || continue
+      cmdline="$(tr '\000' ' ' < "$proc/cmdline" 2>/dev/null)"
+      case "$cmdline" in
+         *'/sbin/fw4 reload'*) return 0 ;;
+      esac
+   done
+   return 1
+}
+
+wait_for_fw4_settle()
+{
+   [ -n "$FW4" ] || return 0
+   local attempts=0
+   # The dnsmasq restart can emit its config event after the service command
+   # returns. Give procd four seconds to launch that reload, then wait at most
+   # eight additional seconds for the transaction to finish.
+   sleep 4
+   while fw4_reload_active && [ "$attempts" -lt 8 ]; do
+      attempts=$((attempts + 1))
+      LOG_TIP "Waiting for fw4 reload to finish before installing OpenKill rules (${attempts}/8)..."
+      sleep 1
+   done
+   [ "$attempts" -eq 0 ] || sleep 1
+   return 0
+}
+
+# dnsmasq/procd can queue a second fw4 reload after its service command has
+# returned.  That reload replaces the fw4 table and can erase direct OpenKill
+# rules in the narrow interval between set_firewall() and readiness. Rebuild
+# only a bounded number of times, so startup remains deterministic if fw4 is
+# genuinely unavailable instead of accepting an incomplete DNS takeover.
+ensure_fw4_dns_hijack()
+{
+   [ -n "$FW4" ] || return 0
+   [ "$enable_redirect_dns" -eq 0 ] && return 0
+
+   local attempt=1
+   while ! fw4_dns_hijack_ready; do
+      [ "$attempt" -ge 3 ] && return 1
+      LOG_WARN "fw4 removed OpenKill DNS rules during startup; rebuilding (${attempt}/3)..."
+      sleep 2
+      wait_for_fw4_settle
+      set_firewall || return 1
+      attempt=$((attempt + 1))
+   done
    return 0
 }
 
@@ -1481,19 +1539,26 @@ prepare_openkill_include()
 {
    [ "$tun_owner" = "mihomo" ] && return 0
 
+   # Keep firewall include setup independent from ucitrack.  Some vendor
+   # builds omit the ucitrack UCI package entirely; treating that as an
+   # incomplete include rewrites firewall config on every OpenKill start and
+   # races the direct nft rule installation below.
    if [ "$(uci -q get firewall.openkill)" != "include" ] || \
-      [ "$(uci -q get firewall.openkill.path)" != "/var/etc/openkill.include" ] || \
-      [ -z "$(uci -q get ucitrack.@openkill[-1].init)" ]; then
-      uci -q delete ucitrack.@openkill[-1]
-      uci -q add ucitrack openkill
-      uci -q set ucitrack.@openkill[-1].init=openkill
-      uci -q commit ucitrack
+      [ "$(uci -q get firewall.openkill.path)" != "/var/etc/openkill.include" ]; then
       uci -q delete firewall.openkill
       uci -q set firewall.openkill=include
       uci -q set firewall.openkill.type=script
       uci -q set firewall.openkill.path=/var/etc/openkill.include
       [ -n "$FW4" ] || uci -q set firewall.openkill.reload=1
       uci -q commit firewall
+   fi
+
+   if uci -q show ucitrack >/dev/null 2>&1 && \
+      [ "$(uci -q get ucitrack.@openkill[-1].init)" != "openkill" ]; then
+      uci -q delete ucitrack.@openkill[-1]
+      uci -q add ucitrack openkill
+      uci -q set ucitrack.@openkill[-1].init=openkill
+      uci -q commit ucitrack
    fi
 
    mkdir -p /var/etc
@@ -1726,15 +1791,15 @@ if [ -n "$FW4" ]; then
                   ACBLACKDNSFILTER="$ACBLACKDNSFILTER ether saddr != @lan_ac_black_macs"
                fi
             fi
-            nft insert rule inet fw4 dstnat position 0 meta nfproto '{ipv4}' meta l4proto '{tcp,udp}' th dport 53 ${ACBLACKDNSFILTER} counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
+            nft "insert rule inet fw4 dstnat position 0 meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ${ACBLACKDNSFILTER} counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\""
          else
-            nft insert rule inet fw4 dstnat position 0 meta nfproto '{ipv4}' meta l4proto '{tcp,udp}' th dport 53 ip saddr @lan_ac_white_ips counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
-            nft insert rule inet fw4 dstnat position 0 meta nfproto '{ipv4}' meta l4proto '{tcp,udp}' th dport 53 ether saddr @lan_ac_white_macs counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
+            nft "insert rule inet fw4 dstnat position 0 meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ip saddr @lan_ac_white_ips counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\""
+            nft "insert rule inet fw4 dstnat position 0 meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ether saddr @lan_ac_white_macs counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\""
          fi
       fi
       if [ "$router_self_proxy" = 1 ]; then
          nft 'add chain inet fw4 nat_output { type nat hook output priority -1; }'
-         nft insert rule inet fw4 nat_output position 0 skgid != 65534 meta nfproto '{ipv4}' meta l4proto '{tcp,udp}' th dport 53 ip daddr {127.0.0.1} counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
+         nft "insert rule inet fw4 nat_output position 0 skgid != 65534 meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ip daddr {127.0.0.1} counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\""
       fi
    elif [ "$enable_redirect_dns" -eq 2 ]; then
       nft 'add chain inet fw4 openkill_dns_redirect'
@@ -1749,15 +1814,15 @@ if [ -n "$FW4" ]; then
                ACBLACKDNSFILTER="$ACBLACKDNSFILTER ether saddr != @lan_ac_black_macs"
             fi
          fi
-         nft add rule inet fw4 openkill_dns_redirect meta nfproto '{ipv4}' meta l4proto '{tcp,udp}' th dport 53 ${ACBLACKDNSFILTER} counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
+         nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ${ACBLACKDNSFILTER} counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\""
       else
-         nft add rule inet fw4 openkill_dns_redirect meta nfproto '{ipv4}' meta l4proto '{tcp,udp}' th dport 53 ip saddr @lan_ac_white_ips counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
-         nft add rule inet fw4 openkill_dns_redirect meta nfproto '{ipv4}' meta l4proto '{tcp,udp}' th dport 53 ether saddr @lan_ac_white_macs counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
+         nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ip saddr @lan_ac_white_ips counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\""
+         nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ether saddr @lan_ac_white_macs counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\""
       fi
       nft 'insert rule inet fw4 dstnat position 0 meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 counter jump openkill_dns_redirect'
       if [ "$router_self_proxy" = 1 ]; then
          nft 'add chain inet fw4 nat_output { type nat hook output priority -1; }'
-         nft insert rule inet fw4 nat_output position 0 meta nfproto '{ipv4}' meta l4proto '{tcp,udp}' th dport 53 ip daddr {127.0.0.1} meta skgid != 65534 counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
+         nft "insert rule inet fw4 nat_output position 0 meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ip daddr {127.0.0.1} meta skgid != 65534 counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\""
       fi
    fi
 
@@ -2105,14 +2170,14 @@ if [ -n "$FW4" ]; then
                      ACBLACKDNSFILTER="$ACBLACKDNSFILTER ether saddr != @lan_ac_black_macs"
                   fi
                fi
-               nft insert rule inet fw4 dstnat position 0 meta nfproto '{ipv6}' ip6 nexthdr '{tcp,udp}' th dport 53 ${ACBLACKDNSFILTER} counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
+               nft "insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ${ACBLACKDNSFILTER} counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\""
             else
-               nft insert rule inet fw4 dstnat position 0 meta nfproto '{ipv6}' ip6 nexthdr '{tcp,udp}' th dport 53 ip6 saddr @lan_ac_white_ipv6s counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
-               nft insert rule inet fw4 dstnat position 0 meta nfproto '{ipv6}' ip6 nexthdr '{tcp,udp}' th dport 53 ether saddr @lan_ac_white_macs counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
+               nft "insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ip6 saddr @lan_ac_white_ipv6s counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\""
+               nft "insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ether saddr @lan_ac_white_macs counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\""
             fi
             if [ "$router_self_proxy" = 1 ]; then
                nft 'add chain inet fw4 nat_output { type nat hook output priority -1; }'
-               nft insert rule inet fw4 nat_output position 0 skgid != 65534 meta nfproto '{ipv6}' ip6 nexthdr '{tcp,udp}' th dport 53 ip6 daddr {::1} counter redirect to "$DNSPORT" comment \"OpenKill DNS Hijack\"
+               nft "insert rule inet fw4 nat_output position 0 skgid != 65534 meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ip6 daddr {::1} counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\""
             fi
          elif [ "$enable_redirect_dns" -eq 2 ]; then
             if [ "$lan_ac_mode" != "1" ]; then
@@ -2125,15 +2190,15 @@ if [ -n "$FW4" ]; then
                      ACBLACKDNSFILTER="$ACBLACKDNSFILTER ether saddr != @lan_ac_black_macs"
                   fi
                fi
-               nft add rule inet fw4 openkill_dns_redirect meta nfproto '{ipv6}' ip6 nexthdr '{tcp,udp}' th dport 53 ${ACBLACKDNSFILTER} counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
+               nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ${ACBLACKDNSFILTER} counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\""
             else
-               nft add rule inet fw4 openkill_dns_redirect meta nfproto '{ipv6}' ip6 nexthdr '{tcp,udp}' th dport 53 ip6 saddr @lan_ac_white_ipv6s counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
-               nft add rule inet fw4 openkill_dns_redirect meta nfproto '{ipv6}' ip6 nexthdr '{tcp,udp}' th dport 53 ether saddr @lan_ac_white_macs counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
+               nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ip6 saddr @lan_ac_white_ipv6s counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\""
+               nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ether saddr @lan_ac_white_macs counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\""
             fi
             nft 'insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 counter jump openkill_dns_redirect'
             if [ "$router_self_proxy" = 1 ]; then
                nft 'add chain inet fw4 nat_output { type nat hook output priority -1; }'
-               nft insert rule inet fw4 nat_output position 0 meta nfproto '{ipv6}' ip6 nexthdr '{tcp,udp}' th dport 53 ip6 daddr {::1} meta skgid != 65534 counter redirect to "$dns_port" comment \"OpenKill DNS Hijack\"
+               nft "insert rule inet fw4 nat_output position 0 meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ip6 daddr {::1} meta skgid != 65534 counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\""
             fi
          fi
       fi
@@ -3308,7 +3373,10 @@ fi
 
 revert_firewall()
 {
-   remove_openkill_include
+   # A firewall-triggered reconciliation must keep the include that invoked
+   # it. Removing and re-adding it commits firewall UCI during fw4 reload,
+   # creating a reload loop that repeatedly erases freshly installed rules.
+   [ "$1" = "keep-include" ] || remove_openkill_include
 
    ip rule del fwmark "$PROXY_FWMARK" table "$PROXY_ROUTE_TABLE"
    ip route del local 0.0.0.0/0 dev lo table "$PROXY_ROUTE_TABLE"
@@ -3998,6 +4066,9 @@ start_service()
    fi
 
    OPENKILL_START_TOKEN="$(date +%s)-$$"
+   # A previous crash can leave a ready marker behind.  A new generation must
+   # clear it before the fw4 include decides whether startup is still active.
+   rm -f /tmp/openkill-ready.token
    printf '%s\n' "$OPENKILL_START_TOKEN" > /tmp/openkill-start.token
    if [ "${OPENKILL_RECOVERY:-0}" != 1 ]; then
       rmdir /tmp/openkill-recovery.once 2>/dev/null || true
@@ -4237,7 +4308,15 @@ stop_service()
       rm -rf /tmp/openkill-watchdog.lock /tmp/openkill-proxy-address.lock
 
       LOG_OUT "Step 3: Delete OpenKill Firewall Rules..."
-      revert_firewall
+      # A failed start must clear runtime state, but retain the already
+      # registered fw4 include.  Removing it commits firewall UCI and makes
+      # the next retry race a new fw4 reload before DNS hijack rules can pass
+      # readiness. Explicit disable/uninstall paths still remove the include.
+      if [ "${OPENKILL_KEEP_INCLUDE:-0}" = "1" ]; then
+         revert_firewall keep-include
+      else
+         revert_firewall
+      fi
 
       LOG_OUT "Step 4: Close The OpenKill Services..."
       for process in "openkill_streaming_unlock.lua"; do
@@ -4325,14 +4404,14 @@ reload_service()
          exit 0
       fi
       LOG_OUT "【${CUR_RELOAD_NUM}/$MAX_RELOAD】Reload OpenKill Firewall Rules..."
-      revert_firewall
+      revert_firewall keep-include
       [ "$tun_owner" = "openkill" ] && prepare_openkill_include
       do_run_mode
       check_core_status &
    fi
    if openkill_core_process_present && [ "$enable" == "1" ] && [ "$1" == "manual" ]; then
       LOG_OUT "Manually Reload Firewall Rules..."
-      revert_firewall
+      revert_firewall keep-include
       [ "$tun_owner" = "openkill" ] && prepare_openkill_include
       do_run_mode
       check_core_status &
