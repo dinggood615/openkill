@@ -605,8 +605,39 @@ probe_openkill_ipv6_https()
 {
    local iface="$1"
    command -v curl >/dev/null 2>&1 || return 1
-   curl -6 -fsS --interface "$iface" --connect-timeout 4 --max-time 7 \
+   openkill_probe_bounded 7 curl -6 -fsS --interface "$iface" --connect-timeout 4 --max-time 7 \
       -o /dev/null https://cp.cloudflare.com/generate_204 >/dev/null 2>&1
+}
+
+# Startup runs while rc.common holds fd 1000 as the service lock.  Network
+# probes must both be bounded and keep that descriptor closed; otherwise a
+# probe orphaned by a watchdog/reload can retain the lock forever and make all
+# later start/status/restart calls block.  BusyBox images without `timeout`
+# use the small shell watchdog below.
+openkill_probe_bounded()
+{
+   local seconds="$1" child elapsed
+   shift
+   (
+      exec 1000>&-
+      if command -v timeout >/dev/null 2>&1; then
+         timeout "$seconds" "$@"
+         exit $?
+      fi
+      "$@" &
+      child=$!
+      elapsed=0
+      while kill -0 "$child" 2>/dev/null; do
+         if [ "$elapsed" -ge "$seconds" ]; then
+            kill "$child" 2>/dev/null || true
+            wait "$child" 2>/dev/null || true
+            exit 124
+         fi
+         sleep 1
+         elapsed=$((elapsed + 1))
+      done
+      wait "$child"
+   )
 }
 
 write_openkill_ipv6_diagnostics()
@@ -622,15 +653,15 @@ write_openkill_ipv6_diagnostics()
    mtu=$(ip link show dev "$iface" 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="mtu"){print $(i+1); exit}}')
    tcp443_state="covered-by-https"
    if command -v nc >/dev/null 2>&1; then
-      nc -w 4 -z 2606:4700:4700::1111 443 >/dev/null 2>&1 && tcp443_state="available" || tcp443_state="unavailable"
+      openkill_probe_bounded 5 nc -w 4 -z 2606:4700:4700::1111 443 >/dev/null 2>&1 && tcp443_state="available" || tcp443_state="unavailable"
    fi
    udp_state="not-tested"
-   if command -v timeout >/dev/null 2>&1 && command -v nslookup >/dev/null 2>&1; then
-      timeout 5 nslookup cloudflare.com 2606:4700:4700::1111 >/dev/null 2>&1 && udp_state="available" || udp_state="unavailable"
+   if command -v nslookup >/dev/null 2>&1; then
+      openkill_probe_bounded 5 nslookup cloudflare.com 2606:4700:4700::1111 >/dev/null 2>&1 && udp_state="available" || udp_state="unavailable"
    fi
    pmtu_state="not-tested"
    if command -v ping >/dev/null 2>&1; then
-      ping -6 -c 1 -W 2 -s 1280 2606:4700:4700::1111 >/dev/null 2>&1 && pmtu_state="available" || pmtu_state="unavailable"
+      openkill_probe_bounded 5 ping -6 -c 1 -W 2 -s 1280 2606:4700:4700::1111 >/dev/null 2>&1 && pmtu_state="available" || pmtu_state="unavailable"
    fi
    {
       printf 'interface=%s\n' "$iface"
