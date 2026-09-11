@@ -59,10 +59,10 @@ jobs:
           grep -q '^PKG_VERSION:=2026-1120$' luci-app-openkill/Makefile
 
           mapfile -t version_hits < <(
-            rg -n --hidden --glob '!**/.git/**' \
-              --glob '*.htm' --glob '*.html' --glob '*.css' --glob '*.js' \
-              --glob '*.lua' --glob '*.sh' --glob '*.po' --glob 'Makefile' \
-              --glob '*.md' 'dev[0-9]+|2026-1119-dev' \
+            grep -R -n -E --exclude-dir=.git \
+              --include='*.htm' --include='*.html' --include='*.css' --include='*.js' \
+              --include='*.lua' --include='*.sh' --include='*.po' --include='Makefile' \
+              --include='*.md' 'dev[0-9]+|2026-1119-dev' \
               luci-app-openkill scripts README.md || true
           )
           if ((${#version_hits[@]})); then
@@ -86,17 +86,28 @@ jobs:
           case "$sdk_archive" in
             *.tar.xz) tar -xJf "$sdk_archive" -C "$GITHUB_WORKSPACE/sdk-download" ;;
             *.tar.gz|*.tgz) tar -xzf "$sdk_archive" -C "$GITHUB_WORKSPACE/sdk-download" ;;
-            *.tar.zst) tar --zstd -xf "$sdk_archive" -C "$GITHUB_WORKSPACE/sdk-download" ;;
+            *.tar.zst)
+              zstd -t "$sdk_archive"
+              zstd -dc "$sdk_archive" | tar -xf - -C "$GITHUB_WORKSPACE/sdk-download"
+              ;;
             *) echo 'Unsupported SDK archive format.' >&2; exit 1 ;;
           esac
 
-          sdk_top="$(tar -tf "$sdk_archive" | sed -n '1s#/.*##p')"
-          test -n "$sdk_top"
-          sdk_dir="$GITHUB_WORKSPACE/sdk-download/$sdk_top"
+          sdk_dir="$(find "$GITHUB_WORKSPACE/sdk-download" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+          test -n "$sdk_dir"
           test -d "$sdk_dir"
           test -f "$sdk_dir/Makefile"
           test -d "$sdk_dir/scripts"
           test -d "$sdk_dir/staging_dir"
+          if test -f "$sdk_dir/.config"; then
+            cp -f "$sdk_dir/.config" "$GITHUB_WORKSPACE/sdk-original.config"
+          else
+            # SDK archives normally omit .config.  Materialize the SDK's
+            # default configuration only to capture a before snapshot; the
+            # package selections are scrubbed before the real build config.
+            make -C "$sdk_dir" defconfig
+            cp -f "$sdk_dir/.config" "$GITHUB_WORKSPACE/sdk-original.config"
+          fi
           printf 'SDK_DIR=%s\n' "$sdk_dir" >> "$GITHUB_ENV"
           echo "SDK directory: $sdk_dir"
           ls -ld "$sdk_dir/Makefile" "$sdk_dir/scripts" "$sdk_dir/staging_dir"
@@ -107,22 +118,89 @@ jobs:
           set -Eeuo pipefail
           cd "$SDK_DIR"
           ./scripts/feeds update -a
-          ./scripts/feeds install -a
+          # Only expose feed packages required by luci-app-openkill.  The SDK
+          # already contains the base/kernel package definitions; installing
+          # every feed package makes the package universe needlessly broad.
+          ./scripts/feeds install \
+            bash ca-bundle curl dnsmasq-full ip-full lua luci-compat \
+            luci-base ruby ruby-yaml unzip
           rm -rf package/luci-app-openkill
           cp -a "$GITHUB_WORKSPACE/luci-app-openkill" package/luci-app-openkill
+          # This smoke job validates the resource package itself.  OpenKill's
+          # production DEPENDS are runtime tools, so let the package manager
+          # resolve them instead of compiling them in this SDK job.  Apply the
+          # override only inside the disposable SDK checkout and fail closed
+          # if the expected Makefile shape changes.
+          python3 - <<'PY'
+          from pathlib import Path
 
+          makefile = Path("package/luci-app-openkill/Makefile")
+          lines = makefile.read_text().splitlines()
+          output = []
+          in_config = False
+          removed_config = 0
+          replaced_depends = 0
+          skip_continuation = False
+          for line in lines:
+              if skip_continuation:
+                  skip_continuation = False
+                  continue
+              if line == "define Package/$(PKG_NAME)/config":
+                  in_config = True
+                  removed_config += 1
+                  continue
+              if in_config:
+                  if line == "endef":
+                      in_config = False
+                  continue
+              if line.strip().startswith("DEPENDS:="):
+                  replaced_depends += 1
+                  output.append("\tDEPENDS:=")
+                  output.append("\tEXTRA_DEPENDS:=dnsmasq-full (>=0),bash (>=0),curl (>=0),ca-bundle (>=0),ip-full (>=0),lua (>=0),ruby (>=0),ruby-yaml (>=0),luci-compat (>=0),kmod-tun (>=0),kmod-inet-diag (>=0),unzip (>=0)")
+                  if line.rstrip().endswith("\\"):
+                      skip_continuation = True
+                  continue
+              output.append(line)
+          if in_config or removed_config != 1 or replaced_depends != 1:
+              raise SystemExit("unexpected OpenKill Makefile shape")
+          makefile.write_text("\n".join(output) + "\n")
+          PY
+
+          # luci-app-openkill compiles its translations with LuCI's host-only
+          # po2lmo helper.  Build that helper without selecting luci-base's
+          # target runtime dependency tree.
+          make package/luci-base/host/compile V=s
+
+          # Load the SDK/feed metadata first so package dependencies are known.
+          # The SDK defaults can select a broad package set, so scrub those
+          # selections after defconfig and do not run defconfig again.
           make defconfig
-          for symbol in CONFIG_ALL CONFIG_ALL_KMODS; do
-            if grep -q "^${symbol}=" .config; then
-              sed -i "s/^${symbol}=.*/# ${symbol} is not set/" .config
-            elif ! grep -q "^# ${symbol} is not set$" .config; then
-              printf '# %s is not set\n' "$symbol" >> .config
-            fi
+          sed -i -E '/^CONFIG_PACKAGE_[^=]+=.*$/d' .config
+          for symbol in CONFIG_ALL CONFIG_ALL_KMODS CONFIG_ALL_NONSHARED CONFIG_BUILDBOT; do
+            sed -i -E "/^${symbol}=.*$/d; /^# ${symbol} is not set$/d" .config
+            printf '# %s is not set\n' "$symbol" >> .config
           done
-          if grep -q '^CONFIG_ALL=y' .config || grep -q '^CONFIG_ALL_KMODS=y' .config; then
-            echo 'Refusing a broad CONFIG_ALL/CONFIG_ALL_KMODS build.' >&2
-            exit 1
-          fi
+          # The project's published channel and version format are IPK based
+          # (2026-1120).  OpenWrt 25.12 defaults to APK, whose version parser
+          # rejects that historical format, so this smoke job explicitly
+          # selects the compatible IPK packager.
+          sed -i -E '/^CONFIG_USE_APK=.*$/d; /^# CONFIG_USE_APK is not set$/d' .config
+          printf '# CONFIG_USE_APK is not set\n' >> .config
+          printf 'CONFIG_PACKAGE_luci-app-openkill=m\n' >> .config
+          grep -Eq '^CONFIG_PACKAGE_luci-app-openkill=[my]$' .config
+          {
+            echo '--- SDK package configuration diagnostics ---'
+            echo "Original active package selections: $(grep -Ec '^CONFIG_PACKAGE_[^=]+=(y|m)$' "$GITHUB_WORKSPACE/sdk-original.config" || true)"
+            echo "Final active package selections: $(grep -Ec '^CONFIG_PACKAGE_[^=]+=(y|m)$' .config || true)"
+            echo 'Original relevant selectors:'
+            grep -E '^CONFIG_(PACKAGE_(luci-app-openkill|firewall4|kmod-(nft|ipt)-|iptables|dnsmasq_full_|ipset|rust|llvm|clang|nft|openssl|gmp)|ALL|ALL_KMODS|ALL_NONSHARED|DEVEL|BUILDBOT)=' "$GITHUB_WORKSPACE/sdk-original.config" || true
+            echo 'Final relevant selectors:'
+            grep -E '^CONFIG_(PACKAGE_(luci-app-openkill|firewall4|kmod-(nft|ipt)-|iptables|dnsmasq_full_|ipset|rust|llvm|clang|nft|openssl|gmp)|ALL|ALL_KMODS|ALL_NONSHARED|DEVEL|BUILDBOT)=' .config || true
+            echo 'Final selected package symbols:'
+            grep -E '^CONFIG_PACKAGE_(luci-app-openkill|firewall4|kmod-(nft|ipt)-|iptables|dnsmasq_full_|ipset|rust|llvm|clang|nft|openssl|gmp)=[my]$' .config || true
+            echo 'Package format selector:'
+            grep -E '^CONFIG_USE_APK=|^# CONFIG_USE_APK is not set$' .config || true
+          } | tee "$GITHUB_WORKSPACE/artifact/config-diagnostics.txt"
 
       - name: Build only luci-app-openkill
         id: package_build
@@ -136,91 +214,105 @@ jobs:
             echo "OpenWrt version: $OPENWRT_VERSION"
             echo "Target: $OPENWRT_TARGET/$OPENWRT_SUBTARGET"
             echo "SDK URL: $OPENWRT_SDK_URL"
-            make package/luci-app-openkill/clean V=s
-            make package/luci-app-openkill/compile V=s
+            make CONFIG_USE_APK= package/luci-app-openkill/clean V=s
+            make CONFIG_USE_APK= package/luci-app-openkill/compile V=s
           } 2>&1 | tee "$GITHUB_WORKSPACE/build-openkill.log"
 
-      - name: Locate and audit the IPK
+      - name: Locate and audit the package
         if: steps.package_build.outcome == 'success'
         shell: bash
         run: |
           set -Eeuo pipefail
-          mapfile -t ipks < <(find "$SDK_DIR/bin" -type f -name "luci-app-openkill_${OPENKILL_VERSION}_all.ipk" -print)
-          if ((${#ipks[@]} != 1)); then
-            printf 'Expected exactly one IPK, found %s:\n' "${#ipks[@]}"
-            printf '%s\n' "${ipks[@]:-<none>}"
+          mapfile -t packages < <(find "$SDK_DIR/bin" -type f \( \
+            -name "luci-app-openkill_${OPENKILL_VERSION}_all.ipk" -o \
+            -name "luci-app-openkill-${OPENKILL_VERSION}.apk" \
+          \) -print)
+          if ((${#packages[@]} != 1)); then
+            printf 'Expected exactly one OpenKill package, found %s:\n' "${#packages[@]}"
+            printf '%s\n' "${packages[@]:-<none>}"
             exit 1
           fi
-          ipk="${ipks[0]}"
-          cp -f "$ipk" "$GITHUB_WORKSPACE/artifact/"
-          printf '%s\n' "$(sha256sum "$ipk")" > "$GITHUB_WORKSPACE/artifact/SHA256SUMS"
+          package_file="${packages[0]}"
+          package_name="$(basename "$package_file")"
+          package_format=ipk
+          case "$package_file" in *.apk) package_format=apk ;; esac
+          cp -f "$package_file" "$GITHUB_WORKSPACE/artifact/"
+          printf '%s\n' "$(sha256sum "$package_file")" > "$GITHUB_WORKSPACE/artifact/SHA256SUMS"
 
           rm -rf "$GITHUB_WORKSPACE/ipk-audit"
           mkdir -p "$GITHUB_WORKSPACE/ipk-audit/control" "$GITHUB_WORKSPACE/ipk-audit/data"
-          if tar -tzf "$ipk" >/dev/null 2>&1; then
-            tar -xzf "$ipk" -C "$GITHUB_WORKSPACE/ipk-audit"
-            for archive in control.tar.gz control.tar.xz control.tar.zst; do
-              if test -f "$GITHUB_WORKSPACE/ipk-audit/$archive"; then
+          if [ "$package_format" = ipk ]; then
+            if tar -tzf "$package_file" >/dev/null 2>&1; then
+              tar -xzf "$package_file" -C "$GITHUB_WORKSPACE/ipk-audit"
+              for archive in control.tar.gz control.tar.xz control.tar.zst; do
+                if test -f "$GITHUB_WORKSPACE/ipk-audit/$archive"; then
+                  case "$archive" in
+                    *.tar.gz) tar -xzf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
+                    *.tar.xz) tar -xJf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
+                    *.tar.zst) tar --zstd -xf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
+                  esac
+                  break
+                fi
+              done
+              for archive in data.tar.gz data.tar.xz data.tar.zst; do
+                if test -f "$GITHUB_WORKSPACE/ipk-audit/$archive"; then
+                  case "$archive" in
+                    *.tar.gz) tar -xzf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
+                    *.tar.xz) tar -xJf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
+                    *.tar.zst) tar --zstd -xf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
+                  esac
+                  break
+                fi
+              done
+            else
+              ar_dir="$GITHUB_WORKSPACE/ipk-audit/ar"
+              mkdir -p "$ar_dir"
+              (cd "$ar_dir" && ar x "$package_file")
+              cd "$ar_dir"
+              for archive in control.tar.gz control.tar.xz control.tar.zst data.tar.gz data.tar.xz data.tar.zst; do
+                test -f "$archive" || continue
                 case "$archive" in
-                  *.tar.gz) tar -xzf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
-                  *.tar.xz) tar -xJf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
-                  *.tar.zst) tar --zstd -xf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
+                  control.tar.gz) tar -xzf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
+                  control.tar.xz) tar -xJf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
+                  control.tar.zst) tar --zstd -xf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
+                  data.tar.gz) tar -xzf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
+                  data.tar.xz) tar -xJf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
+                  data.tar.zst) tar --zstd -xf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
                 esac
-                break
-              fi
-            done
-            for archive in data.tar.gz data.tar.xz data.tar.zst; do
-              if test -f "$GITHUB_WORKSPACE/ipk-audit/$archive"; then
-                case "$archive" in
-                  *.tar.gz) tar -xzf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
-                  *.tar.xz) tar -xJf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
-                  *.tar.zst) tar --zstd -xf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
-                esac
-                break
-              fi
-            done
+              done
+            fi
+            test -f "$GITHUB_WORKSPACE/ipk-audit/control/control" || { echo 'Could not extract IPK control metadata.' >&2; exit 1; }
+            test -f "$GITHUB_WORKSPACE/ipk-audit/control/conffiles" || { echo 'IPK has no conffiles metadata.' >&2; exit 1; }
           else
-            ar_dir="$GITHUB_WORKSPACE/ipk-audit/ar"
-            mkdir -p "$ar_dir"
-            (cd "$ar_dir" && ar x "$ipk")
-            cd "$ar_dir"
-            for archive in control.tar.gz control.tar.xz control.tar.zst data.tar.gz data.tar.xz data.tar.zst; do
-              test -f "$archive" || continue
-              case "$archive" in
-                control.tar.gz) tar -xzf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
-                control.tar.xz) tar -xJf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
-                control.tar.zst) tar --zstd -xf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
-                data.tar.gz) tar -xzf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
-                data.tar.xz) tar -xJf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
-                data.tar.zst) tar --zstd -xf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
-              esac
-            done
+            test -s "$package_file"
+            # apk is a tar archive with a .PKGINFO metadata file.
+            tar -xf "$package_file" -C "$GITHUB_WORKSPACE/ipk-audit/data"
+            tar -xOf "$package_file" .PKGINFO > "$GITHUB_WORKSPACE/ipk-audit/control/control"
+            tar -tf "$package_file" | grep -qx './etc/config/openkill' || tar -tf "$package_file" | grep -qx 'etc/config/openkill'
           fi
-          test -f "$GITHUB_WORKSPACE/ipk-audit/control/control" || {
-            echo 'Could not extract IPK control metadata.' >&2
-            exit 1
-          }
-          test -f "$GITHUB_WORKSPACE/ipk-audit/control/conffiles" || {
-            echo 'IPK has no conffiles metadata.' >&2
-            exit 1
-          }
 
-          grep -qx 'Package: luci-app-openkill' "$GITHUB_WORKSPACE/ipk-audit/control/control"
-          grep -qx 'Version: 2026-1120' "$GITHUB_WORKSPACE/ipk-audit/control/control"
-          grep -qx 'Architecture: all' "$GITHUB_WORKSPACE/ipk-audit/control/control"
-          grep -qx '/etc/config/openkill' "$GITHUB_WORKSPACE/ipk-audit/control/conffiles"
+          if [ "$package_format" = ipk ]; then
+            grep -qx 'Package: luci-app-openkill' "$GITHUB_WORKSPACE/ipk-audit/control/control"
+            grep -qx 'Version: 2026-1120' "$GITHUB_WORKSPACE/ipk-audit/control/control"
+            grep -qx 'Architecture: all' "$GITHUB_WORKSPACE/ipk-audit/control/control"
+            grep -qx '/etc/config/openkill' "$GITHUB_WORKSPACE/ipk-audit/control/conffiles"
+          else
+            grep -qx 'pkgname = luci-app-openkill' "$GITHUB_WORKSPACE/ipk-audit/control/control"
+            grep -qx 'pkgver = 2026-1120' "$GITHUB_WORKSPACE/ipk-audit/control/control"
+            grep -qx 'arch = noarch' "$GITHUB_WORKSPACE/ipk-audit/control/control"
+          fi
 
           postrm="$GITHUB_WORKSPACE/ipk-audit/control/postrm"
-          if test -f "$postrm" && rg -n 'rm[[:space:]].*(/etc/config/openkill|/etc/openkill|/usr/share/openkill|/www/luci-static/resources/openkill)' "$postrm"; then
+          if test -f "$postrm" && grep -n -E 'rm[[:space:]].*(^|[[:space:];])/(etc/config/openkill|etc/openkill|usr/share/openkill|www/luci-static/resources/openkill)([[:space:];&|]|$)' "$postrm"; then
             echo 'postrm contains destructive persistent-path removal.' >&2
             exit 1
           fi
 
           mapfile -t stale_refs < <(
-            rg -n --hidden \
-              --glob '*.htm' --glob '*.html' --glob '*.css' --glob '*.js' \
-              --glob '*.lua' --glob '*.sh' --glob '*.po' --glob '*.conf' \
-              --glob 'control' --glob 'conffiles' \
+            grep -R -n -E \
+              --include='*.htm' --include='*.html' --include='*.css' --include='*.js' \
+              --include='*.lua' --include='*.sh' --include='*.po' --include='*.conf' \
+              --include='control' --include='conffiles' --include='.PKGINFO' \
               'dev[0-9]+|2026-1119-dev' "$GITHUB_WORKSPACE/ipk-audit/control" "$GITHUB_WORKSPACE/ipk-audit/data" || true
           )
           if ((${#stale_refs[@]})); then
@@ -228,11 +320,12 @@ jobs:
             echo 'Stale development resource references found in the IPK.' >&2
             exit 1
           fi
-          rg -n 'oc\.css\?v=2026-1120|flat\.css\?v=2026-1120' "$GITHUB_WORKSPACE/ipk-audit/data" >/dev/null
+          grep -R -n -E 'oc\.css\?v=2026-1120|flat\.css\?v=2026-1120' "$GITHUB_WORKSPACE/ipk-audit/data" >/dev/null
 
           mapfile -t sensitive_hits < <(
-            rg -n --hidden --glob '*.htm' --glob '*.html' --glob '*.css' --glob '*.js' \
-              --glob '*.lua' --glob '*.sh' --glob '*.po' --glob '*.conf' \
+            grep -R -n -E \
+              --include='*.htm' --include='*.html' --include='*.css' --include='*.js' \
+              --include='*.lua' --include='*.sh' --include='*.po' --include='*.conf' \
               '192\.168\.1\.101|[A-Za-z_]*(password|token|private_key|secret)[A-Za-z_]*[[:space:]]*[:=][[:space:]]*["'"'][^"'"']{4,}["'"']|-----BEGIN [A-Z ]+PRIVATE KEY-----' \
               "$GITHUB_WORKSPACE/ipk-audit/data" || true
           )
@@ -243,7 +336,8 @@ jobs:
           fi
 
           {
-            echo "IPK: $(basename "$ipk")"
+            echo "Package: $package_name"
+            echo "Format: $package_format"
             echo "SHA256: $(cut -d' ' -f1 "$GITHUB_WORKSPACE/artifact/SHA256SUMS")"
             echo 'Package metadata: OK'
             echo 'Conffile preservation: /etc/config/openkill'
@@ -282,16 +376,16 @@ jobs:
             exit 1
           fi
           test -f "$GITHUB_WORKSPACE/artifact/audit-report.txt"
-          ipk="$(find "$GITHUB_WORKSPACE/artifact" -maxdepth 1 -type f -name 'luci-app-openkill_2026-1120_all.ipk' -print -quit)"
-          test -n "$ipk"
+          package_file="$(find "$GITHUB_WORKSPACE/artifact" -maxdepth 1 -type f \( -name 'luci-app-openkill_2026-1120_all.ipk' -o -name 'luci-app-openkill-2026-1120.apk' \) -print -quit)"
+          test -n "$package_file"
           {
             echo '## OpenKill 2026-1120 SDK build'
             echo
             echo "- Version: $OPENKILL_VERSION"
             echo "- Commit: $GITHUB_SHA"
             echo "- OpenWrt: $OPENWRT_VERSION ($OPENWRT_TARGET/$OPENWRT_SUBTARGET)"
-            echo "- IPK: $(basename "$ipk")"
-            echo "- Size: $(stat -c '%s' "$ipk") bytes"
-            echo "- SHA256: $(sha256sum "$ipk" | cut -d' ' -f1)"
+            echo "- Package: $(basename "$package_file")"
+            echo "- Size: $(stat -c '%s' "$package_file") bytes"
+            echo "- SHA256: $(sha256sum "$package_file" | cut -d' ' -f1)"
             echo '- Scope: single-package SDK build; no release or publish step'
           } >> "$GITHUB_STEP_SUMMARY"

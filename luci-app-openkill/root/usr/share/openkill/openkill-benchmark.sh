@@ -95,7 +95,10 @@ run_bounded() {
 
 sanitize() {
     # Remove control characters and JSON delimiters from captured text.
-    printf '%s' "$1" | tr '\r\n\t' '   ' | tr -cd '[:print:]' | tr '"' "'" | tr '\\' '/'
+    # BusyBox tr does not implement the POSIX [:print:] class reliably and
+    # can delete ordinary ASCII characters.  sed handles the class correctly
+    # on the OpenWrt ash/BusyBox combinations we support.
+    printf '%s' "$1" | tr '\r\n\t' '   ' | sed 's/[^[:print:]]//g' | tr '"' "'" | tr '\\' '/'
 }
 
 json_value() {
@@ -134,7 +137,9 @@ for candidate in /etc/openkill/clash /etc/openkill/core/clash_meta /tmp/etc/open
 done
 mihomo_version="N/A"
 if [ -n "$core_path" ]; then
-    mihomo_version=$($core_path -v 2>/dev/null | head -n 1 | tr -cd '[:alnum:]._+-')
+    # Keep only a compact version token without BusyBox tr character-class
+    # quirks; sed's POSIX classes work consistently on supported firmware.
+    mihomo_version=$($core_path -v 2>/dev/null | head -n 1 | sed 's/[^[:alnum:]_.+-]//g')
     [ -n "$mihomo_version" ] || mihomo_version="N/A"
 fi
 openkill_version="N/A"
