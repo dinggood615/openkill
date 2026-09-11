@@ -86,13 +86,15 @@ jobs:
           case "$sdk_archive" in
             *.tar.xz) tar -xJf "$sdk_archive" -C "$GITHUB_WORKSPACE/sdk-download" ;;
             *.tar.gz|*.tgz) tar -xzf "$sdk_archive" -C "$GITHUB_WORKSPACE/sdk-download" ;;
-            *.tar.zst) tar --zstd -xf "$sdk_archive" -C "$GITHUB_WORKSPACE/sdk-download" ;;
+            *.tar.zst)
+              zstd -t "$sdk_archive"
+              zstd -dc "$sdk_archive" | tar -xf - -C "$GITHUB_WORKSPACE/sdk-download"
+              ;;
             *) echo 'Unsupported SDK archive format.' >&2; exit 1 ;;
           esac
 
-          sdk_top="$(tar -tf "$sdk_archive" | sed -n '1s#/.*##p')"
-          test -n "$sdk_top"
-          sdk_dir="$GITHUB_WORKSPACE/sdk-download/$sdk_top"
+          sdk_dir="$(find "$GITHUB_WORKSPACE/sdk-download" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+          test -n "$sdk_dir"
           test -d "$sdk_dir"
           test -f "$sdk_dir/Makefile"
           test -d "$sdk_dir/scripts"
