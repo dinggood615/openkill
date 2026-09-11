@@ -8,22 +8,6 @@ PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
 
 include $(INCLUDE_DIR)/package.mk
 
-# The production package keeps runtime tools in DEPENDS so image builds select
-# and build them normally.  The opt-in SDK test mode uses EXTRA_DEPENDS: the
-# package contains only scripts/resources and has no build-time dependency on
-# those target tools, while the generated package still records them for the
-# target package manager.  This keeps the expensive dependency graph out of a
-# single-package CI smoke build without changing production metadata.
-ifeq ($(OPENKILL_SDK_TEST),1)
-  OPENKILL_DEPENDS:=
-  OPENKILL_EXTRA_DEPENDS:=dnsmasq-full (>=0),bash (>=0),curl (>=0),ca-bundle (>=0),ip-full (>=0),lua (>=0),ruby (>=0),ruby-yaml (>=0),luci-compat (>=0),kmod-tun (>=0),kmod-inet-diag (>=0),unzip (>=0)
-else
-  OPENKILL_DEPENDS:=+dnsmasq-full +bash +curl +ca-bundle +ip-full +lua \
-	+ruby +ruby-yaml +luci-compat +kmod-tun +kmod-inet-diag +unzip
-  OPENKILL_EXTRA_DEPENDS:=
-endif
-
-ifneq ($(OPENKILL_SDK_TEST),1)
 define Package/$(PKG_NAME)/config
 	config PACKAGE_kmod-inet-diag
 	default y if PACKAGE_$(PKG_NAME)
@@ -52,15 +36,14 @@ define Package/$(PKG_NAME)/config
 	config PACKAGE_ipset
 	default y if ! PACKAGE_firewall4
 endef
-endif
 
 define Package/$(PKG_NAME)
 	CATEGORY:=LuCI
 	SUBMENU:=3. Applications
 	TITLE:=LuCI support for OpenKill
 	PKGARCH:=all
-	DEPENDS:=$(OPENKILL_DEPENDS)
-	EXTRA_DEPENDS:=$(OPENKILL_EXTRA_DEPENDS)
+	DEPENDS:=+dnsmasq-full +bash +curl +ca-bundle +ip-full +lua \
+	+ruby +ruby-yaml +luci-compat +kmod-tun +kmod-inet-diag +unzip
 	MAINTAINER:=dinggood615
 endef
 

@@ -126,6 +126,27 @@ jobs:
             ruby ruby-yaml unzip
           rm -rf package/luci-app-openkill
           cp -a "$GITHUB_WORKSPACE/luci-app-openkill" package/luci-app-openkill
+          # This smoke job validates the resource package itself.  OpenKill's
+          # production DEPENDS are runtime tools, so let the package manager
+          # resolve them instead of compiling them in this SDK job.  Apply the
+          # override only inside the disposable SDK checkout and fail closed
+          # if the expected Makefile shape changes.
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          makefile = Path("package/luci-app-openkill/Makefile")
+          text = makefile.read_text()
+          config = re.compile(r"define Package/\$\(PKG_NAME\)/config\n.*?^endef\n", re.MULTILINE | re.DOTALL)
+          text, removed = config.subn("", text, count=1)
+          if removed != 1:
+              raise SystemExit("unexpected OpenKill config block")
+          depends = re.compile(r"^[ \t]*DEPENDS:=.*(?:\\\n[ \t]*\+[^\n]+)?$", re.MULTILINE)
+          text, replaced = depends.subn("\tDEPENDS:=\n\tEXTRA_DEPENDS:=dnsmasq-full (>=0),bash (>=0),curl (>=0),ca-bundle (>=0),ip-full (>=0),lua (>=0),ruby (>=0),ruby-yaml (>=0),luci-compat (>=0),kmod-tun (>=0),kmod-inet-diag (>=0),unzip (>=0)", text, count=1)
+          if replaced != 1:
+              raise SystemExit("unexpected OpenKill DEPENDS line")
+          makefile.write_text(text)
+          PY
 
           # Load the SDK/feed metadata first so package dependencies are known.
           # The SDK defaults can select a broad package set, so scrub those
@@ -162,10 +183,6 @@ jobs:
             echo "OpenWrt version: $OPENWRT_VERSION"
             echo "Target: $OPENWRT_TARGET/$OPENWRT_SUBTARGET"
             echo "SDK URL: $OPENWRT_SDK_URL"
-            # package.mk resets MAKEFLAGS for recursive builds, so export the
-            # opt-in test switch instead of relying on a command-line make
-            # variable to reach the package recipe.
-            export OPENKILL_SDK_TEST=1
             make package/luci-app-openkill/clean V=s
             make package/luci-app-openkill/compile V=s
           } 2>&1 | tee "$GITHUB_WORKSPACE/build-openkill.log"
