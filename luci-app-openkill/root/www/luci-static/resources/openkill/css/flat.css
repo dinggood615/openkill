@@ -1082,3 +1082,13 @@ body[data-page="admin-services-openkill-config"] #cbi-openkill > .cbi-section-ca
 }
 
 /* ===== OpenKill Configuration Management Visual Closeout Layout End ===== */
+
+/* Wide settings alignment: use the full LuCI content column on desktop. */
+@media (min-width: 901px) {
+    #cbi-openkill.openkill-settings,
+    #cbi-openkill.openkill-settings .openkill-page-header,
+    #cbi-openkill.openkill-settings > h2,
+    #cbi-openkill.openkill-settings > .cbi-map-descr {
+        max-width: none;
+    }
+}
