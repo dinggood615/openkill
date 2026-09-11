@@ -1,4 +1,4 @@
-name: Build OpenKill 2026-1120 (OpenWrt SDK)
+name: Build OpenKill (OpenWrt SDK Audit)
 
 on:
   # This is an opt-in SDK audit build. The release workflow owns master pushes
@@ -13,7 +13,6 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  OPENKILL_VERSION: "2026-1120"
   OPENWRT_VERSION: ${{ vars.OPENWRT_VERSION }}
   OPENWRT_TARGET: ${{ vars.OPENWRT_TARGET }}
   OPENWRT_SUBTARGET: ${{ vars.OPENWRT_SUBTARGET }}
@@ -56,7 +55,12 @@ jobs:
           esac
 
           test -f luci-app-openkill/Makefile
-          grep -q '^PKG_VERSION:=2026-1120$' luci-app-openkill/Makefile
+          OPENKILL_VERSION=$(awk -F:= '/^PKG_VERSION:=/{print $2; exit}' luci-app-openkill/Makefile | tr -d '[:space:]')
+          case "$OPENKILL_VERSION" in
+            ????-????) ;;
+            *) echo "Invalid PKG_VERSION: $OPENKILL_VERSION" >&2; exit 1 ;;
+          esac
+          echo "OPENKILL_VERSION=$OPENKILL_VERSION" >> "$GITHUB_ENV"
 
           mapfile -t version_hits < <(
             rg -n --hidden --glob '!**/.git/**' \
@@ -111,7 +115,6 @@ jobs:
           rm -rf package/luci-app-openkill
           cp -a "$GITHUB_WORKSPACE/luci-app-openkill" package/luci-app-openkill
 
-          make defconfig
           for symbol in CONFIG_ALL CONFIG_ALL_KMODS; do
             if grep -q "^${symbol}=" .config; then
               sed -i "s/^${symbol}=.*/# ${symbol} is not set/" .config
@@ -119,6 +122,15 @@ jobs:
               printf '# %s is not set\n' "$symbol" >> .config
             fi
           done
+          if [ -x ./scripts/config ]; then
+            ./scripts/config --module CONFIG_PACKAGE_luci-app-openkill
+          else
+            grep -q '^CONFIG_PACKAGE_luci-app-openkill=m' .config || echo 'CONFIG_PACKAGE_luci-app-openkill=m' >> .config
+          fi
+          make defconfig
+          echo 'Selected package summary:'
+          grep -E '^CONFIG_PACKAGE_(luci-app-openkill|firewall4|iptables|openssl|ruby|rust|llvm|gmp)' .config || true
+          echo "CONFIG_PACKAGE count: $(grep -c '^CONFIG_PACKAGE_.*=[ym]' .config || true)"
           if grep -q '^CONFIG_ALL=y' .config || grep -q '^CONFIG_ALL_KMODS=y' .config; then
             echo 'Refusing a broad CONFIG_ALL/CONFIG_ALL_KMODS build.' >&2
             exit 1
@@ -206,7 +218,7 @@ jobs:
           }
 
           grep -qx 'Package: luci-app-openkill' "$GITHUB_WORKSPACE/ipk-audit/control/control"
-          grep -qx 'Version: 2026-1120' "$GITHUB_WORKSPACE/ipk-audit/control/control"
+          grep -qx "Version: $OPENKILL_VERSION" "$GITHUB_WORKSPACE/ipk-audit/control/control"
           grep -qx 'Architecture: all' "$GITHUB_WORKSPACE/ipk-audit/control/control"
           grep -qx '/etc/config/openkill' "$GITHUB_WORKSPACE/ipk-audit/control/conffiles"
 
@@ -228,7 +240,7 @@ jobs:
             echo 'Stale development resource references found in the IPK.' >&2
             exit 1
           fi
-          rg -n 'oc\.css\?v=2026-1120|flat\.css\?v=2026-1120' "$GITHUB_WORKSPACE/ipk-audit/data" >/dev/null
+          rg -n "oc\.css\?v=$OPENKILL_VERSION|flat\.css\?v=$OPENKILL_VERSION" "$GITHUB_WORKSPACE/ipk-audit/data" >/dev/null
 
           mapfile -t sensitive_hits < <(
             rg -n --hidden --glob '*.htm' --glob '*.html' --glob '*.css' --glob '*.js' \
@@ -266,7 +278,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: OpenKill-2026-1120-openwrt-sdk
+          name: OpenKill-openwrt-sdk-audit
           path: artifact/
           if-no-files-found: error
 
@@ -282,10 +294,10 @@ jobs:
             exit 1
           fi
           test -f "$GITHUB_WORKSPACE/artifact/audit-report.txt"
-          ipk="$(find "$GITHUB_WORKSPACE/artifact" -maxdepth 1 -type f -name 'luci-app-openkill_2026-1120_all.ipk' -print -quit)"
+          ipk="$(find "$GITHUB_WORKSPACE/artifact" -maxdepth 1 -type f -name "luci-app-openkill_${OPENKILL_VERSION}_all.ipk" -print -quit)"
           test -n "$ipk"
           {
-            echo '## OpenKill 2026-1120 SDK build'
+            echo '## OpenKill SDK build'
             echo
             echo "- Version: $OPENKILL_VERSION"
             echo "- Commit: $GITHUB_SHA"
