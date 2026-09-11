@@ -292,6 +292,10 @@ class DualStackRoutingTests(unittest.TestCase):
         self.assertIn('openkill-fw4-reload.lock', helper)
         self.assertIn('sleep 3', helper)
         self.assertIn('/etc/init.d/openkill reload "firewall-deferred"', helper)
+        self.assertIn('for attempt in 1 2 3', helper)
+        self.assertIn('uci -q get openkill.config.enable', helper)
+        self.assertIn('/etc/init.d/openkill start', helper)
+        self.assertIn('jsonfilter -e', helper)
 
     def test_dns_fallback_uses_rules_and_health_probes_are_bounded(self):
         source = (SHARE / 'yml_change.sh').read_text(encoding='utf-8')
