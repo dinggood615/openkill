@@ -23,6 +23,7 @@ else
   OPENKILL_EXTRA_DEPENDS:=
 endif
 
+ifneq ($(OPENKILL_SDK_TEST),1)
 define Package/$(PKG_NAME)/config
 	config PACKAGE_kmod-inet-diag
 	default y if PACKAGE_$(PKG_NAME)
@@ -51,6 +52,7 @@ define Package/$(PKG_NAME)/config
 	config PACKAGE_ipset
 	default y if ! PACKAGE_firewall4
 endef
+endif
 
 define Package/$(PKG_NAME)
 	CATEGORY:=LuCI

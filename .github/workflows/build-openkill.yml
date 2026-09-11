@@ -137,21 +137,6 @@ jobs:
             printf '# %s is not set\n' "$symbol" >> .config
           done
           printf 'CONFIG_PACKAGE_luci-app-openkill=m\n' >> .config
-          # Keep the SDK's fw4 target selected so luci-app-openkill's
-          # conditional package options do not fall back to legacy iptables.
-          printf 'CONFIG_PACKAGE_firewall4=y\n' >> .config
-          printf 'CONFIG_PACKAGE_kmod-nft-tproxy=m\n' >> .config
-          printf 'CONFIG_PACKAGE_dnsmasq_full_nftset=y\n' >> .config
-          printf 'CONFIG_PACKAGE_dnsmasq_full_conntrack=y\n' >> .config
-          for symbol in \
-            CONFIG_PACKAGE_kmod-ipt-nat \
-            CONFIG_PACKAGE_iptables-mod-tproxy \
-            CONFIG_PACKAGE_iptables-mod-extra \
-            CONFIG_PACKAGE_dnsmasq_full_ipset \
-            CONFIG_PACKAGE_ipset; do
-            printf '# %s is not set\n' "$symbol" >> .config
-          done
-
           grep -Eq '^CONFIG_PACKAGE_luci-app-openkill=[my]$' .config
           {
             echo '--- SDK package configuration diagnostics ---'
