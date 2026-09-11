@@ -177,79 +177,93 @@ jobs:
             echo "OpenWrt version: $OPENWRT_VERSION"
             echo "Target: $OPENWRT_TARGET/$OPENWRT_SUBTARGET"
             echo "SDK URL: $OPENWRT_SDK_URL"
-            make package/luci-app-openkill/clean V=s
-            make package/luci-app-openkill/compile V=s
+            make OPENKILL_SDK_TEST=1 package/luci-app-openkill/clean V=s
+            make OPENKILL_SDK_TEST=1 package/luci-app-openkill/compile V=s
           } 2>&1 | tee "$GITHUB_WORKSPACE/build-openkill.log"
 
-      - name: Locate and audit the IPK
+      - name: Locate and audit the package
         if: steps.package_build.outcome == 'success'
         shell: bash
         run: |
           set -Eeuo pipefail
-          mapfile -t ipks < <(find "$SDK_DIR/bin" -type f -name "luci-app-openkill_${OPENKILL_VERSION}_all.ipk" -print)
-          if ((${#ipks[@]} != 1)); then
-            printf 'Expected exactly one IPK, found %s:\n' "${#ipks[@]}"
-            printf '%s\n' "${ipks[@]:-<none>}"
+          mapfile -t packages < <(find "$SDK_DIR/bin" -type f \( \
+            -name "luci-app-openkill_${OPENKILL_VERSION}_all.ipk" -o \
+            -name "luci-app-openkill-${OPENKILL_VERSION}.apk" \
+          \) -print)
+          if ((${#packages[@]} != 1)); then
+            printf 'Expected exactly one OpenKill package, found %s:\n' "${#packages[@]}"
+            printf '%s\n' "${packages[@]:-<none>}"
             exit 1
           fi
-          ipk="${ipks[0]}"
-          cp -f "$ipk" "$GITHUB_WORKSPACE/artifact/"
-          printf '%s\n' "$(sha256sum "$ipk")" > "$GITHUB_WORKSPACE/artifact/SHA256SUMS"
+          package_file="${packages[0]}"
+          package_name="$(basename "$package_file")"
+          package_format=ipk
+          case "$package_file" in *.apk) package_format=apk ;; esac
+          cp -f "$package_file" "$GITHUB_WORKSPACE/artifact/"
+          printf '%s\n' "$(sha256sum "$package_file")" > "$GITHUB_WORKSPACE/artifact/SHA256SUMS"
 
           rm -rf "$GITHUB_WORKSPACE/ipk-audit"
           mkdir -p "$GITHUB_WORKSPACE/ipk-audit/control" "$GITHUB_WORKSPACE/ipk-audit/data"
-          if tar -tzf "$ipk" >/dev/null 2>&1; then
-            tar -xzf "$ipk" -C "$GITHUB_WORKSPACE/ipk-audit"
-            for archive in control.tar.gz control.tar.xz control.tar.zst; do
-              if test -f "$GITHUB_WORKSPACE/ipk-audit/$archive"; then
+          if [ "$package_format" = ipk ]; then
+            if tar -tzf "$package_file" >/dev/null 2>&1; then
+              tar -xzf "$package_file" -C "$GITHUB_WORKSPACE/ipk-audit"
+              for archive in control.tar.gz control.tar.xz control.tar.zst; do
+                if test -f "$GITHUB_WORKSPACE/ipk-audit/$archive"; then
+                  case "$archive" in
+                    *.tar.gz) tar -xzf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
+                    *.tar.xz) tar -xJf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
+                    *.tar.zst) tar --zstd -xf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
+                  esac
+                  break
+                fi
+              done
+              for archive in data.tar.gz data.tar.xz data.tar.zst; do
+                if test -f "$GITHUB_WORKSPACE/ipk-audit/$archive"; then
+                  case "$archive" in
+                    *.tar.gz) tar -xzf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
+                    *.tar.xz) tar -xJf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
+                    *.tar.zst) tar --zstd -xf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
+                  esac
+                  break
+                fi
+              done
+            else
+              ar_dir="$GITHUB_WORKSPACE/ipk-audit/ar"
+              mkdir -p "$ar_dir"
+              (cd "$ar_dir" && ar x "$package_file")
+              cd "$ar_dir"
+              for archive in control.tar.gz control.tar.xz control.tar.zst data.tar.gz data.tar.xz data.tar.zst; do
+                test -f "$archive" || continue
                 case "$archive" in
-                  *.tar.gz) tar -xzf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
-                  *.tar.xz) tar -xJf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
-                  *.tar.zst) tar --zstd -xf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
+                  control.tar.gz) tar -xzf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
+                  control.tar.xz) tar -xJf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
+                  control.tar.zst) tar --zstd -xf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
+                  data.tar.gz) tar -xzf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
+                  data.tar.xz) tar -xJf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
+                  data.tar.zst) tar --zstd -xf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
                 esac
-                break
-              fi
-            done
-            for archive in data.tar.gz data.tar.xz data.tar.zst; do
-              if test -f "$GITHUB_WORKSPACE/ipk-audit/$archive"; then
-                case "$archive" in
-                  *.tar.gz) tar -xzf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
-                  *.tar.xz) tar -xJf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
-                  *.tar.zst) tar --zstd -xf "$GITHUB_WORKSPACE/ipk-audit/$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
-                esac
-                break
-              fi
-            done
+              done
+            fi
+            test -f "$GITHUB_WORKSPACE/ipk-audit/control/control" || { echo 'Could not extract IPK control metadata.' >&2; exit 1; }
+            test -f "$GITHUB_WORKSPACE/ipk-audit/control/conffiles" || { echo 'IPK has no conffiles metadata.' >&2; exit 1; }
           else
-            ar_dir="$GITHUB_WORKSPACE/ipk-audit/ar"
-            mkdir -p "$ar_dir"
-            (cd "$ar_dir" && ar x "$ipk")
-            cd "$ar_dir"
-            for archive in control.tar.gz control.tar.xz control.tar.zst data.tar.gz data.tar.xz data.tar.zst; do
-              test -f "$archive" || continue
-              case "$archive" in
-                control.tar.gz) tar -xzf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
-                control.tar.xz) tar -xJf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
-                control.tar.zst) tar --zstd -xf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/control" ;;
-                data.tar.gz) tar -xzf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
-                data.tar.xz) tar -xJf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
-                data.tar.zst) tar --zstd -xf "$archive" -C "$GITHUB_WORKSPACE/ipk-audit/data" ;;
-              esac
-            done
+            test -s "$package_file"
+            # apk is a tar archive with a .PKGINFO metadata file.
+            tar -xf "$package_file" -C "$GITHUB_WORKSPACE/ipk-audit/data"
+            tar -xOf "$package_file" .PKGINFO > "$GITHUB_WORKSPACE/ipk-audit/control/control"
+            tar -tf "$package_file" | grep -qx './etc/config/openkill' || tar -tf "$package_file" | grep -qx 'etc/config/openkill'
           fi
-          test -f "$GITHUB_WORKSPACE/ipk-audit/control/control" || {
-            echo 'Could not extract IPK control metadata.' >&2
-            exit 1
-          }
-          test -f "$GITHUB_WORKSPACE/ipk-audit/control/conffiles" || {
-            echo 'IPK has no conffiles metadata.' >&2
-            exit 1
-          }
 
-          grep -qx 'Package: luci-app-openkill' "$GITHUB_WORKSPACE/ipk-audit/control/control"
-          grep -qx 'Version: 2026-1120' "$GITHUB_WORKSPACE/ipk-audit/control/control"
-          grep -qx 'Architecture: all' "$GITHUB_WORKSPACE/ipk-audit/control/control"
-          grep -qx '/etc/config/openkill' "$GITHUB_WORKSPACE/ipk-audit/control/conffiles"
+          if [ "$package_format" = ipk ]; then
+            grep -qx 'Package: luci-app-openkill' "$GITHUB_WORKSPACE/ipk-audit/control/control"
+            grep -qx 'Version: 2026-1120' "$GITHUB_WORKSPACE/ipk-audit/control/control"
+            grep -qx 'Architecture: all' "$GITHUB_WORKSPACE/ipk-audit/control/control"
+            grep -qx '/etc/config/openkill' "$GITHUB_WORKSPACE/ipk-audit/control/conffiles"
+          else
+            grep -qx 'pkgname = luci-app-openkill' "$GITHUB_WORKSPACE/ipk-audit/control/control"
+            grep -qx 'pkgver = 2026-1120' "$GITHUB_WORKSPACE/ipk-audit/control/control"
+            grep -qx 'arch = noarch' "$GITHUB_WORKSPACE/ipk-audit/control/control"
+          fi
 
           postrm="$GITHUB_WORKSPACE/ipk-audit/control/postrm"
           if test -f "$postrm" && grep -n -E 'rm[[:space:]].*(/etc/config/openkill|/etc/openkill|/usr/share/openkill|/www/luci-static/resources/openkill)' "$postrm"; then
@@ -261,7 +275,7 @@ jobs:
             grep -R -n -E \
               --include='*.htm' --include='*.html' --include='*.css' --include='*.js' \
               --include='*.lua' --include='*.sh' --include='*.po' --include='*.conf' \
-              --include='control' --include='conffiles' \
+              --include='control' --include='conffiles' --include='.PKGINFO' \
               'dev[0-9]+|2026-1119-dev' "$GITHUB_WORKSPACE/ipk-audit/control" "$GITHUB_WORKSPACE/ipk-audit/data" || true
           )
           if ((${#stale_refs[@]})); then
@@ -285,7 +299,8 @@ jobs:
           fi
 
           {
-            echo "IPK: $(basename "$ipk")"
+            echo "Package: $package_name"
+            echo "Format: $package_format"
             echo "SHA256: $(cut -d' ' -f1 "$GITHUB_WORKSPACE/artifact/SHA256SUMS")"
             echo 'Package metadata: OK'
             echo 'Conffile preservation: /etc/config/openkill'
@@ -324,16 +339,16 @@ jobs:
             exit 1
           fi
           test -f "$GITHUB_WORKSPACE/artifact/audit-report.txt"
-          ipk="$(find "$GITHUB_WORKSPACE/artifact" -maxdepth 1 -type f -name 'luci-app-openkill_2026-1120_all.ipk' -print -quit)"
-          test -n "$ipk"
+          package_file="$(find "$GITHUB_WORKSPACE/artifact" -maxdepth 1 -type f \( -name 'luci-app-openkill_2026-1120_all.ipk' -o -name 'luci-app-openkill-2026-1120.apk' \) -print -quit)"
+          test -n "$package_file"
           {
             echo '## OpenKill 2026-1120 SDK build'
             echo
             echo "- Version: $OPENKILL_VERSION"
             echo "- Commit: $GITHUB_SHA"
             echo "- OpenWrt: $OPENWRT_VERSION ($OPENWRT_TARGET/$OPENWRT_SUBTARGET)"
-            echo "- IPK: $(basename "$ipk")"
-            echo "- Size: $(stat -c '%s' "$ipk") bytes"
-            echo "- SHA256: $(sha256sum "$ipk" | cut -d' ' -f1)"
+            echo "- Package: $(basename "$package_file")"
+            echo "- Size: $(stat -c '%s' "$package_file") bytes"
+            echo "- SHA256: $(sha256sum "$package_file" | cut -d' ' -f1)"
             echo '- Scope: single-package SDK build; no release or publish step'
           } >> "$GITHUB_STEP_SUMMARY"
