@@ -137,7 +137,9 @@ for candidate in /etc/openkill/clash /etc/openkill/core/clash_meta /tmp/etc/open
 done
 mihomo_version="N/A"
 if [ -n "$core_path" ]; then
-    mihomo_version=$($core_path -v 2>/dev/null | head -n 1 | tr -cd '[:alnum:]._+-')
+    # Keep only a compact version token without BusyBox tr character-class
+    # quirks; sed's POSIX classes work consistently on supported firmware.
+    mihomo_version=$($core_path -v 2>/dev/null | head -n 1 | sed 's/[^[:alnum:]_.+-]//g')
     [ -n "$mihomo_version" ] || mihomo_version="N/A"
 fi
 openkill_version="N/A"
