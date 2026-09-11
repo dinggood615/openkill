@@ -99,8 +99,15 @@ jobs:
           test -f "$sdk_dir/Makefile"
           test -d "$sdk_dir/scripts"
           test -d "$sdk_dir/staging_dir"
-          test -f "$sdk_dir/.config"
-          cp -f "$sdk_dir/.config" "$GITHUB_WORKSPACE/sdk-original.config"
+          if test -f "$sdk_dir/.config"; then
+            cp -f "$sdk_dir/.config" "$GITHUB_WORKSPACE/sdk-original.config"
+          else
+            # SDK archives normally omit .config.  Materialize the SDK's
+            # default configuration only to capture a before snapshot; the
+            # package selections are scrubbed before the real build config.
+            make -C "$sdk_dir" defconfig
+            cp -f "$sdk_dir/.config" "$GITHUB_WORKSPACE/sdk-original.config"
+          fi
           printf 'SDK_DIR=%s\n' "$sdk_dir" >> "$GITHUB_ENV"
           echo "SDK directory: $sdk_dir"
           ls -ld "$sdk_dir/Makefile" "$sdk_dir/scripts" "$sdk_dir/staging_dir"
