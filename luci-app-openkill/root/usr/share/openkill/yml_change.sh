@@ -75,6 +75,9 @@ if [ -z "${12}" ]; then
 else
    stack_type=${12}
 fi
+# The IPv6-only TUN path has its own stack selector.  Keep the parameter
+# expansion braced so BusyBox ash treats position 30 as one argument.
+stack_type_v6=${30:-"mixed"}
 
 if [ "$1" = "fake-ip" ] && [ "$enable_redirect_dns" != "2" ]; then
    TMP_FILTER_FILE="/tmp/yaml_openkill_fake_filter_include"
@@ -671,7 +674,7 @@ begin
 
          if en_mode_tun != '0' || ['2', '3'].include?(ipv6_mode)
             tun_stack = stack_type
-            tun_stack = '${12}' if en_mode_tun == '0' && ['2', '3'].include?(ipv6_mode) && '${12}' != '0' && '${12}' != ''
+            tun_stack = '$stack_type_v6' if en_mode_tun == '0' && ['2', '3'].include?(ipv6_mode)
             tun_dns_hijack = if tun_owner == 'mihomo'
                ['any:53', 'tcp://any:53']
             else

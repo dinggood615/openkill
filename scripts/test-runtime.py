@@ -160,6 +160,53 @@ class FirewallShellCompatibilityTests(unittest.TestCase):
 
 
 class DualStackRoutingTests(unittest.TestCase):
+    def test_tun_stack_argument_mapping_matrix(self):
+        change = (SHARE / 'yml_change.sh').read_text(encoding='utf-8')
+        init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+
+        # The init call supplies stack_type at position 12 and stack_type_v6
+        # at position 30.  The latter must use braced POSIX expansion.
+        self.assertIn('stack_type_v6=${30:-"mixed"}', change)
+        self.assertIn("tun_stack = '$stack_type_v6' if en_mode_tun == '0'", change)
+        self.assertNotRegex(change, r'(?<!\{)\$30')
+        call = init.split('/usr/share/openkill/yml_change.sh', 1)[1].split(
+            '# Validate the rewritten controller context', 1)[0]
+        self.assertIn('"$en_mode_tun" "$stack_type" "$dns_port"', call)
+        self.assertIn('"$ipv6_mode" "$stack_type_v6" "$enable_unified_delay"', call)
+
+        def selected(v4, v6, en_mode_tun, ipv6_mode):
+            # This is the externally visible selector contract represented by
+            # the Ruby heredoc branch; dual-stack keeps the existing v4 choice.
+            if en_mode_tun == '0' and ipv6_mode in ('2', '3'):
+                return v6
+            return v4
+
+        cases = [
+            ('system', 'gvisor', '1', '0', 'system'),   # IPv4-only
+            ('system', 'gvisor', '0', '2', 'gvisor'),   # IPv6-only
+            ('gvisor', 'mixed', '1', '0', 'gvisor'),    # IPv4-only
+            ('gvisor', 'mixed', '0', '2', 'mixed'),     # IPv6-only
+            ('system', 'gvisor', '1', '2', 'system'),   # dual-stack design
+        ]
+        for v4, v6, tun, ipv6_mode, expected in cases:
+            with self.subTest(v4=v4, v6=v6, tun=tun, ipv6_mode=ipv6_mode):
+                self.assertEqual(selected(v4, v6, tun, ipv6_mode), expected)
+
+    def test_benchmark_is_read_only_and_busybox_ash_compatible(self):
+        source = (SHARE / 'openkill-benchmark.sh').read_text(encoding='utf-8')
+        self.assertTrue(source.startswith('#!/bin/sh'))
+        for marker in ('--label', '--iperf-server', '--udp', '--show-public-ip',
+                       'nf_conntrack_count', 'rps_cpus', 'xps_cpus', 'ethtool',
+                       'openkill-benchmark-'):
+            self.assertIn(marker, source)
+        self.assertNotRegex(source, r'(^|[\s;])\[\[')
+        self.assertNotRegex(source, r'(^|[\s;])\]\]')
+        for forbidden in ('mapfile', 'sysctl -w', 'uci -q set',
+                          'uci set', 'nft add', 'nft delete', 'nft flush',
+                          'ip route add', 'ip route replace', 'ip route del',
+                          'ip -6 route add', 'ip -6 route replace', 'ip -6 route del'):
+            self.assertNotIn(forbidden, source)
+
     def test_dns_bootstrap_is_bound_to_physical_wan(self):
         source = (SHARE / 'yml_change.sh').read_text(encoding='utf-8')
         self.assertIn('dns_wan_interface=', source)
