@@ -133,19 +133,37 @@ jobs:
           # if the expected Makefile shape changes.
           python3 - <<'PY'
           from pathlib import Path
-          import re
 
           makefile = Path("package/luci-app-openkill/Makefile")
-          text = makefile.read_text()
-          config = re.compile(r"define Package/\$\(PKG_NAME\)/config\n.*?^endef\n", re.MULTILINE | re.DOTALL)
-          text, removed = config.subn("", text, count=1)
-          if removed != 1:
-              raise SystemExit("unexpected OpenKill config block")
-          depends = re.compile(r"^[ \t]*DEPENDS:=.*(?:\\\n[ \t]*\+[^\n]+)?$", re.MULTILINE)
-          text, replaced = depends.subn("\tDEPENDS:=\n\tEXTRA_DEPENDS:=dnsmasq-full (>=0),bash (>=0),curl (>=0),ca-bundle (>=0),ip-full (>=0),lua (>=0),ruby (>=0),ruby-yaml (>=0),luci-compat (>=0),kmod-tun (>=0),kmod-inet-diag (>=0),unzip (>=0)", text, count=1)
-          if replaced != 1:
-              raise SystemExit("unexpected OpenKill DEPENDS line")
-          makefile.write_text(text)
+          lines = makefile.read_text().splitlines()
+          output = []
+          in_config = False
+          removed_config = 0
+          replaced_depends = 0
+          skip_continuation = False
+          for line in lines:
+              if skip_continuation:
+                  skip_continuation = False
+                  continue
+              if line == "define Package/$(PKG_NAME)/config":
+                  in_config = True
+                  removed_config += 1
+                  continue
+              if in_config:
+                  if line == "endef":
+                      in_config = False
+                  continue
+              if line.strip().startswith("DEPENDS:="):
+                  replaced_depends += 1
+                  output.append("\tDEPENDS:=")
+                  output.append("\tEXTRA_DEPENDS:=dnsmasq-full (>=0),bash (>=0),curl (>=0),ca-bundle (>=0),ip-full (>=0),lua (>=0),ruby (>=0),ruby-yaml (>=0),luci-compat (>=0),kmod-tun (>=0),kmod-inet-diag (>=0),unzip (>=0)")
+                  if line.rstrip().endswith("\\"):
+                      skip_continuation = True
+                  continue
+              output.append(line)
+          if in_config or removed_config != 1 or replaced_depends != 1:
+              raise SystemExit("unexpected OpenKill Makefile shape")
+          makefile.write_text("\n".join(output) + "\n")
           PY
 
           # Load the SDK/feed metadata first so package dependencies are known.
