@@ -127,17 +127,16 @@ jobs:
           rm -rf package/luci-app-openkill
           cp -a "$GITHUB_WORKSPACE/luci-app-openkill" package/luci-app-openkill
 
-          # Start from the SDK target/toolchain configuration, but remove
-          # package selections inherited from the SDK image.  Those selections
-          # can include Rust/LLVM and other unrelated packages even when the
-          # requested target is a single package.
+          # Load the SDK/feed metadata first so package dependencies are known.
+          # The SDK defaults can select a broad package set, so scrub those
+          # selections after defconfig and do not run defconfig again.
+          make defconfig
           sed -i -E '/^CONFIG_PACKAGE_[^=]+=.*$/d' .config
           for symbol in CONFIG_ALL CONFIG_ALL_KMODS CONFIG_ALL_NONSHARED CONFIG_BUILDBOT; do
             sed -i -E "/^${symbol}=.*$/d; /^# ${symbol} is not set$/d" .config
             printf '# %s is not set\n' "$symbol" >> .config
           done
           printf 'CONFIG_PACKAGE_luci-app-openkill=m\n' >> .config
-          make defconfig
 
           grep -Eq '^CONFIG_PACKAGE_luci-app-openkill=[my]$' .config
           {
