@@ -140,6 +140,17 @@ jobs:
           # Keep the SDK's fw4 target selected so luci-app-openkill's
           # conditional package options do not fall back to legacy iptables.
           printf 'CONFIG_PACKAGE_firewall4=y\n' >> .config
+          printf 'CONFIG_PACKAGE_kmod-nft-tproxy=m\n' >> .config
+          printf 'CONFIG_PACKAGE_dnsmasq_full_nftset=y\n' >> .config
+          printf 'CONFIG_PACKAGE_dnsmasq_full_conntrack=y\n' >> .config
+          for symbol in \
+            CONFIG_PACKAGE_kmod-ipt-nat \
+            CONFIG_PACKAGE_iptables-mod-tproxy \
+            CONFIG_PACKAGE_iptables-mod-extra \
+            CONFIG_PACKAGE_dnsmasq_full_ipset \
+            CONFIG_PACKAGE_ipset; do
+            printf '# %s is not set\n' "$symbol" >> .config
+          done
 
           grep -Eq '^CONFIG_PACKAGE_luci-app-openkill=[my]$' .config
           {
@@ -147,11 +158,11 @@ jobs:
             echo "Original active package selections: $(grep -Ec '^CONFIG_PACKAGE_[^=]+=(y|m)$' "$GITHUB_WORKSPACE/sdk-original.config" || true)"
             echo "Final active package selections: $(grep -Ec '^CONFIG_PACKAGE_[^=]+=(y|m)$' .config || true)"
             echo 'Original relevant selectors:'
-            grep -E '^CONFIG_(PACKAGE_(luci-app-openkill|firewall4|rust|llvm|clang|iptables|nft|openssl|gmp)|ALL|ALL_KMODS|ALL_NONSHARED|DEVEL|BUILDBOT)=' "$GITHUB_WORKSPACE/sdk-original.config" || true
+            grep -E '^CONFIG_(PACKAGE_(luci-app-openkill|firewall4|kmod-(nft|ipt)-|iptables|dnsmasq_full_|ipset|rust|llvm|clang|nft|openssl|gmp)|ALL|ALL_KMODS|ALL_NONSHARED|DEVEL|BUILDBOT)=' "$GITHUB_WORKSPACE/sdk-original.config" || true
             echo 'Final relevant selectors:'
-            grep -E '^CONFIG_(PACKAGE_(luci-app-openkill|firewall4|rust|llvm|clang|iptables|nft|openssl|gmp)|ALL|ALL_KMODS|ALL_NONSHARED|DEVEL|BUILDBOT)=' .config || true
+            grep -E '^CONFIG_(PACKAGE_(luci-app-openkill|firewall4|kmod-(nft|ipt)-|iptables|dnsmasq_full_|ipset|rust|llvm|clang|nft|openssl|gmp)|ALL|ALL_KMODS|ALL_NONSHARED|DEVEL|BUILDBOT)=' .config || true
             echo 'Final selected package symbols:'
-            grep -E '^CONFIG_PACKAGE_(luci-app-openkill|firewall4|rust|llvm|clang|iptables|nft|openssl|gmp)=[my]$' .config || true
+            grep -E '^CONFIG_PACKAGE_(luci-app-openkill|firewall4|kmod-(nft|ipt)-|iptables|dnsmasq_full_|ipset|rust|llvm|clang|nft|openssl|gmp)=[my]$' .config || true
           } | tee "$GITHUB_WORKSPACE/artifact/config-diagnostics.txt"
 
       - name: Build only luci-app-openkill
