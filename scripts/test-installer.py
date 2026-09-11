@@ -156,9 +156,9 @@ chosen=$(select_newest_manifest "$WORK_DIR/rows")
         self.assertNotIn("Post-Process", data["jobs"])
 
         for released, source, expected_returncode in (
-            ("2026-1119", "2026-1120", 0),
-            ("2026-1120", "2026-1120", 1),
-            ("2026-1120", "2026-1119", 1),
+            ("2026-1120", "2026-1121", 0),
+            ("2026-1121", "2026-1121", 1),
+            ("2026-1121", "2026-1120", 1),
             ("2026-9999", "2027-0001", 0),
         ):
             with self.subTest(released=released, source=source):
