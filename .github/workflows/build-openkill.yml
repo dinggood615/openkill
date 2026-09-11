@@ -97,6 +97,8 @@ jobs:
           test -f "$sdk_dir/Makefile"
           test -d "$sdk_dir/scripts"
           test -d "$sdk_dir/staging_dir"
+          test -f "$sdk_dir/.config"
+          cp -f "$sdk_dir/.config" "$GITHUB_WORKSPACE/sdk-original.config"
           printf 'SDK_DIR=%s\n' "$sdk_dir" >> "$GITHUB_ENV"
           echo "SDK directory: $sdk_dir"
           ls -ld "$sdk_dir/Makefile" "$sdk_dir/scripts" "$sdk_dir/staging_dir"
@@ -107,22 +109,39 @@ jobs:
           set -Eeuo pipefail
           cd "$SDK_DIR"
           ./scripts/feeds update -a
-          ./scripts/feeds install -a
+          # Only expose feed packages required by luci-app-openkill.  The SDK
+          # already contains the base/kernel package definitions; installing
+          # every feed package makes the package universe needlessly broad.
+          ./scripts/feeds install \
+            bash ca-bundle curl dnsmasq-full ip-full lua luci-compat \
+            ruby ruby-yaml unzip
           rm -rf package/luci-app-openkill
           cp -a "$GITHUB_WORKSPACE/luci-app-openkill" package/luci-app-openkill
 
-          make defconfig
-          for symbol in CONFIG_ALL CONFIG_ALL_KMODS; do
-            if grep -q "^${symbol}=" .config; then
-              sed -i "s/^${symbol}=.*/# ${symbol} is not set/" .config
-            elif ! grep -q "^# ${symbol} is not set$" .config; then
-              printf '# %s is not set\n' "$symbol" >> .config
-            fi
+          # Start from the SDK target/toolchain configuration, but remove
+          # package selections inherited from the SDK image.  Those selections
+          # can include Rust/LLVM and other unrelated packages even when the
+          # requested target is a single package.
+          sed -i -E '/^CONFIG_PACKAGE_[^=]+=.*$/d' .config
+          for symbol in CONFIG_ALL CONFIG_ALL_KMODS CONFIG_ALL_NONSHARED CONFIG_BUILDBOT; do
+            sed -i -E "/^${symbol}=.*$/d; /^# ${symbol} is not set$/d" .config
+            printf '# %s is not set\n' "$symbol" >> .config
           done
-          if grep -q '^CONFIG_ALL=y' .config || grep -q '^CONFIG_ALL_KMODS=y' .config; then
-            echo 'Refusing a broad CONFIG_ALL/CONFIG_ALL_KMODS build.' >&2
-            exit 1
-          fi
+          printf 'CONFIG_PACKAGE_luci-app-openkill=m\n' >> .config
+          make defconfig
+
+          grep -Eq '^CONFIG_PACKAGE_luci-app-openkill=[my]$' .config
+          {
+            echo '--- SDK package configuration diagnostics ---'
+            echo "Original active package selections: $(grep -Ec '^CONFIG_PACKAGE_[^=]+=(y|m)$' "$GITHUB_WORKSPACE/sdk-original.config" || true)"
+            echo "Final active package selections: $(grep -Ec '^CONFIG_PACKAGE_[^=]+=(y|m)$' .config || true)"
+            echo 'Original relevant selectors:'
+            grep -E '^CONFIG_(PACKAGE_(luci-app-openkill|rust|llvm|clang|iptables|nft|openssl|gmp)|ALL|ALL_KMODS|ALL_NONSHARED|DEVEL|BUILDBOT)=' "$GITHUB_WORKSPACE/sdk-original.config" || true
+            echo 'Final relevant selectors:'
+            grep -E '^CONFIG_(PACKAGE_(luci-app-openkill|rust|llvm|clang|iptables|nft|openssl|gmp)|ALL|ALL_KMODS|ALL_NONSHARED|DEVEL|BUILDBOT)=' .config || true
+            echo 'Final selected package symbols:'
+            grep -E '^CONFIG_PACKAGE_(luci-app-openkill|rust|llvm|clang|iptables|nft|openssl|gmp)=[my]$' .config || true
+          } | tee "$GITHUB_WORKSPACE/artifact/config-diagnostics.txt"
 
       - name: Build only luci-app-openkill
         id: package_build
