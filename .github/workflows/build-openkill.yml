@@ -162,8 +162,12 @@ jobs:
             echo "OpenWrt version: $OPENWRT_VERSION"
             echo "Target: $OPENWRT_TARGET/$OPENWRT_SUBTARGET"
             echo "SDK URL: $OPENWRT_SDK_URL"
-            make OPENKILL_SDK_TEST=1 package/luci-app-openkill/clean V=s
-            make OPENKILL_SDK_TEST=1 package/luci-app-openkill/compile V=s
+            # package.mk resets MAKEFLAGS for recursive builds, so export the
+            # opt-in test switch instead of relying on a command-line make
+            # variable to reach the package recipe.
+            export OPENKILL_SDK_TEST=1
+            make package/luci-app-openkill/clean V=s
+            make package/luci-app-openkill/compile V=s
           } 2>&1 | tee "$GITHUB_WORKSPACE/build-openkill.log"
 
       - name: Locate and audit the package
