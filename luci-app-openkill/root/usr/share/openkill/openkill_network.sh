@@ -12,27 +12,56 @@ openkill_interface_json_value()
 {
     json_file="$1"; index="$2"; field="$3"
     command -v jsonfilter >/dev/null 2>&1 || return 1
-    value=$(jsonfilter -i "$json_file" -e "@.interface[$index].$field" 2>/dev/null | sed -n '1p')
+    case "$field" in
+        ipv6-prefix-assignment*)
+            field_expression="[\"ipv6-prefix-assignment\"]${field#ipv6-prefix-assignment}" ;;
+        ipv4-address*)
+            field_expression="[\"ipv4-address\"]${field#ipv4-address}" ;;
+        ipv6-address*)
+            field_expression="[\"ipv6-address\"]${field#ipv6-address}" ;;
+        ipv6-prefix*)
+            field_expression="[\"ipv6-prefix\"]${field#ipv6-prefix}" ;;
+        dns-server*)
+            field_expression="[\"dns-server\"]${field#dns-server}" ;;
+        *)
+            field_expression=".$field" ;;
+    esac
+    expression="@.interface[$index]$field_expression"
+    value=$(jsonfilter -i "$json_file" -e "$expression" 2>/dev/null | sed -n '1p')
+    # Older jsonfilter builds and lightweight test shims may only implement
+    # dotted access. Keep that as a compatibility fallback, while production
+    # uses bracket notation for netifd's hyphenated keys above.
+    if [ -z "$value" ] && [ "$field_expression" != ".$field" ]; then
+        value=$(jsonfilter -i "$json_file" -e "@.interface[$index].$field" 2>/dev/null | sed -n '1p')
+    fi
     value=$(printf '%s' "$value" | sed 's/^"//; s/"$//')
     [ -n "$value" ] && printf '%s\n' "$value"
+}
+
+openkill_write_selected_interface_role()
+{
+    output_file="$1"; selected_name="$2"; selected_device="$3"; selected_index="$4"
+    printf 'INTERFACE=%s\nDEVICE=%s\n' "$selected_name" "$selected_device" > "$output_file"
+    [ -n "$selected_index" ] && printf 'INDEX=%s\n' "$selected_index" >> "$output_file"
+    return 0
 }
 
 openkill_select_interface_role()
 {
     records_file="$1"; explicit="$2"; canonical="$3"; route_devices="$4"; output_file="$5"; family="${6:-}"
-    selected_name=""; selected_device=""; matches=0
+    selected_name=""; selected_device=""; selected_index=""; matches=0
 
     # Explicit role configuration has precedence, but ambiguity is a hard
     # failure-safe result rather than an arbitrary first match.
     if [ -n "$explicit" ] && [ -r "$records_file" ]; then
-        while IFS='|' read -r name l3_device device has4 has6 proto up; do
+        while IFS='|' read -r name l3_device device has4 has6 proto up index; do
             [ "$up" = false ] || [ "$up" = 0 ] && continue
             if [ "$name" = "$explicit" ] || [ "$l3_device" = "$explicit" ] || [ "$device" = "$explicit" ]; then
-                matches=$((matches + 1)); selected_name="$name"; selected_device="${l3_device:-$device}"
+                matches=$((matches + 1)); selected_name="$name"; selected_device="${l3_device:-$device}"; selected_index="$index"
             fi
         done < "$records_file"
         [ "$matches" -eq 1 ] && {
-            printf 'INTERFACE=%s\nDEVICE=%s\n' "$selected_name" "$selected_device" > "$output_file"
+            openkill_write_selected_interface_role "$output_file" "$selected_name" "$selected_device" "$selected_index"
             return 0
         }
         [ "$matches" -gt 1 ] && return 1
@@ -40,31 +69,31 @@ openkill_select_interface_role()
 
     # Canonical names are matched case-insensitively (WAN/WAN6 are common on
     # LuCI-derived configurations), but only when the match is unique.
-    selected_name=""; selected_device=""; matches=0
+    selected_name=""; selected_device=""; selected_index=""; matches=0
     if [ -r "$records_file" ]; then
-        while IFS='|' read -r name l3_device device has4 has6 proto up; do
+        while IFS='|' read -r name l3_device device has4 has6 proto up index; do
             [ "$up" = false ] || [ "$up" = 0 ] && continue
             lower_name=$(printf '%s' "$name" | tr '[:upper:]' '[:lower:]')
             if [ "$lower_name" = "$canonical" ]; then
-                matches=$((matches + 1)); selected_name="$name"; selected_device="${l3_device:-$device}"
+                matches=$((matches + 1)); selected_name="$name"; selected_device="${l3_device:-$device}"; selected_index="$index"
             fi
         done < "$records_file"
     fi
     [ "$matches" -eq 1 ] && {
-        printf 'INTERFACE=%s\nDEVICE=%s\n' "$selected_name" "$selected_device" > "$output_file"
+        openkill_write_selected_interface_role "$output_file" "$selected_name" "$selected_device" "$selected_index"
         return 0
     }
     [ "$matches" -gt 1 ] && return 1
 
     # Custom logical names are resolved from the active native default-route
     # device. Source-specific IPv6 defaults are included by the route parser.
-    route_matches=0; selected_name=""; selected_device=""
+    route_matches=0; selected_name=""; selected_device=""; selected_index=""
     for route_device in $route_devices; do
-        route_count=0; route_name=""; route_l3=""; family_matches=0; family_name=""; family_l3=""
-        while IFS='|' read -r name l3_device device has4 has6 proto up; do
+        route_count=0; route_name=""; route_l3=""; route_index=""; family_matches=0; family_name=""; family_l3=""; family_index=""
+        while IFS='|' read -r name l3_device device has4 has6 proto up index; do
             [ "$up" = false ] || [ "$up" = 0 ] && continue
             if [ "$name" = "$route_device" ] || [ "$l3_device" = "$route_device" ] || [ "$device" = "$route_device" ]; then
-                route_count=$((route_count + 1)); route_name="$name"; route_l3="${l3_device:-$device}"
+                route_count=$((route_count + 1)); route_name="$name"; route_l3="${l3_device:-$device}"; route_index="$index"
                 role_family_match=0
                 if [ "$family" = 4 ] && [ "$has4" = 1 ]; then
                     role_family_match=1
@@ -76,25 +105,25 @@ openkill_select_interface_role()
                     role_family_match=1
                 fi
                 if [ "$role_family_match" -eq 1 ]; then
-                    family_matches=$((family_matches + 1)); family_name="$name"; family_l3="${l3_device:-$device}"
+                    family_matches=$((family_matches + 1)); family_name="$name"; family_l3="${l3_device:-$device}"; family_index="$index"
                 fi
             fi
         done < "$records_file"
         if [ "$route_count" -eq 1 ]; then
-            route_matches=$((route_matches + 1)); selected_name="$route_name"; selected_device="$route_l3"
+            route_matches=$((route_matches + 1)); selected_name="$route_name"; selected_device="$route_l3"; selected_index="$route_index"
         elif [ "$route_count" -gt 1 ] && [ "$family_matches" -eq 1 ]; then
             # A dual-stack PPPoE can expose separate custom logical objects
             # that share one l3_device.  Use netifd's address-family data (or
             # its dhcpv6 proto) to select the role without guessing.
-            route_matches=$((route_matches + 1)); selected_name="$family_name"; selected_device="$family_l3"
+            route_matches=$((route_matches + 1)); selected_name="$family_name"; selected_device="$family_l3"; selected_index="$family_index"
         elif [ "$route_count" -eq 0 ] && [ -n "$route_device" ]; then
             # A route can exist before netifd publishes its object. The device
             # itself is still safe to use for native address collection.
-            route_matches=$((route_matches + 1)); selected_name="$route_device"; selected_device="$route_device"
+            route_matches=$((route_matches + 1)); selected_name="$route_device"; selected_device="$route_device"; selected_index=""
         fi
     done
     [ "$route_matches" -eq 1 ] || return 1
-    printf 'INTERFACE=%s\nDEVICE=%s\n' "$selected_name" "$selected_device" > "$output_file"
+    openkill_write_selected_interface_role "$output_file" "$selected_name" "$selected_device" "$selected_index"
 }
 
 openkill_resolve_interface_roles()
@@ -130,7 +159,7 @@ openkill_resolve_interface_roles()
         [ -n "$(openkill_interface_json_value "$roles_dump_file" "$roles_index" 'ipv6-address[0].address')" ] && has6=1
         proto=$(openkill_interface_json_value "$roles_dump_file" "$roles_index" proto)
         up=$(openkill_interface_json_value "$roles_dump_file" "$roles_index" up)
-        printf '%s|%s|%s|%s|%s|%s|%s\n' "$name" "$l3_device" "$device" "$has4" "$has6" "$proto" "$up" >> "$roles_records_file"
+        printf '%s|%s|%s|%s|%s|%s|%s|%s\n' "$name" "$l3_device" "$device" "$has4" "$has6" "$proto" "$up" "$roles_index" >> "$roles_records_file"
         roles_index=$((roles_index + 1))
     done
 
@@ -147,12 +176,14 @@ openkill_resolve_interface_roles()
     roles_role4="${roles_tmp_file}.v4"; roles_role6="${roles_tmp_file}.v6"
     openkill_select_interface_role "$roles_records_file" "$explicit4" wan "$route4_devices" "$roles_role4" 4 || :
     openkill_select_interface_role "$roles_records_file" "$explicit6" wan6 "$route6_devices" "$roles_role6" 6 || :
-    printf 'WAN4_INTERFACE=%s\nWAN4_L3_DEVICE=%s\n' \
+    printf 'WAN4_INTERFACE=%s\nWAN4_L3_DEVICE=%s\nWAN4_INDEX=%s\n' \
         "$(openkill_snapshot_value INTERFACE "$roles_role4" 2>/dev/null || true)" \
-        "$(openkill_snapshot_value DEVICE "$roles_role4" 2>/dev/null || true)" >> "$roles_tmp_file"
-    printf 'WAN6_INTERFACE=%s\nWAN6_L3_DEVICE=%s\n' \
+        "$(openkill_snapshot_value DEVICE "$roles_role4" 2>/dev/null || true)" \
+        "$(openkill_snapshot_value INDEX "$roles_role4" 2>/dev/null || true)" >> "$roles_tmp_file"
+    printf 'WAN6_INTERFACE=%s\nWAN6_L3_DEVICE=%s\nWAN6_INDEX=%s\n' \
         "$(openkill_snapshot_value INTERFACE "$roles_role6" 2>/dev/null || true)" \
-        "$(openkill_snapshot_value DEVICE "$roles_role6" 2>/dev/null || true)" >> "$roles_tmp_file"
+        "$(openkill_snapshot_value DEVICE "$roles_role6" 2>/dev/null || true)" \
+        "$(openkill_snapshot_value INDEX "$roles_role6" 2>/dev/null || true)" >> "$roles_tmp_file"
     mv "$roles_tmp_file" "$roles_output_file" || {
         rm -f "$roles_tmp_file" "$roles_records_file" "$roles_role4" "$roles_role6"
         return 1
@@ -180,6 +211,8 @@ openkill_collect_network_snapshot()
     wan6_interface=$(openkill_snapshot_value WAN6_INTERFACE "$role_file" 2>/dev/null || true)
     wan4_device=$(openkill_snapshot_value WAN4_L3_DEVICE "$role_file" 2>/dev/null || true)
     wan6_device=$(openkill_snapshot_value WAN6_L3_DEVICE "$role_file" 2>/dev/null || true)
+    wan4_index=$(openkill_snapshot_value WAN4_INDEX "$role_file" 2>/dev/null || true)
+    wan6_index=$(openkill_snapshot_value WAN6_INDEX "$role_file" 2>/dev/null || true)
     # Keep a narrow legacy fallback for installations without jsonfilter; it
     # is never preferred over the normalized netifd dump.
     [ -n "$wan4_device" ] || wan4_device=$(uci -q get network.wan.device 2>/dev/null || uci -q get network.wan.ifname 2>/dev/null || true)
@@ -191,8 +224,22 @@ openkill_collect_network_snapshot()
     printf 'WAN6_INTERFACE=%s\n' "$wan6_interface" >> "$tmp_file"
     printf 'WAN4_L3_DEVICE=%s\n' "$wan4_device" >> "$tmp_file"
     printf 'WAN6_L3_DEVICE=%s\n' "$wan6_device" >> "$tmp_file"
-    wan4_addresses=$(ip -4 addr show dev "$wan4_device" scope global 2>/dev/null | awk '/inet / {sub("/.*", "", $2); print $2}' | tr '\n' ' ')
-    wan6_addresses=$(ip -6 addr show dev "$wan6_device" scope global 2>/dev/null | awk '/inet6 / {sub("/.*", "", $2); print $2}' | tr '\n' ' ')
+    # Consume address data from the selected objects in the one netifd dump.
+    # Both logical WAN objects may share an L3 device, so aggregate the two
+    # selected indices by family and deduplicate below. The device scan is a
+    # compatibility fallback for normalized role fixtures that have no index;
+    # it is never used to choose a role or inspect unrelated interfaces.
+    wan4_addresses=""
+    wan6_addresses=""
+    for selected_index in "$wan4_index" "$wan6_index"; do
+        [ -n "$selected_index" ] || continue
+        selected_values=$(openkill_interface_address_values "$interface_dump" "$selected_index" 4)
+        [ -n "$selected_values" ] && wan4_addresses="$wan4_addresses $selected_values"
+        selected_values=$(openkill_interface_address_values "$interface_dump" "$selected_index" 6)
+        [ -n "$selected_values" ] && wan6_addresses="$wan6_addresses $selected_values"
+    done
+    [ -n "$wan4_addresses" ] || wan4_addresses=$(openkill_device_address_values "$wan4_device" 4 2>/dev/null || true)
+    [ -n "$wan6_addresses" ] || wan6_addresses=$(openkill_device_address_values "$wan6_device" 6 2>/dev/null || true)
     printf 'WAN4_ADDRESSES=%s\n' "$(openkill_normalize_list "$wan4_addresses")" >> "$tmp_file"
     printf 'WAN6_ADDRESSES=%s\n' "$(openkill_normalize_list "$wan6_addresses")" >> "$tmp_file"
     # Address tokens are whitespace-separated in the normalized snapshot;
@@ -204,7 +251,22 @@ openkill_collect_network_snapshot()
     printf 'NATIVE_IPV6_RULES=%s\n' "$(ip -6 rule show 2>/dev/null | tr '\n' ';')" >> "$tmp_file"
     network_lua="${OPENKILL_NETWORK_LUA:-/usr/share/openkill/openkill_get_network.lua}"
     printf 'INTERNAL_IPV6_PREFIXES=%s\n' "$(OPENKILL_INTERFACE_DUMP_FILE="$interface_dump" "$network_lua" lan_cidr6 2>/dev/null | tr '\n' ' ' | awk '{$1=$1; print}')" >> "$tmp_file"
-    printf 'DNS_SERVERS=%s\n' "$(jsonfilter -i "$interface_dump" -e '@.interface[*].dns-server[*]' 2>/dev/null | tr '\n' ' ' | awk '{$1=$1; print}')" >> "$tmp_file"
+    dns_servers=""
+    for selected_index in "$wan4_index" "$wan6_index"; do
+        [ -n "$selected_index" ] || continue
+        selected_values=$(openkill_interface_dns_values "$interface_dump" "$selected_index")
+        [ -n "$selected_values" ] && dns_servers="$dns_servers $selected_values"
+    done
+    # A legacy normalized role fixture has no object indices. In that case only
+    # the dump-wide DNS list is available; production selections use the
+    # selected-object path above and therefore never include LAN-only DNS data.
+    if [ -z "$wan4_index$wan6_index" ]; then
+        dns_servers=$(jsonfilter -i "$interface_dump" -e '@.interface[*]["dns-server"][*]' 2>/dev/null |
+            sed -n '1p' | tr '\n' ' ')
+        [ -n "$dns_servers" ] || dns_servers=$(jsonfilter -i "$interface_dump" -e '@.interface[*].dns-server[*]' 2>/dev/null |
+            sed -n '1p' | tr '\n' ' ')
+    fi
+    printf 'DNS_SERVERS=%s\n' "$(openkill_normalize_list "$dns_servers")" >> "$tmp_file"
 
     # Readiness is local: address + native route, never a public probe.
     native6_routes=$(openkill_snapshot_value NATIVE_IPV6_ROUTES "$tmp_file")
@@ -279,6 +341,76 @@ openkill_snapshot_value()
     done < "$file"
 }
 
+openkill_interface_address_values()
+{
+    dump_file="$1"; interface_index="$2"; family="$3"
+    [ -n "$interface_index" ] || return 1
+    address_index=0
+    while [ "$address_index" -lt 128 ]; do
+        case "$family" in
+            4)
+                address=$(openkill_interface_json_value "$dump_file" "$interface_index" "ipv4-address[$address_index].address")
+                [ -n "$address" ] || break
+                openkill_valid_ipv4 "$address" && printf '%s\n' "${address%%/*}"
+                ;;
+            6)
+                address=$(openkill_interface_json_value "$dump_file" "$interface_index" "ipv6-address[$address_index].address")
+                [ -n "$address" ] || break
+                mask=$(openkill_interface_json_value "$dump_file" "$interface_index" "ipv6-address[$address_index].mask")
+                openkill_valid_ipv6 "$address" || {
+                    address_index=$((address_index + 1))
+                    continue
+                }
+                # netifd may expose link-local and multicast entries on an
+                # external object as well. They are not usable WAN host
+                # identities and must not become localnetwork6 bypasses.
+                case "$address" in
+                    [fF][eE]80:*|[fF][fF]*|::)
+                        address_index=$((address_index + 1))
+                        continue
+                    ;;
+                esac
+                case "$mask" in
+                    ''|*[!0-9]*) printf '%s\n' "${address%%/*}" ;;
+                    *) [ "$mask" -le 128 ] 2>/dev/null && printf '%s/%s\n' "${address%%/*}" "$mask" ;;
+                esac
+                ;;
+            *) return 1 ;;
+        esac
+        address_index=$((address_index + 1))
+    done
+}
+
+openkill_interface_dns_values()
+{
+    dump_file="$1"; interface_index="$2"
+    [ -n "$interface_index" ] || return 1
+    dns_index=0
+    while [ "$dns_index" -lt 64 ]; do
+        dns_server=$(openkill_interface_json_value "$dump_file" "$interface_index" "dns-server[$dns_index]")
+        [ -n "$dns_server" ] || break
+        printf '%s\n' "$dns_server"
+        dns_index=$((dns_index + 1))
+    done
+}
+
+openkill_device_address_values()
+{
+    device="$1"; family="$2"
+    [ -n "$device" ] || return 1
+    case "$family" in
+        4)
+            ip -4 addr show dev "$device" 2>/dev/null |
+                awk '$1 == "inet" && $0 !~ / scope (host|link)/ {sub("/.*", "", $2); print $2}'
+            ;;
+        6)
+            ip -6 addr show dev "$device" 2>/dev/null |
+                awk '$1 == "inet6" && $0 !~ / scope (host|link)/ {split($2, a, "/"); if (a[1] !~ /^fe80:/ && a[1] !~ /^ff/) print $2}'
+            ;;
+        *) return 1 ;;
+    esac
+}
+
 openkill_normalize_list()
 {
     printf '%s\n' "$*" | awk '{gsub(/[;[:space:]]+/, "\n"); if (length) print}' | sort -u | tr '\n' ' ' | awk '{$1=$1; sub(/[[:space:]]*$/, ""); print}'
@@ -323,8 +455,8 @@ openkill_wan6_host_addresses()
     openkill_resolve_interface_roles "$dump_file" "$role_file" 2>/dev/null || :
     device=$(openkill_snapshot_value WAN6_L3_DEVICE "$role_file" 2>/dev/null || true)
     if [ -n "$device" ]; then
-        ip -6 addr show dev "$device" scope global 2>/dev/null |
-            awk '/inet6 / {split($2,a,"/"); if (a[1] !~ /^fe80:/ && a[1] !~ /^ff/) print a[1]}' |
+        ip -6 addr show dev "$device" 2>/dev/null |
+            awk '$1 == "inet6" && $0 !~ / scope (host|link)/ {split($2,a,"/"); if (a[1] !~ /^fe80:/ && a[1] !~ /^ff/) print a[1]}' |
             while IFS= read -r host_address; do
                 openkill_valid_ipv6 "$host_address" && printf '%s/128\n' "$host_address"
             done | sort -u

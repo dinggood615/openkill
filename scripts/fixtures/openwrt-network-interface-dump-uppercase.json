@@ -1,0 +1,97 @@
+{
+  "interface": [
+    {
+      "interface": "loopback",
+      "up": true,
+      "proto": "static",
+      "device": "lo",
+      "l3_device": "lo",
+      "ipv4-address": [
+        { "address": "127.0.0.1", "mask": 8 }
+      ],
+      "ipv6-address": [
+        { "address": "::1", "mask": 128 }
+      ]
+    },
+    {
+      "interface": "LAN",
+      "up": true,
+      "proto": "static",
+      "device": "br-lan",
+      "l3_device": "br-lan",
+      "ipv4-address": [
+        { "address": "192.0.2.1", "mask": 24 }
+      ],
+      "ipv6-address": [
+        { "address": "2409:8a20:fe0:94::1", "mask": 62 }
+      ],
+      "ipv6-prefix": [
+        { "address": "2409:8a20:fe0:94::", "mask": 62 }
+      ],
+      "ipv6-prefix-assignment": [
+        { "address": "2409:8a20:fe0:94::", "mask": 62 }
+      ],
+      "dns-server": [ "192.0.2.53" ]
+    },
+    {
+      "interface": "WAN",
+      "up": true,
+      "proto": "dhcp",
+      "device": "eth1",
+      "l3_device": "eth1",
+      "ipv4-address": [
+        { "address": "198.51.100.223", "mask": 24 }
+      ],
+      "dns-server": [ "9.9.9.9" ],
+      "route": [
+        { "target": "0.0.0.0", "mask": 0, "nexthop": "198.51.100.1", "interface": "eth1" }
+      ]
+    },
+    {
+      "interface": "WAN6",
+      "up": true,
+      "proto": "dhcpv6",
+      "device": "eth1",
+      "l3_device": "eth1",
+      "ipv6-address": [
+        { "address": "2409:8a20:fe0:90::f4c", "mask": 128 },
+        { "address": "2409:8a20:fe0:90:20c:29ff:fe13:c205", "mask": 64 },
+        { "address": "fe80::1", "mask": 64 }
+      ],
+      "ipv6-prefix": [
+        { "address": "2409:8a20:fe0:90::", "mask": 64 }
+      ],
+      "ipv6-prefix-assignment": [],
+      "dns-server": [ "2001:4860:4860::8888", "9.9.9.9" ],
+      "route": [
+        {
+          "target": "::",
+          "mask": 0,
+          "source": "2409:8a20:fe0:90::/64",
+          "nexthop": "fe80::1",
+          "interface": "eth1"
+        }
+      ]
+    },
+    {
+      "interface": "guest",
+      "up": true,
+      "proto": "static",
+      "device": "br-guest",
+      "l3_device": "br-guest",
+      "ipv6-prefix-assignment": [
+        { "address": "2001:db8:10::", "mask": 64 }
+      ]
+    }
+  ],
+  "route": [
+    { "target": "0.0.0.0", "mask": 0, "nexthop": "198.51.100.1", "interface": "eth1" },
+    {
+      "target": "::",
+      "mask": 0,
+      "source": "2409:8a20:fe0:90::/64",
+      "nexthop": "fe80::1",
+      "interface": "eth1"
+    }
+  ]
+}
