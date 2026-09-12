@@ -113,6 +113,68 @@ INTERNAL_IPV6_PREFIXES=2001:db8:a::/60 2001:db8:b::/64 2001:db8:c::/64
             self.assertEqual(pending.read_text().strip(), "1")
             run_helper("openkill_reconcile_lock_release", lock)
 
+    def test_node_literals_are_split_by_family_and_stale_values_can_be_removed(self):
+        with tempfile.TemporaryDirectory() as td:
+            yaml_file, v4, v6 = [pathlib.Path(td) / name for name in ("config.yaml", "v4", "v6")]
+            yaml_file.write_text("""proxies:
+  - name: v4
+    server: 192.0.2.10
+  - name: v6
+    server: 2001:db8::10
+  - name: domain
+    server: node.example.test
+""", encoding="utf-8")
+            subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_extract_node_endpoints "$1" "$2" "$3"', "model", str(yaml_file), str(v4), str(v6)], check=True)
+            self.assertEqual(v4.read_text().strip(), "192.0.2.10")
+            self.assertEqual(v6.read_text().strip(), "2001:db8::10")
+            self.assertNotIn("node.example.test", v4.read_text() + v6.read_text())
+
+    def test_applied_state_is_not_updated_when_component_apply_fails(self):
+        with tempfile.TemporaryDirectory() as td:
+            desired, applied = pathlib.Path(td) / "desired", pathlib.Path(td) / "applied"
+            desired.write_text("LOCAL6=A B C\n", encoding="utf-8")
+            applied.write_text("LOCAL6=A B\n", encoding="utf-8")
+            failed = subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_apply_component_state LOCAL6 "$1" "$2" fail', "model", str(desired), str(applied)], capture_output=True)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertEqual(applied.read_text(), "LOCAL6=A B\n")
+            subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_apply_component_state LOCAL6 "$1" "$2" ok', "model", str(desired), str(applied)], check=True)
+            self.assertEqual(applied.read_text(), desired.read_text())
+
+    def test_owner_transition_failure_keeps_previous_owner(self):
+        with tempfile.TemporaryDirectory() as td:
+            applied, result = pathlib.Path(td) / "applied", pathlib.Path(td) / "result"
+            applied.write_text("OWNER=openkill\n", encoding="utf-8")
+            failed = subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_owner_transition mihomo "$1" "$2" fail', "model", str(applied), str(result)], capture_output=True)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertEqual(applied.read_text(), "OWNER=openkill\n")
+
+    def test_event_storm_is_bounded_and_pending_is_consumed(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = pathlib.Path(td)
+            for reason in ("wan", "wan6", "pd", "fw4", "watchdog"):
+                subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_request_network_reconcile "$1" "$2"', "model", str(state), reason], check=True)
+            subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_reconcile_worker_guard "$1" 3', "model", str(state)], check=True)
+            self.assertEqual((state / "passes").read_text().strip(), "1")
+            self.assertFalse((state / "pending").exists())
+
+    def test_node_sets_are_family_specific_and_atomic(self):
+        with tempfile.TemporaryDirectory() as td:
+            v4, v6, out = [pathlib.Path(td) / name for name in ("v4", "v6", "sets.nft")]
+            v4.write_text("192.0.2.10\n", encoding="utf-8")
+            v6.write_text("2001:db8::10\n", encoding="utf-8")
+            subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_render_node_sets "$1" "$2" "$3"', "model", str(v4), str(v6), str(out)], check=True)
+            text = out.read_text()
+            self.assertIn("openkill_node4", text)
+            self.assertIn("openkill_node6", text)
+            self.assertIn("192.0.2.10", text)
+            self.assertIn("2001:db8::10", text)
+
+    def test_owner_actions_have_no_dual_owner_activation(self):
+        openkill = subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_owner_actions openkill'], capture_output=True, text=True, check=True).stdout
+        mihomo = subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_owner_actions mihomo'], capture_output=True, text=True, check=True).stdout
+        self.assertLess(openkill.index("REMOVE_MIHOMO_AUTO_ROUTE"), openkill.index("ACTIVATE_CLASSIFIER"))
+        self.assertLess(mihomo.index("DEACTIVATE_CLASSIFIER"), mihomo.index("ENABLE_MIHOMO_AUTO_ROUTE"))
+
 
 if __name__ == "__main__":
     unittest.main()

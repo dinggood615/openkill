@@ -165,6 +165,107 @@ openkill_reconcile_request_pending()
     printf '1\n' > "$tmp_file" && mv "$tmp_file" "$pending_file"
 }
 
+openkill_extract_node_endpoints()
+{
+    yaml_file="$1"
+    v4_file="${2:-/tmp/openkill-node4}"
+    v6_file="${3:-/tmp/openkill-node6}"
+    [ -r "$yaml_file" ] || return 1
+    : > "$v4_file" || return 1
+    : > "$v6_file" || return 1
+    # Only literal server endpoints are authoritative here.  Domain names are
+    # resolved by the existing bootstrap/native resolver at reload time and
+    # are never converted from a client Fake-IP answer.
+    awk '/^[[:space:]]*server:/ {sub(/^[[:space:]]*server:[[:space:]]*/, ""); gsub(/[", #].*/, ""); print}' "$yaml_file" |
+        while IFS= read -r endpoint; do
+            case "$endpoint" in
+                *:*) printf '%s\n' "$endpoint" >> "$v6_file" ;;
+                ''|*[!0-9.]*) : ;; # dynamic hostname: resolver-owned path
+                *) printf '%s\n' "$endpoint" >> "$v4_file" ;;
+            esac
+        done
+    sort -u "$v4_file" -o "$v4_file"
+    sort -u "$v6_file" -o "$v6_file"
+}
+
+openkill_render_node_sets()
+{
+    v4_file="$1"; v6_file="$2"; output_file="${3:-/tmp/openkill-node-sets.nft}"
+    [ -r "$v4_file" ] && [ -r "$v6_file" ] || return 1
+    tmp_file="${output_file}.tmp.$$"
+    {
+        printf 'add set inet fw4 openkill_node4 { type ipv4_addr; flags interval; auto-merge; }\n'
+        printf 'add set inet fw4 openkill_node6 { type ipv6_addr; flags interval; auto-merge; }\n'
+        while IFS= read -r endpoint; do [ -n "$endpoint" ] && printf 'add element inet fw4 openkill_node4 { %s }\n' "$endpoint"; done < "$v4_file"
+        while IFS= read -r endpoint; do [ -n "$endpoint" ] && printf 'add element inet fw4 openkill_node6 { %s }\n' "$endpoint"; done < "$v6_file"
+    } > "$tmp_file" && mv "$tmp_file" "$output_file"
+}
+
+openkill_owner_actions()
+{
+    desired_owner="$1"
+    case "$desired_owner" in
+        openkill) printf '%s\n' 'REMOVE_MIHOMO_AUTO_ROUTE' 'INSTALL_OPENKILL_RULES' 'INSTALL_OPENKILL_TABLE' 'ACTIVATE_CLASSIFIER' ;;
+        mihomo) printf '%s\n' 'DEACTIVATE_CLASSIFIER' 'REMOVE_OPENKILL_RULES' 'REMOVE_OPENKILL_TABLE' 'ENABLE_MIHOMO_AUTO_ROUTE' ;;
+        *) return 1 ;;
+    esac
+}
+
+openkill_update_node_endpoints()
+{
+    old4="$1"; old6="$2"; new4="$3"; new6="$4"; diff_file="${5:-/tmp/openkill-node.diff}"
+    [ -r "$new4" ] && [ -r "$new6" ] || return 1
+    : > "$diff_file" || return 1
+    [ ! -r "$old4" ] || ! cmp -s "$old4" "$new4" && printf 'NODE4_CHANGED\n' >> "$diff_file"
+    [ ! -r "$old6" ] || ! cmp -s "$old6" "$new6" && printf 'NODE6_CHANGED\n' >> "$diff_file"
+}
+
+openkill_owner_transition()
+{
+    desired_owner="$1"; applied_file="$2"; result_file="$3"; apply_status="${4:-ok}"
+    case "$desired_owner" in openkill|mihomo) ;; *) return 1 ;; esac
+    [ "$apply_status" = ok ] || { printf 'OWNER_TRANSITION_FAILED\n' >&2; return 1; }
+    tmp_file="${applied_file}.tmp.$$"
+    printf 'OWNER=%s\n' "$desired_owner" > "$tmp_file" && mv "$tmp_file" "$applied_file"
+    printf 'OWNER=%s\n' "$desired_owner" > "$result_file"
+}
+
+openkill_apply_component_state()
+{
+    component="$1"; desired_file="$2"; applied_file="$3"; apply_status="${4:-ok}"
+    [ -r "$desired_file" ] || return 1
+    [ "$apply_status" = ok ] || { printf '%s_APPLY_FAILED\n' "$component" >&2; return 1; }
+    tmp_file="${applied_file}.tmp.$$"
+    cp "$desired_file" "$tmp_file" && mv "$tmp_file" "$applied_file"
+}
+
+openkill_request_network_reconcile()
+{
+    state_dir="${1:-/tmp/openkill-network-reconcile}"
+    reason="${2:-manual}"
+    mkdir -p "$state_dir" || return 1
+    openkill_reconcile_request_pending "$state_dir/pending" || return 1
+    tmp_file="$state_dir/reason.tmp.$$"
+    printf '%s\n' "$reason" > "$tmp_file" && mv "$tmp_file" "$state_dir/reason"
+}
+
+openkill_reconcile_worker_guard()
+{
+    state_dir="${1:-/tmp/openkill-network-reconcile}"
+    max_passes="${2:-3}"
+    lock_dir="$state_dir/lock"
+    mkdir -p "$state_dir" || return 1
+    openkill_reconcile_lock_acquire "$lock_dir" || return 2
+    passes=0
+    while [ -f "$state_dir/pending" ] && [ "$passes" -lt "$max_passes" ]; do
+        rm -f "$state_dir/pending"
+        passes=$((passes + 1))
+    done
+    printf '%s\n' "$passes" > "$state_dir/passes"
+    openkill_reconcile_lock_release "$lock_dir"
+    [ ! -f "$state_dir/pending" ]
+}
+
 openkill_ensure_proxy_rule4() { ip rule show | grep -q "fwmark $OPENKILL_FWMARK.*lookup $OPENKILL_ROUTE_TABLE" || ip rule add fwmark "$OPENKILL_FWMARK" table "$OPENKILL_ROUTE_TABLE" pref "$OPENKILL_RULE_PREF"; }
 openkill_ensure_proxy_rule6() { ip -6 rule show | grep -q "fwmark $OPENKILL_FWMARK.*lookup $OPENKILL_ROUTE_TABLE" || ip -6 rule add fwmark "$OPENKILL_FWMARK" table "$OPENKILL_ROUTE_TABLE" pref "$OPENKILL_RULE_PREF"; }
 openkill_remove_proxy_rule4() { ip rule del fwmark "$OPENKILL_FWMARK" table "$OPENKILL_ROUTE_TABLE" pref "$OPENKILL_RULE_PREF" 2>/dev/null || true; }
