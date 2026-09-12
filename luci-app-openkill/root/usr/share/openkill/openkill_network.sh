@@ -413,7 +413,22 @@ openkill_device_address_values()
 
 openkill_normalize_list()
 {
-    printf '%s\n' "$*" | awk '{gsub(/[;[:space:]]+/, "\n"); if (length) print}' | sort -u | tr '\n' ' ' | awk '{$1=$1; sub(/[[:space:]]*$/, ""); print}'
+    # Values from jsonfilter and netifd are delimiter-separated text, not
+    # records that need awk's field-rewrite extensions.  BusyBox awk rejects
+    # the trailing-whitespace expression used here on some OpenWrt builds.
+    # Translate delimiters to newlines, squeeze runs so leading/trailing
+    # whitespace cannot create empty records, and join the stable sorted set
+    # with shell parameter expansion for broad BusyBox compatibility.  A
+    # semicolon remains a list delimiter as it did before.
+    normalized=$(
+        printf '%s\n' "$*" |
+            tr -s '[;[:space:]]' '\n' |
+            sort -u |
+            tr '\n' ' '
+    )
+    normalized="${normalized# }"
+    [ -n "$normalized" ] && printf '%s\n' "${normalized% }"
+    return 0
 }
 
 openkill_normalize_tokens()

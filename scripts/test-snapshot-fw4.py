@@ -14,6 +14,7 @@ SHARE = ROOT / "luci-app-openkill/root/usr/share/openkill"
 NETWORK = SHARE / "openkill_network.sh"
 FW4_HOOK = SHARE / "openkill_fw4_reload.sh"
 FIXTURE = ROOT / "scripts/fixtures/openwrt-network-interface-dump-uppercase.json"
+FIXTURE_102 = ROOT / "scripts/fixtures/openwrt-network-interface-dump-102.json"
 
 
 def write_jsonfilter(path):
@@ -189,6 +190,51 @@ esac
             self.assertIn("2409:8a20:fe0:90::f4c/128", local6.split())
             self.assertIn("2409:8a20:fe0:90:20c:29ff:fe13:c205/128", local6.split())
             self.assertNotIn("2409:8a20:fe0:90::/64", local6.split())
+
+    def test_real_102_fixture_populates_addresses_dns_and_source_specific_readiness(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            dump = root / "dump.json"
+            dump.write_text(FIXTURE_102.read_text(encoding="utf-8"), encoding="utf-8")
+            output = root / "snapshot"
+            bindir = root / "bin"
+            bindir.mkdir()
+            write_jsonfilter(bindir / "jsonfilter")
+            write_executable(
+                bindir / "ip",
+                """#!/bin/sh
+case "$*" in
+  *"-4 route show table main"*) echo 'default via 192.168.10.2 dev eth1' ;;
+  *"-6 route show table main"*) echo 'default from fd15:4ba5:5a2b:1008::/64 via fe80::250:56ff:fec0:2222 dev eth1' ;;
+  *"-6 rule show"*) echo '0: from all lookup local' ;;
+esac
+""",
+            )
+            lua = root / "network.lua"
+            write_executable(lua, "#!/bin/sh\nexit 0\n")
+            env = os.environ.copy()
+            env["PATH"] = f"{bindir}:/bin:/usr/bin"
+            env["OPENKILL_INTERFACE_DUMP_FILE"] = str(dump)
+            env["OPENKILL_JSONFILTER_FIXTURE"] = str(dump)
+            env["OPENKILL_NETWORK_LUA"] = str(lua)
+            result = subprocess.run(
+                ["sh", "-c", f'. "{NETWORK}"; openkill_collect_network_snapshot "$1"',
+                 "model", str(output)],
+                capture_output=True, text=True, check=True, env=env,
+            )
+            self.assertEqual(result.returncode, 0)
+            values = dict(line.split("=", 1) for line in output.read_text(encoding="utf-8").splitlines() if "=" in line)
+            self.assertEqual(values["WAN4_INTERFACE"], "WAN")
+            self.assertEqual(values["WAN6_INTERFACE"], "WAN6")
+            self.assertEqual(values["WAN4_L3_DEVICE"], "eth1")
+            self.assertEqual(values["WAN6_L3_DEVICE"], "eth1")
+            self.assertEqual(values["WAN4_ADDRESSES"], "192.168.10.128")
+            self.assertEqual(values["WAN6_ADDRESSES"], "fd15:4ba5:5a2b:1008:20c:29ff:fe07:4ffe/64")
+            self.assertEqual(values["WAN6_HOST_ADDRESSES"], "fd15:4ba5:5a2b:1008:20c:29ff:fe07:4ffe/128")
+            self.assertEqual(values["DNS_SERVERS"], "192.168.10.2")
+            self.assertEqual(values["LOCAL_IPV6_READY"], "1")
+            self.assertIn("default from", values["NATIVE_IPV6_ROUTES"])
+            self.assertNotIn("default dev", values["NATIVE_IPV6_ROUTES"])
 
 
 class Fw4LifecycleTests(unittest.TestCase):

@@ -204,6 +204,48 @@ esac
             )
             self.assertEqual(result.stdout.splitlines(), ["2001:db8:1::123/128", "2001:db8:1::124/128"])
 
+    def test_normalize_list_preserves_addresses_dns_and_crlf(self):
+        cases = [
+            ("192.168.10.128/24", "192.168.10.128/24\n"),
+            (" 192.168.10.128/24 ", "192.168.10.128/24\n"),
+            ("\t192.168.10.128/24\t", "192.168.10.128/24\n"),
+            (
+                "192.168.10.129/24\r\n\r\n192.168.10.128/24\r\n",
+                "192.168.10.128/24 192.168.10.129/24\n",
+            ),
+            (
+                "fd15:4ba5:5a2b:1008:20c:29ff:fe07:4ffe/64\n"
+                "fd15:4ba5:5a2b:1008::1/128\n",
+                "fd15:4ba5:5a2b:1008:20c:29ff:fe07:4ffe/64 "
+                "fd15:4ba5:5a2b:1008::1/128\n",
+            ),
+            ("192.168.10.2\n2001:4860:4860::8888\n192.168.10.2\n", "192.168.10.2 2001:4860:4860::8888\n"),
+            ("\n\t\r\n", ""),
+        ]
+        for raw, expected in cases:
+            with self.subTest(raw=repr(raw)):
+                result = run_helper_env("openkill_normalize_list", raw)
+                self.assertEqual(result.stdout, expected)
+
+    def test_normalize_list_does_not_require_awk(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            fake = td / "bin"
+            fake.mkdir()
+            marker = td / "awk-called"
+            (fake / "awk").write_text(
+                f"#!/bin/sh\n: > {marker}\nexit 99\n", encoding="utf-8"
+            )
+            (fake / "awk").chmod(0o755)
+            env = {**os.environ, "PATH": f"{fake}:/bin:/usr/bin"}
+            result = run_helper_env(
+                "openkill_normalize_list",
+                " 192.168.10.128/24; fd15:4ba5::1/64 ",
+                env=env,
+            )
+            self.assertEqual(result.stdout, "192.168.10.128/24 fd15:4ba5::1/64\n")
+            self.assertFalse(marker.exists())
+
     def test_desired_localnetwork6_keeps_wan_as_hosts_and_lan_as_prefixes(self):
         state = build("""SNAPSHOT_VERSION=1
 LOCAL_IPV6_READY=1
