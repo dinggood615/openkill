@@ -178,8 +178,9 @@ openkill_extract_node_endpoints()
     # Only literal server endpoints are authoritative here.  Domain names are
     # resolved by the existing bootstrap/native resolver at reload time and
     # are never converted from a client Fake-IP answer.
-    awk '/^[[:space:]]*server:/ {sub(/^[[:space:]]*server:[[:space:]]*/, ""); gsub(/[", #].*/, ""); print}' "$yaml_file" |
+    awk '/^[[:space:]]*server:/ {sub(/^[[:space:]]*server:[[:space:]]*/, ""); gsub(/^["\047]/, ""); gsub(/["\047, #].*/, ""); print}' "$yaml_file" |
         while IFS= read -r endpoint; do
+            endpoint=$(printf '%s' "$endpoint" | sed 's/^\[//; s/\]$//')
             case "$endpoint" in
                 *:*) printf '%s\n' "$endpoint" >> "$v6_file" ;;
                 ''|*[!0-9.]*) printf '%s\n' "$endpoint" >> "$domain_file" ;;

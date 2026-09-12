@@ -122,7 +122,7 @@ INTERNAL_IPV6_PREFIXES=2001:db8:a::/60 2001:db8:b::/64 2001:db8:c::/64
   - name: v4
     server: 192.0.2.10
   - name: v6
-    server: 2001:db8::10
+    server: "[2001:db8::10]"
   - name: domain
     server: node.example.test
 """, encoding="utf-8")
