@@ -175,6 +175,30 @@ INTERNAL_IPV6_PREFIXES=2001:db8:a::/60 2001:db8:b::/64 2001:db8:c::/64
         self.assertLess(openkill.index("REMOVE_MIHOMO_AUTO_ROUTE"), openkill.index("ACTIVATE_CLASSIFIER"))
         self.assertLess(mihomo.index("DEACTIVATE_CLASSIFIER"), mihomo.index("ENABLE_MIHOMO_AUTO_ROUTE"))
 
+    def test_runtime_divergence_requests_reapply_without_network_change(self):
+        with tempfile.TemporaryDirectory() as td:
+            desired, runtime = pathlib.Path(td) / "desired", pathlib.Path(td) / "runtime"
+            desired.write_text("TUN_OWNER=openkill\nLOCALNETWORK6_PREFIXES=A\n", encoding="utf-8")
+            runtime.write_text("NFT_CHAIN_PRESENT=0\n", encoding="utf-8")
+            out = subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_runtime_integrity_action "$1" "$2"', "model", str(desired), str(runtime)], check=True, capture_output=True, text=True).stdout.strip()
+            self.assertEqual(out, "REAPPLY_NFT")
+
+    def test_enable_zero_blocks_every_event_source(self):
+        with tempfile.TemporaryDirectory() as td:
+            snapshot = pathlib.Path(td) / "snapshot"
+            snapshot.write_text("ENABLE=0\n", encoding="utf-8")
+            for reason in ("fw4", "wan", "wan6", "pd", "watchdog", "manual"):
+                self.assertNotEqual(subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_event_allowed "$1"', "model", str(snapshot)]).returncode, 0, reason)
+
+    def test_generation_invalidates_old_worker(self):
+        with tempfile.TemporaryDirectory() as td:
+            generation = pathlib.Path(td) / "generation"
+            first = subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_generation_start "$1"', "model", str(generation)], check=True, capture_output=True, text=True).stdout.strip()
+            second = subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_generation_start "$1"', "model", str(generation)], check=True, capture_output=True, text=True).stdout.strip()
+            self.assertNotEqual(first, second)
+            self.assertNotEqual(subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_generation_is_current "$1" "$2"', "model", str(generation), first]).returncode, 0)
+            self.assertEqual(subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_generation_is_current "$1" "$2"', "model", str(generation), second]).returncode, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

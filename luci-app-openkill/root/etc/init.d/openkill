@@ -4421,6 +4421,9 @@ start_watchdog()
 
 reload_service()
 {
+   case "$1" in
+      firewall|network|manual) openkill_request_network_reconcile /tmp/openkill-network-reconcile "$1" 2>/dev/null || true ;;
+   esac
    OPENKILL_START_TOKEN="$(cat /tmp/openkill-start.token 2>/dev/null)"
    get_config
    MAX_RELOAD=10

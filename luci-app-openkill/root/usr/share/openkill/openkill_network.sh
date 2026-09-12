@@ -266,6 +266,42 @@ openkill_reconcile_worker_guard()
     [ ! -f "$state_dir/pending" ]
 }
 
+openkill_runtime_integrity_action()
+{
+    desired_file="$1"; runtime_file="$2"
+    [ -r "$desired_file" ] && [ -r "$runtime_file" ] || return 1
+    chain_present=$(openkill_snapshot_value NFT_CHAIN_PRESENT "$runtime_file")
+    owner=$(openkill_snapshot_value TUN_OWNER "$desired_file")
+    if [ "$chain_present" != 1 ] && [ "$owner" = openkill ]; then
+        printf 'REAPPLY_NFT\n'
+    else
+        printf 'NO_ACTION\n'
+    fi
+}
+
+openkill_event_allowed()
+{
+    snapshot_file="$1"
+    [ "$(openkill_snapshot_value ENABLE "$snapshot_file")" = 1 ]
+}
+
+openkill_generation_start()
+{
+    generation_file="${1:-/tmp/openkill-network-reconcile/generation}"
+    generation_dir=$(dirname "$generation_file")
+    mkdir -p "$generation_dir" || return 1
+    generation="$(date +%s 2>/dev/null)-$$"
+    tmp_file="${generation_file}.tmp.$$"
+    printf '%s\n' "$generation" > "$tmp_file" && mv "$tmp_file" "$generation_file"
+    printf '%s\n' "$generation"
+}
+
+openkill_generation_is_current()
+{
+    generation_file="$1"; expected="$2"
+    [ -r "$generation_file" ] && [ "$(cat "$generation_file")" = "$expected" ]
+}
+
 openkill_ensure_proxy_rule4() { ip rule show | grep -q "fwmark $OPENKILL_FWMARK.*lookup $OPENKILL_ROUTE_TABLE" || ip rule add fwmark "$OPENKILL_FWMARK" table "$OPENKILL_ROUTE_TABLE" pref "$OPENKILL_RULE_PREF"; }
 openkill_ensure_proxy_rule6() { ip -6 rule show | grep -q "fwmark $OPENKILL_FWMARK.*lookup $OPENKILL_ROUTE_TABLE" || ip -6 rule add fwmark "$OPENKILL_FWMARK" table "$OPENKILL_ROUTE_TABLE" pref "$OPENKILL_RULE_PREF"; }
 openkill_remove_proxy_rule4() { ip rule del fwmark "$OPENKILL_FWMARK" table "$OPENKILL_ROUTE_TABLE" pref "$OPENKILL_RULE_PREF" 2>/dev/null || true; }
