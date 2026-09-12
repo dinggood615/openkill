@@ -272,6 +272,20 @@ openkill_render_nft_set_batch()
     } > "$tmp_file" && mv "$tmp_file" "$output_file"
 }
 
+openkill_render_nft_set_update_batch()
+{
+    family="$1"; set_name="$2"; elements_file="$3"; output_file="${4:-/tmp/openkill-set-update.batch}"
+    [ -r "$elements_file" ] || return 1
+    case "$family" in 4) address_type=ipv4_addr ;; 6) address_type=ipv6_addr ;; *) return 1 ;; esac
+    tmp_file="${output_file}.tmp.$$"
+    {
+        printf 'flush set inet fw4 %s\n' "$set_name"
+        while IFS= read -r element; do
+            [ -n "$element" ] && printf 'add element inet fw4 %s { %s }\n' "$set_name" "$element"
+        done < "$elements_file"
+    } > "$tmp_file" && mv "$tmp_file" "$output_file"
+}
+
 openkill_validate_nft_batch()
 {
     batch_file="$1"
@@ -398,6 +412,19 @@ openkill_runtime_integrity_action()
     else
         printf 'NO_ACTION\n'
     fi
+}
+
+openkill_minimal_apply_action()
+{
+    desired_file="$1"; applied_file="$2"; runtime_file="$3"
+    [ -r "$desired_file" ] && [ -r "$applied_file" ] && [ -r "$runtime_file" ] || return 1
+    owner=$(openkill_snapshot_value TUN_OWNER "$desired_file")
+    chain_present=$(openkill_snapshot_value NFT_CHAIN_PRESENT "$runtime_file")
+    [ "$owner" = openkill ] && [ "$chain_present" != 1 ] && { printf 'REAPPLY_NFT\n'; return 0; }
+    cmp -s "$desired_file" "$applied_file" && { printf 'NO_ACTION\n'; return 0; }
+    [ "$(openkill_snapshot_value LOCALNETWORK6_PREFIXES "$desired_file")" != "$(openkill_snapshot_value LOCALNETWORK6_PREFIXES "$applied_file")" ] && printf 'LOCAL6_CHANGED\n'
+    [ "$(openkill_snapshot_value NODE4_ENDPOINTS "$desired_file")" != "$(openkill_snapshot_value NODE4_ENDPOINTS "$applied_file")" ] && printf 'NODE4_CHANGED\n'
+    [ "$(openkill_snapshot_value NODE6_ENDPOINTS "$desired_file")" != "$(openkill_snapshot_value NODE6_ENDPOINTS "$applied_file")" ] && printf 'NODE6_CHANGED\n'
 }
 
 openkill_event_allowed()

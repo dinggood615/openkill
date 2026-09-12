@@ -1716,21 +1716,21 @@ if [ -n "$FW4" ]; then
 
    #local
    nft 'add set inet fw4 localnetwork { type ipv4_addr; flags interval; auto-merge; }'
-   #nft 'delete set inet fw4 localnetwork'
+   localnetwork4_elements=/tmp/openkill-localnetwork4.elements
    if [ -f "/etc/openkill/custom/openkill_custom_localnetwork_ipv4.list" ]; then
-      for line in `cat "/etc/openkill/custom/openkill_custom_localnetwork_ipv4.list"`
-      do
-         nft add element inet fw4 localnetwork { "$line" }
-      done
+      cat "/etc/openkill/custom/openkill_custom_localnetwork_ipv4.list" > "$localnetwork4_elements"
    else
-      nft 'add element inet fw4 localnetwork { 0.0.0.0/8, 127.0.0.0/8, 10.0.0.0/8, 169.254.0.0/16, 192.168.0.0/16, 224.0.0.0/4, 240.0.0.0/4, 172.16.0.0/12, 100.64.0.0/10}'
+      printf '%s\n' 0.0.0.0/8 127.0.0.0/8 10.0.0.0/8 169.254.0.0/16 192.168.0.0/16 224.0.0.0/4 240.0.0.0/4 172.16.0.0/12 100.64.0.0/10 > "$localnetwork4_elements"
    fi
-
-   if [ -n "$wan_ip4s" ]; then
-      for wan_ip4 in $wan_ip4s; do
-         nft add element inet fw4 localnetwork { "$wan_ip4" }
-      done
+   for wan_ip4 in $wan_ip4s; do printf '%s\n' "$wan_ip4" >> "$localnetwork4_elements"; done
+   if [ "${OPENKILL_NFT_BATCH:-1}" = 1 ] &&
+      openkill_render_nft_set_update_batch 4 localnetwork "$localnetwork4_elements" /tmp/openkill-localnetwork4.batch &&
+      openkill_validate_nft_batch /tmp/openkill-localnetwork4.batch && nft -f /tmp/openkill-localnetwork4.batch; then :
+   else
+      nft 'flush set inet fw4 localnetwork'
+      while IFS= read -r line; do [ -n "$line" ] && nft add element inet fw4 localnetwork { "$line" }; done < "$localnetwork4_elements"
    fi
+   rm -f "$localnetwork4_elements" /tmp/openkill-localnetwork4.batch
 
    #common ports
    if [ -n "$common_ports" ] && [ "$common_ports" != "0" ]; then
@@ -2223,30 +2223,30 @@ if [ -n "$FW4" ]; then
 
       #local
       nft 'add set inet fw4 localnetwork6 { type ipv6_addr; flags interval; auto-merge; }'
-      #nft 'delete set inet fw4 localnetwork6'
+      localnetwork6_elements=/tmp/openkill-localnetwork6.elements
       if [ -f "/etc/openkill/custom/openkill_custom_localnetwork_ipv6.list" ]; then
-         for line in `cat "/etc/openkill/custom/openkill_custom_localnetwork_ipv6.list"`
-         do
-            nft add element inet fw4 localnetwork6 { "$line" }
-         done
+         cat "/etc/openkill/custom/openkill_custom_localnetwork_ipv6.list" > "$localnetwork6_elements"
       else
-         nft 'add element inet fw4 localnetwork6 { ::/128, ::1/128, ::ffff:0:0/96, ::ffff:0:0:0/96, 64:ff9b::/96, 100::/64, 2001::/32, 2001:20::/28, 2001:db8::/32, 2002::/16, fe80::/10, ff00::/8}'
+         printf '%s\n' ::/128 ::1/128 ::ffff:0:0/96 ::ffff:0:0:0/96 64:ff9b::/96 100::/64 2001::/32 2001:20::/28 2001:db8::/32 2002::/16 fe80::/10 ff00::/8 > "$localnetwork6_elements"
       fi
-
-      if [ -n "$wan_ip6s" ]; then
-         for wan_ip6 in $wan_ip6s; do
-            nft add element inet fw4 localnetwork6 { "$wan_ip6" }
-         done
-      fi
+      for wan_ip6 in $wan_ip6s; do printf '%s\n' "$wan_ip6" >> "$localnetwork6_elements"; done
       # Internal IPv6 prefixes are distinct from WAN host addresses.  Include
       # every delegated/on-link prefix reported by netifd so same-prefix LAN
       # traffic never reaches the proxy classifier.
       lan_ip6_prefixes=$(/usr/share/openkill/openkill_get_network.lua "lan_cidr6" 2>/dev/null)
       if [ -n "$lan_ip6_prefixes" ]; then
          for lan_ip6_prefix in $lan_ip6_prefixes; do
-            nft add element inet fw4 localnetwork6 { "$lan_ip6_prefix" }
+            printf '%s\n' "$lan_ip6_prefix" >> "$localnetwork6_elements"
          done
       fi
+      if [ "${OPENKILL_NFT_BATCH:-1}" = 1 ] &&
+         openkill_render_nft_set_update_batch 6 localnetwork6 "$localnetwork6_elements" /tmp/openkill-localnetwork6.batch &&
+         openkill_validate_nft_batch /tmp/openkill-localnetwork6.batch && nft -f /tmp/openkill-localnetwork6.batch; then :
+      else
+         nft 'flush set inet fw4 localnetwork6'
+         while IFS= read -r line; do [ -n "$line" ] && nft add element inet fw4 localnetwork6 { "$line" }; done < "$localnetwork6_elements"
+      fi
+      rm -f "$localnetwork6_elements" /tmp/openkill-localnetwork6.batch
 
       if [ "$ipv6_mode" -eq 1 ] || [ "$ipv6_mode" -eq 3 ]; then
          #tcp

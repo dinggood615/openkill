@@ -26,6 +26,16 @@ class StageD(unittest.TestCase):
             self.assertNotIn('flush table inet fw4', text)
             self.assertEqual(run('openkill_validate_nft_batch', out), '')
 
+    def test_dynamic_set_batch_is_stable_and_scoped(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d); elements=p/'elements'; out=p/'batch'
+            elements.write_text('fd00::/8\nfd00:1::/48\n')
+            run('openkill_render_nft_set_update_batch', 6, 'localnetwork6', elements, out)
+            text=out.read_text()
+            self.assertEqual(text.splitlines()[0], 'flush set inet fw4 localnetwork6')
+            self.assertIn('add element inet fw4 localnetwork6 { fd00::/8 }', text)
+            self.assertNotIn('flush ruleset', text)
+
     def test_classifier_golden_order(self):
         self.assertEqual(run('openkill_render_classifier_order').split(),
             'CONTROL_BYPASS SELF_BYPASS NODE_BYPASS LOCAL_BYPASS USER_BYPASS CHINA_DIRECT USER_PROXY DEFAULT_POLICY'.split())
@@ -34,6 +44,15 @@ class StageD(unittest.TestCase):
         self.assertEqual(run('openkill_classifier_match', 4, 'NODE_BYPASS').strip(), 'ip daddr @openkill_node4 counter return')
         self.assertEqual(run('openkill_classifier_match', 6, 'NODE_BYPASS').strip(), 'ip6 daddr @openkill_node6 counter return')
         self.assertIn('openkill_classifier_match 4 NODE_BYPASS', INIT.read_text())
+
+    def test_minimal_apply_noop_and_runtime_loss(self):
+        with tempfile.TemporaryDirectory() as d:
+            p=Path(d); desired=p/'desired'; applied=p/'applied'; runtime=p/'runtime'
+            payload='TUN_OWNER=openkill\nLOCALNETWORK6_PREFIXES=fd00::/8\nNODE4_ENDPOINTS=203.0.113.1\nNODE6_ENDPOINTS=2001:db8::1\n'
+            desired.write_text(payload); applied.write_text(payload); runtime.write_text('NFT_CHAIN_PRESENT=1\n')
+            self.assertEqual(run('openkill_minimal_apply_action', desired, applied, runtime).strip(), 'NO_ACTION')
+            runtime.write_text('NFT_CHAIN_PRESENT=0\n')
+            self.assertEqual(run('openkill_minimal_apply_action', desired, applied, runtime).strip(), 'REAPPLY_NFT')
 
     def test_dns_generation_deduplicates_and_is_family_aware(self):
         with tempfile.TemporaryDirectory() as d:
