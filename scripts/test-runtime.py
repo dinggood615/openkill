@@ -246,21 +246,16 @@ class DualStackRoutingTests(unittest.TestCase):
         self.assertIn('set_default remote_service_bypass 0', normalize)
         self.assertIn('compat_migration_version=2026-1108', normalize)
 
-    def test_ipv6_fallback_route_is_safe_and_reversible(self):
+    def test_ipv6_native_route_is_preserved_and_readiness_is_local(self):
         source = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
         self.assertIn('add_openkill_ipv6_fallback_route()', source)
         self.assertIn('remove_openkill_ipv6_fallback_route()', source)
-        self.assertIn('metric=2048', source)
         self.assertIn('OPENKILL_IPV6_ROUTE_MARKER', source)
-        self.assertIn('probe_openkill_ipv6_https()', source)
-        self.assertIn('curl -6 -fsS --interface "$iface"', source)
-        self.assertIn('set_openkill_ipv6_state unavailable https-timeout', source)
-        self.assertIn('removed the temporary fallback route', source)
+        self.assertIn('Never manufacture a global default in the main table.', source)
+        self.assertNotIn('ip -6 route replace default via "$gateway" dev "$iface"', source)
+        self.assertNotIn('probe_openkill_ipv6_https "$iface"', source)
+        self.assertIn('set_openkill_ipv6_state available local-route', source)
         self.assertIn('write_openkill_ipv6_diagnostics()', source)
-        self.assertIn('openkill_probe_bounded()', source)
-        self.assertIn('exec 1000>&-', source)
-        self.assertIn('openkill_probe_bounded 5 ping -6', source)
-        self.assertIn('openkill_probe_bounded 7 curl -6', source)
         self.assertIn('route_source=', source)
         self.assertIn('route_lan_source=', source)
         self.assertIn('tcp_443=', source)
@@ -289,6 +284,23 @@ class DualStackRoutingTests(unittest.TestCase):
         self.assertNotIn('dns_ipv6 = false', change)
         self.assertIn('Do not reject the valid combination dns.ipv6=true + ipv6=false', semantic)
         self.assertIn('if [ "$ipv6_dns" -eq 1 ]; then', init)
+
+    def test_ipv6_local_prefixes_come_from_internal_netifd_interfaces(self):
+        source = (SHARE / 'openkill_get_network.lua').read_text(encoding='utf-8')
+        init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        self.assertIn('ubus call network.interface dump', source)
+        self.assertIn('ipv6-prefix', source)
+        self.assertIn('name ~= "wan" and name ~= "wan6"', source)
+        self.assertNotIn('for o = 1, #(rv.wan) do\n\t\t\tif rv.wan[o].proto ~= "pppoe" then\n\t\t\t\tif rv.wan[o].ip6addr', source)
+        self.assertIn('openkill_get_network.lua "lan_cidr6"', init)
+
+    def test_ipv6_control_plane_is_never_proxy_marked(self):
+        source = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        for chain in ('openkill_mangle_v6', 'openkill_mangle_output_v6'):
+            self.assertIn('ip6 nexthdr udp th dport {546,547} counter return', source)
+            self.assertIn('ip6 nexthdr icmpv6 icmpv6 type { nd-neighbor-solicit', source)
+        self.assertIn('packet-too-big', source)
+        self.assertIn('parameter-problem', source)
 
     def test_dnsmasq_forwarding_is_the_safe_default_for_tun_and_dual_stack(self):
         config = (ROOT / 'luci-app-openkill/root/etc/config/openkill').read_text(encoding='utf-8')

@@ -88,3 +88,4 @@ Makefile text eol=lf
 *.ipk binary
 *.apk binary
 *.xz binary
+luci-app-openkill/root/etc/uci-defaults/* text eol=lf

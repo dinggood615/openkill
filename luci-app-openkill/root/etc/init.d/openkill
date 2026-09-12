@@ -29,8 +29,14 @@ CRON_FILE="/etc/crontabs/root"
 CACHE_PATH="/etc/openkill/cache.db"
 LOG_FILE="/tmp/openkill.log"
 START_LOG="/tmp/openkill_start.log"
-PROXY_FWMARK="0x162"
-PROXY_ROUTE_TABLE="0x162"
+# Stable OpenKill policy-routing ABI. Keep the legacy aliases below because
+# existing generated rules and cleanup paths consume them.
+OPENKILL_FWMARK="0x162"
+OPENKILL_FWMASK="0xffffffff"
+OPENKILL_ROUTE_TABLE="0x162"
+OPENKILL_RULE_PREF="1888"
+PROXY_FWMARK="$OPENKILL_FWMARK"
+PROXY_ROUTE_TABLE="$OPENKILL_ROUTE_TABLE"
 QUICK_START_CHECK=false
 QUICK_START=true
 
@@ -651,18 +657,12 @@ write_openkill_ipv6_diagnostics()
    route_lan_source="not-present"
    [ -n "$lan_source6" ] && route_lan_source=$(ip -6 route get 2606:4700:4700::1111 from "$lan_source6" 2>/dev/null | head -n 1)
    mtu=$(ip link show dev "$iface" 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="mtu"){print $(i+1); exit}}')
-   tcp443_state="covered-by-https"
-   if command -v nc >/dev/null 2>&1; then
-      openkill_probe_bounded 5 nc -w 4 -z 2606:4700:4700::1111 443 >/dev/null 2>&1 && tcp443_state="available" || tcp443_state="unavailable"
-   fi
+   # Public reachability is telemetry, not local route readiness.  Keep this
+   # snapshot side-effect free; the optional bounded probe helper remains
+   # available to explicit diagnostics and is never used to rewrite YAML.
+   tcp443_state="not-tested"
    udp_state="not-tested"
-   if command -v nslookup >/dev/null 2>&1; then
-      openkill_probe_bounded 5 nslookup cloudflare.com 2606:4700:4700::1111 >/dev/null 2>&1 && udp_state="available" || udp_state="unavailable"
-   fi
    pmtu_state="not-tested"
-   if command -v ping >/dev/null 2>&1; then
-      openkill_probe_bounded 5 ping -6 -c 1 -W 2 -s 1280 2606:4700:4700::1111 >/dev/null 2>&1 && pmtu_state="available" || pmtu_state="unavailable"
-   fi
    {
       printf 'interface=%s\n' "$iface"
       printf 'global_address=%s\n' "${source6:-missing}"
@@ -680,7 +680,7 @@ write_openkill_ipv6_diagnostics()
 
 add_openkill_ipv6_fallback_route()
 {
-   local iface gateway metric
+   local iface gateway native_defaults
    if [ "${ipv6_enable:-0}" != "1" ] && [ "${ipv6_dns:-0}" != "1" ]; then
       set_openkill_ipv6_state not-requested
       rm -f /tmp/openkill-ipv6-diagnostics
@@ -689,6 +689,9 @@ add_openkill_ipv6_fallback_route()
    [ "${tun_owner:-openkill}" = "openkill" ] || return 0
    command -v ip >/dev/null 2>&1 || return 0
 
+   # Native IPv6 routing belongs to netifd.  In particular, OpenWrt may
+   # intentionally install source-specific defaults plus an unreachable PD
+   # guard route.  Never manufacture a global default in the main table.
    if ip -6 route show default 2>/dev/null | awk '
       $1 == "default" {
          has = 1; from = 0
@@ -700,42 +703,28 @@ add_openkill_ipv6_fallback_route()
       iface=$(ip -6 route show default 2>/dev/null | awk '$1 == "default" {for (i=1; i<=NF; i++) if ($i == "dev") {print $(i+1); exit}}')
       gateway=$(ip -6 route show default 2>/dev/null | awk '$1 == "default" {for (i=1; i<=NF; i++) if ($i == "via") {print $(i+1); exit}}')
       write_openkill_ipv6_diagnostics "$iface" "$gateway"
-      if [ -n "$iface" ] && probe_openkill_ipv6_https "$iface"; then
-         set_openkill_ipv6_state available
-      else
-         set_openkill_ipv6_state unavailable https-timeout
-         LOG_WARN "Native IPv6 has a default route but failed the HTTPS readiness probe; IPv4 proxy underlay remains preferred."
-      fi
+      set_openkill_ipv6_state available local-route
       return 0
    fi
 
+   native_defaults=$(ip -6 route show default 2>/dev/null)
+   if [ -z "$native_defaults" ]; then
+      set_openkill_ipv6_state unavailable no-local-route
+      LOG_WARN "IPv6 is enabled but netifd has no native default route; leaving routes unchanged."
+      return 0
+   fi
    iface=$(/usr/share/openkill/openkill_get_network.lua "pppoe" 2>/dev/null | awk 'NF { print; exit }')
    [ -z "$iface" ] && iface=$(/usr/share/openkill/openkill_get_network.lua "dhcp" 2>/dev/null | awk 'NF { print; exit }')
    [ -z "$iface" ] && iface=$(ip -6 route show default 2>/dev/null | awk '$1 == "default" {for (i=1; i<=NF; i++) if ($i == "dev") {print $(i+1); exit}}')
    gateway=$(/usr/share/openkill/openkill_get_network.lua "gateway6" 2>/dev/null | awk 'NF { print; exit }')
    [ -z "$gateway" ] && gateway=$(ip -6 route show default 2>/dev/null | awk '$1 == "default" {for (i=1; i<=NF; i++) if ($i == "via") {print $(i+1); exit}}')
    [ -n "$iface" ] && [ -n "$gateway" ] || {
-      LOG_WARN "IPv6 is enabled but no WAN IPv6 interface/gateway was found; keeping existing routes."
+      set_openkill_ipv6_state unavailable no-local-route
+      LOG_WARN "IPv6 is enabled but no native WAN IPv6 route was found; leaving netifd routes unchanged."
       return 0
    }
-
-   metric=2048
-   if ip -6 route replace default via "$gateway" dev "$iface" metric "$metric" 2>/dev/null; then
-      write_openkill_ipv6_diagnostics "$iface" "$gateway"
-      printf '%s %s %s\n' "$iface" "$gateway" "$metric" > "$OPENKILL_IPV6_ROUTE_MARKER"
-      if probe_openkill_ipv6_https "$iface"; then
-         set_openkill_ipv6_state available
-         LOG_TIP "IPv6 HTTPS readiness passed; retained the low-priority fallback route via ${iface}."
-      else
-         ip -6 route del default via "$gateway" dev "$iface" metric "$metric" 2>/dev/null || true
-         rm -f "$OPENKILL_IPV6_ROUTE_MARKER"
-         set_openkill_ipv6_state unavailable https-timeout
-         LOG_WARN "IPv6 gateway is reachable but HTTPS failed; removed the temporary fallback route to prevent dual-stack stalls."
-      fi
-   else
-      set_openkill_ipv6_state unavailable route-add-failed
-      LOG_WARN "Unable to add the IPv6 fallback route; existing IPv6 routing was left unchanged."
-   fi
+   write_openkill_ipv6_diagnostics "$iface" "$gateway"
+   set_openkill_ipv6_state available local-route
 }
 
 remove_openkill_ipv6_fallback_route()
@@ -1082,12 +1071,12 @@ check_core_status()
       if [ -n "$en_mode_tun" ]; then
          ip route replace default dev "$OPENKILL_TUN_DEVICE" table 354 || start_fail
          ip rule show | grep -q 'fwmark 0x162.*lookup 354' ||
-            ip rule add fwmark "$PROXY_FWMARK" table 354 pref 1888 || start_fail
+            ip rule add fwmark "$PROXY_FWMARK" table 354 pref "$OPENKILL_RULE_PREF" || start_fail
       fi
       if [ "$ipv6_mode" -eq 2 ] || [ "$ipv6_mode" -eq 3 ]; then
          ip -6 route replace default dev "$OPENKILL_TUN_DEVICE" table 354 || start_fail
          ip -6 rule show | grep -q 'fwmark 0x162.*lookup 354' ||
-            ip -6 rule add fwmark "$PROXY_FWMARK" table 354 pref 1888 || start_fail
+            ip -6 rule add fwmark "$PROXY_FWMARK" table 354 pref "$OPENKILL_RULE_PREF" || start_fail
       fi
    fi
 
@@ -2251,6 +2240,15 @@ if [ -n "$FW4" ]; then
             nft add element inet fw4 localnetwork6 { "$wan_ip6" }
          done
       fi
+      # Internal IPv6 prefixes are distinct from WAN host addresses.  Include
+      # every delegated/on-link prefix reported by netifd so same-prefix LAN
+      # traffic never reaches the proxy classifier.
+      lan_ip6_prefixes=$(/usr/share/openkill/openkill_get_network.lua "lan_cidr6" 2>/dev/null)
+      if [ -n "$lan_ip6_prefixes" ]; then
+         for lan_ip6_prefix in $lan_ip6_prefixes; do
+            nft add element inet fw4 localnetwork6 { "$lan_ip6_prefix" }
+         done
+      fi
 
       if [ "$ipv6_mode" -eq 1 ] || [ "$ipv6_mode" -eq 3 ]; then
          #tcp
@@ -2297,6 +2295,11 @@ if [ -n "$FW4" ]; then
          nft 'add rule inet fw4 openkill_mangle_v6 ct direction reply counter return'
          nft 'add rule inet fw4 openkill_mangle_v6 th dport @openkill_service_ports counter return'
          nft 'add rule inet fw4 openkill_mangle_v6 th sport @openkill_service_ports counter return'
+         # IPv6 control-plane traffic must remain native.  Keep DHCPv6 and
+         # ICMPv6 path/neighbor signalling out of proxy marking so ND, RA and
+         # Packet Too Big continue to work with netifd source-specific routes.
+         nft 'add rule inet fw4 openkill_mangle_v6 ip6 nexthdr udp th dport {546,547} counter return'
+         nft 'add rule inet fw4 openkill_mangle_v6 ip6 nexthdr icmpv6 icmpv6 type { nd-neighbor-solicit, nd-neighbor-advert, nd-router-solicit, nd-router-advert, packet-too-big, destination-unreachable, time-exceeded, parameter-problem } counter return'
          if [ "$lan_ac_mode" = "1" ] && [ -n "$(uci_get_config "lan_ac_white_ips")" ] && [ -n "$(uci_get_config "lan_ac_white_macs")" ]; then
             nft 'add rule inet fw4 openkill_mangle_v6 ether saddr != @lan_ac_white_macs ip6 saddr != @lan_ac_white_ipv6s counter return'
          else
@@ -2405,6 +2408,8 @@ if [ -n "$FW4" ]; then
          nft 'add rule inet fw4 openkill_mangle_output_v6 ct direction reply counter return'
          nft 'add rule inet fw4 openkill_mangle_output_v6 th dport @openkill_service_ports counter return'
          nft 'add rule inet fw4 openkill_mangle_output_v6 th sport @openkill_service_ports counter return'
+         nft 'add rule inet fw4 openkill_mangle_output_v6 ip6 nexthdr udp th dport {546,547} counter return'
+         nft 'add rule inet fw4 openkill_mangle_output_v6 ip6 nexthdr icmpv6 icmpv6 type { nd-neighbor-solicit, nd-neighbor-advert, nd-router-solicit, nd-router-advert, packet-too-big, destination-unreachable, time-exceeded, parameter-problem } counter return'
          if ([ "$ipv6_mode" -eq 1 ] && [ "$enable_v6_udp_proxy" -eq 1 ]) || [ "$ipv6_mode" -eq 3 ]; then
             nft add rule inet fw4 openkill_mangle_output_v6 ip6 nexthdr {udp} ip6 daddr { "$fakeip_range6" } mark set "$PROXY_FWMARK" counter
          fi

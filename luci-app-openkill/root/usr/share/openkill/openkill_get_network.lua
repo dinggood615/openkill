@@ -168,14 +168,34 @@ if type == "lan_cidr" then
 end
 
 if type == "lan_cidr6" then
-	if wan then
-		for o = 1, #(rv.wan) do
-			if rv.wan[o].proto ~= "pppoe" then
-				if rv.wan[o].ip6addr then
-					local ip6, prefix = rv.wan[o].ip6addr:match("([^/]+)/(%d+)")
-					local network = cidr.IPv6(ip6, tonumber(prefix)):network():string()
-					local prefix = cidr.IPv6(ip6, tonumber(prefix)):prefix()
-					print(network.."/"..prefix)
+	-- Return prefixes belonging to internal network interfaces.  The old
+	-- implementation accidentally iterated the WAN model here, which could
+	-- put the uplink prefix into localnetwork6 and omit the delegated LAN PD.
+	-- Read netifd's authoritative interface dump so multiple internal
+	-- prefixes are retained and WAN/WAN6 remain separate.
+	local ok, jsonc = pcall(require, "luci.jsonc")
+	if ok and jsonc then
+		local dump = luci.sys.exec("ubus call network.interface dump 2>/dev/null")
+		local data = jsonc.parse(dump or "")
+		if data and data.interface then
+			for _, iface in ipairs(data.interface) do
+				local name = iface.interface or ""
+				if name ~= "wan" and name ~= "wan6" and name ~= "loopback" and
+				   not name:match("^wan%d*$") then
+					for _, addr in ipairs(iface["ipv6-address"] or {}) do
+						if addr.address and addr.mask then
+							local network = cidr.IPv6(addr.address, tonumber(addr.mask)):network():string()
+							local prefix = cidr.IPv6(addr.address, tonumber(addr.mask)):prefix()
+							print(network.."/"..prefix)
+						end
+					end
+					for _, prefix_info in ipairs(iface["ipv6-prefix"] or {}) do
+						if prefix_info.address and prefix_info.mask then
+							local network = cidr.IPv6(prefix_info.address, tonumber(prefix_info.mask)):network():string()
+							local prefix = cidr.IPv6(prefix_info.address, tonumber(prefix_info.mask)):prefix()
+							print(network.."/"..prefix)
+						end
+					end
 				end
 			end
 		end
