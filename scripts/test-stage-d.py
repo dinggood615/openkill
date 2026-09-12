@@ -30,13 +30,18 @@ class StageD(unittest.TestCase):
         self.assertEqual(run('openkill_render_classifier_order').split(),
             'CONTROL_BYPASS SELF_BYPASS NODE_BYPASS LOCAL_BYPASS USER_BYPASS CHINA_DIRECT USER_PROXY DEFAULT_POLICY'.split())
 
+    def test_classifier_match_is_used_by_runtime(self):
+        self.assertEqual(run('openkill_classifier_match', 4, 'NODE_BYPASS').strip(), 'ip daddr @openkill_node4 counter return')
+        self.assertEqual(run('openkill_classifier_match', 6, 'NODE_BYPASS').strip(), 'ip6 daddr @openkill_node6 counter return')
+        self.assertIn('openkill_classifier_match 4 NODE_BYPASS', INIT.read_text())
+
     def test_dns_generation_deduplicates_and_is_family_aware(self):
         with tempfile.TemporaryDirectory() as d:
             p=Path(d); domains=p/'domains'; out4=p/'4'; out6=p/'6'
-            domains.write_text('example.com\n# ignored\nexample.com\n test.example\n')
+            domains.write_text('example.com\n# ignored\nexample.com\n test.example\n192.0.2.0/24\n')
             run('openkill_render_dns_set_rules', 4, domains, 'china_ip_route_pass', out4, 'nftset')
             run('openkill_render_dns_set_rules', 6, domains, 'china_ip6_route_pass', out6, 'nftset')
-            self.assertEqual(out4.read_text().splitlines(), ['nftset=/example.com/#inet#fw4#china_ip_route_pass','nftset=/test.example/#inet#fw4#china_ip_route_pass'])
+            self.assertEqual(out4.read_text().splitlines(), ['nftset=/example.com/4#inet#fw4#china_ip_route_pass','nftset=/test.example/4#inet#fw4#china_ip_route_pass'])
             self.assertTrue(all('/6#inet#fw4#china_ip6_route_pass' in x for x in out6.read_text().splitlines()))
 
     def test_init_uses_bounded_batch_and_fallback(self):

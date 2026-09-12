@@ -70,12 +70,17 @@ openkill_build_desired_state()
 
 openkill_snapshot_value()
 {
-    sed -n "s/^$1=//p" "$2" | head -n 1
+    key="$1"; file="$2"
+    while IFS= read -r line; do
+        case "$line" in
+            "$key="*) printf '%s\n' "${line#*=}"; return 0 ;;
+        esac
+    done < "$file"
 }
 
 openkill_normalize_list()
 {
-    printf '%s\n' "$*" | tr ' ;' '\n\n' | sed '/^$/d' | sort -u | tr '\n' ' ' | sed 's/[[:space:]]*$//'
+    printf '%s\n' "$*" | awk '{gsub(/[;[:space:]]+/, "\n"); if (length) print}' | sort -u | tr '\n' ' ' | awk '{$1=$1; sub(/[[:space:]]*$/, ""); print}'
 }
 
 openkill_network_fingerprint()
@@ -282,18 +287,28 @@ openkill_render_classifier_order()
     printf '%s\n' CONTROL_BYPASS SELF_BYPASS NODE_BYPASS LOCAL_BYPASS USER_BYPASS CHINA_DIRECT USER_PROXY DEFAULT_POLICY
 }
 
+openkill_classifier_match()
+{
+    family="$1"; role="$2"
+    case "$family:$role" in
+        4:NODE_BYPASS) printf 'ip daddr @openkill_node4 counter return' ;;
+        6:NODE_BYPASS) printf 'ip6 daddr @openkill_node6 counter return' ;;
+        *) return 1 ;;
+    esac
+}
+
 openkill_render_dns_set_rules()
 {
     family="$1"; domains_file="$2"; target_set="$3"; output_file="$4"; backend="${5:-nftset}"
     [ -r "$domains_file" ] || return 1
     tmp_file="${output_file}.tmp.$$"
     case "$family:$backend" in
-        4:nftset) prefix="nftset=/"; suffix="/#inet#fw4#$target_set" ;;
+        4:nftset) prefix="nftset=/"; suffix="/4#inet#fw4#$target_set" ;;
         6:nftset) prefix="nftset=/"; suffix="/6#inet#fw4#$target_set" ;;
         4:ipset|6:ipset) prefix="ipset=/"; suffix="/$target_set" ;;
         *) return 1 ;;
     esac
-    awk 'NF && $0 !~ /^[[:space:]]*#/ {gsub(/[[:space:]]+/, "", $0); print}' "$domains_file" |
+    awk 'NF && $0 !~ /^[[:space:]]*#/ {gsub(/[[:space:]]+/, "", $0); if ($0 ~ /[A-Za-z0-9-]+\.[A-Za-z]{2,}$/) print}' "$domains_file" |
         sort -u | awk -v p="$prefix" -v s="$suffix" '{print p $0 s}' > "$tmp_file" || return 1
     mv "$tmp_file" "$output_file"
 }
