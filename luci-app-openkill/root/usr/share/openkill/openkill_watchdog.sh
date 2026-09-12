@@ -379,7 +379,9 @@ HISTORY_INT=$(expr "$HISTORY_INT" + 1)
 if [ "$tun_owner" = "openkill" ]; then
 if [ "$LOCALNETWORK_INT" -eq 1 ] || [ "$(expr "$LOCALNETWORK_INT" % "$LOCALNETWORK_INTERVAL")" -eq 0 ]; then
    wan_ip4s=$(/usr/share/openkill/openkill_get_network.lua "wanip" 2>/dev/null)
-   wan_ip6s=$(ip -6 addr show scope global 2>/dev/null | awk '/inet6/{split($2,a,"/"); if (a[1] !~ /^fe80:/) print a[1]}' 2>/dev/null)
+    # Keep WAN IPv6 as host-only bypass; internal delegated prefixes come from
+    # lan_cidr6 and must never be inferred from a device-wide address scan.
+    wan_ip6s=$(openkill_wan6_host_addresses 2>/dev/null)
    lan_ip4s=$(/usr/share/openkill/openkill_get_network.lua "lan_cidr" 2>/dev/null)
    lan_ip6s=$(/usr/share/openkill/openkill_get_network.lua "lan_cidr6" 2>/dev/null)
    if [ -n "$FW4" ]; then

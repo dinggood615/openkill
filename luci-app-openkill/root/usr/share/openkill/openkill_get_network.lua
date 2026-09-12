@@ -172,32 +172,73 @@ if type == "lan_cidr6" then
 	-- implementation accidentally iterated the WAN model here, which could
 	-- put the uplink prefix into localnetwork6 and omit the delegated LAN PD.
 	-- Read netifd's authoritative interface dump so multiple internal
-	-- prefixes are retained and WAN/WAN6 remain separate.
+	-- prefixes are retained and WAN/WAN6 remain separate.  The historical
+	-- predicate was `name ~= "wan" and name ~= "wan6"`; role detection below is
+	-- case-insensitive and also checks the active native default-route device.
 	local ok, jsonc = pcall(require, "luci.jsonc")
 	if ok and jsonc then
-		local dump = luci.sys.exec("ubus call network.interface dump 2>/dev/null")
+		local dump_path = os.getenv("OPENKILL_INTERFACE_DUMP_FILE")
+		local dump = nil
+		if dump_path and dump_path ~= "" then
+			local fd = io.open(dump_path, "r")
+			if fd then
+				dump = fd:read("*a")
+				fd:close()
+			end
+		end
+		dump = dump or luci.sys.exec("ubus call network.interface dump 2>/dev/null")
 		local data = jsonc.parse(dump or "")
 		if data and data.interface then
+			local external_devices = {}
+			local route_dump = luci.sys.exec("ip -4 route show default 2>/dev/null; ip -6 route show default 2>/dev/null") or ""
+			for device in route_dump:gmatch("%sdev%s+([^%s]+)") do
+				external_devices[device] = true
+			end
+			local prefixes = {}
+			local function add_prefix(address, mask)
+				mask = tonumber(mask)
+				if not address or not mask or mask < 0 or mask > 128 then return end
+				local ok_cidr, value = pcall(cidr.IPv6, address, mask)
+				if not ok_cidr or not value then return end
+				local ok_network, network = pcall(function() return value:network():string() end)
+				local ok_prefix, prefix = pcall(function() return value:prefix() end)
+				if ok_network and ok_prefix and network and prefix then
+					prefixes[network.."/"..prefix] = true
+				end
+			end
+			local function is_external(iface)
+				local name = tostring(iface.interface or "")
+				local lower_name = string.lower(name)
+				if iface.up == false or iface.up == 0 then return true end
+				if lower_name == "wan" or lower_name == "wan6" or lower_name == "loopback" or
+				   lower_name:match("^wan%d*$") or lower_name:match("^wan6%d*$") then
+					return true
+				end
+				return external_devices[name] or
+					external_devices[iface.l3_device or ""] or
+					external_devices[iface.device or ""]
+			end
 			for _, iface in ipairs(data.interface) do
-				local name = iface.interface or ""
-				if name ~= "wan" and name ~= "wan6" and name ~= "loopback" and
-				   not name:match("^wan%d*$") then
+				if not is_external(iface) then
 					for _, addr in ipairs(iface["ipv6-address"] or {}) do
-						if addr.address and addr.mask then
-							local network = cidr.IPv6(addr.address, tonumber(addr.mask)):network():string()
-							local prefix = cidr.IPv6(addr.address, tonumber(addr.mask)):prefix()
-							print(network.."/"..prefix)
-						end
+						add_prefix(addr.address, addr.mask)
 					end
 					for _, prefix_info in ipairs(iface["ipv6-prefix"] or {}) do
-						if prefix_info.address and prefix_info.mask then
-							local network = cidr.IPv6(prefix_info.address, tonumber(prefix_info.mask)):network():string()
-							local prefix = cidr.IPv6(prefix_info.address, tonumber(prefix_info.mask)):prefix()
-							print(network.."/"..prefix)
-						end
+						add_prefix(prefix_info.address, prefix_info.mask)
+					end
+					-- netifd commonly exposes a delegated prefix on the WAN6
+					-- object and the assigned LAN slice on this separate list.
+					-- Internal interfaces must consume the assignment so a PD
+					-- does not disappear merely because WAN6 itself is external.
+					for _, prefix_info in ipairs(iface["ipv6-prefix-assignment"] or {}) do
+						add_prefix(prefix_info.address, prefix_info.mask)
 					end
 				end
 			end
+			local sorted = {}
+			for prefix in pairs(prefixes) do sorted[#sorted + 1] = prefix end
+			table.sort(sorted)
+			for _, prefix in ipairs(sorted) do print(prefix) end
 		end
 	end
 end

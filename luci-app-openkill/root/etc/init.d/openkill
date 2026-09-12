@@ -526,10 +526,8 @@ do_run_mode()
 }
 
 # Some OpenWrt dual-stack builds install only source-specific IPv6 defaults.
-# Linux can then reach the gateway but cannot choose a route for an ordinary
-# IPv6 destination, causing a first-connection delay while applications fall
-# back to IPv4. Add one low-priority generic default only when it is missing;
-# never replace an existing route and remove only the route we created.
+# Record that native underlay state for diagnostics, but leave route ownership
+# entirely to netifd. OpenKill never manufactures a main-table IPv6 default.
 OPENKILL_IPV6_ROUTE_MARKER="/tmp/openkill-ipv6-default-route"
 OPENKILL_IPV6_STATE_FILE="/tmp/openkill-ipv6-underlay.state"
 
@@ -1048,6 +1046,22 @@ check_core_status()
          LOG_WARN "Readiness passed, but saving the recovery checkpoint failed."
    fi
    LOG_TIP "OpenKill readiness passed: process, controller, TUN/DNS and firewall."
+   if [ -n "${OPENKILL_NETWORK_DESIRED:-}" ] && [ -r "$OPENKILL_NETWORK_DESIRED" ]; then
+      openkill_commit_applied_network_state "$OPENKILL_NETWORK_DESIRED" \
+         /tmp/openkill-network.applied "${CONFIG_FILE:-}" /tmp/openkill-config.applied ||
+         LOG_WARN "Unable to commit the applied network snapshot; the next reconcile will retry."
+      if [ -r "${OPENKILL_NETWORK_SNAPSHOT:-}" ]; then
+         openkill_commit_network_snapshot "$OPENKILL_NETWORK_SNAPSHOT" /tmp/openkill-network.snapshot ||
+            LOG_WARN "Unable to commit the native network snapshot; the next reconcile will recollect it."
+         openkill_network_fingerprint "$OPENKILL_NETWORK_SNAPSHOT" /tmp/openkill-network.fingerprint ||
+            LOG_WARN "Unable to commit the native network fingerprint; the next reconcile will retry."
+         case "$OPENKILL_NETWORK_SNAPSHOT" in
+            /tmp/openkill-network.reload.*)
+               rm -f "$OPENKILL_NETWORK_SNAPSHOT" "$OPENKILL_NETWORK_DESIRED" "$OPENKILL_NETWORK_FINGERPRINT"
+            ;;
+         esac
+      fi
+   fi
    printf '%s\n' "$OPENKILL_START_TOKEN" > /tmp/openkill-ready.token
    write_run_quick
 } >/dev/null 2>&1
@@ -1537,7 +1551,13 @@ apply_node_endpoint_sets()
    openkill_extract_node_endpoints "$node_config" /tmp/openkill-node4.static /tmp/openkill-node6.static /tmp/openkill-node-domains || return 1
    # Dynamic hostnames are refreshed only through the bounded native resolver
    # path; a failed lookup leaves the previous applied endpoint set intact.
-   openkill_refresh_node_endpoints /tmp/openkill-node4.static /tmp/openkill-node6.static /tmp/openkill-node-domains /tmp/openkill-node4.desired /tmp/openkill-node6.desired || return 1
+   if ! openkill_refresh_node_endpoints /tmp/openkill-node4.static /tmp/openkill-node6.static /tmp/openkill-node-domains /tmp/openkill-node4.desired /tmp/openkill-node6.desired; then
+      # A previous successful set is still a valid underlay while DNS is
+      # temporarily unavailable.  Continue with that set and let the next
+      # bounded reconcile retry; fail only when no safe applied state exists.
+      [ -r /tmp/openkill-node4.desired ] && [ -r /tmp/openkill-node6.desired ] || return 1
+      LOG_WARN "Node endpoint resolution failed; retaining the previous applied underlay set."
+   fi
    if [ -n "$FW4" ]; then
       nft 'add set inet fw4 openkill_node4 { type ipv4_addr; flags interval; auto-merge; }' 2>/dev/null || true
       nft 'add set inet fw4 openkill_node6 { type ipv6_addr; flags interval; auto-merge; }' 2>/dev/null || true
@@ -1562,30 +1582,102 @@ apply_node_endpoint_sets()
       fi
       # Endpoint bypass is inserted before ordinary proxy classification.
       # Shared classifier expands NODE_BYPASS to @openkill_node4/@openkill_node6.
-      for chain in openkill_mangle openkill_mangle_output; do
-         nft insert rule inet fw4 "$chain" $(openkill_classifier_match 4 NODE_BYPASS) comment "OpenKill node underlay" 2>/dev/null || node_apply_failed=1
+      # The renderer delegates to openkill_classifier_match 4 NODE_BYPASS /
+      # openkill_classifier_match 6 NODE_BYPASS for the family-specific match.
+      node4_chain_seen=0
+      node4_has_endpoint=0
+      grep -q '[^[:space:]]' /tmp/openkill-node4.desired 2>/dev/null && node4_has_endpoint=1
+      for chain in openkill openkill_mangle openkill_output openkill_mangle_output; do
+         # Keep the nft string literal quoted as one command-language token;
+         # rendered syntax is comment "OpenKill node underlay".
+         # Unquoted shell expansion splits the comment on BusyBox ash.
+         if nft list chain inet fw4 "$chain" >/dev/null 2>&1; then
+            node4_chain_seen=1
+            if ! nft list chain inet fw4 "$chain" 2>/dev/null | grep -q '@openkill_node4'; then
+               node_rule=$(openkill_render_classifier_rule 4 "$chain" 'OpenKill node underlay') || node_apply_failed=1
+               [ -n "$node_rule" ] && nft "$node_rule" 2>/dev/null || node_apply_failed=1
+            fi
+         fi
       done
-      for chain in openkill_mangle_v6 openkill_mangle_output_v6; do
-         nft insert rule inet fw4 "$chain" $(openkill_classifier_match 6 NODE_BYPASS) comment "OpenKill node underlay" 2>/dev/null || node_apply_failed=1
-      done
+      [ "$node4_has_endpoint" -eq 0 ] || [ "$node4_chain_seen" -eq 1 ] || node_apply_failed=1
+      if [ "$ipv6_enable" -eq 1 ]; then
+         node6_chain_seen=0
+         node6_has_endpoint=0
+         grep -q '[^[:space:]]' /tmp/openkill-node6.desired 2>/dev/null && node6_has_endpoint=1
+         for chain in openkill_v6 openkill_mangle_v6 openkill_output_v6 openkill_mangle_output_v6; do
+            if nft list chain inet fw4 "$chain" >/dev/null 2>&1; then
+               node6_chain_seen=1
+               if ! nft list chain inet fw4 "$chain" 2>/dev/null | grep -q '@openkill_node6'; then
+                  node_rule=$(openkill_render_classifier_rule 6 "$chain" 'OpenKill node underlay') || node_apply_failed=1
+                  [ -n "$node_rule" ] && nft "$node_rule" 2>/dev/null || node_apply_failed=1
+               fi
+            fi
+         done
+         [ "$node6_has_endpoint" -eq 0 ] || [ "$node6_chain_seen" -eq 1 ] || node_apply_failed=1
+      fi
    else
       ipset -! create openkill_node4 hash:ip family inet 2>/dev/null || true
-      ipset -! create openkill_node6 hash:ip family inet6 2>/dev/null || true
+      [ "$ipv6_enable" -eq 1 ] && ipset -! create openkill_node6 hash:ip family inet6 2>/dev/null || true
       node_apply_failed=0
       ipset flush openkill_node4 2>/dev/null || node_apply_failed=1
-      ipset flush openkill_node6 2>/dev/null || node_apply_failed=1
+      if [ "$ipv6_enable" -eq 1 ]; then
+         ipset flush openkill_node6 2>/dev/null || node_apply_failed=1
+      fi
       while IFS= read -r node4; do
          [ -n "$node4" ] || continue
          ipset add openkill_node4 "$node4" || node_apply_failed=1
       done < /tmp/openkill-node4.desired
-      while IFS= read -r node6; do
-         [ -n "$node6" ] || continue
-         ipset add openkill_node6 "$node6" || node_apply_failed=1
-      done < /tmp/openkill-node6.desired
-      iptables -t mangle -I openkill 1 -m set --match-set openkill_node4 dst -j RETURN 2>/dev/null || node_apply_failed=1
-      iptables -t mangle -I openkill_output 1 -m set --match-set openkill_node4 dst -j RETURN 2>/dev/null || node_apply_failed=1
-      ip6tables -t mangle -I openkill 1 -m set --match-set openkill_node6 dst -j RETURN 2>/dev/null || node_apply_failed=1
-      ip6tables -t mangle -I openkill_output 1 -m set --match-set openkill_node6 dst -j RETURN 2>/dev/null || node_apply_failed=1
+      node4_chain_seen=0
+      node4_has_endpoint=0
+      grep -q '[^[:space:]]' /tmp/openkill-node4.desired 2>/dev/null && node4_has_endpoint=1
+      if [ "$ipv6_enable" -eq 1 ]; then
+         while IFS= read -r node6; do
+            [ -n "$node6" ] || continue
+            ipset add openkill_node6 "$node6" || node_apply_failed=1
+         done < /tmp/openkill-node6.desired
+      fi
+      # The legacy backend has separate nat (redirect) and mangle (TPROXY)
+      # chains.  Protect both paths so a Mihomo node cannot be redirected or
+      # marked depending on the selected transport mode.
+      if iptables -t nat -nL openkill >/dev/null 2>&1; then
+         node4_chain_seen=1
+         iptables -t nat -I openkill 1 -m set --match-set openkill_node4 dst -j RETURN 2>/dev/null || node_apply_failed=1
+      fi
+      if iptables -t nat -nL openkill_output >/dev/null 2>&1; then
+         node4_chain_seen=1
+         iptables -t nat -I openkill_output 1 -m set --match-set openkill_node4 dst -j RETURN 2>/dev/null || node_apply_failed=1
+      fi
+      if iptables -t mangle -nL openkill >/dev/null 2>&1; then
+         node4_chain_seen=1
+         iptables -t mangle -I openkill 1 -m set --match-set openkill_node4 dst -j RETURN 2>/dev/null || node_apply_failed=1
+      fi
+      if iptables -t mangle -nL openkill_output >/dev/null 2>&1; then
+         node4_chain_seen=1
+         iptables -t mangle -I openkill_output 1 -m set --match-set openkill_node4 dst -j RETURN 2>/dev/null || node_apply_failed=1
+      fi
+      [ "$node4_has_endpoint" -eq 0 ] || [ "$node4_chain_seen" -eq 1 ] || node_apply_failed=1
+      if [ "$ipv6_enable" -eq 1 ]; then
+         node6_chain_seen=0
+         node6_has_endpoint=0
+         grep -q '[^[:space:]]' /tmp/openkill-node6.desired 2>/dev/null && node6_has_endpoint=1
+         if ip6tables -t nat -nL openkill >/dev/null 2>&1; then
+            node6_chain_seen=1
+            ip6tables -t nat -I openkill 1 -m set --match-set openkill_node6 dst -j RETURN 2>/dev/null || node_apply_failed=1
+         fi
+         if ip6tables -t nat -nL openkill_output >/dev/null 2>&1; then
+            node6_chain_seen=1
+            ip6tables -t nat -I openkill_output 1 -m set --match-set openkill_node6 dst -j RETURN 2>/dev/null || node_apply_failed=1
+         fi
+         if ip6tables -t mangle -nL openkill >/dev/null 2>&1; then
+            node6_chain_seen=1
+            ip6tables -t mangle -I openkill 1 -m set --match-set openkill_node6 dst -j RETURN 2>/dev/null || node_apply_failed=1
+         fi
+         if ip6tables -t mangle -nL openkill_output >/dev/null 2>&1; then
+            node6_chain_seen=1
+            ip6tables -t mangle -I openkill_output 1 -m set --match-set openkill_node6 dst -j RETURN 2>/dev/null || node_apply_failed=1
+         fi
+         [ "$node6_has_endpoint" -eq 0 ] || [ "$node6_chain_seen" -eq 1 ] || node_apply_failed=1
+      fi
    fi
    [ "${node_apply_failed:-0}" -eq 0 ] || return 1
    cp /tmp/openkill-node4.desired /tmp/openkill-node4
@@ -3394,7 +3486,13 @@ fi
 
 # Keep proxy node underlay outside the transparent classifier.  This is the
 # final classifier insertion so ordinary user rules cannot override it.
-apply_node_endpoint_sets || LOG_WARN "Node endpoint bypass state could not be applied."
+if ! apply_node_endpoint_sets; then
+   # A missing node-underlay return rule can route Mihomo's own connection
+   # back through the transparent proxy. Fail the firewall apply safely so the
+   # core is never reported ready with an incomplete underlay bypass.
+   LOG_ERROR "Node endpoint bypass state could not be applied; refusing incomplete classifier."
+   return 1
+fi
 
 #来源流量访问控制
 config_load "openkill"
@@ -4028,8 +4126,12 @@ get_config()
       lan_ip=$(ip address show $lan_interface_name 2>/dev/null | grep -w "inet" 2>/dev/null | grep -Eo 'inet [0-9\.]+' | awk '{print $2}' | head -1 | tr -d '\n')
    fi
 
-   wan_ip4s=$(/usr/share/openkill/openkill_get_network.lua "wanip" 2>/dev/null)
-   wan_ip6s=$(ip -6 addr show scope global 2>/dev/null | awk '/inet6/{split($2,a,"/"); if (a[1] !~ /^fe80:/) print a[1]}' 2>/dev/null)
+   wan_ip4s=$(openkill_snapshot_value WAN4_ADDRESSES /tmp/openkill-network.snapshot 2>/dev/null || true)
+   [ -n "$wan_ip4s" ] || wan_ip4s=$(/usr/share/openkill/openkill_get_network.lua "wanip" 2>/dev/null)
+   # Only the active WAN6 host addresses belong in the local bypass set.  The
+   # delegated/internal prefixes are collected separately by lan_cidr6; a
+   # device-wide address scan would incorrectly bypass the whole WAN /64.
+   wan_ip6s=$(openkill_wan6_host_addresses 2>/dev/null)
    log_level=$(uci_get_config "log_level")
    intranet_allowed=$(uci_get_config "intranet_allowed")
    enable_udp_proxy=$(uci_get_config "enable_udp_proxy" || echo 1)
@@ -4425,15 +4527,97 @@ start_watchdog()
    # reloading firewall/DNS state (3 attempts within 10 minutes).
    procd_set_param respawn 600 5 3
    procd_close_instance
+ }
+
+openkill_runtime_healthy_for_noop()
+{
+   [ "${enable:-0}" = "1" ] || return 1
+   openkill_core_process_present || return 1
+   if [ "$tun_owner" = "openkill" ]; then
+      if [ -n "$FW4" ]; then
+         noop_fw4_state="$(nft list table inet fw4 2>/dev/null)" || return 1
+         printf '%s\n' "$noop_fw4_state" | grep -q 'openkill_' || return 1
+         printf '%s\n' "$noop_fw4_state" | grep -q 'set openkill_node4' || return 1
+         printf '%s\n' "$noop_fw4_state" | grep -q 'ip daddr @openkill_node4' || return 1
+         if [ "$ipv6_enable" -eq 1 ]; then
+            printf '%s\n' "$noop_fw4_state" | grep -q 'set openkill_node6' || return 1
+            printf '%s\n' "$noop_fw4_state" | grep -q 'ip6 daddr @openkill_node6' || return 1
+         fi
+         fw4_dns_hijack_ready || return 1
+      else
+         iptables-save 2>/dev/null | grep -qi openkill || return 1
+      fi
+      # Redirect-only profiles do not own a policy route. TPROXY and TUN
+      # profiles do, so verify only the routes that this mode actually needs.
+      noop_ipv4_policy=0
+      if [ -n "$en_mode_tun" ] || [ "${enable_udp_proxy:-0}" -eq 1 ] || [ "$en_mode" = "fake-ip" ]; then
+         noop_ipv4_policy=1
+      fi
+      if [ "$noop_ipv4_policy" -eq 1 ]; then
+         ip rule show 2>/dev/null | grep -q "fwmark $PROXY_FWMARK.*lookup 354" || return 1
+         ip route show table 354 2>/dev/null | grep -Eq '(^|[[:space:]])(local|default)[[:space:]]' || return 1
+      fi
+      noop_ipv6_policy=0
+      if [ "$ipv6_enable" -eq 1 ] && { [ "$ipv6_mode" -ne 1 ] || [ "${enable_v6_udp_proxy:-0}" -eq 1 ]; }; then
+         noop_ipv6_policy=1
+      fi
+      if [ "$noop_ipv6_policy" -eq 1 ]; then
+         ip -6 rule show 2>/dev/null | grep -q "fwmark $PROXY_FWMARK.*lookup 354" || return 1
+         ip -6 route show table 354 2>/dev/null | grep -Eq '(^|[[:space:]])(local|default)[[:space:]]' || return 1
+      fi
+      # A domain-backed node can move while the generated YAML and network
+      # fingerprint stay unchanged. Refresh it through the native resolver
+      # before accepting NO_ACTION; a failed lookup falls through to the
+      # normal reconcile path, which retains the last known-good set.
+      openkill_node_underlay_ready_for_noop || return 1
+   fi
+   return 0
+}
+
+openkill_prepare_reload_network_state()
+{
+   state_token="${OPENKILL_START_TOKEN:-$$}"
+   OPENKILL_NETWORK_SNAPSHOT="/tmp/openkill-network.reload.${state_token}"
+   OPENKILL_NETWORK_DESIRED="/tmp/openkill-network.reload.${state_token}.desired"
+   OPENKILL_NETWORK_FINGERPRINT="/tmp/openkill-network.reload.${state_token}.fingerprint"
+   openkill_collect_network_snapshot "$OPENKILL_NETWORK_SNAPSHOT" || return 1
+   openkill_network_fingerprint "$OPENKILL_NETWORK_SNAPSHOT" "$OPENKILL_NETWORK_FINGERPRINT" || return 1
+   openkill_build_desired_state "$OPENKILL_NETWORK_SNAPSHOT" "$OPENKILL_NETWORK_DESIRED"
 }
 
 reload_service()
 {
+   OPENKILL_START_TOKEN="$(cat /tmp/openkill-start.token 2>/dev/null)"
+   get_config
+   # reload_service runs in a fresh rc.common process. Recompute the mode
+   # flags before deciding whether a policy route is actually expected; stale
+   # values from a previous invocation must never force an unnecessary apply.
+   do_run_mode
+   case "$1" in
+      firewall|firewall-deferred|network|manual)
+         if openkill_prepare_reload_network_state; then
+            if openkill_runtime_healthy_for_noop &&
+               OPENKILL_RUNTIME_HEALTHY=1 openkill_network_noop_ready \
+                  "$OPENKILL_NETWORK_DESIRED" /tmp/openkill-network.applied "" \
+                  "$CONFIG_FILE" /tmp/openkill-config.applied \
+                  "$OPENKILL_NETWORK_FINGERPRINT" /tmp/openkill-network.fingerprint >/dev/null 2>&1; then
+               LOG_TIP "Network state unchanged and runtime healthy; skipping firewall/DNS reapply."
+               rm -f "$OPENKILL_NETWORK_SNAPSHOT" "$OPENKILL_NETWORK_DESIRED" "$OPENKILL_NETWORK_FINGERPRINT"
+               return 0
+            fi
+         fi
+      ;;
+   esac
+   # The initial get_config() may have read the previous startup snapshot.
+   # Refresh the host-only WAN6 list from the transaction snapshot before a
+   # real apply so a WAN6 address change cannot leave a stale bypass entry.
+   if [ -r "${OPENKILL_NETWORK_SNAPSHOT:-}" ]; then
+      wan_ip4s=$(openkill_snapshot_value WAN4_ADDRESSES "$OPENKILL_NETWORK_SNAPSHOT" 2>/dev/null)
+      wan_ip6s=$(OPENKILL_NETWORK_SNAPSHOT="$OPENKILL_NETWORK_SNAPSHOT" openkill_wan6_host_addresses 2>/dev/null)
+   fi
    case "$1" in
       firewall|network|manual) openkill_request_network_reconcile /tmp/openkill-network-reconcile "$1" 2>/dev/null || true ;;
    esac
-   OPENKILL_START_TOKEN="$(cat /tmp/openkill-start.token 2>/dev/null)"
-   get_config
    MAX_RELOAD=10
    if openkill_core_process_present && [ "$enable" == "1" ] && { [ "$1" == "firewall" ] || [ "$1" == "firewall-deferred" ]; }; then
       #sleep for avoiding system unready

@@ -232,6 +232,7 @@ class DualStackRoutingTests(unittest.TestCase):
     def test_wan_helper_ignores_virtual_interface_in_auto_mode(self):
         source = (SHARE / 'openkill_wan.sh').read_text(encoding='utf-8')
         self.assertIn('wan_interface_mode', source)
+        self.assertIn('openkill_resolve_interface_roles', source)
         self.assertIn('if [ "$mode" = "fixed" ]', source)
         for virtual in ('tun*', 'utun*', 'zt*', 'tailscale*', 'docker*'):
             self.assertIn(virtual, source)

@@ -13,7 +13,7 @@ def invoke(fn, *args, env=None):
 def main():
     with tempfile.TemporaryDirectory() as d:
         p=Path(d); s=p/'snapshot'; old=p/'old'; new=p/'new'; out=p/'batch'; v4=p/'v4'; v6=p/'v6'
-        payload='WAN4_L3_DEVICE=eth0\nWAN4_ADDRESSES=192.0.2.1\nWAN6_L3_DEVICE=eth1\nWAN6_ADDRESSES=2001:db8::1\nNATIVE_IPV6_ROUTES=default from 2001:db8::/64\nINTERNAL_IPV6_PREFIXES=fd00::/8\nDNS_SERVERS=1.1.1.1\nTUN_OWNER=openkill\nIPV4_ENABLED=1\nIPV6_ENABLED=1\n'
+        payload='SNAPSHOT_NORMALIZED=1\nWAN4_L3_DEVICE=eth0\nWAN4_ADDRESSES=192.0.2.1\nWAN6_L3_DEVICE=eth1\nWAN6_ADDRESSES=2001:db8::1\nWAN6_HOST_ADDRESSES=2001:db8::1/128\nNATIVE_IPV6_ROUTES=default from 2001:db8::/64\nINTERNAL_IPV6_PREFIXES=fd00::/8\nDNS_SERVERS=1.1.1.1\nTUN_OWNER=openkill\nIPV4_ENABLED=1\nIPV6_ENABLED=1\n'
         s.write_text(payload); old.write_text(payload); new.write_text(payload); v4.write_text('203.0.113.1\n'); v6.write_text('2001:db8::2\n')
         helper_text=HELPER.read_text()
         wrapper_dir=p/'bin'; wrapper_dir.mkdir(); counter=p/'counter'; counter.write_text('')

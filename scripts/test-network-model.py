@@ -19,6 +19,14 @@ def run_helper(action, *args):
     )
 
 
+def run_helper_env(action, *args, env=None, check=True):
+    script = '. "$1"; ' + action + ' ' + ' '.join('"$%d"' % (i + 2) for i in range(len(args)))
+    return subprocess.run(
+        ["sh", "-c", script, "model", str(HELPER), *map(str, args)],
+        check=check, capture_output=True, text=True, env=env or os.environ.copy(),
+    )
+
+
 def build(snapshot: str):
     with tempfile.TemporaryDirectory() as td:
         src = pathlib.Path(td) / "snapshot"
@@ -32,6 +40,397 @@ def build(snapshot: str):
 
 
 class NetworkModelTests(unittest.TestCase):
+    def test_ipv6_cidr_helper_handles_compressed_and_non_boundary_prefixes(self):
+        self.assertNotEqual(
+            run_helper_env("openkill_ipv6_in_cidr", "2001:db8::2", "fdfe:dcba:9876::/64", check=False).returncode,
+            0,
+        )
+        self.assertEqual(
+            run_helper_env("openkill_ipv6_in_cidr", "fdfe:dcba:9876::2", "fdfe:dcba:9876::/64").returncode,
+            0,
+        )
+        self.assertEqual(
+            run_helper_env("openkill_ipv6_in_cidr", "2001:db8:1234::2", "2001:db8::/32").returncode,
+            0,
+        )
+
+    def test_interface_roles_accept_uppercase_netifd_objects(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            fixture = td / "roles"
+            fixture.write_text(
+                "WAN4_INTERFACE=WAN\nWAN4_L3_DEVICE=pppoe-wan\n"
+                "WAN6_INTERFACE=WAN6\nWAN6_L3_DEVICE=pppoe-wan\n",
+                encoding="utf-8",
+            )
+            env = os.environ.copy()
+            env["OPENKILL_INTERFACE_ROLE_FIXTURE"] = str(fixture)
+            result = run_helper_env("openkill_resolve_interface_roles", td / "missing", td / "out", env=env)
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual((td / "out").read_text().splitlines(), fixture.read_text().splitlines())
+
+    def test_interface_roles_fall_back_to_custom_default_route_devices(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            records = td / "records"
+            records.write_text("internet|pppoe-wan|eth0\nv6internet|pppoe-wan6|eth1\n", encoding="utf-8")
+            out4, out6 = td / "out4", td / "out6"
+            run_helper_env(
+                "openkill_select_interface_role", records, "", "wan", "pppoe-wan", out4
+            )
+            run_helper_env(
+                "openkill_select_interface_role", records, "", "wan6", "pppoe-wan6", out6
+            )
+            self.assertIn("DEVICE=pppoe-wan", out4.read_text())
+            self.assertIn("INTERFACE=internet", out4.read_text())
+            self.assertIn("DEVICE=pppoe-wan6", out6.read_text())
+            self.assertIn("INTERFACE=v6internet", out6.read_text())
+
+    def test_interface_roles_disambiguate_shared_l3_device_by_family(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            records = td / "records"
+            records.write_text(
+                "internet|pppoe-wan|eth0|1||pppoe\n"
+                "v6internet|pppoe-wan|eth0||1|dhcpv6\n",
+                encoding="utf-8",
+            )
+            out4, out6 = td / "out4", td / "out6"
+            self.assertEqual(
+                run_helper_env(
+                    "openkill_select_interface_role", records, "", "wan", "pppoe-wan", out4, 4
+                ).returncode,
+                0,
+            )
+            self.assertEqual(
+                run_helper_env(
+                    "openkill_select_interface_role", records, "", "wan6", "pppoe-wan", out6, 6
+                ).returncode,
+                0,
+            )
+            self.assertIn("INTERFACE=internet", out4.read_text())
+            self.assertIn("INTERFACE=v6internet", out6.read_text())
+
+    def test_interface_role_resolver_consumes_one_dump_and_handles_uppercase_names(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            dump = td / "dump"; out = td / "roles"; fake = td / "bin"; fake.mkdir()
+            dump.write_text("{\"interface\":[{\"interface\":\"WAN\",\"l3_device\":\"pppoe-wan\",\"device\":\"eth0\"},{\"interface\":\"WAN6\",\"l3_device\":\"pppoe-wan\",\"device\":\"eth0\"},{\"interface\":\"LAN\",\"l3_device\":\"br-lan\",\"device\":\"br-lan\"}]}\n", encoding="utf-8")
+            (fake / "jsonfilter").write_text(
+                r"""#!/bin/sh
+expr=; file=
+while [ "$#" -gt 0 ]; do case "$1" in -i) file="$2"; shift 2;; -e) expr="$2"; shift 2;; *) shift;; esac; done
+case "$expr" in
+  *@.interface\[0\].interface) echo WAN;; *@.interface\[0\].l3_device) echo pppoe-wan;; *@.interface\[0\].device) echo eth0;;
+  *@.interface\[1\].interface) echo WAN6;; *@.interface\[1\].l3_device) echo pppoe-wan;; *@.interface\[1\].device) echo eth0;;
+  *@.interface\[2\].interface) echo LAN;; *@.interface\[2\].l3_device) echo br-lan;; *@.interface\[2\].device) echo br-lan;;
+esac
+""", encoding="utf-8")
+            (fake / "ip").write_text(
+                """#!/bin/sh
+case "$*" in *"-4 route"*) echo 'default via 192.0.2.1 dev pppoe-wan'; echo '192.168.1.0/24 dev br-lan';; *"-6 route"*) echo 'default from 2001:db8:1::/64 via fe80::1 dev pppoe-wan'; echo '2001:db8:2::/62 dev br-lan';; esac
+""", encoding="utf-8")
+            for name in ("jsonfilter", "ip"):
+                (fake / name).chmod(0o755)
+            env = os.environ.copy(); env["PATH"] = f"{fake}:/bin:/usr/bin"
+            result = run_helper_env("openkill_resolve_interface_roles", dump, out, env=env)
+            self.assertEqual(result.returncode, 0)
+            self.assertIn("WAN4_INTERFACE=WAN", out.read_text())
+            self.assertIn("WAN6_INTERFACE=WAN6", out.read_text())
+            self.assertIn("WAN4_L3_DEVICE=pppoe-wan", out.read_text())
+            self.assertIn("WAN6_L3_DEVICE=pppoe-wan", out.read_text())
+
+    def test_snapshot_uses_uppercase_wan_roles_and_keeps_wan_prefix_host_only(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            dump, lua, snapshot, fake = td / "dump", td / "network.lua", td / "snapshot", td / "bin"
+            fake.mkdir()
+            dump.write_text(
+                '{"interface":[{"interface":"WAN","l3_device":"pppoe-wan","device":"eth0"},'
+                '{"interface":"WAN6","l3_device":"pppoe-wan","device":"eth0"},'
+                '{"interface":"LAN","l3_device":"br-lan","device":"br-lan"}]}\n',
+                encoding="utf-8",
+            )
+            lua.write_text("#!/bin/sh\nprintf '%s\\n' '2001:db8:2::/62'\n", encoding="utf-8")
+            (fake / "jsonfilter").write_text(
+                r"""#!/bin/sh
+expr=
+while [ "$#" -gt 0 ]; do case "$1" in -e) expr="$2"; shift 2;; *) shift;; esac; done
+case "$expr" in
+  *@.interface\[0\].interface) echo WAN;; *@.interface\[0\].l3_device) echo pppoe-wan;; *@.interface\[0\].device) echo eth0;;
+  *@.interface\[1\].interface) echo WAN6;; *@.interface\[1\].l3_device) echo pppoe-wan;; *@.interface\[1\].device) echo eth0;;
+  *@.interface\[2\].interface) echo LAN;; *@.interface\[2\].l3_device) echo br-lan;; *@.interface\[2\].device) echo br-lan;;
+  *@.interface\[*\].dns-server\[*\]) echo 2001:4860:4860::8888;;
+esac
+""", encoding="utf-8")
+            (fake / "ip").write_text(
+                """#!/bin/sh
+case "$*" in
+  *"-4 route"*) echo 'default via 192.0.2.1 dev pppoe-wan';;
+  *"-6 route"*) echo 'default from 2001:db8:1::/64 via fe80::1 dev pppoe-wan';;
+  *"-4 addr show dev pppoe-wan"*) echo '    inet 192.0.2.2/24 scope global pppoe-wan';;
+  *"-6 addr show dev pppoe-wan"*) echo '    inet6 2001:db8:1::123/64 scope global';;
+esac
+""", encoding="utf-8")
+            for path in (lua, fake / "jsonfilter", fake / "ip"):
+                path.chmod(0o755)
+            env = os.environ.copy()
+            env["PATH"] = f"{fake}:/bin:/usr/bin"
+            env["OPENKILL_INTERFACE_DUMP_FILE"] = str(dump)
+            env["OPENKILL_NETWORK_LUA"] = str(lua)
+            result = run_helper_env("openkill_collect_network_snapshot", snapshot, env=env)
+            self.assertEqual(result.returncode, 0)
+            values = dict(line.split("=", 1) for line in snapshot.read_text().splitlines() if "=" in line)
+            self.assertEqual(values["SNAPSHOT_NORMALIZED"], "1")
+            self.assertEqual(values["WAN4_ADDRESSES"], "192.0.2.2")
+            self.assertEqual(values["WAN4_L3_DEVICE"], "pppoe-wan")
+            self.assertEqual(values["WAN6_L3_DEVICE"], "pppoe-wan")
+            self.assertEqual(values["WAN6_HOST_ADDRESSES"], "2001:db8:1::123/128")
+            self.assertEqual(values["INTERNAL_IPV6_PREFIXES"], "2001:db8:2::/62")
+            self.assertEqual(values["LOCAL_IPV6_READY"], "1")
+
+    def test_internal_prefix_discovery_consumes_netifd_assignments(self):
+        text = (ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_get_network.lua").read_text(encoding="utf-8")
+        self.assertIn('ipv6-prefix-assignment', text)
+        self.assertIn('Internal interfaces must consume the assignment', text)
+
+    def test_wan_ipv6_bypass_is_host_only(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            snapshot = td / "snapshot"
+            snapshot.write_text("WAN6_ADDRESSES=2001:db8:1::123/64 2001:db8:1::123 2001:db8:1::124/64\n", encoding="utf-8")
+            result = run_helper_env(
+                "openkill_wan6_host_addresses", env={**os.environ, "OPENKILL_NETWORK_SNAPSHOT": str(snapshot)}
+            )
+            self.assertEqual(result.stdout.splitlines(), ["2001:db8:1::123/128", "2001:db8:1::124/128"])
+
+    def test_desired_localnetwork6_keeps_wan_as_hosts_and_lan_as_prefixes(self):
+        state = build("""SNAPSHOT_VERSION=1
+LOCAL_IPV6_READY=1
+WAN6_HOST_ADDRESSES=2001:db8:1::123/128
+INTERNAL_IPV6_PREFIXES=2001:db8:2::/62
+""")
+        self.assertEqual(state["LOCALNETWORK6_PREFIXES"].split(), ["2001:db8:1::123/128", "2001:db8:2::/62"])
+        self.assertNotIn("2001:db8:1::/64", state["LOCALNETWORK6_PREFIXES"])
+
+    def test_invalid_ipv6_literals_are_not_rendered(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            yaml_file, v4, v6, domains = [td / name for name in ("config.yaml", "v4", "v6", "domains")]
+            yaml_file.write_text("proxies:\n  - name: bad-v6\n    server: 2001:::1\n  - name: good-v6\n    server: 2001:db8::2\n  - name: bad-v4\n    server: 999.999.1.1\n", encoding="utf-8")
+            subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_extract_node_endpoints "$1" "$2" "$3" "$4"', "model", str(yaml_file), str(v4), str(v6), str(domains)], check=True)
+            self.assertEqual(v4.read_text(), "")
+            self.assertEqual(v6.read_text().strip(), "2001:db8::2")
+            self.assertEqual(domains.read_text(), "")
+
+    def test_nft_string_quote_and_node_classifier_rule(self):
+        quoted = run_helper_env("openkill_nft_string_quote", 'OpenKill "node" \\ test')
+        self.assertEqual(quoted.stdout.strip(), '"OpenKill \\"node\\" \\\\ test"')
+        rendered = run_helper_env("openkill_render_classifier_rule", 6, "openkill_mangle_v6", "OpenKill node underlay")
+        self.assertIn('ip6 daddr @openkill_node6 counter return comment "OpenKill node underlay"', rendered.stdout)
+
+    def test_native_resolver_works_without_getent_and_rejects_fake_ip(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            domains, v4, v6 = td / "domains", td / "v4", td / "v6"
+            domains.write_text("node.example.test\n", encoding="utf-8")
+            v4.write_text("\n", encoding="utf-8"); v6.write_text("\n", encoding="utf-8")
+            fake = td / "bin"; fake.mkdir()
+            (fake / "timeout").write_text("#!/bin/sh\nshift; exec \"$@\"\n", encoding="utf-8")
+            (fake / "nslookup").write_text(
+                "#!/bin/sh\nprintf '%s\\n' 'Server: 192.0.2.53' 'Address 1: 192.0.2.53' 'Name: node.example.test' 'Address 1: 192.0.2.2' 'Address 2: 2001:db8::2'\n",
+                encoding="utf-8",
+            )
+            for name in ("timeout", "nslookup"):
+                (fake / name).chmod(0o755)
+            env = os.environ.copy()
+            env["PATH"] = f"{fake}:/bin:/usr/bin"
+            env["OPENKILL_NODE_DNS_SERVERS"] = "192.0.2.53"
+            env["OPENKILL_FAKEIP_RANGE4"] = "198.18.0.0/15"
+            env["OPENKILL_FAKEIP_RANGE6"] = "fdfe:dcba:9876::/64"
+            run_helper_env("openkill_resolve_node_domains", domains, v4, v6, env=env)
+            self.assertEqual(v4.read_text().strip(), "192.0.2.2")
+            self.assertEqual(v6.read_text().strip(), "2001:db8::2")
+
+    def test_resolver_fake_ip_results_are_not_node_endpoints(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            domains, v4, v6 = td / "domains", td / "v4", td / "v6"
+            domains.write_text("node.example.test\n", encoding="utf-8")
+            v4.write_text("\n", encoding="utf-8"); v6.write_text("\n", encoding="utf-8")
+            fake = td / "bin"; fake.mkdir()
+            (fake / "timeout").write_text("#!/bin/sh\nshift; exec \"$@\"\n", encoding="utf-8")
+            (fake / "nslookup").write_text(
+                "#!/bin/sh\nprintf '%s\\n' 'Name: node.example.test' 'Address 1: 198.18.1.2' 'Address 2: fdfe:dcba:9876::2'\n",
+                encoding="utf-8",
+            )
+            for name in ("timeout", "nslookup"):
+                (fake / name).chmod(0o755)
+            env = os.environ.copy(); env["PATH"] = f"{fake}:/bin:/usr/bin"; env["OPENKILL_NODE_DNS_SERVERS"] = "192.0.2.53"
+            result = run_helper_env("openkill_resolve_node_domains", domains, v4, v6, env=env, check=False)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(v4.read_text(), "\n"); self.assertEqual(v6.read_text(), "\n")
+
+    def test_resolver_filters_configured_uppercase_fake_ipv6_range(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            domains, v4, v6 = td / "domains", td / "v4", td / "v6"
+            domains.write_text("node.example.test\n", encoding="utf-8")
+            v4.write_text("\n", encoding="utf-8"); v6.write_text("\n", encoding="utf-8")
+            fake = td / "bin"; fake.mkdir()
+            (fake / "timeout").write_text("#!/bin/sh\nshift; exec \"$@\"\n", encoding="utf-8")
+            (fake / "nslookup").write_text(
+                "#!/bin/sh\nprintf '%s\\n' 'Name: node.example.test' 'Address 1: FD00:ABCD::2'\n", encoding="utf-8")
+            for name in ("timeout", "nslookup"):
+                (fake / name).chmod(0o755)
+            env = {**os.environ, "PATH": f"{fake}:/bin:/usr/bin", "OPENKILL_NODE_DNS_SERVERS": "192.0.2.53", "OPENKILL_FAKEIP_RANGE6": "FD00:ABCD::/64"}
+            result = run_helper_env("openkill_resolve_node_domains", domains, v4, v6, env=env, check=False)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(v6.read_text(), "\n")
+
+    def test_resolver_filters_ipv6_fake_range_by_cidr_width(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            domains, v4, v6 = td / "domains", td / "v4", td / "v6"
+            domains.write_text("node.example.test\n", encoding="utf-8")
+            v4.write_text("\n", encoding="utf-8"); v6.write_text("\n", encoding="utf-8")
+            fake = td / "bin"; fake.mkdir()
+            (fake / "timeout").write_text("#!/bin/sh\nshift; exec \"$@\"\n", encoding="utf-8")
+            (fake / "nslookup").write_text(
+                "#!/bin/sh\nprintf '%s\\n' 'Name: node.example.test' 'Address 1: 2001:db8:1234::2'\n",
+                encoding="utf-8")
+            for name in ("timeout", "nslookup"):
+                (fake / name).chmod(0o755)
+            env = {**os.environ, "PATH": f"{fake}:/bin:/usr/bin", "OPENKILL_NODE_DNS_SERVERS": "192.0.2.53"}
+            result = run_helper_env(
+                "openkill_resolve_node_domains", domains, v4, v6, env={**env, "OPENKILL_FAKEIP_RANGE6": "2001:db8::/32"}, check=False)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(v6.read_text(), "\n")
+
+    def test_resolution_failure_preserves_old_and_first_start_keeps_static_literals(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            static4, static6 = td / "static4", td / "static6"
+            domains, applied4, applied6 = td / "domains", td / "applied4", td / "applied6"
+            static4.write_text("192.0.2.10\n", encoding="utf-8")
+            static6.write_text("2001:db8::10\n", encoding="utf-8")
+            domains.write_text("node.example.test\n", encoding="utf-8")
+            fake = td / "bin"; fake.mkdir()
+            (fake / "timeout").write_text("#!/bin/sh\nexit 124\n", encoding="utf-8")
+            (fake / "nslookup").write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+            for path in (fake / "timeout", fake / "nslookup"):
+                path.chmod(0o755)
+            env = {**os.environ, "PATH": f"{fake}:/bin:/usr/bin", "OPENKILL_NODE_DNS_SERVERS": "192.0.2.53"}
+            self.assertEqual(
+                run_helper_env("openkill_refresh_node_endpoints", static4, static6, domains, applied4, applied6, env=env).returncode,
+                0,
+            )
+            self.assertEqual(applied4.read_text(), static4.read_text())
+            self.assertEqual(applied6.read_text(), static6.read_text())
+            applied4.write_text("192.0.2.20\n", encoding="utf-8")
+            applied6.write_text("2001:db8::20\n", encoding="utf-8")
+            failed = run_helper_env("openkill_refresh_node_endpoints", static4, static6, domains, applied4, applied6, env=env, check=False)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertEqual(applied4.read_text(), "192.0.2.20\n")
+            self.assertEqual(applied6.read_text(), "2001:db8::20\n")
+
+    def test_domain_node_noop_probe_refreshes_without_mutating_applied_set(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            static4, static6 = td / "static4", td / "static6"
+            domains, applied4, applied6 = td / "domains", td / "applied4", td / "applied6"
+            static4.write_text("192.0.2.10\n", encoding="utf-8")
+            static6.write_text("\n", encoding="utf-8")
+            domains.write_text("node.example.test\n", encoding="utf-8")
+            applied4.write_text("192.0.2.10\n", encoding="utf-8")
+            applied6.write_text("\n", encoding="utf-8")
+            fake = td / "bin"; fake.mkdir()
+            (fake / "timeout").write_text("#!/bin/sh\nshift; exec \"$@\"\n", encoding="utf-8")
+            (fake / "nslookup").write_text(
+                "#!/bin/sh\nprintf '%s\\n' 'Name: node.example.test' 'Address 1: 192.0.2.10'\n",
+                encoding="utf-8",
+            )
+            for path in (fake / "timeout", fake / "nslookup"):
+                path.chmod(0o755)
+            env = {
+                **os.environ,
+                "PATH": f"{fake}:/bin:/usr/bin",
+                "OPENKILL_NODE_DNS_SERVERS": "192.0.2.53",
+            }
+            result = run_helper_env(
+                "openkill_node_underlay_ready_for_noop",
+                domains,
+                static4,
+                static6,
+                applied4,
+                applied6,
+                env=env,
+            )
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(applied4.read_text(), "192.0.2.10\n")
+            self.assertEqual(applied6.read_text(), "\n")
+
+            (fake / "nslookup").write_text(
+                "#!/bin/sh\nprintf '%s\\n' 'Name: node.example.test' 'Address 1: 192.0.2.11'\n",
+                encoding="utf-8",
+            )
+            self.assertNotEqual(
+                run_helper_env(
+                    "openkill_node_underlay_ready_for_noop",
+                    domains,
+                    static4,
+                    static6,
+                    applied4,
+                    applied6,
+                    env=env,
+                    check=False,
+                ).returncode,
+                0,
+            )
+            self.assertEqual(applied4.read_text(), "192.0.2.10\n")
+
+    def test_network_applied_state_enables_noop_only_when_runtime_is_healthy(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            desired, applied, config, config_applied, fingerprint, fingerprint_applied = [td / n for n in ("desired", "applied", "config", "config.applied", "fingerprint", "fingerprint.applied")]
+            desired.write_text("LOCALNETWORK6_PREFIXES=fd00::/8\n", encoding="utf-8")
+            config.write_text("mode=redir-host\n", encoding="utf-8")
+            run_helper_env("openkill_commit_applied_network_state", desired, applied, config, config_applied)
+            fingerprint.write_text("WAN6_L3_DEVICE=pppoe-wan\nWAN6_ADDRESSES=2001:db8::1\n", encoding="utf-8")
+            fingerprint_applied.write_text(fingerprint.read_text(), encoding="utf-8")
+            env = {**os.environ, "OPENKILL_RUNTIME_HEALTHY": "1"}
+            result = run_helper_env("openkill_network_noop_ready", desired, applied, "", config, config_applied, fingerprint, fingerprint_applied, env=env)
+            self.assertEqual(result.stdout.strip(), "NO_ACTION")
+            fingerprint.write_text("WAN6_L3_DEVICE=pppoe-wan\nWAN6_ADDRESSES=2001:db8::2\n", encoding="utf-8")
+            self.assertNotEqual(run_helper_env("openkill_network_noop_ready", desired, applied, "", config, config_applied, fingerprint, fingerprint_applied, env=env, check=False).returncode, 0)
+            config.write_text("mode=fake-ip\n", encoding="utf-8")
+            self.assertNotEqual(run_helper_env("openkill_network_noop_ready", desired, applied, "", config, config_applied, env=env, check=False).returncode, 0)
+
+    def test_network_snapshot_commit_is_atomic(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            source, target = td / "source", td / "target"
+            source.write_text("WAN6_L3_DEVICE=pppoe-wan\nLOCAL_IPV6_READY=1\n", encoding="utf-8")
+            run_helper_env("openkill_commit_network_snapshot", source, target)
+            self.assertEqual(target.read_text(), source.read_text())
+            self.assertFalse((td / "target.tmp").exists())
+
+    def test_readiness_commits_reload_snapshot_before_fingerprint(self):
+        text = INIT.read_text(encoding="utf-8")
+        snapshot_commit = text.index("openkill_commit_network_snapshot")
+        fingerprint = text.index("openkill_network_fingerprint", snapshot_commit)
+        self.assertLess(snapshot_commit, fingerprint)
+        self.assertIn("/tmp/openkill-network.reload.*", text)
+
+    def test_reload_noop_gate_precedes_firewall_apply(self):
+        text = INIT.read_text(encoding="utf-8")
+        noop = text.index("openkill_network_noop_ready")
+        first_apply = text.index("revert_firewall keep-include", noop)
+        self.assertLess(noop, first_apply)
+        self.assertIn("openkill_node_underlay_ready_for_noop", text)
+        self.assertIn('"$OPENKILL_NETWORK_FINGERPRINT" /tmp/openkill-network.fingerprint', text)
+        self.assertIn('Network state unchanged and runtime healthy; skipping firewall/DNS reapply.', text)
+
     def test_source_specific_native_routes_are_untouched(self):
         state = build("""SNAPSHOT_VERSION=1
 LOCAL_IPV6_READY=1
@@ -221,6 +620,10 @@ INTERNAL_IPV6_PREFIXES=2001:db8:a::/60 2001:db8:b::/64 2001:db8:c::/64
         self.assertIn("@openkill_node6", text)
         self.assertIn('comment "OpenKill node underlay"', text)
         self.assertIn("skgid == 65534", text)
+        for chain in ("openkill", "openkill_mangle", "openkill_output", "openkill_mangle_output",
+                      "openkill_v6", "openkill_mangle_v6", "openkill_output_v6", "openkill_mangle_output_v6"):
+            self.assertIn(chain, text)
+        self.assertIn('nft "$node_rule"', text)
 
     def test_owner_runtime_cleanup_is_private_to_openkill_state(self):
         text = HELPER.read_text(encoding="utf-8")
