@@ -239,6 +239,65 @@ openkill_render_node_sets()
     } > "$tmp_file" && mv "$tmp_file" "$output_file"
 }
 
+# Render only OpenKill-owned dynamic set contents.  The transaction is safe to
+# apply after the sets have been created and never flushes fw4 or native state.
+openkill_render_nft_set_batch()
+{
+    v4_file="$1"; v6_file="$2"; output_file="${3:-/tmp/openkill-node-sets.batch}"
+    [ -r "$v4_file" ] && [ -r "$v6_file" ] || return 1
+    tmp_file="${output_file}.tmp.$$"
+    {
+        printf 'flush set inet fw4 openkill_node4\n'
+        printf 'flush set inet fw4 openkill_node6\n'
+        while IFS= read -r endpoint; do
+            [ -n "$endpoint" ] && printf 'add element inet fw4 openkill_node4 { %s }\n' "$endpoint"
+        done < "$v4_file"
+        while IFS= read -r endpoint; do
+            [ -n "$endpoint" ] && printf 'add element inet fw4 openkill_node6 { %s }\n' "$endpoint"
+        done < "$v6_file"
+    } > "$tmp_file" && mv "$tmp_file" "$output_file"
+}
+
+openkill_validate_nft_batch()
+{
+    batch_file="$1"
+    [ -r "$batch_file" ] || return 1
+    ! grep -Eq 'flush ruleset|flush table inet fw4|delete table inet fw4' "$batch_file" || return 1
+    if command -v nft >/dev/null 2>&1 && [ "${OPENKILL_NFT_VALIDATE:-1}" = 1 ]; then
+        nft -c -f "$batch_file" >/dev/null 2>&1 || return 1
+    fi
+}
+
+openkill_replace_if_changed()
+{
+    new_file="$1"; current_file="$2"
+    cmp -s "$new_file" "$current_file" 2>/dev/null && return 1
+    tmp_file="${current_file}.tmp.$$"
+    cp "$new_file" "$tmp_file" && mv "$tmp_file" "$current_file"
+}
+
+openkill_render_classifier_order()
+{
+    # Shared semantic order consumed by nft and legacy backends.
+    printf '%s\n' CONTROL_BYPASS SELF_BYPASS NODE_BYPASS LOCAL_BYPASS USER_BYPASS CHINA_DIRECT USER_PROXY DEFAULT_POLICY
+}
+
+openkill_render_dns_set_rules()
+{
+    family="$1"; domains_file="$2"; target_set="$3"; output_file="$4"; backend="${5:-nftset}"
+    [ -r "$domains_file" ] || return 1
+    tmp_file="${output_file}.tmp.$$"
+    case "$family:$backend" in
+        4:nftset) prefix="nftset=/"; suffix="/#inet#fw4#$target_set" ;;
+        6:nftset) prefix="nftset=/"; suffix="/6#inet#fw4#$target_set" ;;
+        4:ipset|6:ipset) prefix="ipset=/"; suffix="/$target_set" ;;
+        *) return 1 ;;
+    esac
+    awk 'NF && $0 !~ /^[[:space:]]*#/ {gsub(/[[:space:]]+/, "", $0); print}' "$domains_file" |
+        sort -u | awk -v p="$prefix" -v s="$suffix" '{print p $0 s}' > "$tmp_file" || return 1
+    mv "$tmp_file" "$output_file"
+}
+
 openkill_owner_actions()
 {
     desired_owner="$1"

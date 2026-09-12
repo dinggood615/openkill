@@ -1607,16 +1607,24 @@ apply_node_endpoint_sets()
       nft 'add set inet fw4 openkill_node4 { type ipv4_addr; flags interval; auto-merge; }' 2>/dev/null || true
       nft 'add set inet fw4 openkill_node6 { type ipv6_addr; flags interval; auto-merge; }' 2>/dev/null || true
       node_apply_failed=0
-      nft 'flush set inet fw4 openkill_node4' 2>/dev/null || node_apply_failed=1
-      nft 'flush set inet fw4 openkill_node6' 2>/dev/null || node_apply_failed=1
-      while IFS= read -r node4; do
-         [ -n "$node4" ] || continue
-         nft add element inet fw4 openkill_node4 { "$node4" } || node_apply_failed=1
-      done < /tmp/openkill-node4.desired
-      while IFS= read -r node6; do
-         [ -n "$node6" ] || continue
-         nft add element inet fw4 openkill_node6 { "$node6" } || node_apply_failed=1
-      done < /tmp/openkill-node6.desired
+      if [ "${OPENKILL_NFT_BATCH:-1}" = 1 ] &&
+         openkill_render_nft_set_batch /tmp/openkill-node4.desired /tmp/openkill-node6.desired /tmp/openkill-node-sets.batch &&
+         openkill_validate_nft_batch /tmp/openkill-node-sets.batch &&
+         nft -f /tmp/openkill-node-sets.batch; then
+         :
+      else
+         # Compatibility fallback for older nft implementations.
+         nft 'flush set inet fw4 openkill_node4' 2>/dev/null || node_apply_failed=1
+         nft 'flush set inet fw4 openkill_node6' 2>/dev/null || node_apply_failed=1
+         while IFS= read -r node4; do
+            [ -n "$node4" ] || continue
+            nft add element inet fw4 openkill_node4 { "$node4" } || node_apply_failed=1
+         done < /tmp/openkill-node4.desired
+         while IFS= read -r node6; do
+            [ -n "$node6" ] || continue
+            nft add element inet fw4 openkill_node6 { "$node6" } || node_apply_failed=1
+         done < /tmp/openkill-node6.desired
+      fi
       # Endpoint bypass is inserted before ordinary proxy classification.
       for chain in openkill_mangle openkill_mangle_output; do
          nft insert rule inet fw4 "$chain" ip daddr @openkill_node4 counter return comment "OpenKill node underlay" 2>/dev/null || node_apply_failed=1
