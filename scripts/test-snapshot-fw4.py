@@ -197,6 +197,11 @@ esac
             dump = root / "dump.json"
             dump.write_text(FIXTURE_102.read_text(encoding="utf-8"), encoding="utf-8")
             output = root / "snapshot"
+            output2 = root / "snapshot.2"
+            desired = root / "desired"
+            desired2 = root / "desired.2"
+            fingerprint = root / "fingerprint"
+            fingerprint2 = root / "fingerprint.2"
             bindir = root / "bin"
             bindir.mkdir()
             write_jsonfilter(bindir / "jsonfilter")
@@ -235,6 +240,35 @@ esac
             self.assertEqual(values["LOCAL_IPV6_READY"], "1")
             self.assertIn("default from", values["NATIVE_IPV6_ROUTES"])
             self.assertNotIn("default dev", values["NATIVE_IPV6_ROUTES"])
+
+            subprocess.run(
+                ["sh", "-c", f'. "{NETWORK}"; openkill_collect_network_snapshot "$1"',
+                 "model", str(output2)],
+                capture_output=True, text=True, check=True, env=env,
+            )
+            self.assertEqual(output.read_bytes(), output2.read_bytes())
+            subprocess.run(
+                ["sh", "-c", f'. "{NETWORK}"; openkill_build_desired_state "$1" "$2"',
+                 "model", str(output), str(desired)],
+                capture_output=True, text=True, check=True, env=env,
+            )
+            subprocess.run(
+                ["sh", "-c", f'. "{NETWORK}"; openkill_build_desired_state "$1" "$2"',
+                 "model", str(output2), str(desired2)],
+                capture_output=True, text=True, check=True, env=env,
+            )
+            subprocess.run(
+                ["sh", "-c", f'. "{NETWORK}"; openkill_network_fingerprint "$1" "$2"',
+                 "model", str(output), str(fingerprint)],
+                capture_output=True, text=True, check=True, env=env,
+            )
+            subprocess.run(
+                ["sh", "-c", f'. "{NETWORK}"; openkill_network_fingerprint "$1" "$2"',
+                 "model", str(output2), str(fingerprint2)],
+                capture_output=True, text=True, check=True, env=env,
+            )
+            self.assertEqual(desired.read_bytes(), desired2.read_bytes())
+            self.assertEqual(fingerprint.read_bytes(), fingerprint2.read_bytes())
 
 
 class Fw4LifecycleTests(unittest.TestCase):

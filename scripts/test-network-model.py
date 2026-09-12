@@ -39,7 +39,93 @@ def build(snapshot: str):
         return dict(line.split("=", 1) for line in out.read_text(encoding="utf-8").splitlines() if "=" in line)
 
 
+def run_manual_reload_harness(state: pathlib.Path, changed: bool = False):
+    """Exercise the init entry point with real network no-op logic and fake applies."""
+    trace = state / "trace"
+    desired = state / "desired"
+    applied = state / "applied"
+    config = state / "config.yaml"
+    config_applied = state / "config.applied"
+    fingerprint = state / "fingerprint"
+    fingerprint_applied = state / "fingerprint.applied"
+    snapshot = state / "reload.snapshot"
+    desired.write_text("LOCALNETWORK6_PREFIXES=fd00::/8\n", encoding="utf-8")
+    applied.write_text(desired.read_text(encoding="utf-8"), encoding="utf-8")
+    config.write_text("mode=redir-host\n", encoding="utf-8")
+    config_applied.write_text(config.read_text(encoding="utf-8"), encoding="utf-8")
+    fingerprint.write_text("WAN6_ADDRESSES=2001:db8::1\n", encoding="utf-8")
+    fingerprint_applied.write_text(fingerprint.read_text(encoding="utf-8"), encoding="utf-8")
+    snapshot.write_text("SNAPSHOT_VERSION=1\n", encoding="utf-8")
+    if changed:
+        fingerprint.write_text("WAN6_ADDRESSES=2001:db8::2\n", encoding="utf-8")
+
+    reload_function = INIT.read_text(encoding="utf-8").split("reload_service()\n", 1)[1].split("\nboot()\n", 1)[0]
+    reload_function = "reload_service()\n" + reload_function
+    script = r'''
+set +e
+STATE="$2"
+TRACE="$3"
+MODE="$4"
+. "$1"
+get_config() {
+    enable=1
+    tun_owner=openkill
+    ipv6_enable=1
+    ipv6_mode=2
+    enable_v6_udp_proxy=0
+    en_mode_tun=1
+    en_mode=fake-ip
+    CONFIG_FILE="$STATE/config.yaml"
+}
+LOG_TIP() { :; }
+LOG_OUT() { :; }
+do_run_mode() { echo run-mode >> "$TRACE"; }
+openkill_prepare_reload_network_state() {
+    OPENKILL_NETWORK_SNAPSHOT="$STATE/reload.snapshot"
+    OPENKILL_NETWORK_DESIRED="$STATE/desired"
+    OPENKILL_NETWORK_FINGERPRINT="$STATE/fingerprint"
+    return 0
+}
+openkill_runtime_healthy_for_noop() { [ "$MODE" = healthy ]; }
+openkill_core_process_present() { echo core >> "$TRACE"; return 0; }
+openkill_request_network_reconcile() { echo request >> "$TRACE"; return 0; }
+revert_firewall() { echo "revert:$*" >> "$TRACE"; return 0; }
+prepare_openkill_include() { echo include >> "$TRACE"; return 0; }
+check_core_status() { echo check >> "$TRACE"; return 0; }
+''' + reload_function + r'''
+reload_service manual
+'''
+    env = {
+        **os.environ,
+        "OPENKILL_NETWORK_APPLIED_FILE": str(applied),
+        "OPENKILL_CONFIG_APPLIED_FILE": str(config_applied),
+        "OPENKILL_FINGERPRINT_APPLIED_FILE": str(fingerprint_applied),
+    }
+    result = subprocess.run(
+        [
+            "sh", "-c", script, "harness", str(HELPER), str(state), str(trace), "healthy",
+        ],
+        capture_output=True, text=True, env=env,
+    )
+    return result, trace.read_text(encoding="utf-8") if trace.exists() else ""
+
+
 class NetworkModelTests(unittest.TestCase):
+    def test_manual_reload_healthy_path_reaches_noop_without_apply(self):
+        with tempfile.TemporaryDirectory() as td:
+            result, trace = run_manual_reload_harness(pathlib.Path(td), changed=False)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(trace, "run-mode\n")
+
+    def test_manual_reload_changed_state_keeps_apply_path(self):
+        with tempfile.TemporaryDirectory() as td:
+            result, trace = run_manual_reload_harness(pathlib.Path(td), changed=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("request\n", trace)
+            self.assertIn("revert:keep-include\n", trace)
+            self.assertIn("include\n", trace)
+            self.assertIn("check\n", trace)
+
     def test_ipv6_cidr_helper_handles_compressed_and_non_boundary_prefixes(self):
         self.assertNotEqual(
             run_helper_env("openkill_ipv6_in_cidr", "2001:db8::2", "fdfe:dcba:9876::/64", check=False).returncode,
@@ -508,7 +594,7 @@ INTERNAL_IPV6_PREFIXES=2001:db8:2::/62
         first_apply = text.index("revert_firewall keep-include", noop)
         self.assertLess(noop, first_apply)
         self.assertIn("openkill_node_underlay_ready_for_noop", text)
-        self.assertIn('"$OPENKILL_NETWORK_FINGERPRINT" /tmp/openkill-network.fingerprint', text)
+        self.assertIn('"$OPENKILL_NETWORK_FINGERPRINT" "$fingerprint_applied_file"', text)
         self.assertIn('Network state unchanged and runtime healthy; skipping firewall/DNS reapply.', text)
 
     def test_source_specific_native_routes_are_untouched(self):
@@ -552,6 +638,57 @@ INTERNAL_IPV6_PREFIXES=2001:db8:a::/60 2001:db8:b::/64 2001:db8:c::/64
             run_helper("openkill_network_fingerprint", a, fa)
             run_helper("openkill_network_fingerprint", b, fb)
             self.assertEqual(fa.read_text(), fb.read_text())
+
+    def test_native_route_fingerprint_ignores_dynamic_lifetime(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            base = (
+                "WAN4_L3_DEVICE=eth1\nWAN4_ADDRESSES=192.0.2.2\n"
+                "WAN6_L3_DEVICE=eth1\nWAN6_ADDRESSES=2001:db8::2/64\n"
+                "INTERNAL_IPV6_PREFIXES=2001:db8:10::/62\n"
+                "DNS_SERVERS=192.0.2.53\nTUN_OWNER=openkill\n"
+                "IPV4_ENABLED=1\nIPV6_ENABLED=1\n"
+            )
+            first = td / "first"
+            second = td / "second"
+            changed = td / "changed"
+            first.write_text(
+                base
+                + "NATIVE_IPV6_ROUTES=default from 2001:db8:10::/62 via fe80::1 "
+                "expires 2973sec dev eth1\n",
+                encoding="utf-8",
+            )
+            second.write_text(
+                base
+                + "NATIVE_IPV6_ROUTES=default from 2001:db8:10::/62 via fe80::1 "
+                "expires 2960sec dev eth1\n",
+                encoding="utf-8",
+            )
+            changed.write_text(
+                base
+                + "NATIVE_IPV6_ROUTES=default from 2001:db8:11::/62 via fe80::1 "
+                "expires 2960sec dev eth1\n",
+                encoding="utf-8",
+            )
+            first_fp, second_fp, changed_fp = [td / name for name in ("first.fp", "second.fp", "changed.fp")]
+            run_helper("openkill_network_fingerprint", first, first_fp)
+            run_helper("openkill_network_fingerprint", second, second_fp)
+            run_helper("openkill_network_fingerprint", changed, changed_fp)
+            self.assertEqual(first_fp.read_text(), second_fp.read_text())
+            self.assertNotEqual(first_fp.read_text(), changed_fp.read_text())
+            self.assertIn("default from 2001:db8:10::/62 via fe80::1 dev eth1", first_fp.read_text())
+
+    def test_native_route_normalizer_keeps_semantic_tokens_and_stable_order(self):
+        result = run_helper_env(
+            "openkill_normalize_text_lines",
+            " default from 2001:db8:10::/62 via fe80::1 expires 10sec dev eth1;"
+            "2001:db8:10::/62 dev eth1;"
+            "default from 2001:db8:10::/62 via fe80::1 expires 20sec dev eth1",
+        )
+        self.assertEqual(
+            result.stdout,
+            "2001:db8:10::/62 dev eth1 default from 2001:db8:10::/62 via fe80::1 dev eth1\n",
+        )
 
     def test_pd_and_wan_changes_are_classified(self):
         with tempfile.TemporaryDirectory() as td:

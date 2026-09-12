@@ -4589,6 +4589,9 @@ reload_service()
 {
    OPENKILL_START_TOKEN="$(cat /tmp/openkill-start.token 2>/dev/null)"
    get_config
+   network_applied_file="${OPENKILL_NETWORK_APPLIED_FILE:-/tmp/openkill-network.applied}"
+   config_applied_file="${OPENKILL_CONFIG_APPLIED_FILE:-/tmp/openkill-config.applied}"
+   fingerprint_applied_file="${OPENKILL_FINGERPRINT_APPLIED_FILE:-/tmp/openkill-network.fingerprint}"
    # reload_service runs in a fresh rc.common process. Recompute the mode
    # flags before deciding whether a policy route is actually expected; stale
    # values from a previous invocation must never force an unnecessary apply.
@@ -4598,9 +4601,9 @@ reload_service()
          if openkill_prepare_reload_network_state; then
             if openkill_runtime_healthy_for_noop &&
                OPENKILL_RUNTIME_HEALTHY=1 openkill_network_noop_ready \
-                  "$OPENKILL_NETWORK_DESIRED" /tmp/openkill-network.applied "" \
-                  "$CONFIG_FILE" /tmp/openkill-config.applied \
-                  "$OPENKILL_NETWORK_FINGERPRINT" /tmp/openkill-network.fingerprint >/dev/null 2>&1; then
+                  "$OPENKILL_NETWORK_DESIRED" "$network_applied_file" "" \
+                  "$CONFIG_FILE" "$config_applied_file" \
+                  "$OPENKILL_NETWORK_FINGERPRINT" "$fingerprint_applied_file" >/dev/null 2>&1; then
                LOG_TIP "Network state unchanged and runtime healthy; skipping firewall/DNS reapply."
                rm -f "$OPENKILL_NETWORK_SNAPSHOT" "$OPENKILL_NETWORK_DESIRED" "$OPENKILL_NETWORK_FINGERPRINT"
                return 0
@@ -4619,7 +4622,7 @@ reload_service()
       firewall|network|manual) openkill_request_network_reconcile /tmp/openkill-network-reconcile "$1" 2>/dev/null || true ;;
    esac
    MAX_RELOAD=10
-   if openkill_core_process_present && [ "$enable" == "1" ] && { [ "$1" == "firewall" ] || [ "$1" == "firewall-deferred" ]; }; then
+   if openkill_core_process_present && [ "$enable" = "1" ] && { [ "$1" = "firewall" ] || [ "$1" = "firewall-deferred" ]; }; then
       #sleep for avoiding system unready
       sleep 5
       NOW_TS=$(date +%s)
@@ -4647,18 +4650,18 @@ reload_service()
       do_run_mode
       check_core_status &
    fi
-   if openkill_core_process_present && [ "$enable" == "1" ] && [ "$1" == "manual" ]; then
+   if openkill_core_process_present && [ "$enable" = "1" ] && [ "$1" = "manual" ]; then
       LOG_OUT "Manually Reload Firewall Rules..."
       revert_firewall keep-include
       [ "$tun_owner" = "openkill" ] && prepare_openkill_include
       do_run_mode
       check_core_status &
    fi
-   if openkill_core_process_present && [ "$enable" == "1" ] && [ "$1" == "revert" ]; then
+   if openkill_core_process_present && [ "$enable" = "1" ] && [ "$1" = "revert" ]; then
       revert_firewall
       revert_dnsmasq
    fi
-   if openkill_core_process_present && [ "$enable" == "1" ] && [ "$1" == "restore" ]; then
+   if openkill_core_process_present && [ "$enable" = "1" ] && [ "$1" = "restore" ]; then
       do_run_mode
       # used for config subscribe, not background for avoiding system unready
       check_core_status

@@ -444,12 +444,12 @@ openkill_normalize_list()
 openkill_normalize_text_lines()
 {
     [ -n "${1:-}" ] || return 0
-    # Native route descriptions are semicolon- or newline-separated records;
-    # their internal spaces are meaningful and must not be tokenized.
+    # Native route records keep internal spaces. Ignore only a dynamic kernel
+    # lifetime ("expires 2973sec") so it cannot churn the fingerprint.
     normalized=$(
         printf '%s\n' "$*" |
             tr ';' '\n' |
-            sed -e 's/\r$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' |
+            sed -e 's/\r$//' -e 's/[[:space:]][[:space:]]*expires[[:space:]][[:space:]]*[0-9][0-9]*[[:alnum:]._-]*//g' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' |
             sort -u |
             tr '\n' ' '
     )
