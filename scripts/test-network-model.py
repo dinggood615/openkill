@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Pure tests for the Stage B network snapshot/desired-state boundary."""
 import pathlib
+import os
 import subprocess
 import tempfile
 import unittest
@@ -8,6 +9,7 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 HELPER = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_network.sh"
+INIT = ROOT / "luci-app-openkill/root/etc/init.d/openkill"
 
 
 def run_helper(action, *args):
@@ -129,6 +131,32 @@ INTERNAL_IPV6_PREFIXES=2001:db8:a::/60 2001:db8:b::/64 2001:db8:c::/64
             self.assertEqual(v6.read_text().strip(), "2001:db8::10")
             self.assertNotIn("node.example.test", v4.read_text() + v6.read_text())
 
+    def test_domain_resolution_refreshes_both_families_and_failure_keeps_old(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            domains, static4, static6 = td / "domains", td / "static4", td / "static6"
+            applied4, applied6 = td / "applied4", td / "applied6"
+            domains.write_text("node.example.test\n", encoding="utf-8")
+            static4.write_text("\n", encoding="utf-8")
+            static6.write_text("\n", encoding="utf-8")
+            applied4.write_text("192.0.2.1\n", encoding="utf-8")
+            applied6.write_text("2001:db8::1\n", encoding="utf-8")
+            fake = td / "bin"
+            fake.mkdir()
+            (fake / "getent").write_text("#!/bin/sh\ncase \"$1\" in ahostsv4) echo '192.0.2.2 STREAM node';; ahostsv6) echo '2001:db8::2 STREAM node';; esac\n", encoding="utf-8")
+            (fake / "timeout").write_text("#!/bin/sh\nshift; exec \"$@\"\n", encoding="utf-8")
+            for name in ("getent", "timeout"):
+                (fake / name).chmod(0o755)
+            env = os.environ.copy()
+            env["PATH"] = f"{fake}:{env['PATH']}"
+            subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_refresh_node_endpoints "$1" "$2" "$3" "$4" "$5"', "model", str(static4), str(static6), str(domains), str(applied4), str(applied6)], check=True, env=env)
+            self.assertEqual(applied4.read_text().strip(), "192.0.2.2")
+            self.assertEqual(applied6.read_text().strip(), "2001:db8::2")
+            (fake / "timeout").write_text("#!/bin/sh\nexit 124\n", encoding="utf-8")
+            (fake / "timeout").chmod(0o755)
+            self.assertNotEqual(subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_refresh_node_endpoints "$1" "$2" "$3" "$4" "$5"', "model", str(static4), str(static6), str(domains), str(applied4), str(applied6)], env=env).returncode, 0)
+            self.assertEqual(applied4.read_text().strip(), "192.0.2.2")
+
     def test_applied_state_is_not_updated_when_component_apply_fails(self):
         with tempfile.TemporaryDirectory() as td:
             desired, applied = pathlib.Path(td) / "desired", pathlib.Path(td) / "applied"
@@ -147,6 +175,23 @@ INTERNAL_IPV6_PREFIXES=2001:db8:a::/60 2001:db8:b::/64 2001:db8:c::/64
             failed = subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_owner_transition mihomo "$1" "$2" fail', "model", str(applied), str(result)], capture_output=True)
             self.assertNotEqual(failed.returncode, 0)
             self.assertEqual(applied.read_text(), "OWNER=openkill\n")
+
+    def test_owner_runtime_apply_orders_steps_and_keeps_state_on_failure(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            applied, generation, trace = td / "owner", td / "generation", td / "trace"
+            applied.write_text("OWNER=openkill\n", encoding="utf-8")
+            generation.write_text("g1\n", encoding="utf-8")
+            env = os.environ.copy(); env["OPENKILL_OWNER_DRY_RUN"] = "1"; env["OPENKILL_OWNER_TRACE"] = str(trace)
+            subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_apply_owner_transition mihomo "$1" "$2" g1 1', "model", str(applied), str(generation)], check=True, env=env)
+            steps = trace.read_text().splitlines()
+            self.assertEqual(steps, ["DISABLE_CLASSIFIER", "REMOVE_OPENKILL_RUNTIME", "ENABLE_MIHOMO_OWNER"])
+            self.assertEqual(applied.read_text().strip(), "OWNER=mihomo")
+            applied.write_text("OWNER=openkill\n", encoding="utf-8")
+            env["OPENKILL_OWNER_FAIL_STEP"] = "ENABLE_MIHOMO_OWNER"
+            failed = subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_apply_owner_transition mihomo "$1" "$2" g1 1', "model", str(applied), str(generation)], env=env)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertEqual(applied.read_text().strip(), "OWNER=openkill")
 
     def test_event_storm_is_bounded_and_pending_is_consumed(self):
         with tempfile.TemporaryDirectory() as td:
@@ -168,6 +213,21 @@ INTERNAL_IPV6_PREFIXES=2001:db8:a::/60 2001:db8:b::/64 2001:db8:c::/64
             self.assertIn("openkill_node6", text)
             self.assertIn("192.0.2.10", text)
             self.assertIn("2001:db8::10", text)
+
+    def test_node_sets_are_installed_before_normal_proxy_classification(self):
+        text = INIT.read_text(encoding="utf-8")
+        self.assertIn("apply_node_endpoint_sets", text)
+        self.assertIn("@openkill_node4", text)
+        self.assertIn("@openkill_node6", text)
+        self.assertIn('comment "OpenKill node underlay"', text)
+        self.assertIn("skgid == 65534", text)
+
+    def test_owner_runtime_cleanup_is_private_to_openkill_state(self):
+        text = HELPER.read_text(encoding="utf-8")
+        self.assertIn('ip rule del fwmark "$OPENKILL_FWMARK" table 354 pref "$OPENKILL_RULE_PREF"', text)
+        self.assertIn('ip -6 rule del fwmark "$OPENKILL_FWMARK" table 354 pref "$OPENKILL_RULE_PREF"', text)
+        self.assertIn("ip route del default dev utun table 354", text)
+        self.assertNotIn("ip route flush table main", text)
 
     def test_owner_actions_have_no_dual_owner_activation(self):
         openkill = subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_owner_actions openkill'], capture_output=True, text=True, check=True).stdout

@@ -1594,11 +1594,68 @@ remove_openkill_include()
    uci -q commit firewall
 }
 
+apply_node_endpoint_sets()
+{
+   [ "$tun_owner" = "openkill" ] || return 0
+   node_config="${CONFIG_FILE:-}"
+   [ -r "$node_config" ] || return 0
+   openkill_extract_node_endpoints "$node_config" /tmp/openkill-node4.static /tmp/openkill-node6.static /tmp/openkill-node-domains || return 1
+   # Dynamic hostnames are refreshed only through the bounded native resolver
+   # path; a failed lookup leaves the previous applied endpoint set intact.
+   openkill_refresh_node_endpoints /tmp/openkill-node4.static /tmp/openkill-node6.static /tmp/openkill-node-domains /tmp/openkill-node4.desired /tmp/openkill-node6.desired || return 1
+   if [ -n "$FW4" ]; then
+      nft 'add set inet fw4 openkill_node4 { type ipv4_addr; flags interval; auto-merge; }' 2>/dev/null || true
+      nft 'add set inet fw4 openkill_node6 { type ipv6_addr; flags interval; auto-merge; }' 2>/dev/null || true
+      node_apply_failed=0
+      nft 'flush set inet fw4 openkill_node4' 2>/dev/null || node_apply_failed=1
+      nft 'flush set inet fw4 openkill_node6' 2>/dev/null || node_apply_failed=1
+      while IFS= read -r node4; do
+         [ -n "$node4" ] || continue
+         nft add element inet fw4 openkill_node4 { "$node4" } || node_apply_failed=1
+      done < /tmp/openkill-node4.desired
+      while IFS= read -r node6; do
+         [ -n "$node6" ] || continue
+         nft add element inet fw4 openkill_node6 { "$node6" } || node_apply_failed=1
+      done < /tmp/openkill-node6.desired
+      # Endpoint bypass is inserted before ordinary proxy classification.
+      for chain in openkill_mangle openkill_mangle_output; do
+         nft insert rule inet fw4 "$chain" ip daddr @openkill_node4 counter return comment "OpenKill node underlay" 2>/dev/null || node_apply_failed=1
+      done
+      for chain in openkill_mangle_v6 openkill_mangle_output_v6; do
+         nft insert rule inet fw4 "$chain" ip6 daddr @openkill_node6 counter return comment "OpenKill node underlay" 2>/dev/null || node_apply_failed=1
+      done
+   else
+      ipset -! create openkill_node4 hash:ip family inet 2>/dev/null || true
+      ipset -! create openkill_node6 hash:ip family inet6 2>/dev/null || true
+      node_apply_failed=0
+      ipset flush openkill_node4 2>/dev/null || node_apply_failed=1
+      ipset flush openkill_node6 2>/dev/null || node_apply_failed=1
+      while IFS= read -r node4; do
+         [ -n "$node4" ] || continue
+         ipset add openkill_node4 "$node4" || node_apply_failed=1
+      done < /tmp/openkill-node4.desired
+      while IFS= read -r node6; do
+         [ -n "$node6" ] || continue
+         ipset add openkill_node6 "$node6" || node_apply_failed=1
+      done < /tmp/openkill-node6.desired
+      iptables -t mangle -I openkill 1 -m set --match-set openkill_node4 dst -j RETURN 2>/dev/null || node_apply_failed=1
+      iptables -t mangle -I openkill_output 1 -m set --match-set openkill_node4 dst -j RETURN 2>/dev/null || node_apply_failed=1
+      ip6tables -t mangle -I openkill 1 -m set --match-set openkill_node6 dst -j RETURN 2>/dev/null || node_apply_failed=1
+      ip6tables -t mangle -I openkill_output 1 -m set --match-set openkill_node6 dst -j RETURN 2>/dev/null || node_apply_failed=1
+   fi
+   [ "${node_apply_failed:-0}" -eq 0 ] || return 1
+   cp /tmp/openkill-node4.desired /tmp/openkill-node4
+   cp /tmp/openkill-node6.desired /tmp/openkill-node6
+}
+
 set_firewall()
 {
    # Mihomo-native mode owns all TUN routing and redirect rules.  OpenKill
    # must not add a second set of nftables/iptables rules in that mode.
-   [ "$tun_owner" = "mihomo" ] && return 0
+   if [ "$tun_owner" = "mihomo" ]; then
+      openkill_remove_proxy_runtime
+      return 0
+   fi
 
 prepare_openkill_include
 
@@ -3391,6 +3448,10 @@ if [ -z "$FW4" ]; then
    fi
 fi
 
+# Keep proxy node underlay outside the transparent classifier.  This is the
+# final classifier insertion so ordinary user rules cannot override it.
+apply_node_endpoint_sets || LOG_WARN "Node endpoint bypass state could not be applied."
+
 #来源流量访问控制
 config_load "openkill"
 config_foreach firewall_lan_ac_traffic "lan_ac_traffic"
@@ -3406,6 +3467,7 @@ fi
 
 revert_firewall()
 {
+   rm -f /tmp/openkill-node4 /tmp/openkill-node6 /tmp/openkill-node4.static /tmp/openkill-node6.static /tmp/openkill-node4.desired /tmp/openkill-node6.desired /tmp/openkill-node-domains /tmp/openkill-node.diff
    # A firewall-triggered reconciliation must keep the include that invoked
    # it. Removing and re-adding it commits firewall UCI during fw4 reload,
    # creating a reload loop that repeatedly erases freshly installed rules.
@@ -3435,7 +3497,7 @@ revert_firewall()
          nft delete chain inet fw4 handle ${handle}
       done
 
-      for handle in $(nft -a list sets |grep -E "set localnetwork|china_ip|lan_ac_|wan_ac_black_|common_ports|set openkill_service_ports" |awk -F '# handle ' '{print$2}'); do
+      for handle in $(nft -a list sets |grep -E "set localnetwork|set openkill_node|china_ip|lan_ac_|wan_ac_black_|common_ports|set openkill_service_ports" |awk -F '# handle ' '{print$2}'); do
          nft delete set inet fw4 handle ${handle}
       done
    else
@@ -3466,6 +3528,8 @@ revert_firewall()
       done
 
       ipset destroy localnetwork6
+      ipset destroy openkill_node4
+      ipset destroy openkill_node6
       ipset destroy china_ip6_route
       ipset destroy china_ip6_route_pass
       ipset destroy lan_ac_white_ipv6s

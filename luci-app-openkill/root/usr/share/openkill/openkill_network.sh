@@ -170,9 +170,11 @@ openkill_extract_node_endpoints()
     yaml_file="$1"
     v4_file="${2:-/tmp/openkill-node4}"
     v6_file="${3:-/tmp/openkill-node6}"
+    domain_file="${4:-/tmp/openkill-node-domains}"
     [ -r "$yaml_file" ] || return 1
     : > "$v4_file" || return 1
     : > "$v6_file" || return 1
+    : > "$domain_file" || return 1
     # Only literal server endpoints are authoritative here.  Domain names are
     # resolved by the existing bootstrap/native resolver at reload time and
     # are never converted from a client Fake-IP answer.
@@ -180,12 +182,47 @@ openkill_extract_node_endpoints()
         while IFS= read -r endpoint; do
             case "$endpoint" in
                 *:*) printf '%s\n' "$endpoint" >> "$v6_file" ;;
-                ''|*[!0-9.]*) : ;; # dynamic hostname: resolver-owned path
+                ''|*[!0-9.]*) printf '%s\n' "$endpoint" >> "$domain_file" ;;
                 *) printf '%s\n' "$endpoint" >> "$v4_file" ;;
             esac
         done
     sort -u "$v4_file" -o "$v4_file"
     sort -u "$v6_file" -o "$v6_file"
+    sort -u "$domain_file" -o "$domain_file"
+}
+
+openkill_resolve_node_domains()
+{
+    domain_file="$1"; v4_file="$2"; v6_file="$3"
+    [ -r "$domain_file" ] || return 1
+    command -v getent >/dev/null 2>&1 || return 1
+    command -v timeout >/dev/null 2>&1 || return 1
+    resolved=0
+    while IFS= read -r domain; do
+        [ -n "$domain" ] || continue
+        v4_result=$(timeout 5 getent ahostsv4 "$domain" 2>/dev/null | awk '$1 ~ /^[0-9.]+$/ {print $1}')
+        v6_result=$(timeout 5 getent ahostsv6 "$domain" 2>/dev/null | awk '$1 ~ /:/ {print $1}')
+        [ -n "$v4_result" ] && { printf '%s\n' "$v4_result" >> "$v4_file"; resolved=1; }
+        [ -n "$v6_result" ] && { printf '%s\n' "$v6_result" >> "$v6_file"; resolved=1; }
+    done < "$domain_file"
+    sort -u "$v4_file" -o "$v4_file"; sort -u "$v6_file" -o "$v6_file"
+    [ "$resolved" -eq 1 ]
+}
+
+openkill_refresh_node_endpoints()
+{
+    static4="$1"; static6="$2"; domains="$3"; applied4="$4"; applied6="$5"
+    [ -r "$static4" ] && [ -r "$static6" ] || return 1
+    tmp4="${applied4}.tmp.$$"; tmp6="${applied6}.tmp.$$"
+    cp "$static4" "$tmp4" && cp "$static6" "$tmp6" || return 1
+    if [ -s "$domains" ] && ! openkill_resolve_node_domains "$domains" "$tmp4" "$tmp6"; then
+        rm -f "$tmp4" "$tmp6"
+        # Transient DNS failure must not remove a known-good underlay.
+        [ -r "$applied4" ] && [ -r "$applied6" ] || return 1
+        return 1
+    fi
+    sort -u "$tmp4" -o "$tmp4"; sort -u "$tmp6" -o "$tmp6"
+    mv "$tmp4" "$applied4" && mv "$tmp6" "$applied6"
 }
 
 openkill_render_node_sets()
@@ -300,6 +337,73 @@ openkill_generation_is_current()
 {
     generation_file="$1"; expected="$2"
     [ -r "$generation_file" ] && [ "$(cat "$generation_file")" = "$expected" ]
+}
+
+openkill_remove_proxy_runtime()
+{
+    # Delete only OpenKill's marked rules and routes in its private table.
+    # Native main/source-specific routes and third-party policy are untouched.
+    ip rule del fwmark "$OPENKILL_FWMARK" table 354 pref "$OPENKILL_RULE_PREF" 2>/dev/null || true
+    ip -6 rule del fwmark "$OPENKILL_FWMARK" table 354 pref "$OPENKILL_RULE_PREF" 2>/dev/null || true
+    ip route del default dev utun table 354 2>/dev/null || true
+    ip -6 route del default dev utun table 354 2>/dev/null || true
+    ip route del local 0.0.0.0/0 dev lo table 354 2>/dev/null || true
+    ip -6 route del local ::/0 dev lo table 354 2>/dev/null || true
+}
+
+openkill_verify_owner_runtime()
+{
+    owner="$1"
+    case "$owner" in
+        openkill)
+            ip rule show | grep -q "fwmark $OPENKILL_FWMARK.*lookup 354" || return 1
+            ip -6 rule show | grep -q "fwmark $OPENKILL_FWMARK.*lookup 354" || return 1
+            ;;
+        mihomo)
+            ! ip rule show | grep -q "fwmark $OPENKILL_FWMARK.*lookup 354" || return 1
+            ! ip -6 rule show | grep -q "fwmark $OPENKILL_FWMARK.*lookup 354" || return 1
+            ;;
+        *) return 1 ;;
+    esac
+}
+
+openkill_owner_step()
+{
+    step="$1"
+    [ -z "${OPENKILL_OWNER_TRACE:-}" ] || printf '%s\n' "$step" >> "$OPENKILL_OWNER_TRACE"
+    [ "${OPENKILL_OWNER_FAIL_STEP:-}" != "$step" ]
+}
+
+openkill_apply_owner_transition()
+{
+    desired_owner="$1"; applied_file="$2"; generation_file="$3"; expected_generation="$4"; enabled="${5:-1}"
+    [ "$enabled" = 1 ] || return 1
+    openkill_generation_is_current "$generation_file" "$expected_generation" || return 1
+    case "$desired_owner" in
+        mihomo)
+            openkill_owner_step DISABLE_CLASSIFIER || return 1
+            openkill_generation_is_current "$generation_file" "$expected_generation" || return 1
+            openkill_owner_step REMOVE_OPENKILL_RUNTIME || return 1
+            [ "${OPENKILL_OWNER_DRY_RUN:-0}" = 1 ] || openkill_remove_proxy_runtime || return 1
+            openkill_owner_step ENABLE_MIHOMO_OWNER || return 1
+            ;;
+        openkill)
+            openkill_owner_step DISABLE_MIHOMO_OWNER || return 1
+            openkill_generation_is_current "$generation_file" "$expected_generation" || return 1
+            openkill_owner_step INSTALL_OPENKILL_ROUTE || return 1
+            if [ "${OPENKILL_OWNER_DRY_RUN:-0}" != 1 ]; then
+                [ -n "${OPENKILL_TUN_DEVICE:-}" ] || return 1
+                ip route replace default dev "$OPENKILL_TUN_DEVICE" table 354 || return 1
+                ip -6 route replace default dev "$OPENKILL_TUN_DEVICE" table 354 || return 1
+                openkill_ensure_proxy_rule4 || return 1
+                openkill_ensure_proxy_rule6 || return 1
+            fi
+            openkill_owner_step ACTIVATE_CLASSIFIER || return 1
+            ;;
+        *) return 1 ;;
+    esac
+    openkill_generation_is_current "$generation_file" "$expected_generation" || return 1
+    openkill_owner_transition "$desired_owner" "$applied_file" "${applied_file}.result" ok
 }
 
 openkill_ensure_proxy_rule4() { ip rule show | grep -q "fwmark $OPENKILL_FWMARK.*lookup $OPENKILL_ROUTE_TABLE" || ip rule add fwmark "$OPENKILL_FWMARK" table "$OPENKILL_ROUTE_TABLE" pref "$OPENKILL_RULE_PREF"; }
