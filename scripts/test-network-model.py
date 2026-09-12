@@ -678,6 +678,35 @@ INTERNAL_IPV6_PREFIXES=2001:db8:a::/60 2001:db8:b::/64 2001:db8:c::/64
             self.assertNotEqual(first_fp.read_text(), changed_fp.read_text())
             self.assertIn("default from 2001:db8:10::/62 via fe80::1 dev eth1", first_fp.read_text())
 
+    def test_native_route_fingerprint_ignores_openkill_tun_runtime_routes(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            base = (
+                "WAN4_L3_DEVICE=eth1\nWAN4_ADDRESSES=192.0.2.2\n"
+                "WAN6_L3_DEVICE=eth1\nWAN6_ADDRESSES=2001:db8::2/64\n"
+                "INTERNAL_IPV6_PREFIXES=\nDNS_SERVERS=192.0.2.53\n"
+                "TUN_OWNER=openkill\nIPV4_ENABLED=1\nIPV6_ENABLED=1\n"
+            )
+            native = td / "native"
+            with_tun = td / "with-tun"
+            native.write_text(
+                base
+                + "NATIVE_IPV6_ROUTES=default from 2001:db8:1::/64 via fe80::1 dev eth1\n",
+                encoding="utf-8",
+            )
+            with_tun.write_text(
+                base
+                + "NATIVE_IPV6_ROUTES=default from 2001:db8:1::/64 via fe80::1 dev eth1;"
+                + "2001:db8:2::/126 dev utun proto kernel metric 256\n",
+                encoding="utf-8",
+            )
+            native_fp, tun_fp = td / "native.fp", td / "tun.fp"
+            run_helper("openkill_network_fingerprint", native, native_fp)
+            run_helper("openkill_network_fingerprint", with_tun, tun_fp)
+            self.assertEqual(native_fp.read_text(), tun_fp.read_text())
+            self.assertIn("default from 2001:db8:1::/64 via fe80::1 dev eth1", native_fp.read_text())
+            self.assertNotIn("dev utun", tun_fp.read_text())
+
     def test_native_route_normalizer_keeps_semantic_tokens_and_stable_order(self):
         result = run_helper_env(
             "openkill_normalize_text_lines",

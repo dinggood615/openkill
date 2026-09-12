@@ -444,12 +444,18 @@ openkill_normalize_list()
 openkill_normalize_text_lines()
 {
     [ -n "${1:-}" ] || return 0
-    # Native route records keep internal spaces. Ignore only a dynamic kernel
-    # lifetime ("expires 2973sec") so it cannot churn the fingerprint.
+    # Native route records keep internal spaces. Ignore only data owned by the
+    # transient OpenKill TUN/runtime and a dynamic kernel lifetime so the
+    # semantic fingerprint remains about native network state. The raw
+    # snapshot still retains every route for diagnostics.
     normalized=$(
         printf '%s\n' "$*" |
             tr ';' '\n' |
-            sed -e 's/\r$//' -e 's/[[:space:]][[:space:]]*expires[[:space:]][[:space:]]*[0-9][0-9]*[[:alnum:]._-]*//g' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' |
+            sed -e 's/\r$//' \
+                -e '/[[:space:]]dev[[:space:]]utun[[:space:]]/d' \
+                -e '/[[:space:]]dev[[:space:]]utun$/d' \
+                -e 's/[[:space:]][[:space:]]*expires[[:space:]][[:space:]]*[0-9][0-9]*[[:alnum:]._-]*//g' \
+                -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' |
             sort -u |
             tr '\n' ' '
     )
