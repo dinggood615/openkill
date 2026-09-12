@@ -5,11 +5,15 @@
 # restore OpenKill rules only after fw4 has finished its own transaction.
 
 LOCK_DIR="/tmp/lock/openkill-fw4-reload.lock"
-PENDING_FILE="/tmp/openkill-fw4-reload.pending"
+PENDING_FILE="/tmp/openkill-network-reconcile.pending"
+NETWORK_STATE_DIR="/tmp/openkill-network-reconcile"
+
+[ -r /usr/share/openkill/openkill_network.sh ] && . /usr/share/openkill/openkill_network.sh
 
 [ -x /etc/init.d/openkill ] || exit 0
 mkdir -p /tmp/lock 2>/dev/null || exit 0
-touch "$PENDING_FILE"
+[ -n "$(command -v openkill_request_network_reconcile 2>/dev/null)" ] &&
+    openkill_request_network_reconcile "$NETWORK_STATE_DIR" fw4-reload || touch "$PENDING_FILE"
 mkdir "$LOCK_DIR" 2>/dev/null || exit 0
 
 (
