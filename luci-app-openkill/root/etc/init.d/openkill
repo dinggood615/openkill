@@ -12,6 +12,7 @@ USE_PROCD=1
 . $IPKG_INSTROOT/usr/share/openkill/openkill_curl.sh
 . $IPKG_INSTROOT/usr/share/openkill/runtime.sh
 . $IPKG_INSTROOT/usr/share/openkill/openkill_wan.sh
+. $IPKG_INSTROOT/usr/share/openkill/openkill_network.sh
 
 [ -f /etc/openwrt_release ] && {
 FW4=$(command -v fw4)
@@ -31,10 +32,6 @@ LOG_FILE="/tmp/openkill.log"
 START_LOG="/tmp/openkill_start.log"
 # Stable OpenKill policy-routing ABI. Keep the legacy aliases below because
 # existing generated rules and cleanup paths consume them.
-OPENKILL_FWMARK="0x162"
-OPENKILL_FWMASK="0xffffffff"
-OPENKILL_ROUTE_TABLE="0x162"
-OPENKILL_RULE_PREF="1888"
 PROXY_FWMARK="$OPENKILL_FWMARK"
 PROXY_ROUTE_TABLE="$OPENKILL_ROUTE_TABLE"
 QUICK_START_CHECK=false
@@ -4119,6 +4116,16 @@ start_service()
       uci -q set openkill.config.last_start_failed=wan-not-ready
       uci -q commit openkill
       exit 1
+   fi
+
+   # Capture native network state once after WAN readiness.  Consumers can
+   # reuse this snapshot during startup without treating OpenKill-owned table
+   # 354 or marks as native routes.
+   OPENKILL_NETWORK_SNAPSHOT=/tmp/openkill-network.snapshot
+   OPENKILL_NETWORK_DESIRED=/tmp/openkill-network.desired
+   openkill_collect_network_snapshot "$OPENKILL_NETWORK_SNAPSHOT" || LOG_WARN "Network snapshot unavailable; continuing with legacy probes."
+   if [ -s "$OPENKILL_NETWORK_SNAPSHOT" ] && ! openkill_build_desired_state "$OPENKILL_NETWORK_SNAPSHOT" "$OPENKILL_NETWORK_DESIRED"; then
+      LOG_WARN "Network desired-state model unavailable; continuing with existing setup."
    fi
 
    {

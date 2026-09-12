@@ -29,6 +29,7 @@ for file in \
   luci-app-openkill/root/usr/share/openkill/openkill_zerotier.sh \
   luci-app-openkill/root/usr/share/openkill/runtime.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_wan.sh \
+  luci-app-openkill/root/usr/share/openkill/openkill_network.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_config_normalize.sh \
   luci-app-openkill/root/usr/share/openkill/openkill-benchmark.sh \
   luci-app-openkill/root/usr/share/openkill/dependencies.conf \
@@ -62,6 +63,7 @@ for file in \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_zerotier.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/runtime.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_wan.sh" \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_network.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_config_normalize.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill-benchmark.sh" \
   "$ROOT_DIR/luci-app-openkill/tools/prune-ui-css.sh" \
