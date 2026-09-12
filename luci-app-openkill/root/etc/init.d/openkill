@@ -4599,14 +4599,42 @@ reload_service()
    case "$1" in
       firewall|firewall-deferred|network|manual)
          if openkill_prepare_reload_network_state; then
-            if openkill_runtime_healthy_for_noop &&
-               OPENKILL_RUNTIME_HEALTHY=1 openkill_network_noop_ready \
-                  "$OPENKILL_NETWORK_DESIRED" "$network_applied_file" "" \
-                  "$CONFIG_FILE" "$config_applied_file" \
-                  "$OPENKILL_NETWORK_FINGERPRINT" "$fingerprint_applied_file" >/dev/null 2>&1; then
-               LOG_TIP "Network state unchanged and runtime healthy; skipping firewall/DNS reapply."
-               rm -f "$OPENKILL_NETWORK_SNAPSHOT" "$OPENKILL_NETWORK_DESIRED" "$OPENKILL_NETWORK_FINGERPRINT"
-               return 0
+            fingerprint_applied_schema=$(openkill_network_fingerprint_schema "$fingerprint_applied_file" 2>/dev/null)
+            [ -n "$fingerprint_applied_schema" ] || fingerprint_applied_schema=MISSING
+            [ "$fingerprint_applied_schema" = LEGACY ] &&
+               LOG_TIP "Legacy network fingerprint detected; checking safe baseline migration."
+            [ "$fingerprint_applied_schema" = UNKNOWN ] &&
+               LOG_WARN "Unknown network fingerprint schema; normal reconcile required."
+            # Never trust an inherited value from a previous service invocation;
+            # the current runtime verifier must establish health for this
+            # transaction.
+            OPENKILL_RUNTIME_HEALTHY=0
+            if openkill_runtime_healthy_for_noop; then
+               OPENKILL_RUNTIME_HEALTHY=1
+            fi
+            if [ "${OPENKILL_RUNTIME_HEALTHY:-0}" = 1 ]; then
+               if [ "$fingerprint_applied_schema" = LEGACY ]; then
+                  if openkill_migrate_network_fingerprint \
+                     "$OPENKILL_NETWORK_FINGERPRINT" "$fingerprint_applied_file" \
+                     "$OPENKILL_NETWORK_DESIRED" "$network_applied_file" \
+                     "$CONFIG_FILE" "$config_applied_file"; then
+                     LOG_TIP "Network fingerprint baseline migrated; runtime healthy, no firewall/DNS reapply."
+                     rm -f "$OPENKILL_NETWORK_SNAPSHOT" "$OPENKILL_NETWORK_DESIRED" "$OPENKILL_NETWORK_FINGERPRINT"
+                     return 0
+                  elif [ -n "${OPENKILL_FINGERPRINT_MIGRATION_REASON:-}" ]; then
+                     LOG_TIP "Legacy fingerprint migration rejected: ${OPENKILL_FINGERPRINT_MIGRATION_REASON:-state changed}; normal reconcile required."
+                  else
+                     LOG_WARN "Network fingerprint baseline migration failed; normal reconcile will retry."
+                  fi
+               elif [ "$fingerprint_applied_schema" = CURRENT ] &&
+                  openkill_network_noop_ready \
+                     "$OPENKILL_NETWORK_DESIRED" "$network_applied_file" "" \
+                     "$CONFIG_FILE" "$config_applied_file" \
+                     "$OPENKILL_NETWORK_FINGERPRINT" "$fingerprint_applied_file" >/dev/null 2>&1; then
+                  LOG_TIP "Network state unchanged and runtime healthy; skipping firewall/DNS reapply."
+                  rm -f "$OPENKILL_NETWORK_SNAPSHOT" "$OPENKILL_NETWORK_DESIRED" "$OPENKILL_NETWORK_FINGERPRINT"
+                  return 0
+               fi
             fi
          fi
       ;;

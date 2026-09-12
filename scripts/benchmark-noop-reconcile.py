@@ -26,6 +26,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--iterations", type=int, default=100)
     parser.add_argument("--init", type=pathlib.Path, help="init script to profile (defaults to the working tree)")
+    parser.add_argument(
+        "--legacy-migration",
+        action="store_true",
+        help="measure the first legacy-baseline migration and the following current-schema reload",
+    )
     args = parser.parse_args()
     if args.iterations < 1:
         parser.error("--iterations must be positive")
@@ -33,6 +38,58 @@ def main():
     tests = load_test_module()
     if args.init is not None:
         tests.INIT = args.init
+
+    if args.legacy_migration:
+        first_samples = []
+        second_samples = []
+        first_traces = []
+        second_traces = []
+        first_rewrites = 0
+        second_rewrites = 0
+        for _ in range(args.iterations):
+            with tempfile.TemporaryDirectory() as directory:
+                state = pathlib.Path(directory)
+                applied = state / "fingerprint.applied"
+                started = time.perf_counter_ns()
+                result, trace = tests.run_manual_reload_harness(state, legacy=True)
+                first_samples.append((time.perf_counter_ns() - started) / 1_000_000)
+                if result.returncode != 0:
+                    raise SystemExit(result.stderr or "legacy migration harness failed")
+                first_traces.append(trace)
+                if applied.read_text(encoding="utf-8").startswith("SCHEMA=2\n"):
+                    first_rewrites += 1
+                migrated_mtime = applied.stat().st_mtime_ns
+                started = time.perf_counter_ns()
+                result, trace = tests.run_manual_reload_harness(state, initialize=False)
+                second_samples.append((time.perf_counter_ns() - started) / 1_000_000)
+                if result.returncode != 0:
+                    raise SystemExit(result.stderr or "current-schema no-op harness failed")
+                second_traces.append(trace)
+                if applied.stat().st_mtime_ns != migrated_mtime:
+                    second_rewrites += 1
+
+        def summary(samples):
+            ordered = sorted(samples)
+            return {
+                "iterations": args.iterations,
+                "median_ms": statistics.median(samples),
+                "p95_ms": ordered[max(0, int(args.iterations * 0.95) - 1)],
+            }
+
+        print(json.dumps({
+            "scenario": "LEGACY_HEALTHY_MIGRATION",
+            "first_reload": {
+                **summary(first_samples),
+                "baseline_atomic_replacements": first_rewrites,
+                "no_apply": sum(trace == "run-mode\n" for trace in first_traces),
+            },
+            "second_reload": {
+                **summary(second_samples),
+                "baseline_atomic_replacements": second_rewrites,
+                "no_apply": sum(trace == "run-mode\n" for trace in second_traces),
+            },
+        }, indent=2, sort_keys=True))
+        return
 
     samples = []
     apply_traces = []

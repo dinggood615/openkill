@@ -39,7 +39,13 @@ def build(snapshot: str):
         return dict(line.split("=", 1) for line in out.read_text(encoding="utf-8").splitlines() if "=" in line)
 
 
-def run_manual_reload_harness(state: pathlib.Path, changed: bool = False):
+def run_manual_reload_harness(
+    state: pathlib.Path,
+    changed: bool = False,
+    legacy: bool = False,
+    initialize: bool = True,
+    runtime_healthy: bool = True,
+):
     """Exercise the init entry point with real network no-op logic and fake applies."""
     trace = state / "trace"
     desired = state / "desired"
@@ -49,15 +55,29 @@ def run_manual_reload_harness(state: pathlib.Path, changed: bool = False):
     fingerprint = state / "fingerprint"
     fingerprint_applied = state / "fingerprint.applied"
     snapshot = state / "reload.snapshot"
-    desired.write_text("LOCALNETWORK6_PREFIXES=fd00::/8\n", encoding="utf-8")
-    applied.write_text(desired.read_text(encoding="utf-8"), encoding="utf-8")
-    config.write_text("mode=redir-host\n", encoding="utf-8")
-    config_applied.write_text(config.read_text(encoding="utf-8"), encoding="utf-8")
-    fingerprint.write_text("WAN6_ADDRESSES=2001:db8::1\n", encoding="utf-8")
-    fingerprint_applied.write_text(fingerprint.read_text(encoding="utf-8"), encoding="utf-8")
-    snapshot.write_text("SNAPSHOT_VERSION=1\n", encoding="utf-8")
-    if changed:
-        fingerprint.write_text("WAN6_ADDRESSES=2001:db8::2\n", encoding="utf-8")
+    trace.write_text("", encoding="utf-8")
+    if initialize:
+        desired.write_text("LOCALNETWORK6_PREFIXES=fd00::/8\n", encoding="utf-8")
+        applied.write_text(desired.read_text(encoding="utf-8"), encoding="utf-8")
+        config.write_text("mode=redir-host\n", encoding="utf-8")
+        config_applied.write_text(config.read_text(encoding="utf-8"), encoding="utf-8")
+        fingerprint_payload = "SCHEMA=2\nWAN6_ADDRESSES=2001:db8::1\n"
+        fingerprint.write_text(fingerprint_payload, encoding="utf-8")
+        fingerprint_applied.write_text(
+            "WAN6_ADDRESSES=2001:db8::1\n" if legacy else fingerprint_payload,
+            encoding="utf-8",
+        )
+        snapshot.write_text("SNAPSHOT_VERSION=1\n", encoding="utf-8")
+        if changed:
+            fingerprint.write_text("SCHEMA=2\nWAN6_ADDRESSES=2001:db8::2\n", encoding="utf-8")
+    else:
+        # A successful reload removes its transient current files. Recreate
+        # the next transaction's current inputs while preserving the migrated
+        # applied baseline and configuration files.
+        desired.write_text("LOCALNETWORK6_PREFIXES=fd00::/8\n", encoding="utf-8")
+        config.write_text("mode=redir-host\n", encoding="utf-8")
+        fingerprint.write_text("SCHEMA=2\nWAN6_ADDRESSES=2001:db8::1\n", encoding="utf-8")
+        snapshot.write_text("SNAPSHOT_VERSION=1\n", encoding="utf-8")
 
     reload_function = INIT.read_text(encoding="utf-8").split("reload_service()\n", 1)[1].split("\nboot()\n", 1)[0]
     reload_function = "reload_service()\n" + reload_function
@@ -100,10 +120,11 @@ reload_service manual
         "OPENKILL_NETWORK_APPLIED_FILE": str(applied),
         "OPENKILL_CONFIG_APPLIED_FILE": str(config_applied),
         "OPENKILL_FINGERPRINT_APPLIED_FILE": str(fingerprint_applied),
+        "OPENKILL_NETWORK_PENDING_FILE": str(state / "pending"),
     }
     result = subprocess.run(
         [
-            "sh", "-c", script, "harness", str(HELPER), str(state), str(trace), "healthy",
+            "sh", "-c", script, "harness", str(HELPER), str(state), str(trace), "healthy" if runtime_healthy else "unhealthy",
         ],
         capture_output=True, text=True, env=env,
     )
@@ -125,6 +146,194 @@ class NetworkModelTests(unittest.TestCase):
             self.assertIn("revert:keep-include\n", trace)
             self.assertIn("include\n", trace)
             self.assertIn("check\n", trace)
+
+    def test_fingerprint_schema_detects_current_legacy_and_unknown(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            current = td / "current"
+            legacy = td / "legacy"
+            unknown = td / "unknown"
+            current.write_text("SCHEMA=2\nWAN6_ADDRESSES=2001:db8::1\n", encoding="utf-8")
+            legacy.write_text("WAN6_ADDRESSES=2001:db8::1\n", encoding="utf-8")
+            unknown.write_text("SCHEMA=3\nWAN6_ADDRESSES=2001:db8::1\n", encoding="utf-8")
+            self.assertEqual(run_helper("openkill_network_fingerprint_schema", current).stdout.strip(), "CURRENT")
+            self.assertEqual(run_helper("openkill_network_fingerprint_schema", legacy).stdout.strip(), "LEGACY")
+            unknown_result = run_helper_env("openkill_network_fingerprint_schema", unknown, check=False)
+            self.assertEqual(unknown_result.stdout.strip(), "UNKNOWN")
+
+    def test_manual_reload_legacy_healthy_migrates_without_apply(self):
+        with tempfile.TemporaryDirectory() as td:
+            state = pathlib.Path(td)
+            result, trace = run_manual_reload_harness(state, legacy=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(trace, "run-mode\n")
+            migrated = state / "fingerprint.applied"
+            self.assertTrue(migrated.read_text(encoding="utf-8").startswith("SCHEMA=2\n"))
+            migrated_mtime = migrated.stat().st_mtime_ns
+            result2, trace2 = run_manual_reload_harness(state, initialize=False)
+            self.assertEqual(result2.returncode, 0, result2.stderr)
+            self.assertEqual(trace2, "run-mode\n")
+            self.assertEqual(migrated.stat().st_mtime_ns, migrated_mtime)
+            self.assertFalse(list(state.glob("fingerprint.applied.migration.tmp.*")))
+
+    def test_manual_reload_legacy_changed_state_keeps_apply_path(self):
+        with tempfile.TemporaryDirectory() as td:
+            result, trace = run_manual_reload_harness(pathlib.Path(td), changed=True, legacy=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("request\n", trace)
+            self.assertIn("revert:keep-include\n", trace)
+
+    def test_legacy_runtime_unknown_keeps_apply_path(self):
+        with tempfile.TemporaryDirectory() as td:
+            result, trace = run_manual_reload_harness(pathlib.Path(td), legacy=True, runtime_healthy=False)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("request\n", trace)
+            self.assertIn("revert:keep-include\n", trace)
+
+    def test_legacy_migration_accepts_old_tun_route_but_rejects_route_change(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            current = td / "current"
+            legacy = td / "legacy"
+            desired = td / "desired"
+            applied = td / "applied"
+            config = td / "config"
+            config_applied = td / "config.applied"
+            pending = td / "pending"
+            base = (
+                "WAN4_INTERFACE=WAN\nWAN4_L3_DEVICE=eth1\nWAN4_ADDRESSES=192.0.2.2\n"
+                "WAN6_INTERFACE=WAN6\nWAN6_L3_DEVICE=eth1\nWAN6_ADDRESSES=2001:db8::2/64\n"
+                "INTERNAL_IPV4_PREFIXES=\nINTERNAL_IPV6_PREFIXES=2001:db8:10::/62\n"
+                "DNS_SERVERS=192.0.2.53\nTUN_OWNER=openkill\nIPV4_ENABLED=1\nIPV6_ENABLED=1\n"
+            )
+            current.write_text(
+                "SCHEMA=2\n" + base +
+                "NATIVE_IPV6_ROUTES=default from 2001:db8:10::/62 via fe80::1 dev eth1\n",
+                encoding="utf-8",
+            )
+            legacy.write_text(
+                base +
+                "NATIVE_IPV6_ROUTES=default from 2001:db8:10::/62 via fe80::1 dev eth1 2001:db8:2::/126 dev utun\n",
+                encoding="utf-8",
+            )
+            desired.write_text("LOCALNETWORK6_PREFIXES=2001:db8:10::/62\n", encoding="utf-8")
+            applied.write_text(desired.read_text(encoding="utf-8"), encoding="utf-8")
+            config.write_text("mode=fake-ip\n", encoding="utf-8")
+            config_applied.write_text(config.read_text(encoding="utf-8"), encoding="utf-8")
+            env = {**os.environ, "OPENKILL_RUNTIME_HEALTHY": "1", "OPENKILL_NETWORK_PENDING_FILE": str(pending)}
+            accepted = run_helper_env(
+                "openkill_can_migrate_network_fingerprint",
+                current, legacy, desired, applied, config, config_applied, env=env,
+            )
+            self.assertEqual(accepted.returncode, 0, accepted.stderr)
+            run_helper_env(
+                "openkill_migrate_network_fingerprint",
+                current, legacy, desired, applied, config, config_applied, env=env,
+            )
+            self.assertTrue(legacy.read_text(encoding="utf-8").startswith("SCHEMA=2\n"))
+
+            changed_current = td / "changed-current"
+            changed_current.write_text(
+                current.read_text(encoding="utf-8").replace("2001:db8:10::/62 via", "2001:db8:11::/62 via"),
+                encoding="utf-8",
+            )
+            rejected = run_helper_env(
+                "openkill_can_migrate_network_fingerprint",
+                changed_current, legacy, desired, applied, config, config_applied, env=env, check=False,
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+
+    def test_legacy_migration_rejects_runtime_unknown_and_current_schema_mismatch(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            current = td / "current"
+            legacy = td / "legacy"
+            desired = td / "desired"
+            applied = td / "applied"
+            config = td / "config"
+            config_applied = td / "config.applied"
+            current.write_text("SCHEMA=2\nWAN6_ADDRESSES=2001:db8::1\n", encoding="utf-8")
+            legacy.write_text("WAN6_ADDRESSES=2001:db8::1\n", encoding="utf-8")
+            desired.write_text("LOCALNETWORK6_PREFIXES=fd00::/8\n", encoding="utf-8")
+            applied.write_text(desired.read_text(encoding="utf-8"), encoding="utf-8")
+            config.write_text("mode=fake-ip\n", encoding="utf-8")
+            config_applied.write_text(config.read_text(encoding="utf-8"), encoding="utf-8")
+            env = {**os.environ, "OPENKILL_NETWORK_PENDING_FILE": str(td / "pending")}
+            unknown_runtime = run_helper_env(
+                "openkill_can_migrate_network_fingerprint",
+                current, legacy, desired, applied, config, config_applied, env=env, check=False,
+            )
+            self.assertNotEqual(unknown_runtime.returncode, 0)
+
+            current_applied = td / "current-applied"
+            current_applied.write_text(current.read_text(encoding="utf-8"), encoding="utf-8")
+            env["OPENKILL_RUNTIME_HEALTHY"] = "1"
+            current_schema = run_helper_env(
+                "openkill_can_migrate_network_fingerprint",
+                current, current_applied, desired, applied, config, config_applied, env=env, check=False,
+            )
+            self.assertNotEqual(current_schema.returncode, 0)
+
+    def test_legacy_migration_does_not_hide_desired_or_config_changes(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            current = td / "current"
+            legacy = td / "legacy"
+            current.write_text("SCHEMA=2\nWAN6_ADDRESSES=2001:db8::1\n", encoding="utf-8")
+            legacy.write_text("WAN6_ADDRESSES=2001:db8::1\n", encoding="utf-8")
+            config = td / "config"
+            config_applied = td / "config.applied"
+            config.write_text("mode=fake-ip\n", encoding="utf-8")
+            config_applied.write_text(config.read_text(encoding="utf-8"), encoding="utf-8")
+            env = {
+                **os.environ,
+                "OPENKILL_RUNTIME_HEALTHY": "1",
+                "OPENKILL_NETWORK_PENDING_FILE": str(td / "pending"),
+            }
+
+            def probe(desired_text, applied_text, config_text=None, config_applied_text=None):
+                desired = td / "desired"
+                applied = td / "applied"
+                desired.write_text(desired_text, encoding="utf-8")
+                applied.write_text(applied_text, encoding="utf-8")
+                if config_text is not None:
+                    config.write_text(config_text, encoding="utf-8")
+                if config_applied_text is not None:
+                    config_applied.write_text(config_applied_text, encoding="utf-8")
+                return run_helper_env(
+                    "openkill_can_migrate_network_fingerprint",
+                    current, legacy, desired, applied, config, config_applied, env=env, check=False,
+                )
+
+            desired_same = "LOCALNETWORK6_PREFIXES=fd00::/8\n"
+            self.assertNotEqual(
+                probe("LOCALNETWORK6_PREFIXES=2001:db8:1::/64\n", desired_same).returncode,
+                0,
+            )
+            self.assertNotEqual(probe("NODE4_ENDPOINTS=192.0.2.2\n", "NODE4_ENDPOINTS=192.0.2.1\n").returncode, 0)
+            self.assertNotEqual(
+                probe(desired_same, desired_same, "mode=fake-ip\n", "mode=redir-host\n").returncode,
+                0,
+            )
+
+    def test_legacy_migration_write_failure_preserves_old_baseline(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            current = td / "current"
+            legacy = td / "legacy"
+            current.write_text("SCHEMA=2\nWAN6_ADDRESSES=2001:db8::1\n", encoding="utf-8")
+            legacy_payload = "WAN6_ADDRESSES=2001:db8::1\n"
+            legacy.write_text(legacy_payload, encoding="utf-8")
+            fake_bin = td / "bin"
+            fake_bin.mkdir()
+            fake_mv = fake_bin / "mv"
+            fake_mv.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+            fake_mv.chmod(0o755)
+            env = {**os.environ, "PATH": f"{fake_bin}:/bin:/usr/bin", "OPENKILL_RUNTIME_HEALTHY": "1"}
+            failed = run_helper_env("openkill_migrate_network_fingerprint", current, legacy, env=env, check=False)
+            self.assertNotEqual(failed.returncode, 0)
+            self.assertEqual(legacy.read_text(encoding="utf-8"), legacy_payload)
+            self.assertFalse(list(td.glob("legacy.migration.tmp.*")))
 
     def test_ipv6_cidr_helper_handles_compressed_and_non_boundary_prefixes(self):
         self.assertNotEqual(

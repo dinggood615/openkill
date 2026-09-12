@@ -7,6 +7,10 @@ OPENKILL_FWMARK="0x162"
 OPENKILL_FWMASK="0xffffffff"
 OPENKILL_ROUTE_TABLE="0x162"
 OPENKILL_RULE_PREF="1888"
+# The fingerprint payload is deliberately versioned outside the semantic
+# fields.  A schema change must be distinguishable from a real network change
+# so a healthy upgrade can migrate its baseline without reapplying policy.
+OPENKILL_NETWORK_FINGERPRINT_SCHEMA="2"
 
 openkill_interface_json_value()
 {
@@ -520,6 +524,7 @@ openkill_network_fingerprint()
     [ -r "$snapshot_file" ] || return 1
     tmp_file="${fingerprint_file}.tmp.$$"
     {
+        printf 'SCHEMA=%s\n' "$OPENKILL_NETWORK_FINGERPRINT_SCHEMA"
         printf 'WAN4_INTERFACE=%s\n' "$(openkill_snapshot_value WAN4_INTERFACE "$snapshot_file")"
         printf 'WAN4_L3_DEVICE=%s\n' "$(openkill_snapshot_value WAN4_L3_DEVICE "$snapshot_file")"
         printf 'WAN4_ADDRESSES=%s\n' "$(openkill_normalize_list "$(openkill_snapshot_value WAN4_ADDRESSES "$snapshot_file")")"
@@ -534,6 +539,197 @@ openkill_network_fingerprint()
         printf 'IPV4_ENABLED=%s\nIPV6_ENABLED=%s\n' "$(openkill_snapshot_value IPV4_ENABLED "$snapshot_file")" "$(openkill_snapshot_value IPV6_ENABLED "$snapshot_file")"
     } > "$tmp_file" || return 1
     mv "$tmp_file" "$fingerprint_file"
+}
+
+openkill_network_fingerprint_schema()
+{
+    fingerprint_file="$1"
+    [ -r "$fingerprint_file" ] || {
+        printf 'MISSING\n'
+        return 1
+    }
+    [ -s "$fingerprint_file" ] || {
+        printf 'MISSING\n'
+        return 1
+    }
+    first_line=""
+    IFS= read -r first_line < "$fingerprint_file" || :
+    case "$first_line" in
+        SCHEMA=*)
+            schema_value="${first_line#SCHEMA=}"
+            if [ "$schema_value" = "$OPENKILL_NETWORK_FINGERPRINT_SCHEMA" ]; then
+                printf 'CURRENT\n'
+                return 0
+            fi
+            printf 'UNKNOWN\n'
+            return 2
+        ;;
+        *)
+            printf 'LEGACY\n'
+            return 0
+        ;;
+    esac
+}
+
+openkill_network_fingerprint_semantic_view()
+{
+    fingerprint_file="$1"
+    [ -r "$fingerprint_file" ] && [ -s "$fingerprint_file" ] || return 1
+    # Remove only the schema marker. Native route compatibility is checked
+    # separately because legacy fingerprints flattened route records into one
+    # space-separated line; all other fields remain exact here.
+    while IFS= read -r line || [ -n "$line" ]; do
+        case "$line" in
+            SCHEMA=*) ;;
+            NATIVE_IPV6_ROUTES=*) ;;
+            '') ;;
+            *) printf '%s\n' "$line" ;;
+        esac
+    done < "$fingerprint_file" | sort -u
+}
+
+openkill_network_fingerprint_native_routes_compatible()
+{
+    current_file="$1"
+    legacy_file="$2"
+    current_routes=$(openkill_snapshot_value NATIVE_IPV6_ROUTES "$current_file")
+    legacy_routes=$(openkill_snapshot_value NATIVE_IPV6_ROUTES "$legacy_file")
+    case "$legacy_routes" in
+        *" dev utun"*)
+            # Old fingerprints may contain native records followed by the
+            # OpenKill TUN records on one flattened line. Require the complete
+            # current native payload to remain present, so a real route/gateway
+            # change cannot be hidden by migration.
+            if [ -n "$current_routes" ]; then
+                case " $legacy_routes " in
+                    *" $current_routes "*) return 0 ;;
+                    *) return 1 ;;
+                esac
+            fi
+            legacy_without_tun=$(printf '%s\n' "$legacy_routes" | sed -e 's/[[:space:]][[:space:]]*dev[[:space:]][[:space:]]*utun.*$//')
+            [ -z "$legacy_without_tun" ]
+        ;;
+        *)
+            [ "$current_routes" = "$legacy_routes" ]
+        ;;
+    esac
+}
+
+openkill_network_fingerprint_semantically_equal()
+{
+    left_file="$1"
+    right_file="$2"
+    left_view="${left_file}.semantic.$$"
+    right_view="${right_file}.semantic.$$"
+    openkill_network_fingerprint_semantic_view "$left_file" > "$left_view" || {
+        rm -f "$left_view" "$right_view"
+        return 1
+    }
+    openkill_network_fingerprint_semantic_view "$right_file" > "$right_view" || {
+        rm -f "$left_view" "$right_view"
+        return 1
+    }
+    cmp -s "$left_view" "$right_view"
+    result=$?
+    rm -f "$left_view" "$right_view"
+    return "$result"
+}
+
+openkill_can_migrate_network_fingerprint()
+{
+    migration_current_file="$1"
+    migration_legacy_file="$2"
+    migration_desired_file="${3:-}"
+    migration_network_applied_file="${4:-}"
+    migration_config_file="${5:-}"
+    migration_config_applied_file="${6:-}"
+    OPENKILL_FINGERPRINT_MIGRATION_REASON=""
+
+    current_schema=$(openkill_network_fingerprint_schema "$migration_current_file" 2>/dev/null) || current_schema=MISSING
+    applied_schema=$(openkill_network_fingerprint_schema "$migration_legacy_file" 2>/dev/null) || applied_schema=MISSING
+    [ "$current_schema" = CURRENT ] || {
+        OPENKILL_FINGERPRINT_MIGRATION_REASON="current-schema-not-current"
+        return 1
+    }
+    [ "$applied_schema" = LEGACY ] || {
+        OPENKILL_FINGERPRINT_MIGRATION_REASON="persisted-schema-not-legacy"
+        return 1
+    }
+
+    pending_file="${OPENKILL_NETWORK_PENDING_FILE:-/tmp/openkill-network-reconcile/pending}"
+    [ ! -e "$pending_file" ] || {
+        OPENKILL_FINGERPRINT_MIGRATION_REASON="pending-reconcile"
+        return 1
+    }
+    [ "${OPENKILL_OWNER_TRANSITION_ACTIVE:-0}" != 1 ] || {
+        OPENKILL_FINGERPRINT_MIGRATION_REASON="owner-transition"
+        return 1
+    }
+    [ "${OPENKILL_RESTART_REQUIRED:-0}" != 1 ] || {
+        OPENKILL_FINGERPRINT_MIGRATION_REASON="restart-required"
+        return 1
+    }
+    [ "${OPENKILL_PENDING_COMPONENT_FAILURE:-0}" != 1 ] || {
+        OPENKILL_FINGERPRINT_MIGRATION_REASON="pending-component-failure"
+        return 1
+    }
+
+    # The production caller has already performed the runtime verifier.  When
+    # state files are supplied, repeat the semantic desired/config checks here
+    # so this helper cannot be used as an unconditional overwrite shortcut.
+    [ "${OPENKILL_RUNTIME_HEALTHY:-0}" = 1 ] || {
+        OPENKILL_FINGERPRINT_MIGRATION_REASON="runtime-unknown"
+        return 1
+    }
+    if [ -n "$migration_desired_file" ]; then
+        [ -n "$migration_network_applied_file" ] || {
+            OPENKILL_FINGERPRINT_MIGRATION_REASON="applied-state-missing"
+            return 1
+        }
+        openkill_network_noop_ready \
+            "$migration_desired_file" "$migration_network_applied_file" "" \
+            "$migration_config_file" "$migration_config_applied_file" "" "$migration_legacy_file" >/dev/null 2>&1 || {
+            OPENKILL_FINGERPRINT_MIGRATION_REASON="state-not-healthy"
+            return 1
+        }
+    fi
+
+    openkill_network_fingerprint_semantically_equal "$migration_current_file" "$migration_legacy_file" || {
+        OPENKILL_FINGERPRINT_MIGRATION_REASON="semantic-fingerprint-changed"
+        return 1
+    }
+    openkill_network_fingerprint_native_routes_compatible "$migration_current_file" "$migration_legacy_file" || {
+        OPENKILL_FINGERPRINT_MIGRATION_REASON="native-route-changed"
+        return 1
+    }
+    return 0
+}
+
+openkill_migrate_network_fingerprint()
+{
+    migration_current_file="$1"
+    migration_legacy_file="$2"
+    migration_desired_file="${3:-}"
+    migration_network_applied_file="${4:-}"
+    migration_config_file="${5:-}"
+    migration_config_applied_file="${6:-}"
+    openkill_can_migrate_network_fingerprint \
+        "$migration_current_file" "$migration_legacy_file" \
+        "$migration_desired_file" "$migration_network_applied_file" \
+        "$migration_config_file" "$migration_config_applied_file" || return 1
+
+    migrated_tmp="${migration_legacy_file}.migration.tmp.$$"
+    cp "$migration_current_file" "$migrated_tmp" || {
+        OPENKILL_FINGERPRINT_MIGRATION_REASON="baseline-copy-failed"
+        rm -f "$migrated_tmp"
+        return 1
+    }
+    mv "$migrated_tmp" "$migration_legacy_file" || {
+        OPENKILL_FINGERPRINT_MIGRATION_REASON="baseline-replace-failed"
+        rm -f "$migrated_tmp"
+        return 1
+    }
+    return 0
 }
 
 openkill_classify_network_change()
