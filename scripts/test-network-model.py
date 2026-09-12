@@ -246,6 +246,44 @@ esac
             self.assertEqual(result.stdout, "192.168.10.128/24 fd15:4ba5::1/64\n")
             self.assertFalse(marker.exists())
 
+    def test_normalize_list_uses_safe_delimiter_translation_for_ipv6(self):
+        source = HELPER.read_text(encoding="utf-8")
+        self.assertIn("tr ';' '\\n'", source)
+        self.assertNotIn("tr -s '[;[:space:]]'", source)
+        result = run_helper_env(
+            "openkill_normalize_list",
+            "fd15:4ba5:5a2b:1008:20c:29ff:fe07:4ffe/64;"
+            "2001:db8::1/128;fd15:4ba5:5a2b:1008:20c:29ff:fe07:4ffe/64",
+        )
+        self.assertEqual(
+            result.stdout,
+            "2001:db8::1/128 fd15:4ba5:5a2b:1008:20c:29ff:fe07:4ffe/64\n",
+        )
+
+    def test_normalize_text_lines_preserves_internal_route_text_spaces(self):
+        result = run_helper_env(
+            "openkill_normalize_text_lines",
+            "default from fd15:4ba5:5a2b:1008::/64 via fe80::1 dev eth1;"
+            "fd15:4ba5:5a2b:1008::/64 dev eth1",
+        )
+        self.assertEqual(
+            result.stdout,
+            "default from fd15:4ba5:5a2b:1008::/64 via fe80::1 dev eth1 "
+            "fd15:4ba5:5a2b:1008::/64 dev eth1\n",
+        )
+
+    def test_normalize_list_splits_whitespace_separated_tokens_without_losing_ipv6(self):
+        result = run_helper_env(
+            "openkill_normalize_list",
+            " 192.168.10.2\t2606:4700:4700::1111\n"
+            "fd15:4ba5:5a2b:1008:20c:29ff:fe07:4ffe/64 192.168.10.2",
+        )
+        self.assertEqual(
+            result.stdout,
+            "192.168.10.2 2606:4700:4700::1111 "
+            "fd15:4ba5:5a2b:1008:20c:29ff:fe07:4ffe/64\n",
+        )
+
     def test_desired_localnetwork6_keeps_wan_as_hosts_and_lan_as_prefixes(self):
         state = build("""SNAPSHOT_VERSION=1
 LOCAL_IPV6_READY=1

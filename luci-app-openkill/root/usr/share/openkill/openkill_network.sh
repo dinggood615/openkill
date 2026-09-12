@@ -413,21 +413,48 @@ openkill_device_address_values()
 
 openkill_normalize_list()
 {
-    # Values from jsonfilter and netifd are delimiter-separated text, not
-    # records that need awk's field-rewrite extensions.  BusyBox awk rejects
-    # the trailing-whitespace expression used here on some OpenWrt builds.
-    # Translate delimiters to newlines, squeeze runs so leading/trailing
-    # whitespace cannot create empty records, and join the stable sorted set
-    # with shell parameter expansion for broad BusyBox compatibility.  A
-    # semicolon remains a list delimiter as it did before.
+    [ -n "${1:-}" ] || return 0
+    # Address, DNS, prefix, and endpoint fields are simple token lists.  Only
+    # the semicolon is translated by tr; sed handles whitespace with its
+    # regular-expression character class, and the final split is therefore
+    # independent of BusyBox tr's character-set parser.  Do not use this
+    # helper for free-form route text; openkill_normalize_text_lines below
+    # preserves spaces inside each record.
     normalized=$(
         printf '%s\n' "$*" |
-            tr -s '[;[:space:]]' '\n' |
+            tr ';' '\n' |
+            sed -e 's/\r$//' -e '/^[[:space:]]*$/d' |
+            while IFS= read -r record; do
+                # These callers provide IP/CIDR/DNS tokens only.  Shell word
+                # splitting is safe here and avoids another tr character-set
+                # interpretation on BusyBox; free-form text uses the helper
+                # below instead.
+                for token in $record; do
+                    printf '%s\n' "$token"
+                done
+            done |
             sort -u |
             tr '\n' ' '
     )
-    normalized="${normalized# }"
-    [ -n "$normalized" ] && printf '%s\n' "${normalized% }"
+    normalized="${normalized% }"
+    [ -n "$normalized" ] && printf '%s\n' "$normalized"
+    return 0
+}
+
+openkill_normalize_text_lines()
+{
+    [ -n "${1:-}" ] || return 0
+    # Native route descriptions are semicolon- or newline-separated records;
+    # their internal spaces are meaningful and must not be tokenized.
+    normalized=$(
+        printf '%s\n' "$*" |
+            tr ';' '\n' |
+            sed -e 's/\r$//' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e '/^$/d' |
+            sort -u |
+            tr '\n' ' '
+    )
+    normalized="${normalized% }"
+    [ -n "$normalized" ] && printf '%s\n' "$normalized"
     return 0
 }
 
@@ -493,7 +520,7 @@ openkill_network_fingerprint()
         printf 'WAN6_INTERFACE=%s\n' "$(openkill_snapshot_value WAN6_INTERFACE "$snapshot_file")"
         printf 'WAN6_L3_DEVICE=%s\n' "$(openkill_snapshot_value WAN6_L3_DEVICE "$snapshot_file")"
         printf 'WAN6_ADDRESSES=%s\n' "$(openkill_normalize_list "$(openkill_snapshot_value WAN6_ADDRESSES "$snapshot_file")")"
-        printf 'NATIVE_IPV6_ROUTES=%s\n' "$(openkill_normalize_list "$(openkill_snapshot_value NATIVE_IPV6_ROUTES "$snapshot_file")")"
+        printf 'NATIVE_IPV6_ROUTES=%s\n' "$(openkill_normalize_text_lines "$(openkill_snapshot_value NATIVE_IPV6_ROUTES "$snapshot_file")")"
         printf 'INTERNAL_IPV4_PREFIXES=%s\n' "$(openkill_normalize_list "$(openkill_snapshot_value INTERNAL_IPV4_PREFIXES "$snapshot_file")")"
         printf 'INTERNAL_IPV6_PREFIXES=%s\n' "$(openkill_normalize_list "$(openkill_snapshot_value INTERNAL_IPV6_PREFIXES "$snapshot_file")")"
         printf 'DNS_SERVERS=%s\n' "$(openkill_normalize_list "$(openkill_snapshot_value DNS_SERVERS "$snapshot_file")")"
