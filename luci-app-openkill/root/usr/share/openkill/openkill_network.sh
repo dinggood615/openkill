@@ -50,10 +50,15 @@ openkill_build_desired_state()
     [ -r "$snapshot_file" ] || return 1
     # Do not source arbitrary snapshot data.  The model consumes only the
     # whitelisted fields and writes stable KEY=value output.
-    ipv6_ready=$(sed -n 's/^LOCAL_IPV6_READY=//p' "$snapshot_file" | head -n 1)
-    internal6=$(sed -n 's/^INTERNAL_IPV6_PREFIXES=//p' "$snapshot_file" | head -n 1)
-    node4=$(sed -n 's/^NODE4_ENDPOINTS=//p' "$snapshot_file" | head -n 1)
-    node6=$(sed -n 's/^NODE6_ENDPOINTS=//p' "$snapshot_file" | head -n 1)
+    ipv6_ready=0; internal6=""; node4=""; node6=""
+    while IFS= read -r line; do
+        case "$line" in
+            LOCAL_IPV6_READY=*) ipv6_ready="${line#*=}" ;;
+            INTERNAL_IPV6_PREFIXES=*) internal6="${line#*=}" ;;
+            NODE4_ENDPOINTS=*) node4="${line#*=}" ;;
+            NODE6_ENDPOINTS=*) node6="${line#*=}" ;;
+        esac
+    done < "$snapshot_file"
     : > "$desired_file" || return 1
     printf 'OPENKILL_FWMARK=%s\nOPENKILL_FWMASK=%s\nOPENKILL_ROUTE_TABLE=%s\nOPENKILL_RULE_PREF=%s\n' \
         "$OPENKILL_FWMARK" "$OPENKILL_FWMASK" "$OPENKILL_ROUTE_TABLE" "$OPENKILL_RULE_PREF" >> "$desired_file"
@@ -131,6 +136,10 @@ openkill_desired_diff()
     old_file="$1"
     new_file="$2"
     [ -r "$old_file" ] && [ -r "$new_file" ] || return 1
+    # Fast path avoids two sort processes on the overwhelmingly common exact
+    # no-op reconcile case.  Sorting remains for semantically equivalent files
+    # whose line order differs.
+    cmp -s "$old_file" "$new_file" && { printf 'NO_ACTION\n'; return 0; }
     old_norm=$(sort "$old_file")
     new_norm=$(sort "$new_file")
     [ "$old_norm" = "$new_norm" ] && { printf 'NO_ACTION\n'; return 0; }
