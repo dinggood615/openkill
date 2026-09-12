@@ -4,6 +4,7 @@
 . /usr/share/openkill/openkill_ps.sh
 . /usr/share/openkill/uci.sh
 . /usr/share/openkill/runtime.sh
+. /usr/share/openkill/openkill_network.sh
 
 LOG_FILE="/tmp/openkill.log"
 CLASH="/etc/openkill/clash"
@@ -357,12 +358,14 @@ HISTORY_INT=$(expr "$HISTORY_INT" + 1)
       if ([ "$nat_last_line" != "$nat_op_line" ] && [ -n "$nat_op_line" ]) || ([ "$man_last_line" != "$man_op_line" ] && [ -n "$man_op_line" ]); then
          ## 转发顺序检查
          LOG_WATCHDOG "Setting Firewall For Rules Order..."
-         /etc/init.d/openkill reload "firewall"
+         openkill_request_network_reconcile /tmp/openkill-network-reconcile watchdog
+         /usr/share/openkill/openkill_fw4_reload.sh
          let FIREWALL_RELOAD++
       elif [ -n "$(ip link show utun 2>/dev/null)" ] && [ -z "$(ip route list table 354)" ]; then
          ## 路由表检查
          LOG_WATCHDOG "Setting Firewall For IP Rules Table Recreate..."
-         /etc/init.d/openkill reload "firewall"
+         openkill_request_network_reconcile /tmp/openkill-network-reconcile watchdog
+         /usr/share/openkill/openkill_fw4_reload.sh
          let FIREWALL_RELOAD++
       else
          FIREWALL_RELOAD=0
