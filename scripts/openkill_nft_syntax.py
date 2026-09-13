@@ -736,6 +736,21 @@ def _chain_targets_for_rule(
         # DNS is an independent entry point: LAN traffic is sent to the LAN
         # hijack chain and router output to the router redirect chain.
         suffix = "V4" if family == "IPv4" else "V6"
+        scope = rule.get("dns_scope")
+        if scope == "DNS_LAN":
+            return [
+                (
+                    _physical_chain("OPENKILL_PREROUTING_MANGLE_" + suffix, chains, external),
+                    _physical_chain("OPENKILL_DNS_LAN_" + suffix, chains, external),
+                )
+            ]
+        if scope == "DNS_ROUTER":
+            return [
+                (
+                    _physical_chain("OPENKILL_OUTPUT_MANGLE_" + suffix, chains, external),
+                    _physical_chain("OPENKILL_DNS_ROUTER_" + suffix, chains, external),
+                )
+            ]
         return [
             (
                 _physical_chain("OPENKILL_PREROUTING_MANGLE_" + suffix, chains, external),
@@ -947,6 +962,8 @@ def _lower_action_ir(
         "possible_decisions": [action.get("decision")] if action.get("decision") else [],
         "precedence_index": action.get("precedence_index"),
     }
+    if reason == "DNS":
+        source_rule["dns_scope"] = "DNS_ROUTER" if direction == "ROUTER_OUTPUT" else "DNS_LAN"
     return _lower_rule_variants(
         source_rule,
         chains=chains,
@@ -1111,7 +1128,15 @@ def lower_nft_ir(
     syntax_sets.sort(key=lambda item: item["logical_id"])
 
     rules: List[Dict[str, Any]] = []
+    context_record = normalized.get("context")
     for rule in normalized.get("rules", ()):
+        # A context render is a packet-scoped intent.  Its concrete DNS
+        # action is emitted below with the selected LAN/router scope; the
+        # state-level DNS policy rules would otherwise expand to both entry
+        # points and make LAN and router renders indistinguishable.  The
+        # state renderer (without context) retains the complete static plan.
+        if context_record and rule.get("semantic_reason") == "DNS":
+            continue
         rules.extend(
             _lower_rule_variants(
                 rule,
