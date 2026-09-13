@@ -1,0 +1,186 @@
+{
+  "schema": "OPENKILL_NFT_IR_FIXTURE_V1",
+  "ir_version": 1,
+  "semantic_spec_version": 1,
+  "classifier_contract_version": 1,
+  "ownership_manifest_version": 1,
+  "default_renderer_profile": "current",
+  "supported_profiles": ["current", "target"],
+  "supported_backend": "ABSTRACT_NFT",
+  "production_wiring": "NONE",
+  "required_metadata_fields": [
+    "semantic_spec_version",
+    "classifier_contract_version",
+    "renderer_profile",
+    "renderer_backend",
+    "ir_version",
+    "ownership_manifest_version",
+    "behavior_change_lock"
+  ],
+  "object_types": ["table_ref", "chain", "chain_ref", "set", "rule", "jump"],
+  "chain_roles": [
+    "PREROUTING_PROXY",
+    "PREROUTING_MANGLE",
+    "OUTPUT_PROXY",
+    "OUTPUT_MANGLE",
+    "POSTROUTING",
+    "DNS_LAN",
+    "DNS_ROUTER",
+    "WAN_INPUT",
+    "UPNP"
+  ],
+  "match_types": [
+    "family",
+    "direction",
+    "protocol",
+    "source_set",
+    "destination_set",
+    "port_set",
+    "connection",
+    "owner",
+    "interface_role",
+    "semantic_flag",
+    "service"
+  ],
+  "action_types": [
+    "RETURN_NATIVE",
+    "REDIRECT_PROXY",
+    "MARK_PROXY",
+    "TPROXY_PROXY",
+    "DNS_REDIRECT",
+    "ACCESS_DENY_REQUIRED",
+    "JUMP",
+    "ACCEPT_IF_REQUIRED",
+    "NOT_OWNED",
+    "UNSUPPORTED_ACTION",
+    "CONTINUE_POLICY",
+    "UNRESOLVED_SEMANTIC",
+    "ACTION_FROM_CLASSIFICATION"
+  ],
+  "components": [
+    "TOPOLOGY",
+    "LOCAL",
+    "NODE",
+    "CHINA",
+    "ACCESS",
+    "SERVICE",
+    "DNS",
+    "PROXY_ACTION",
+    "WAN_INPUT",
+    "UPNP",
+    "OWNER"
+  ],
+  "element_types": ["ADDRESS", "PREFIX", "PORT", "MAC", "INTERVAL", "TOKEN"],
+  "set_inventory": [
+    {"semantic_id": "LOCAL_V4", "physical_name": "localnetwork", "family": "IPv4", "element_type": "PREFIX", "component": "LOCAL"},
+    {"semantic_id": "LOCAL_V6", "physical_name": "localnetwork6", "family": "IPv6", "element_type": "PREFIX", "component": "LOCAL"},
+    {"semantic_id": "NODE_ENDPOINT_V4", "physical_name": "openkill_node4", "family": "IPv4", "element_type": "ADDRESS", "component": "NODE"},
+    {"semantic_id": "NODE_ENDPOINT_V6", "physical_name": "openkill_node6", "family": "IPv6", "element_type": "ADDRESS", "component": "NODE"},
+    {"semantic_id": "CHINA_V4", "physical_name": "china_ip_route", "family": "IPv4", "element_type": "PREFIX", "component": "CHINA"},
+    {"semantic_id": "CHINA_V6", "physical_name": "china_ip6_route", "family": "IPv6", "element_type": "PREFIX", "component": "CHINA"},
+    {"semantic_id": "CHINA_PASS_V4", "physical_name": "china_ip_route_pass", "family": "IPv4", "element_type": "PREFIX", "component": "CHINA"},
+    {"semantic_id": "CHINA_PASS_V6", "physical_name": "china_ip6_route_pass", "family": "IPv6", "element_type": "PREFIX", "component": "CHINA"},
+    {"semantic_id": "SERVICE_PORTS", "physical_name": "openkill_service_ports", "family": "ALL", "element_type": "PORT", "component": "SERVICE"},
+    {"semantic_id": "COMMON_PORTS", "physical_name": "common_ports", "family": "ALL", "element_type": "PORT", "component": "SERVICE"},
+    {"semantic_id": "WAN_AC_BLACK_V4", "physical_name": "wan_ac_black_ips", "family": "IPv4", "element_type": "PREFIX", "component": "ACCESS"},
+    {"semantic_id": "WAN_AC_BLACK_V6", "physical_name": "wan_ac_black_ipv6s", "family": "IPv6", "element_type": "PREFIX", "component": "ACCESS"},
+    {"semantic_id": "WAN_AC_BLACK_PORTS", "physical_name": "wan_ac_black_ports", "family": "ALL", "element_type": "PORT", "component": "ACCESS"},
+    {"semantic_id": "LAN_AC_BLACK_MACS", "physical_name": "lan_ac_black_macs", "family": "ALL", "element_type": "MAC", "component": "ACCESS"},
+    {"semantic_id": "LAN_AC_WHITE_MACS", "physical_name": "lan_ac_white_macs", "family": "ALL", "element_type": "MAC", "component": "ACCESS"}
+  ],
+  "rule_id_examples": [
+    "CURRENT_NODE_ENDPOINT_V4",
+    "CURRENT_NODE_ENDPOINT_V6",
+    "CURRENT_LOCAL_DESTINATION_V4",
+    "CURRENT_LOCAL_DESTINATION_V6",
+    "CURRENT_DEFAULT_POLICY_V4",
+    "CURRENT_DEFAULT_POLICY_V6",
+    "SAFETY_NODE_V4",
+    "SAFETY_NODE_V6"
+  ],
+  "dependency_graph": {
+    "TOPOLOGY": ["NODE", "LOCAL", "CHINA", "ACCESS", "SERVICE", "DNS", "PROXY_ACTION"],
+    "NODE": ["PROXY_ACTION"],
+    "LOCAL": ["PROXY_ACTION"],
+    "CHINA": ["PROXY_ACTION"],
+    "ACCESS": ["PROXY_ACTION"],
+    "SERVICE": ["PROXY_ACTION"],
+    "DNS": ["DNS"],
+    "PROXY_ACTION": [],
+    "OWNER": ["TOPOLOGY"]
+  },
+  "ownership_model": {
+    "parent_owner": "FW4",
+    "child_owner": "OPENKILL",
+    "table_owner": "FW4",
+    "manifest_schema": "OPENKILL_NFT_MANIFEST_V1",
+    "cleanup": "MANIFEST_SCOPED_ONLY",
+    "comment_alone_is_authority": false,
+    "foreign_preservation": "HARD_INVARIANT"
+  },
+  "runtime_audit_model": {
+    "actual_state_schema": "OPENKILL_ACTUAL_NFT_STATE_V1",
+    "desired_state": "NFT_IR_V1",
+    "mode": "FIXTURE_ONLY",
+    "repair": "OWNERSHIP_SCOPED_INCREMENTAL",
+    "foreign_preservation": true
+  },
+  "cleanup_contract": {
+    "scope": "OWNERSHIP_MANIFEST_ONLY",
+    "flush_ruleset": false,
+    "flush_parent_table": false,
+    "foreign_objects": "PRESERVE"
+  },
+  "external_references": [
+    {"logical_id": "FW4_TABLE", "physical_name": "inet fw4", "priority": "EXTERNAL_UNVERIFIED"},
+    {"logical_id": "FW4_MANGLE_PREROUTING", "physical_name": "mangle_prerouting", "priority": "EXTERNAL_UNVERIFIED"},
+    {"logical_id": "FW4_MANGLE_OUTPUT", "physical_name": "mangle_output", "priority": "EXTERNAL_UNVERIFIED"},
+    {"logical_id": "FW4_DSTNAT", "physical_name": "dstnat", "priority": "EXTERNAL_UNVERIFIED"}
+  ],
+  "current_owned_base_chain": {
+    "logical_id": "OPENKILL_NAT_OUTPUT_CURRENT",
+    "physical_name": "nat_output",
+    "hook": "OUTPUT",
+    "priority": -1,
+    "profile": "current",
+    "design_status": "CURRENT_EXPRESSION_ONLY"
+  },
+  "diff_categories": [
+    "NO_CHANGE",
+    "SET_ELEMENT_CHANGE",
+    "RULE_CHANGE",
+    "TOPOLOGY_CHANGE",
+    "TOPOLOGY_ADD",
+    "TOPOLOGY_REMOVE",
+    "COMPONENT_CHANGE"
+  ],
+  "static_topology_rule": "Topology is stable for a fixed owner, run mode, backend capability, and semantic configuration; dynamic endpoint changes update sets only.",
+  "dynamic_state_rule": "Sets are canonicalized, deduplicated, sorted, and may be empty without removing their static rule references.",
+  "foreign_object_examples": [
+    {"logical_id": "FOREIGN_CHAIN_SAME_NAME", "physical_name": "openkill_mangle", "object_type": "chain", "owner": "FOREIGN", "ownership": "FOREIGN", "parent_owner": "FW4", "parent_table": "inet fw4", "component": "TOPOLOGY", "family": "IPv4", "semantic_spec_version": 1},
+    {"logical_id": "FOREIGN_SET", "physical_name": "openkill_node4", "object_type": "set", "owner": "FOREIGN", "ownership": "FOREIGN", "parent_owner": "FW4", "parent_table": "inet fw4", "component": "NODE", "family": "IPv4", "semantic_spec_version": 1, "element_type": "ADDRESS", "elements": []},
+    {"logical_id": "FOREIGN_RULE", "physical_name": "foreign_rule", "object_type": "rule", "owner": "FOREIGN", "ownership": "FOREIGN", "parent_owner": "FW4", "parent_table": "inet fw4", "component": "TOPOLOGY", "family": "IPv4", "semantic_spec_version": 1}
+  ],
+  "behavior_change_lock": {
+    "ids": ["BC-01", "BC-02", "BC-03", "BC-04", "BC-05", "BC-06", "BC-07"],
+    "status": "PRODUCTION_NOT_APPROVED",
+    "current_renderer": "CURRENT_ONLY",
+    "target_renderer": "TARGET_PREVIEW_ONLY"
+  },
+  "golden_compatibility": {
+    "phase_2a_current_cases": 97,
+    "phase_2a_target_cases": 97,
+    "phase_2a_overlap_cases": 32,
+    "phase_2a_parity_groups": 31,
+    "phase_2c_shadow_cases": 109
+  },
+  "examples": [
+    {"id": "basic_ipv4_tun", "profile": "current", "backend": "ABSTRACT_NFT", "family": "IPv4", "run_mode": "TUN", "action": "MARK_PROXY"},
+    {"id": "dual_stack_tun", "profile": "current", "backend": "ABSTRACT_NFT", "families": ["IPv4", "IPv6"], "run_mode": "TUN", "action": "MARK_PROXY"},
+    {"id": "tproxy", "profile": "current", "backend": "ABSTRACT_NFT", "run_mode": "TPROXY", "action": "TPROXY_PROXY"},
+    {"id": "mihomo_owned", "profile": "current", "backend": "ABSTRACT_NFT", "owner": "MIHOMO", "owned_objects": 0, "action": "NOT_OWNED"},
+    {"id": "node_endpoint_change", "profile": "current", "diff": ["SET_ELEMENT_CHANGE", "COMPONENT_CHANGE"], "component": "NODE"},
+    {"id": "pd_change", "profile": "current", "diff": ["SET_ELEMENT_CHANGE", "COMPONENT_CHANGE"], "component": "LOCAL"},
+    {"id": "foreign_same_name", "profile": "current", "cleanup": "PRESERVE_FOREIGN_OBJECT"}
+  ]
+}
