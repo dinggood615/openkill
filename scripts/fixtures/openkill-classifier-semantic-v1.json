@@ -1,5 +1,10 @@
 {
   "schema": "CLASSIFIER_SEMANTIC_CONTRACT_V1",
+  "contract_version": 1,
+  "profile_enum": [
+    "current",
+    "target"
+  ],
   "status": "PHASE_2A_MODEL_ONLY",
   "runtime_wiring": "NONE",
   "decision_enum": [
