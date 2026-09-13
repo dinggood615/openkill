@@ -1,0 +1,178 @@
+SHELL_RENDERER_INPUT_V1	1
+META	profile	current
+META	owner	OPENKILL
+META	backend	modern_fw4_nft
+META	run_mode	TPROXY
+META	semantic_spec_version	1
+META	classifier_contract_version	1
+META	nft_ir_version	1
+META	ownership_manifest_version	1
+META	redirect_port	7892
+META	tproxy_port	7895
+META	dns_port	7874
+META	mark	0x162
+META	mask	0xffffffff
+META	route_table	354
+META	rule_pref	1888
+META	router_self_proxy	0
+META	component_state	READY
+CHAIN	OPENKILL_DNS_LAN_V4	openkill_dns_hijack	IPv4	DNS	DNS_LAN	0	-	-	-
+CHAIN	OPENKILL_DNS_LAN_V6	openkill_dns_hijack_v6	IPv6	DNS	DNS_LAN	0	-	-	-
+CHAIN	OPENKILL_DNS_ROUTER_V4	openkill_dns_redirect	IPv4	DNS	DNS_ROUTER	0	-	-	-
+CHAIN	OPENKILL_DNS_ROUTER_V6	openkill_dns_redirect_v6	IPv6	DNS	DNS_ROUTER	0	-	-	-
+CHAIN	OPENKILL_NAT_OUTPUT_CURRENT	nat_output	ALL	TOPOLOGY	OUTPUT_PROXY	1	nat	OUTPUT	-1
+CHAIN	OPENKILL_OUTPUT_MANGLE_V4	openkill_mangle_output	IPv4	TOPOLOGY	OUTPUT_MANGLE	0	-	-	-
+CHAIN	OPENKILL_OUTPUT_MANGLE_V6	openkill_mangle_output_v6	IPv6	TOPOLOGY	OUTPUT_MANGLE	0	-	-	-
+CHAIN	OPENKILL_OUTPUT_PROXY_V4	openkill_output	IPv4	TOPOLOGY	OUTPUT_PROXY	0	-	-	-
+CHAIN	OPENKILL_OUTPUT_PROXY_V6	openkill_output_v6	IPv6	TOPOLOGY	OUTPUT_PROXY	0	-	-	-
+CHAIN	OPENKILL_POSTROUTING_V4	openkill_post	IPv4	TOPOLOGY	POSTROUTING	0	-	-	-
+CHAIN	OPENKILL_POSTROUTING_V6	openkill_post_v6	IPv6	TOPOLOGY	POSTROUTING	0	-	-	-
+CHAIN	OPENKILL_PREROUTING_MANGLE_V4	openkill_mangle	IPv4	TOPOLOGY	PREROUTING_MANGLE	0	-	-	-
+CHAIN	OPENKILL_PREROUTING_MANGLE_V6	openkill_mangle_v6	IPv6	TOPOLOGY	PREROUTING_MANGLE	0	-	-	-
+CHAIN	OPENKILL_PREROUTING_PROXY_V4	openkill	IPv4	TOPOLOGY	PREROUTING_PROXY	0	-	-	-
+CHAIN	OPENKILL_PREROUTING_PROXY_V6	openkill_v6	IPv6	TOPOLOGY	PREROUTING_PROXY	0	-	-	-
+CHAIN	OPENKILL_TPROXY_V4	openkill_tproxy	IPv4	PROXY_ACTION	PREROUTING_PROXY	0	-	-	-
+CHAIN	OPENKILL_TPROXY_V6	openkill_tproxy_v6	IPv6	PROXY_ACTION	PREROUTING_PROXY	0	-	-	-
+CHAIN	OPENKILL_UPNP	openkill_upnp	ALL	UPNP	UPNP	0	-	-	-
+CHAIN	OPENKILL_WAN_INPUT_V4	openkill_wan_input	IPv4	WAN_INPUT	WAN_INPUT	0	-	-	-
+CHAIN	OPENKILL_WAN_INPUT_V6	openkill_wan6_input	IPv6	WAN_INPUT	WAN_INPUT	0	-	-	-
+SET	ACCESS_V4_ALLOW	openkill_access4_allow	IPv4	PREFIX	interval	-	ACCESS
+SET	ACCESS_V4_BYPASS	openkill_access4_bypass	IPv4	PREFIX	interval	-	ACCESS
+SET	ACCESS_V4_DENY	openkill_access4_deny	IPv4	PREFIX	interval	-	ACCESS
+SET	ACCESS_V6_ALLOW	openkill_access6_allow	IPv6	PREFIX	interval	-	ACCESS
+SET	ACCESS_V6_BYPASS	openkill_access6_bypass	IPv6	PREFIX	interval	-	ACCESS
+SET	ACCESS_V6_DENY	openkill_access6_deny	IPv6	PREFIX	interval	-	ACCESS
+SET	CHINA_PASS_V4	china_ip_route_pass	IPv4	PREFIX	interval	-	CHINA
+SET	CHINA_PASS_V6	china_ip6_route_pass	IPv6	PREFIX	interval	-	CHINA
+SET	CHINA_V4	china_ip_route	IPv4	PREFIX	interval	-	CHINA
+SET	CHINA_V6	china_ip6_route	IPv6	PREFIX	interval	-	CHINA
+SET	COMMON_PORTS	common_ports	ALL	PORT	-	-	SERVICE
+SET	DELEGATED_V6	openkill_delegated6	IPv6	PREFIX	interval	-	LOCAL
+SET	FAKEIP_V4	openkill_fakeip4	IPv4	PREFIX	interval	-	PROXY_ACTION
+SET	FAKEIP_V6	openkill_fakeip6	IPv6	PREFIX	interval	-	PROXY_ACTION
+SET	LAN_AC_BLACK_MACS	lan_ac_black_macs	ALL	MAC	-	-	ACCESS
+SET	LAN_AC_BLACK_V4	lan_ac_black_ips	IPv4	PREFIX	interval	-	ACCESS
+SET	LAN_AC_BLACK_V6	lan_ac_black_ipv6s	IPv6	PREFIX	interval	-	ACCESS
+SET	LAN_AC_WHITE_MACS	lan_ac_white_macs	ALL	MAC	-	-	ACCESS
+SET	LAN_AC_WHITE_V4	lan_ac_white_ips	IPv4	PREFIX	interval	-	ACCESS
+SET	LAN_AC_WHITE_V6	lan_ac_white_ipv6s	IPv6	PREFIX	interval	-	ACCESS
+SET	LAN_V4	openkill_lan4	IPv4	PREFIX	interval	-	LOCAL
+SET	LAN_V6	openkill_lan6	IPv6	PREFIX	interval	-	LOCAL
+SET	LOCAL_V4	localnetwork	IPv4	PREFIX	interval	-	LOCAL
+SET	LOCAL_V6	localnetwork6	IPv6	PREFIX	interval	-	LOCAL
+SET	NODE_ENDPOINT_V4	openkill_node4	IPv4	ADDRESS	-	-	NODE
+SET	NODE_ENDPOINT_V6	openkill_node6	IPv6	ADDRESS	-	-	NODE
+SET	SERVICE_PORTS	openkill_service_ports	ALL	PORT	-	-	SERVICE
+SET	USER_DIRECT_V4	openkill_user_direct4	IPv4	PREFIX	interval	-	ACCESS
+SET	USER_DIRECT_V6	openkill_user_direct6	IPv6	PREFIX	interval	-	ACCESS
+SET	USER_PROXY_V4	openkill_user_proxy4	IPv4	PREFIX	interval	-	ACCESS
+SET	USER_PROXY_V6	openkill_user_proxy6	IPv6	PREFIX	interval	-	ACCESS
+SET	WAN_AC_BLACK_PORTS	wan_ac_black_ports	ALL	PORT	-	-	ACCESS
+SET	WAN_AC_BLACK_V4	wan_ac_black_ips	IPv4	PREFIX	interval	-	ACCESS
+SET	WAN_AC_BLACK_V6	wan_ac_black_ipv6s	IPv6	PREFIX	interval	-	ACCESS
+SET	WAN_HOST_V4	openkill_wan_host4	IPv4	ADDRESS	-	-	LOCAL
+SET	WAN_HOST_V6	openkill_wan_host6	IPv6	ADDRESS	-	-	LOCAL
+ATTACH	ATTACH_MANGLE_OUTPUT_V4	TOPOLOGY	IPv4	mangle_output	meta nfproto ipv4	JUMP	jump openkill_mangle_output	openkill_mangle_output
+ATTACH	ATTACH_MANGLE_OUTPUT_V6	TOPOLOGY	IPv6	mangle_output	meta nfproto ipv6	JUMP	jump openkill_mangle_output_v6	openkill_mangle_output_v6
+ATTACH	ATTACH_MANGLE_PREROUTING_V4	TOPOLOGY	IPv4	mangle_prerouting	meta nfproto ipv4	JUMP	jump openkill_mangle	openkill_mangle
+ATTACH	ATTACH_MANGLE_PREROUTING_V6	TOPOLOGY	IPv6	mangle_prerouting	meta nfproto ipv6	JUMP	jump openkill_mangle_v6	openkill_mangle_v6
+ATTACH	ATTACH_NAT_OUTPUT_CURRENT_V4	TOPOLOGY	IPv4	nat_output	meta nfproto ipv4 ip protocol tcp	JUMP	jump openkill_output	openkill_output
+ATTACH	ATTACH_NAT_OUTPUT_CURRENT_V6	TOPOLOGY	IPv6	nat_output	meta nfproto ipv6	JUMP	jump openkill_output_v6	openkill_output_v6
+ATTACH	ATTACH_UPNP_V4	UPNP	IPv4	openkill_mangle	meta nfproto ipv4	JUMP	jump openkill_upnp	openkill_upnp
+ATTACH	ATTACH_UPNP_V6	UPNP	IPv6	openkill_mangle_v6	meta nfproto ipv6	JUMP	jump openkill_upnp	openkill_upnp
+RULE	CURRENT_DNS_V4__c00__m00	DNS	IPv4	openkill_mangle	0	meta nfproto ipv4 tcp dport 53	DNS_REDIRECT	jump openkill_dns_hijack	DNS	DNS_SPECIAL	-
+RULE	CURRENT_DNS_V4__c00__m01	DNS	IPv4	openkill_mangle	1	meta nfproto ipv4 udp dport 53	DNS_REDIRECT	jump openkill_dns_hijack	DNS	DNS_SPECIAL	-
+RULE	CURRENT_NODE_ENDPOINT_V4__c00__m00	NODE	IPv4	openkill_mangle	2	meta nfproto ipv4 ip daddr @openkill_node4	RETURN_NATIVE	return	NODE_ENDPOINT	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_CUSTOM_V4__c00__m00	ACCESS	IPv4	openkill_mangle	3	meta nfproto ipv4 ip daddr @openkill_access4_allow	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_CUSTOM_V4__c00__m01	ACCESS	IPv4	openkill_mangle	4	meta nfproto ipv4 ip daddr @openkill_access4_bypass	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_CUSTOM_V4__c00__m02	ACCESS	IPv4	openkill_mangle	5	meta nfproto ipv4 ip daddr @openkill_access4_deny	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_SELF_TRAFFIC_V4__c00__m00	PROXY_ACTION	IPv4	openkill_mangle	6	meta nfproto ipv4 meta skgid 65534	RETURN_NATIVE	return	SELF_TRAFFIC	BYPASS	-
+RULE	CURRENT_TUN_INGRESS_V4__c00__m00	PROXY_ACTION	IPv4	openkill_mangle	7	meta nfproto ipv4 iifname "utun"	RETURN_NATIVE	return	TUN_INGRESS	BYPASS	-
+RULE	CURRENT_LOCAL_DESTINATION_V4__c00__m00	LOCAL	IPv4	openkill_mangle	8	meta nfproto ipv4 ip daddr @localnetwork	RETURN_NATIVE	return	LOCAL_DESTINATION	BYPASS	-
+RULE	CURRENT_LOCAL_DESTINATION_V4__c00__m01	LOCAL	IPv4	openkill_mangle	9	meta nfproto ipv4 ip daddr @openkill_lan4	RETURN_NATIVE	return	LOCAL_DESTINATION	BYPASS	-
+RULE	CURRENT_LOCAL_DESTINATION_V4__c00__m02	LOCAL	IPv4	openkill_mangle	10	meta nfproto ipv4 ip daddr @openkill_wan_host4	RETURN_NATIVE	return	LOCAL_DESTINATION	BYPASS	-
+RULE	CURRENT_REPLY_TRAFFIC_V4__c00__m00	PROXY_ACTION	IPv4	openkill_mangle	11	meta nfproto ipv4 ct direction reply	RETURN_NATIVE	return	REPLY_TRAFFIC	BYPASS	-
+RULE	CURRENT_SERVICE_PORT_V4__c00__m00	SERVICE	IPv4	openkill_mangle	12	meta nfproto ipv4 tcp dport @openkill_service_ports	RETURN_NATIVE	return	SERVICE_PORT	BYPASS	-
+RULE	CURRENT_SERVICE_PORT_V4__c00__m01	SERVICE	IPv4	openkill_mangle	13	meta nfproto ipv4 udp dport @openkill_service_ports	RETURN_NATIVE	return	SERVICE_PORT	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_V4__c00__m00	ACCESS	IPv4	openkill_mangle	14	meta nfproto ipv4 ip daddr @openkill_access4_allow	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_V4__c00__m01	ACCESS	IPv4	openkill_mangle	15	meta nfproto ipv4 ip daddr @openkill_access4_bypass	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_V4__c00__m02	ACCESS	IPv4	openkill_mangle	16	meta nfproto ipv4 ip daddr @openkill_access4_deny	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_FAKEIP_V4__c00__m00	PROXY_ACTION	IPv4	openkill_mangle	17	meta nfproto ipv4 ip daddr @openkill_fakeip4 meta l4proto tcp	TPROXY_PROXY	tproxy ip to :7895 meta mark set 0x162	FAKEIP	PROXY	-
+RULE	CURRENT_FAKEIP_V4__c00__m01	PROXY_ACTION	IPv4	openkill_mangle	18	meta nfproto ipv4 ip daddr @openkill_fakeip4 meta l4proto udp	TPROXY_PROXY	tproxy ip to :7895 meta mark set 0x162	FAKEIP	PROXY	-
+RULE	CURRENT_CHINA_PASS_FALLTHROUGH_V4__c00__m00	CHINA	IPv4	openkill_mangle	19	meta nfproto ipv4 ip daddr @china_ip_route_pass	CONTINUE_POLICY	counter	CHINA_PASS	PROXY	-
+RULE	CURRENT_CHINA_POLICY_V4__c00__m00	CHINA	IPv4	openkill_mangle	20	meta nfproto ipv4 ip daddr @china_ip_route	RETURN_NATIVE	return	CHINA_POLICY	DIRECT	-
+RULE	CURRENT_DEFAULT_POLICY_V4__c00__m00	PROXY_ACTION	IPv4	openkill_mangle	21	meta nfproto ipv4 meta l4proto tcp	TPROXY_PROXY	tproxy ip to :7895 meta mark set 0x162	DEFAULT_POLICY	PROXY	-
+RULE	CURRENT_DEFAULT_POLICY_V4__c00__m01	PROXY_ACTION	IPv4	openkill_mangle	22	meta nfproto ipv4 meta l4proto udp	TPROXY_PROXY	tproxy ip to :7895 meta mark set 0x162	DEFAULT_POLICY	PROXY	-
+RULE	CURRENT_DNS_V4__c01__m00	DNS	IPv4	openkill_mangle_output	0	meta nfproto ipv4 tcp dport 53	DNS_REDIRECT	jump openkill_dns_redirect	DNS	DNS_SPECIAL	-
+RULE	CURRENT_DNS_V4__c01__m01	DNS	IPv4	openkill_mangle_output	1	meta nfproto ipv4 udp dport 53	DNS_REDIRECT	jump openkill_dns_redirect	DNS	DNS_SPECIAL	-
+RULE	CURRENT_NODE_ENDPOINT_V4__c01__m00	NODE	IPv4	openkill_mangle_output	2	meta nfproto ipv4 ip daddr @openkill_node4	RETURN_NATIVE	return	NODE_ENDPOINT	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_CUSTOM_V4__c01__m00	ACCESS	IPv4	openkill_mangle_output	3	meta nfproto ipv4 ip daddr @openkill_access4_allow	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_CUSTOM_V4__c01__m01	ACCESS	IPv4	openkill_mangle_output	4	meta nfproto ipv4 ip daddr @openkill_access4_bypass	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_CUSTOM_V4__c01__m02	ACCESS	IPv4	openkill_mangle_output	5	meta nfproto ipv4 ip daddr @openkill_access4_deny	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_SELF_TRAFFIC_V4__c01__m00	PROXY_ACTION	IPv4	openkill_mangle_output	6	meta nfproto ipv4 meta skgid 65534	RETURN_NATIVE	return	SELF_TRAFFIC	BYPASS	-
+RULE	CURRENT_TUN_INGRESS_V4__c01__m00	PROXY_ACTION	IPv4	openkill_mangle_output	7	meta nfproto ipv4 iifname "utun"	RETURN_NATIVE	return	TUN_INGRESS	BYPASS	-
+RULE	CURRENT_LOCAL_DESTINATION_V4__c01__m00	LOCAL	IPv4	openkill_mangle_output	8	meta nfproto ipv4 ip daddr @localnetwork	RETURN_NATIVE	return	LOCAL_DESTINATION	BYPASS	-
+RULE	CURRENT_LOCAL_DESTINATION_V4__c01__m01	LOCAL	IPv4	openkill_mangle_output	9	meta nfproto ipv4 ip daddr @openkill_lan4	RETURN_NATIVE	return	LOCAL_DESTINATION	BYPASS	-
+RULE	CURRENT_LOCAL_DESTINATION_V4__c01__m02	LOCAL	IPv4	openkill_mangle_output	10	meta nfproto ipv4 ip daddr @openkill_wan_host4	RETURN_NATIVE	return	LOCAL_DESTINATION	BYPASS	-
+RULE	CURRENT_REPLY_TRAFFIC_V4__c01__m00	PROXY_ACTION	IPv4	openkill_mangle_output	11	meta nfproto ipv4 ct direction reply	RETURN_NATIVE	return	REPLY_TRAFFIC	BYPASS	-
+RULE	CURRENT_SERVICE_PORT_V4__c01__m00	SERVICE	IPv4	openkill_mangle_output	12	meta nfproto ipv4 tcp dport @openkill_service_ports	RETURN_NATIVE	return	SERVICE_PORT	BYPASS	-
+RULE	CURRENT_SERVICE_PORT_V4__c01__m01	SERVICE	IPv4	openkill_mangle_output	13	meta nfproto ipv4 udp dport @openkill_service_ports	RETURN_NATIVE	return	SERVICE_PORT	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_V4__c01__m00	ACCESS	IPv4	openkill_mangle_output	14	meta nfproto ipv4 ip daddr @openkill_access4_allow	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_V4__c01__m01	ACCESS	IPv4	openkill_mangle_output	15	meta nfproto ipv4 ip daddr @openkill_access4_bypass	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_V4__c01__m02	ACCESS	IPv4	openkill_mangle_output	16	meta nfproto ipv4 ip daddr @openkill_access4_deny	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_FAKEIP_V4__c01__m00	PROXY_ACTION	IPv4	openkill_mangle_output	17	meta nfproto ipv4 ip daddr @openkill_fakeip4 meta l4proto tcp	TPROXY_PROXY	tproxy ip to :7895 meta mark set 0x162	FAKEIP	PROXY	-
+RULE	CURRENT_FAKEIP_V4__c01__m01	PROXY_ACTION	IPv4	openkill_mangle_output	18	meta nfproto ipv4 ip daddr @openkill_fakeip4 meta l4proto udp	TPROXY_PROXY	tproxy ip to :7895 meta mark set 0x162	FAKEIP	PROXY	-
+RULE	CURRENT_CHINA_PASS_FALLTHROUGH_V4__c01__m00	CHINA	IPv4	openkill_mangle_output	19	meta nfproto ipv4 ip daddr @china_ip_route_pass	CONTINUE_POLICY	counter	CHINA_PASS	PROXY	-
+RULE	CURRENT_CHINA_POLICY_V4__c01__m00	CHINA	IPv4	openkill_mangle_output	20	meta nfproto ipv4 ip daddr @china_ip_route	RETURN_NATIVE	return	CHINA_POLICY	DIRECT	-
+RULE	CURRENT_DEFAULT_POLICY_V4__c01__m00	PROXY_ACTION	IPv4	openkill_mangle_output	21	meta nfproto ipv4 meta l4proto tcp	TPROXY_PROXY	tproxy ip to :7895 meta mark set 0x162	DEFAULT_POLICY	PROXY	-
+RULE	CURRENT_DEFAULT_POLICY_V4__c01__m01	PROXY_ACTION	IPv4	openkill_mangle_output	22	meta nfproto ipv4 meta l4proto udp	TPROXY_PROXY	tproxy ip to :7895 meta mark set 0x162	DEFAULT_POLICY	PROXY	-
+RULE	CURRENT_DNS_V6__c01__m00	DNS	IPv6	openkill_mangle_output_v6	0	meta nfproto ipv6 tcp dport 53	DNS_REDIRECT	jump openkill_dns_redirect_v6	DNS	DNS_SPECIAL	-
+RULE	CURRENT_DNS_V6__c01__m01	DNS	IPv6	openkill_mangle_output_v6	1	meta nfproto ipv6 udp dport 53	DNS_REDIRECT	jump openkill_dns_redirect_v6	DNS	DNS_SPECIAL	-
+RULE	CURRENT_NODE_ENDPOINT_V6__c01__m00	NODE	IPv6	openkill_mangle_output_v6	2	meta nfproto ipv6 ip6 daddr @openkill_node6	RETURN_NATIVE	return	NODE_ENDPOINT	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_CUSTOM_V6__c01__m00	ACCESS	IPv6	openkill_mangle_output_v6	3	meta nfproto ipv6 ip6 daddr @openkill_access6_allow	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_CUSTOM_V6__c01__m01	ACCESS	IPv6	openkill_mangle_output_v6	4	meta nfproto ipv6 ip6 daddr @openkill_access6_bypass	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_CUSTOM_V6__c01__m02	ACCESS	IPv6	openkill_mangle_output_v6	5	meta nfproto ipv6 ip6 daddr @openkill_access6_deny	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_SELF_TRAFFIC_V6__c01__m00	PROXY_ACTION	IPv6	openkill_mangle_output_v6	6	meta nfproto ipv6 meta skgid 65534	RETURN_NATIVE	return	SELF_TRAFFIC	BYPASS	-
+RULE	CURRENT_LOCAL_DESTINATION_V6__c01__m00	LOCAL	IPv6	openkill_mangle_output_v6	7	meta nfproto ipv6 ip6 daddr @localnetwork6	RETURN_NATIVE	return	LOCAL_DESTINATION	BYPASS	-
+RULE	CURRENT_LOCAL_DESTINATION_V6__c01__m01	LOCAL	IPv6	openkill_mangle_output_v6	8	meta nfproto ipv6 ip6 daddr @openkill_lan6	RETURN_NATIVE	return	LOCAL_DESTINATION	BYPASS	-
+RULE	CURRENT_LOCAL_DESTINATION_V6__c01__m02	LOCAL	IPv6	openkill_mangle_output_v6	9	meta nfproto ipv6 ip6 daddr @openkill_wan_host6	RETURN_NATIVE	return	LOCAL_DESTINATION	BYPASS	-
+RULE	CURRENT_LOCAL_DESTINATION_V6__c01__m03	LOCAL	IPv6	openkill_mangle_output_v6	10	meta nfproto ipv6 ip6 daddr @openkill_delegated6	RETURN_NATIVE	return	LOCAL_DESTINATION	BYPASS	-
+RULE	CURRENT_REPLY_TRAFFIC_V6__c01__m00	PROXY_ACTION	IPv6	openkill_mangle_output_v6	11	meta nfproto ipv6 ct direction reply	RETURN_NATIVE	return	REPLY_TRAFFIC	BYPASS	-
+RULE	CURRENT_SERVICE_PORT_V6__c01__m00	SERVICE	IPv6	openkill_mangle_output_v6	12	meta nfproto ipv6 tcp dport @openkill_service_ports	RETURN_NATIVE	return	SERVICE_PORT	BYPASS	-
+RULE	CURRENT_SERVICE_PORT_V6__c01__m01	SERVICE	IPv6	openkill_mangle_output_v6	13	meta nfproto ipv6 udp dport @openkill_service_ports	RETURN_NATIVE	return	SERVICE_PORT	BYPASS	-
+RULE	CURRENT_CONTROL_PROTOCOL_IPV6_V6__c01__m00	PROXY_ACTION	IPv6	openkill_mangle_output_v6	14	meta nfproto ipv6 icmpv6 type {nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, packet-too-big, destination-unreachable, time-exceeded, parameter-problem}	RETURN_NATIVE	return	CONTROL_PROTOCOL	BYPASS	-
+RULE	CURRENT_CONTROL_PROTOCOL_IPV6_V6__c01__m01	PROXY_ACTION	IPv6	openkill_mangle_output_v6	15	meta nfproto ipv6 udp dport { 546, 547 }	RETURN_NATIVE	return	CONTROL_PROTOCOL	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_V6__c01__m00	ACCESS	IPv6	openkill_mangle_output_v6	16	meta nfproto ipv6 ip6 daddr @openkill_access6_allow	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_V6__c01__m01	ACCESS	IPv6	openkill_mangle_output_v6	17	meta nfproto ipv6 ip6 daddr @openkill_access6_bypass	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_V6__c01__m02	ACCESS	IPv6	openkill_mangle_output_v6	18	meta nfproto ipv6 ip6 daddr @openkill_access6_deny	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_FAKEIP_V6__c01__m00	PROXY_ACTION	IPv6	openkill_mangle_output_v6	19	meta nfproto ipv6 ip6 daddr @openkill_fakeip6 meta l4proto tcp	TPROXY_PROXY	tproxy ip6 to :7895 meta mark set 0x162	FAKEIP	PROXY	-
+RULE	CURRENT_FAKEIP_V6__c01__m01	PROXY_ACTION	IPv6	openkill_mangle_output_v6	20	meta nfproto ipv6 ip6 daddr @openkill_fakeip6 meta l4proto udp	TPROXY_PROXY	tproxy ip6 to :7895 meta mark set 0x162	FAKEIP	PROXY	-
+RULE	CURRENT_CHINA_PASS_FALLTHROUGH_V6__c01__m00	CHINA	IPv6	openkill_mangle_output_v6	21	meta nfproto ipv6 ip6 daddr @china_ip6_route_pass	CONTINUE_POLICY	counter	CHINA_PASS	PROXY	-
+RULE	CURRENT_CHINA_POLICY_V6__c01__m00	CHINA	IPv6	openkill_mangle_output_v6	22	meta nfproto ipv6 ip6 daddr @china_ip6_route	RETURN_NATIVE	return	CHINA_POLICY	DIRECT	-
+RULE	CURRENT_DEFAULT_POLICY_V6__c01__m00	PROXY_ACTION	IPv6	openkill_mangle_output_v6	23	meta nfproto ipv6 meta l4proto tcp	TPROXY_PROXY	tproxy ip6 to :7895 meta mark set 0x162	DEFAULT_POLICY	PROXY	-
+RULE	CURRENT_DEFAULT_POLICY_V6__c01__m01	PROXY_ACTION	IPv6	openkill_mangle_output_v6	24	meta nfproto ipv6 meta l4proto udp	TPROXY_PROXY	tproxy ip6 to :7895 meta mark set 0x162	DEFAULT_POLICY	PROXY	-
+RULE	CURRENT_DNS_V6__c00__m00	DNS	IPv6	openkill_mangle_v6	0	meta nfproto ipv6 tcp dport 53	DNS_REDIRECT	jump openkill_dns_hijack_v6	DNS	DNS_SPECIAL	-
+RULE	CURRENT_DNS_V6__c00__m01	DNS	IPv6	openkill_mangle_v6	1	meta nfproto ipv6 udp dport 53	DNS_REDIRECT	jump openkill_dns_hijack_v6	DNS	DNS_SPECIAL	-
+RULE	CURRENT_NODE_ENDPOINT_V6__c00__m00	NODE	IPv6	openkill_mangle_v6	2	meta nfproto ipv6 ip6 daddr @openkill_node6	RETURN_NATIVE	return	NODE_ENDPOINT	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_CUSTOM_V6__c00__m00	ACCESS	IPv6	openkill_mangle_v6	3	meta nfproto ipv6 ip6 daddr @openkill_access6_allow	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_CUSTOM_V6__c00__m01	ACCESS	IPv6	openkill_mangle_v6	4	meta nfproto ipv6 ip6 daddr @openkill_access6_bypass	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_CUSTOM_V6__c00__m02	ACCESS	IPv6	openkill_mangle_v6	5	meta nfproto ipv6 ip6 daddr @openkill_access6_deny	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_SELF_TRAFFIC_V6__c00__m00	PROXY_ACTION	IPv6	openkill_mangle_v6	6	meta nfproto ipv6 meta skgid 65534	RETURN_NATIVE	return	SELF_TRAFFIC	BYPASS	-
+RULE	CURRENT_LOCAL_DESTINATION_V6__c00__m00	LOCAL	IPv6	openkill_mangle_v6	7	meta nfproto ipv6 ip6 daddr @localnetwork6	RETURN_NATIVE	return	LOCAL_DESTINATION	BYPASS	-
+RULE	CURRENT_LOCAL_DESTINATION_V6__c00__m01	LOCAL	IPv6	openkill_mangle_v6	8	meta nfproto ipv6 ip6 daddr @openkill_lan6	RETURN_NATIVE	return	LOCAL_DESTINATION	BYPASS	-
+RULE	CURRENT_LOCAL_DESTINATION_V6__c00__m02	LOCAL	IPv6	openkill_mangle_v6	9	meta nfproto ipv6 ip6 daddr @openkill_wan_host6	RETURN_NATIVE	return	LOCAL_DESTINATION	BYPASS	-
+RULE	CURRENT_LOCAL_DESTINATION_V6__c00__m03	LOCAL	IPv6	openkill_mangle_v6	10	meta nfproto ipv6 ip6 daddr @openkill_delegated6	RETURN_NATIVE	return	LOCAL_DESTINATION	BYPASS	-
+RULE	CURRENT_REPLY_TRAFFIC_V6__c00__m00	PROXY_ACTION	IPv6	openkill_mangle_v6	11	meta nfproto ipv6 ct direction reply	RETURN_NATIVE	return	REPLY_TRAFFIC	BYPASS	-
+RULE	CURRENT_SERVICE_PORT_V6__c00__m00	SERVICE	IPv6	openkill_mangle_v6	12	meta nfproto ipv6 tcp dport @openkill_service_ports	RETURN_NATIVE	return	SERVICE_PORT	BYPASS	-
+RULE	CURRENT_SERVICE_PORT_V6__c00__m01	SERVICE	IPv6	openkill_mangle_v6	13	meta nfproto ipv6 udp dport @openkill_service_ports	RETURN_NATIVE	return	SERVICE_PORT	BYPASS	-
+RULE	CURRENT_CONTROL_PROTOCOL_IPV6_V6__c00__m00	PROXY_ACTION	IPv6	openkill_mangle_v6	14	meta nfproto ipv6 icmpv6 type {nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, packet-too-big, destination-unreachable, time-exceeded, parameter-problem}	RETURN_NATIVE	return	CONTROL_PROTOCOL	BYPASS	-
+RULE	CURRENT_CONTROL_PROTOCOL_IPV6_V6__c00__m01	PROXY_ACTION	IPv6	openkill_mangle_v6	15	meta nfproto ipv6 udp dport { 546, 547 }	RETURN_NATIVE	return	CONTROL_PROTOCOL	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_V6__c00__m00	ACCESS	IPv6	openkill_mangle_v6	16	meta nfproto ipv6 ip6 daddr @openkill_access6_allow	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_V6__c00__m01	ACCESS	IPv6	openkill_mangle_v6	17	meta nfproto ipv6 ip6 daddr @openkill_access6_bypass	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_ACCESS_CONTROL_V6__c00__m02	ACCESS	IPv6	openkill_mangle_v6	18	meta nfproto ipv6 ip6 daddr @openkill_access6_deny	ACTION_FROM_CLASSIFICATION	counter	ACCESS_CONTROL	BYPASS	-
+RULE	CURRENT_FAKEIP_V6__c00__m00	PROXY_ACTION	IPv6	openkill_mangle_v6	19	meta nfproto ipv6 ip6 daddr @openkill_fakeip6 meta l4proto tcp	TPROXY_PROXY	tproxy ip6 to :7895 meta mark set 0x162	FAKEIP	PROXY	-
+RULE	CURRENT_FAKEIP_V6__c00__m01	PROXY_ACTION	IPv6	openkill_mangle_v6	20	meta nfproto ipv6 ip6 daddr @openkill_fakeip6 meta l4proto udp	TPROXY_PROXY	tproxy ip6 to :7895 meta mark set 0x162	FAKEIP	PROXY	-
+RULE	CURRENT_CHINA_PASS_FALLTHROUGH_V6__c00__m00	CHINA	IPv6	openkill_mangle_v6	21	meta nfproto ipv6 ip6 daddr @china_ip6_route_pass	CONTINUE_POLICY	counter	CHINA_PASS	PROXY	-
+RULE	CURRENT_CHINA_POLICY_V6__c00__m00	CHINA	IPv6	openkill_mangle_v6	22	meta nfproto ipv6 ip6 daddr @china_ip6_route	RETURN_NATIVE	return	CHINA_POLICY	DIRECT	-
+RULE	CURRENT_DEFAULT_POLICY_V6__c00__m00	PROXY_ACTION	IPv6	openkill_mangle_v6	23	meta nfproto ipv6 meta l4proto tcp	TPROXY_PROXY	tproxy ip6 to :7895 meta mark set 0x162	DEFAULT_POLICY	PROXY	-
+RULE	CURRENT_DEFAULT_POLICY_V6__c00__m01	PROXY_ACTION	IPv6	openkill_mangle_v6	24	meta nfproto ipv6 meta l4proto udp	TPROXY_PROXY	tproxy ip6 to :7895 meta mark set 0x162	DEFAULT_POLICY	PROXY	-

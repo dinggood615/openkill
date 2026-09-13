@@ -13,6 +13,7 @@ RENDERER_PATH = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_nft_r
 RENDERER_SOURCE = RENDERER_PATH.read_text(encoding="utf-8")
 SHADOW_PATH = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_nft_shadow.sh"
 SHADOW_SOURCE = SHADOW_PATH.read_text(encoding="utf-8")
+SHADOW_TEMPLATE_DIR = ROOT / "luci-app-openkill/root/usr/share/openkill/shadow"
 MAKEFILE_SOURCE = (ROOT / "luci-app-openkill/Makefile").read_text(encoding="utf-8")
 SETTINGS_SOURCE = (ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua").read_text(encoding="utf-8")
 SETTINGS_THEME = (ROOT / "luci-app-openkill/luasrc/view/openkill/settings_theme.htm").read_text(encoding="utf-8")
@@ -110,6 +111,10 @@ chosen=$(select_newest_manifest "$WORK_DIR/rows")
         self.assertTrue(RENDERER_SOURCE.startswith("#!/bin/sh\n"))
         self.assertTrue(SHADOW_PATH.is_file())
         self.assertTrue(SHADOW_SOURCE.startswith("#!/bin/sh\n"))
+        for template in ("input_tun_v1.tsv", "input_tproxy_v1.tsv", "input_redirect_v1.tsv"):
+            template_path = SHADOW_TEMPLATE_DIR / template
+            self.assertTrue(template_path.is_file(), template)
+            self.assertTrue(template_path.read_text(encoding="utf-8").startswith("SHELL_RENDERER_INPUT_V1\t1\n"), template)
         self.assertIn("chmod -R 0755 $(PKG_BUILD_DIR)/root/usr/share/openkill/", MAKEFILE_SOURCE)
         self.assertNotIn("#!/bin/bash", RENDERER_SOURCE)
         self.assertNotIn("eval", RENDERER_SOURCE)

@@ -32,6 +32,9 @@ for file in \
   luci-app-openkill/root/usr/share/openkill/openkill_wan.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_network.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_nft_shadow.sh \
+  luci-app-openkill/root/usr/share/openkill/shadow/input_tun_v1.tsv \
+  luci-app-openkill/root/usr/share/openkill/shadow/input_tproxy_v1.tsv \
+  luci-app-openkill/root/usr/share/openkill/shadow/input_redirect_v1.tsv \
   luci-app-openkill/root/usr/share/openkill/openkill_config_normalize.sh \
   luci-app-openkill/root/usr/share/openkill/openkill-benchmark.sh \
   luci-app-openkill/root/usr/share/openkill/dependencies.conf \

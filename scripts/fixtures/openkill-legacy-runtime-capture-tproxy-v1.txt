@@ -1,0 +1,475 @@
+LEGACY_RUNTIME_CAPTURE_V1=1
+# SOURCE=PYTHON_ORACLE_TPROXY_FIXTURE
+OBJECT	chain	openkill_dns_hijack
+table inet fw4 {
+ chain openkill_dns_hijack {
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_dns_hijack_v6
+table inet fw4 {
+ chain openkill_dns_hijack_v6 {
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_dns_redirect
+table inet fw4 {
+ chain openkill_dns_redirect {
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_dns_redirect_v6
+table inet fw4 {
+ chain openkill_dns_redirect_v6 {
+ }
+}
+OBJECT_END
+OBJECT	chain	nat_output
+table inet fw4 {
+ chain nat_output {
+  meta nfproto ipv6 jump openkill_output_v6 comment "OpenKill logical_id=ATTACH_NAT_OUTPUT_CURRENT_V6 component=TOPOLOGY source=ATTACH_NAT_OUTPUT_CURRENT owner=OPENKILL"
+  meta nfproto ipv4 ip protocol tcp jump openkill_output comment "OpenKill logical_id=ATTACH_NAT_OUTPUT_CURRENT_V4 component=TOPOLOGY source=ATTACH_NAT_OUTPUT_CURRENT owner=OPENKILL"
+  type nat hook output priority -1;
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_mangle_output
+table inet fw4 {
+ chain openkill_mangle_output {
+  meta nfproto ipv4 meta l4proto udp tproxy ip to :7895 meta mark set 0x162 comment "OpenKill logical_id=CURRENT_DEFAULT_POLICY_V4__c01__m01 component=PROXY_ACTION r=DEFAULT_POLICY d=PROXY o=OPENKILL"
+  meta nfproto ipv4 meta l4proto tcp tproxy ip to :7895 meta mark set 0x162 comment "OpenKill logical_id=CURRENT_DEFAULT_POLICY_V4__c01__m00 component=PROXY_ACTION r=DEFAULT_POLICY d=PROXY o=OPENKILL"
+  meta nfproto ipv4 ip daddr @china_ip_route return comment "OpenKill logical_id=CURRENT_CHINA_POLICY_V4__c01__m00 component=CHINA reason=CHINA_POLICY decision=DIRECT owner=OPENKILL"
+  meta nfproto ipv4 ip daddr @china_ip_route_pass counter comment "OpenKill logical_id=CURRENT_CHINA_PASS_FALLTHROUGH_V4__c01__m00 component=CHINA reason=CHINA_PASS decision=PROXY owner=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_fakeip4 meta l4proto udp tproxy ip to :7895 meta mark set 0x162 comment "OpenKill logical_id=CURRENT_FAKEIP_V4__c01__m01 component=PROXY_ACTION reason=FAKEIP decision=PROXY owner=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_fakeip4 meta l4proto tcp tproxy ip to :7895 meta mark set 0x162 comment "OpenKill logical_id=CURRENT_FAKEIP_V4__c01__m00 component=PROXY_ACTION reason=FAKEIP decision=PROXY owner=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_access4_deny counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_V4__c01__m02 component=ACCESS reason=ACCESS_CONTROL decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_access4_bypass counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_V4__c01__m01 component=ACCESS reason=ACCESS_CONTROL decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_access4_allow counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_V4__c01__m00 component=ACCESS reason=ACCESS_CONTROL decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv4 udp dport @openkill_service_ports return comment "OpenKill logical_id=CURRENT_SERVICE_PORT_V4__c01__m01 component=SERVICE reason=SERVICE_PORT decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv4 tcp dport @openkill_service_ports return comment "OpenKill logical_id=CURRENT_SERVICE_PORT_V4__c01__m00 component=SERVICE reason=SERVICE_PORT decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv4 ct direction reply return comment "OpenKill logical_id=CURRENT_REPLY_TRAFFIC_V4__c01__m00 component=PROXY_ACTION r=REPLY_TRAFFIC d=BYPASS o=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_wan_host4 return comment "OpenKill logical_id=CURRENT_LOCAL_DESTINATION_V4__c01__m02 component=LOCAL r=LOCAL_DESTINATION d=BYPASS o=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_lan4 return comment "OpenKill logical_id=CURRENT_LOCAL_DESTINATION_V4__c01__m01 component=LOCAL r=LOCAL_DESTINATION d=BYPASS o=OPENKILL"
+  meta nfproto ipv4 ip daddr @localnetwork return comment "OpenKill logical_id=CURRENT_LOCAL_DESTINATION_V4__c01__m00 component=LOCAL r=LOCAL_DESTINATION d=BYPASS o=OPENKILL"
+  meta nfproto ipv4 iifname "utun" return comment "OpenKill logical_id=CURRENT_TUN_INGRESS_V4__c01__m00 component=PROXY_ACTION reason=TUN_INGRESS decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv4 meta skgid 65534 return comment "OpenKill logical_id=CURRENT_SELF_TRAFFIC_V4__c01__m00 component=PROXY_ACTION reason=SELF_TRAFFIC decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_access4_deny counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_CUSTOM_V4__c01__m02 component=ACCESS r=ACCESS_CONTROL d=BYPASS o=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_access4_bypass counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_CUSTOM_V4__c01__m01 component=ACCESS r=ACCESS_CONTROL d=BYPASS o=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_access4_allow counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_CUSTOM_V4__c01__m00 component=ACCESS r=ACCESS_CONTROL d=BYPASS o=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_node4 return comment "OpenKill logical_id=CURRENT_NODE_ENDPOINT_V4__c01__m00 component=NODE reason=NODE_ENDPOINT decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv4 udp dport 53 jump openkill_dns_redirect comment "OpenKill logical_id=CURRENT_DNS_V4__c01__m01 component=DNS source=CURRENT_DNS_V4 reason=DNS decision=DNS_SPECIAL owner=OPENKILL"
+  meta nfproto ipv4 tcp dport 53 jump openkill_dns_redirect comment "OpenKill logical_id=CURRENT_DNS_V4__c01__m00 component=DNS source=CURRENT_DNS_V4 reason=DNS decision=DNS_SPECIAL owner=OPENKILL"
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_mangle_output_v6
+table inet fw4 {
+ chain openkill_mangle_output_v6 {
+  meta nfproto ipv6 meta l4proto udp tproxy ip6 to :7895 meta mark set 0x162 comment "OpenKill logical_id=CURRENT_DEFAULT_POLICY_V6__c01__m01 component=PROXY_ACTION r=DEFAULT_POLICY d=PROXY o=OPENKILL"
+  meta nfproto ipv6 meta l4proto tcp tproxy ip6 to :7895 meta mark set 0x162 comment "OpenKill logical_id=CURRENT_DEFAULT_POLICY_V6__c01__m00 component=PROXY_ACTION r=DEFAULT_POLICY d=PROXY o=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @china_ip6_route return comment "OpenKill logical_id=CURRENT_CHINA_POLICY_V6__c01__m00 component=CHINA reason=CHINA_POLICY decision=DIRECT owner=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @china_ip6_route_pass counter comment "OpenKill logical_id=CURRENT_CHINA_PASS_FALLTHROUGH_V6__c01__m00 component=CHINA reason=CHINA_PASS decision=PROXY owner=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_fakeip6 meta l4proto udp tproxy ip6 to :7895 meta mark set 0x162 comment "OpenKill logical_id=CURRENT_FAKEIP_V6__c01__m01 component=PROXY_ACTION reason=FAKEIP decision=PROXY owner=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_fakeip6 meta l4proto tcp tproxy ip6 to :7895 meta mark set 0x162 comment "OpenKill logical_id=CURRENT_FAKEIP_V6__c01__m00 component=PROXY_ACTION reason=FAKEIP decision=PROXY owner=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_access6_deny counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_V6__c01__m02 component=ACCESS reason=ACCESS_CONTROL decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_access6_bypass counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_V6__c01__m01 component=ACCESS reason=ACCESS_CONTROL decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_access6_allow counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_V6__c01__m00 component=ACCESS reason=ACCESS_CONTROL decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv6 udp dport { 546, 547 } return comment "OpenKill logical_id=CURRENT_CONTROL_PROTOCOL_IPV6_V6__c01__m01 component=PROXY_ACTION r=CONTROL_PROTOCOL d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 icmpv6 type {nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, packet-too-big, destination-unreachable, time-exceeded, parameter-problem} return comment "OpenKill logical_id=CURRENT_CONTROL_PROTOCOL_IPV6_V6__c01__m00 component=PROXY_ACTION r=CONTROL_PROTOCOL d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 udp dport @openkill_service_ports return comment "OpenKill logical_id=CURRENT_SERVICE_PORT_V6__c01__m01 component=SERVICE reason=SERVICE_PORT decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv6 tcp dport @openkill_service_ports return comment "OpenKill logical_id=CURRENT_SERVICE_PORT_V6__c01__m00 component=SERVICE reason=SERVICE_PORT decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv6 ct direction reply return comment "OpenKill logical_id=CURRENT_REPLY_TRAFFIC_V6__c01__m00 component=PROXY_ACTION r=REPLY_TRAFFIC d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_delegated6 return comment "OpenKill logical_id=CURRENT_LOCAL_DESTINATION_V6__c01__m03 component=LOCAL r=LOCAL_DESTINATION d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_wan_host6 return comment "OpenKill logical_id=CURRENT_LOCAL_DESTINATION_V6__c01__m02 component=LOCAL r=LOCAL_DESTINATION d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_lan6 return comment "OpenKill logical_id=CURRENT_LOCAL_DESTINATION_V6__c01__m01 component=LOCAL r=LOCAL_DESTINATION d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @localnetwork6 return comment "OpenKill logical_id=CURRENT_LOCAL_DESTINATION_V6__c01__m00 component=LOCAL r=LOCAL_DESTINATION d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 meta skgid 65534 return comment "OpenKill logical_id=CURRENT_SELF_TRAFFIC_V6__c01__m00 component=PROXY_ACTION reason=SELF_TRAFFIC decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_access6_deny counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_CUSTOM_V6__c01__m02 component=ACCESS r=ACCESS_CONTROL d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_access6_bypass counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_CUSTOM_V6__c01__m01 component=ACCESS r=ACCESS_CONTROL d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_access6_allow counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_CUSTOM_V6__c01__m00 component=ACCESS r=ACCESS_CONTROL d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_node6 return comment "OpenKill logical_id=CURRENT_NODE_ENDPOINT_V6__c01__m00 component=NODE reason=NODE_ENDPOINT decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv6 udp dport 53 jump openkill_dns_redirect_v6 comment "OpenKill logical_id=CURRENT_DNS_V6__c01__m01 component=DNS source=CURRENT_DNS_V6 reason=DNS decision=DNS_SPECIAL owner=OPENKILL"
+  meta nfproto ipv6 tcp dport 53 jump openkill_dns_redirect_v6 comment "OpenKill logical_id=CURRENT_DNS_V6__c01__m00 component=DNS source=CURRENT_DNS_V6 reason=DNS decision=DNS_SPECIAL owner=OPENKILL"
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_output
+table inet fw4 {
+ chain openkill_output {
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_output_v6
+table inet fw4 {
+ chain openkill_output_v6 {
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_post
+table inet fw4 {
+ chain openkill_post {
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_post_v6
+table inet fw4 {
+ chain openkill_post_v6 {
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_mangle
+table inet fw4 {
+ chain openkill_mangle {
+  meta nfproto ipv4 meta l4proto udp tproxy ip to :7895 meta mark set 0x162 comment "OpenKill logical_id=CURRENT_DEFAULT_POLICY_V4__c00__m01 component=PROXY_ACTION r=DEFAULT_POLICY d=PROXY o=OPENKILL"
+  meta nfproto ipv4 meta l4proto tcp tproxy ip to :7895 meta mark set 0x162 comment "OpenKill logical_id=CURRENT_DEFAULT_POLICY_V4__c00__m00 component=PROXY_ACTION r=DEFAULT_POLICY d=PROXY o=OPENKILL"
+  meta nfproto ipv4 ip daddr @china_ip_route return comment "OpenKill logical_id=CURRENT_CHINA_POLICY_V4__c00__m00 component=CHINA reason=CHINA_POLICY decision=DIRECT owner=OPENKILL"
+  meta nfproto ipv4 ip daddr @china_ip_route_pass counter comment "OpenKill logical_id=CURRENT_CHINA_PASS_FALLTHROUGH_V4__c00__m00 component=CHINA reason=CHINA_PASS decision=PROXY owner=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_fakeip4 meta l4proto udp tproxy ip to :7895 meta mark set 0x162 comment "OpenKill logical_id=CURRENT_FAKEIP_V4__c00__m01 component=PROXY_ACTION reason=FAKEIP decision=PROXY owner=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_fakeip4 meta l4proto tcp tproxy ip to :7895 meta mark set 0x162 comment "OpenKill logical_id=CURRENT_FAKEIP_V4__c00__m00 component=PROXY_ACTION reason=FAKEIP decision=PROXY owner=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_access4_deny counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_V4__c00__m02 component=ACCESS reason=ACCESS_CONTROL decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_access4_bypass counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_V4__c00__m01 component=ACCESS reason=ACCESS_CONTROL decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_access4_allow counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_V4__c00__m00 component=ACCESS reason=ACCESS_CONTROL decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv4 udp dport @openkill_service_ports return comment "OpenKill logical_id=CURRENT_SERVICE_PORT_V4__c00__m01 component=SERVICE reason=SERVICE_PORT decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv4 tcp dport @openkill_service_ports return comment "OpenKill logical_id=CURRENT_SERVICE_PORT_V4__c00__m00 component=SERVICE reason=SERVICE_PORT decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv4 ct direction reply return comment "OpenKill logical_id=CURRENT_REPLY_TRAFFIC_V4__c00__m00 component=PROXY_ACTION r=REPLY_TRAFFIC d=BYPASS o=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_wan_host4 return comment "OpenKill logical_id=CURRENT_LOCAL_DESTINATION_V4__c00__m02 component=LOCAL r=LOCAL_DESTINATION d=BYPASS o=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_lan4 return comment "OpenKill logical_id=CURRENT_LOCAL_DESTINATION_V4__c00__m01 component=LOCAL r=LOCAL_DESTINATION d=BYPASS o=OPENKILL"
+  meta nfproto ipv4 ip daddr @localnetwork return comment "OpenKill logical_id=CURRENT_LOCAL_DESTINATION_V4__c00__m00 component=LOCAL r=LOCAL_DESTINATION d=BYPASS o=OPENKILL"
+  meta nfproto ipv4 iifname "utun" return comment "OpenKill logical_id=CURRENT_TUN_INGRESS_V4__c00__m00 component=PROXY_ACTION reason=TUN_INGRESS decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv4 meta skgid 65534 return comment "OpenKill logical_id=CURRENT_SELF_TRAFFIC_V4__c00__m00 component=PROXY_ACTION reason=SELF_TRAFFIC decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_access4_deny counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_CUSTOM_V4__c00__m02 component=ACCESS r=ACCESS_CONTROL d=BYPASS o=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_access4_bypass counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_CUSTOM_V4__c00__m01 component=ACCESS r=ACCESS_CONTROL d=BYPASS o=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_access4_allow counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_CUSTOM_V4__c00__m00 component=ACCESS r=ACCESS_CONTROL d=BYPASS o=OPENKILL"
+  meta nfproto ipv4 ip daddr @openkill_node4 return comment "OpenKill logical_id=CURRENT_NODE_ENDPOINT_V4__c00__m00 component=NODE reason=NODE_ENDPOINT decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv4 udp dport 53 jump openkill_dns_hijack comment "OpenKill logical_id=CURRENT_DNS_V4__c00__m01 component=DNS source=CURRENT_DNS_V4 reason=DNS decision=DNS_SPECIAL owner=OPENKILL"
+  meta nfproto ipv4 tcp dport 53 jump openkill_dns_hijack comment "OpenKill logical_id=CURRENT_DNS_V4__c00__m00 component=DNS source=CURRENT_DNS_V4 reason=DNS decision=DNS_SPECIAL owner=OPENKILL"
+  meta nfproto ipv4 jump openkill_upnp comment "OpenKill logical_id=ATTACH_UPNP_V4 component=UPNP owner=OPENKILL"
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_mangle_v6
+table inet fw4 {
+ chain openkill_mangle_v6 {
+  meta nfproto ipv6 meta l4proto udp tproxy ip6 to :7895 meta mark set 0x162 comment "OpenKill logical_id=CURRENT_DEFAULT_POLICY_V6__c00__m01 component=PROXY_ACTION r=DEFAULT_POLICY d=PROXY o=OPENKILL"
+  meta nfproto ipv6 meta l4proto tcp tproxy ip6 to :7895 meta mark set 0x162 comment "OpenKill logical_id=CURRENT_DEFAULT_POLICY_V6__c00__m00 component=PROXY_ACTION r=DEFAULT_POLICY d=PROXY o=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @china_ip6_route return comment "OpenKill logical_id=CURRENT_CHINA_POLICY_V6__c00__m00 component=CHINA reason=CHINA_POLICY decision=DIRECT owner=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @china_ip6_route_pass counter comment "OpenKill logical_id=CURRENT_CHINA_PASS_FALLTHROUGH_V6__c00__m00 component=CHINA reason=CHINA_PASS decision=PROXY owner=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_fakeip6 meta l4proto udp tproxy ip6 to :7895 meta mark set 0x162 comment "OpenKill logical_id=CURRENT_FAKEIP_V6__c00__m01 component=PROXY_ACTION reason=FAKEIP decision=PROXY owner=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_fakeip6 meta l4proto tcp tproxy ip6 to :7895 meta mark set 0x162 comment "OpenKill logical_id=CURRENT_FAKEIP_V6__c00__m00 component=PROXY_ACTION reason=FAKEIP decision=PROXY owner=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_access6_deny counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_V6__c00__m02 component=ACCESS reason=ACCESS_CONTROL decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_access6_bypass counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_V6__c00__m01 component=ACCESS reason=ACCESS_CONTROL decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_access6_allow counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_V6__c00__m00 component=ACCESS reason=ACCESS_CONTROL decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv6 udp dport { 546, 547 } return comment "OpenKill logical_id=CURRENT_CONTROL_PROTOCOL_IPV6_V6__c00__m01 component=PROXY_ACTION r=CONTROL_PROTOCOL d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 icmpv6 type {nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, packet-too-big, destination-unreachable, time-exceeded, parameter-problem} return comment "OpenKill logical_id=CURRENT_CONTROL_PROTOCOL_IPV6_V6__c00__m00 component=PROXY_ACTION r=CONTROL_PROTOCOL d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 udp dport @openkill_service_ports return comment "OpenKill logical_id=CURRENT_SERVICE_PORT_V6__c00__m01 component=SERVICE reason=SERVICE_PORT decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv6 tcp dport @openkill_service_ports return comment "OpenKill logical_id=CURRENT_SERVICE_PORT_V6__c00__m00 component=SERVICE reason=SERVICE_PORT decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv6 ct direction reply return comment "OpenKill logical_id=CURRENT_REPLY_TRAFFIC_V6__c00__m00 component=PROXY_ACTION r=REPLY_TRAFFIC d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_delegated6 return comment "OpenKill logical_id=CURRENT_LOCAL_DESTINATION_V6__c00__m03 component=LOCAL r=LOCAL_DESTINATION d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_wan_host6 return comment "OpenKill logical_id=CURRENT_LOCAL_DESTINATION_V6__c00__m02 component=LOCAL r=LOCAL_DESTINATION d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_lan6 return comment "OpenKill logical_id=CURRENT_LOCAL_DESTINATION_V6__c00__m01 component=LOCAL r=LOCAL_DESTINATION d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @localnetwork6 return comment "OpenKill logical_id=CURRENT_LOCAL_DESTINATION_V6__c00__m00 component=LOCAL r=LOCAL_DESTINATION d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 meta skgid 65534 return comment "OpenKill logical_id=CURRENT_SELF_TRAFFIC_V6__c00__m00 component=PROXY_ACTION reason=SELF_TRAFFIC decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_access6_deny counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_CUSTOM_V6__c00__m02 component=ACCESS r=ACCESS_CONTROL d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_access6_bypass counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_CUSTOM_V6__c00__m01 component=ACCESS r=ACCESS_CONTROL d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_access6_allow counter comment "OpenKill logical_id=CURRENT_ACCESS_CONTROL_CUSTOM_V6__c00__m00 component=ACCESS r=ACCESS_CONTROL d=BYPASS o=OPENKILL"
+  meta nfproto ipv6 ip6 daddr @openkill_node6 return comment "OpenKill logical_id=CURRENT_NODE_ENDPOINT_V6__c00__m00 component=NODE reason=NODE_ENDPOINT decision=BYPASS owner=OPENKILL"
+  meta nfproto ipv6 udp dport 53 jump openkill_dns_hijack_v6 comment "OpenKill logical_id=CURRENT_DNS_V6__c00__m01 component=DNS source=CURRENT_DNS_V6 reason=DNS decision=DNS_SPECIAL owner=OPENKILL"
+  meta nfproto ipv6 tcp dport 53 jump openkill_dns_hijack_v6 comment "OpenKill logical_id=CURRENT_DNS_V6__c00__m00 component=DNS source=CURRENT_DNS_V6 reason=DNS decision=DNS_SPECIAL owner=OPENKILL"
+  meta nfproto ipv6 jump openkill_upnp comment "OpenKill logical_id=ATTACH_UPNP_V6 component=UPNP owner=OPENKILL"
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill
+table inet fw4 {
+ chain openkill {
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_v6
+table inet fw4 {
+ chain openkill_v6 {
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_tproxy
+table inet fw4 {
+ chain openkill_tproxy {
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_tproxy_v6
+table inet fw4 {
+ chain openkill_tproxy_v6 {
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_upnp
+table inet fw4 {
+ chain openkill_upnp {
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_wan_input
+table inet fw4 {
+ chain openkill_wan_input {
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_wan6_input
+table inet fw4 {
+ chain openkill_wan6_input {
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_access4_allow
+table inet fw4 {
+ set openkill_access4_allow {
+  type ipv4_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_access4_bypass
+table inet fw4 {
+ set openkill_access4_bypass {
+  type ipv4_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_access4_deny
+table inet fw4 {
+ set openkill_access4_deny {
+  type ipv4_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_access6_allow
+table inet fw4 {
+ set openkill_access6_allow {
+  type ipv6_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_access6_bypass
+table inet fw4 {
+ set openkill_access6_bypass {
+  type ipv6_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_access6_deny
+table inet fw4 {
+ set openkill_access6_deny {
+  type ipv6_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	china_ip_route_pass
+table inet fw4 {
+ set china_ip_route_pass {
+  type ipv4_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	china_ip6_route_pass
+table inet fw4 {
+ set china_ip6_route_pass {
+  type ipv6_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	china_ip_route
+table inet fw4 {
+ set china_ip_route {
+  type ipv4_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	china_ip6_route
+table inet fw4 {
+ set china_ip6_route {
+  type ipv6_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	common_ports
+table inet fw4 {
+ set common_ports {
+  type inet_service;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_delegated6
+table inet fw4 {
+ set openkill_delegated6 {
+  type ipv6_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_fakeip4
+table inet fw4 {
+ set openkill_fakeip4 {
+  type ipv4_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_fakeip6
+table inet fw4 {
+ set openkill_fakeip6 {
+  type ipv6_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	lan_ac_black_macs
+table inet fw4 {
+ set lan_ac_black_macs {
+  type ether_addr;
+ }
+}
+OBJECT_END
+OBJECT	set	lan_ac_black_ips
+table inet fw4 {
+ set lan_ac_black_ips {
+  type ipv4_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	lan_ac_black_ipv6s
+table inet fw4 {
+ set lan_ac_black_ipv6s {
+  type ipv6_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	lan_ac_white_macs
+table inet fw4 {
+ set lan_ac_white_macs {
+  type ether_addr;
+ }
+}
+OBJECT_END
+OBJECT	set	lan_ac_white_ips
+table inet fw4 {
+ set lan_ac_white_ips {
+  type ipv4_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	lan_ac_white_ipv6s
+table inet fw4 {
+ set lan_ac_white_ipv6s {
+  type ipv6_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_lan4
+table inet fw4 {
+ set openkill_lan4 {
+  type ipv4_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_lan6
+table inet fw4 {
+ set openkill_lan6 {
+  type ipv6_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	localnetwork
+table inet fw4 {
+ set localnetwork {
+  type ipv4_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	localnetwork6
+table inet fw4 {
+ set localnetwork6 {
+  type ipv6_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_node4
+table inet fw4 {
+ set openkill_node4 {
+  type ipv4_addr;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_node6
+table inet fw4 {
+ set openkill_node6 {
+  type ipv6_addr;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_service_ports
+table inet fw4 {
+ set openkill_service_ports {
+  type inet_service;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_user_direct4
+table inet fw4 {
+ set openkill_user_direct4 {
+  type ipv4_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_user_direct6
+table inet fw4 {
+ set openkill_user_direct6 {
+  type ipv6_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_user_proxy4
+table inet fw4 {
+ set openkill_user_proxy4 {
+  type ipv4_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_user_proxy6
+table inet fw4 {
+ set openkill_user_proxy6 {
+  type ipv6_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	wan_ac_black_ports
+table inet fw4 {
+ set wan_ac_black_ports {
+  type inet_service;
+ }
+}
+OBJECT_END
+OBJECT	set	wan_ac_black_ips
+table inet fw4 {
+ set wan_ac_black_ips {
+  type ipv4_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	wan_ac_black_ipv6s
+table inet fw4 {
+ set wan_ac_black_ipv6s {
+  type ipv6_addr; flags interval;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_wan_host4
+table inet fw4 {
+ set openkill_wan_host4 {
+  type ipv4_addr;
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_wan_host6
+table inet fw4 {
+ set openkill_wan_host6 {
+  type ipv6_addr;
+ }
+}
+OBJECT_END

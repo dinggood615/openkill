@@ -1,0 +1,171 @@
+{
+  "schema": "OPENKILL_SHADOW_SELF_SUFFICIENCY_V1",
+  "version": 1,
+  "auto_state_version": 1,
+  "legacy_runtime_intent_version": 1,
+  "production_bundle_required": false,
+  "default_off": true,
+  "source_map": {
+    "owner": {
+      "primary": "OPENKILL_NFT_SHADOW_SOURCE_FILE:OWNER|TUN_OWNER",
+      "fallback": "tun_owner/OpenKill applied control state",
+      "required": true,
+      "failure": "INPUT_SOURCE_GAP"
+    },
+    "run_mode": {
+      "primary": "source:RUN_MODE",
+      "fallback": "en_mode_tun/enable_udp_proxy",
+      "required": true,
+      "failure": "INPUT_SOURCE_GAP"
+    },
+    "ipv4_ipv6_readiness": {
+      "primary": "OPENKILL_NETWORK_SNAPSHOT:LOCAL_IPV6_READY",
+      "fallback": "committed desired state",
+      "required": false,
+      "failure": "INPUT_SOURCE_GAP"
+    },
+    "wan_host": {
+      "primary": "snapshot:WAN4_ADDRESSES/WAN6_HOST_ADDRESSES",
+      "fallback": "committed desired state",
+      "required": false,
+      "failure": "INPUT_SOURCE_GAP"
+    },
+    "lan_prefixes": {
+      "primary": "source:LAN4/LAN6",
+      "fallback": "desired state",
+      "required": false,
+      "failure": "INPUT_SOURCE_GAP"
+    },
+    "delegated_prefixes": {
+      "primary": "source:DELEGATED6",
+      "fallback": "desired:LOCALNETWORK6_PREFIXES",
+      "required": false,
+      "failure": "INPUT_SOURCE_GAP"
+    },
+    "local_sets": {
+      "primary": "source:LOCAL4/LOCAL6",
+      "fallback": "desired state",
+      "required": false,
+      "failure": "INPUT_SOURCE_GAP"
+    },
+    "node4_node6": {
+      "primary": "/tmp/openkill-node4.desired,/tmp/openkill-node6.desired",
+      "fallback": "source:NODE4/NODE6",
+      "required": false,
+      "failure": "INPUT_SOURCE_GAP"
+    },
+    "china": {
+      "primary": "source:CHINA4/CHINA6/CHINA_PASS4/CHINA_PASS6",
+      "fallback": "committed desired state",
+      "required": false,
+      "failure": "INPUT_SOURCE_GAP"
+    },
+    "acl": {
+      "primary": "source:ACCESS*",
+      "fallback": "committed config-applied semantic state",
+      "required": false,
+      "failure": "INPUT_SOURCE_GAP"
+    },
+    "service_ports": {
+      "primary": "source:SERVICE_PORTS/COMMON_PORTS",
+      "fallback": "committed config-applied state",
+      "required": false,
+      "failure": "INPUT_SOURCE_GAP"
+    },
+    "fake_ip_ranges": {
+      "primary": "source:FAKE_IP4/FAKE_IP6",
+      "fallback": "committed config-applied state",
+      "required": false,
+      "failure": "INPUT_SOURCE_GAP"
+    },
+    "router_self_proxy": {
+      "primary": "source:ROUTER_SELF_PROXY",
+      "fallback": "router_self_proxy control state",
+      "required": true,
+      "failure": "INPUT_SOURCE_GAP"
+    },
+    "listener_ports": {
+      "primary": "source:REDIRECT_PORT/TPROXY_PORT/DNS_PORT",
+      "fallback": "proxy_port/tproxy_port/dns_port already-normalized globals",
+      "required": true,
+      "failure": "INPUT_SOURCE_GAP"
+    },
+    "mark_abi": {
+      "primary": "source:MARK/MASK/ROUTE_TABLE/RULE_PREF",
+      "fallback": "committed desired state constants",
+      "required": true,
+      "failure": "INPUT_SOURCE_GAP"
+    },
+    "generation": {
+      "primary": "source:GENERATION or /tmp/openkill-network-reconcile/generation",
+      "fallback": "existing applied generation",
+      "required": true,
+      "failure": "STALE"
+    }
+  },
+  "capture": {
+    "schema": "LEGACY_RUNTIME_INTENT_V1",
+    "allowed_nft_verbs": [
+      "list"
+    ],
+    "allowed_forms": [
+      "list chain inet fw4 <known-chain>",
+      "list set inet fw4 <known-set>"
+    ],
+    "broad_ruleset_read": false,
+    "known_base_chains": [
+      "dstnat",
+      "mangle_prerouting",
+      "mangle_output",
+      "output",
+      "srcnat",
+      "input",
+      "forward",
+      "nat_output"
+    ],
+    "unknown_owned_rule": "CAPTURE_UNSUPPORTED",
+    "foreign_object": "ignore_without_claim",
+    "handles_in_hash": false,
+    "counters_in_hash": false
+  },
+  "statuses": [
+    "MATCH",
+    "MISMATCH",
+    "STALE",
+    "INPUT_SOURCE_GAP",
+    "INPUT_ERROR",
+    "CAPTURE_UNAVAILABLE",
+    "CAPTURE_ERROR",
+    "CAPTURE_UNSUPPORTED",
+    "UNSUPPORTED_CURRENT_STATE",
+    "DISABLED",
+    "SOURCE_DRIFT"
+  ],
+  "scenarios": [
+    "AUTO-01",
+    "AUTO-02",
+    "AUTO-03",
+    "AUTO-04",
+    "AUTO-05",
+    "AUTO-06",
+    "AUTO-07",
+    "AUTO-08",
+    "AUTO-09",
+    "AUTO-10",
+    "AUTO-11",
+    "AUTO-12",
+    "AUTO-13",
+    "AUTO-14",
+    "AUTO-15",
+    "AUTO-16",
+    "AUTO-17",
+    "AUTO-18",
+    "AUTO-19",
+    "AUTO-20",
+    "AUTO-21",
+    "AUTO-22",
+    "AUTO-23",
+    "AUTO-24",
+    "AUTO-25"
+  ]
+}
