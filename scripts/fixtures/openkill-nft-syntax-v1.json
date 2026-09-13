@@ -1,0 +1,135 @@
+{
+  "schema": "OPENKILL_NFT_SYNTAX_FIXTURE_V1",
+  "syntax_version": 1,
+  "ir_schema": "OPENKILL_NFT_IR_V1",
+  "semantic_spec_version": 1,
+  "classifier_contract_version": 1,
+  "ownership_manifest_schema": "OPENKILL_NFT_MANIFEST_V1",
+  "default_profile": "current",
+  "supported_profiles": [
+    "current",
+    "target"
+  ],
+  "target_requires": "development_preview",
+  "backend": "ABSTRACT_NFT",
+  "parent_table": {
+    "family": "inet",
+    "name": "fw4",
+    "ownership": "REFERENCE_ONLY",
+    "owner": "FW4"
+  },
+  "external_priority": "EXTERNAL_UNVERIFIED",
+  "current_owned_base_chain": {
+    "logical_id": "OPENKILL_NAT_OUTPUT_CURRENT",
+    "physical_name": "nat_output",
+    "type": "nat",
+    "hook": "output",
+    "priority": -1
+  },
+  "object_sections": [
+    "owned_chains",
+    "sets",
+    "rules",
+    "attachments"
+  ],
+  "set_types": [
+    "ipv4_addr",
+    "ipv6_addr",
+    "ether_addr",
+    "inet_service"
+  ],
+  "actions": {
+    "RETURN_NATIVE": "return",
+    "MARK_PROXY": "meta mark set 0x162",
+    "TPROXY_PROXY": "tproxy to :<development-port> meta mark set 0x162",
+    "REDIRECT_PROXY": "redirect to :<development-port> (TCP only)",
+    "DNS_REDIRECT": "jump to owned DNS scope chain",
+    "JUMP": "jump to owned chain",
+    "CONTINUE_POLICY": "counter-only fall-through",
+    "ACTION_FROM_CLASSIFICATION": "counter-only unresolved action",
+    "ACCESS_DENY_REQUIRED": "unsupported until a verdict is approved",
+    "UNSUPPORTED_ACTION": "reject before nft -c",
+    "UNRESOLVED_SEMANTIC": "omit from current syntax",
+    "NOT_OWNED": "omit OpenKill-owned syntax"
+  },
+  "mark_abi": {
+    "version": 1,
+    "mark": "0x162",
+    "mask": "0xffffffff",
+    "route_table": 354,
+    "rule_preference": 1888
+  },
+  "forbidden_output": [
+    "flush ruleset",
+    "flush table inet fw4",
+    "delete table inet fw4",
+    "delete foreign",
+    "include arbitrary path",
+    "shell expansion",
+    "nft -f apply"
+  ],
+  "scaffold": {
+    "schema": "TEST_ONLY_FW4_SCAFFOLD_V1",
+    "production_output_contains": false,
+    "simulates_device_priority": false,
+    "purpose": "parser-only nft -c fixture"
+  },
+  "normalization": {
+    "addresses": "ipaddress canonical form",
+    "prefixes": "network canonical form preserving prefix length",
+    "wan_ipv6": "host-only /128",
+    "sets": "deduplicate then stable sort",
+    "rules": "semantic precedence then logical id"
+  },
+  "component_diff_categories": [
+    "NO_CHANGE",
+    "SET_ELEMENT_CHANGE",
+    "RULE_CHANGE",
+    "TOPOLOGY_CHANGE",
+    "TOPOLOGY_ADD",
+    "TOPOLOGY_REMOVE",
+    "COMPONENT_CHANGE"
+  ],
+  "golden_matrix": [
+    "basic_ipv4_tun",
+    "basic_ipv6_tun_current",
+    "dual_stack_tun",
+    "ipv4_tproxy_tcp",
+    "ipv4_tproxy_udp",
+    "ipv6_tproxy_tcp",
+    "ipv6_tproxy_udp",
+    "redirect_tcp",
+    "dns_lan_v4",
+    "dns_lan_v6",
+    "dns_router_v4",
+    "dns_router_v6",
+    "node4",
+    "node6",
+    "empty_node_sets",
+    "local4",
+    "local6",
+    "delegated6",
+    "china4",
+    "china6",
+    "china_pass4",
+    "china_pass6",
+    "acl",
+    "service_ports",
+    "mihomo_owner"
+  ],
+  "behavior_change_lock": {
+    "ids": [
+      "BC-01",
+      "BC-02",
+      "BC-03",
+      "BC-04",
+      "BC-05",
+      "BC-06",
+      "BC-07"
+    ],
+    "status": "PRODUCTION_NOT_APPROVED",
+    "current_renderer": "CURRENT_ONLY",
+    "target_renderer": "TARGET_PREVIEW_ONLY"
+  },
+  "production_wiring": "NONE"
+}

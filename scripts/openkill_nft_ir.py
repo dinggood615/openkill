@@ -958,7 +958,10 @@ def _build_dependencies() -> Dict[str, List[str]]:
         "CHINA": ["PROXY_ACTION"],
         "ACCESS": ["PROXY_ACTION"],
         "SERVICE": ["PROXY_ACTION"],
-        "DNS": ["DNS"],
+        # DNS is a self-contained component.  A literal DNS -> DNS edge
+        # made graph consumers observe a cycle, although it represented no
+        # dependency on another component.
+        "DNS": [],
         "PROXY_ACTION": [],
         "OWNER": ["TOPOLOGY"],
     }

@@ -105,7 +105,8 @@
     "CHINA": ["PROXY_ACTION"],
     "ACCESS": ["PROXY_ACTION"],
     "SERVICE": ["PROXY_ACTION"],
-    "DNS": ["DNS"],
+    "DNS": [],
+    "self_contained_components": ["DNS"],
     "PROXY_ACTION": [],
     "OWNER": ["TOPOLOGY"]
   },
