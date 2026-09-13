@@ -1,0 +1,2695 @@
+{
+  "schema": "CLASSIFIER_SEMANTIC_CONTRACT_V1",
+  "status": "PHASE_2A_MODEL_ONLY",
+  "runtime_wiring": "NONE",
+  "decision_enum": [
+    "NOT_OWNED",
+    "BYPASS",
+    "DIRECT",
+    "PROXY",
+    "DNS_SPECIAL",
+    "ACCESS_DENY"
+  ],
+  "match_reason_enum": [
+    "OWNER_DISABLED",
+    "DNS",
+    "CONTROL_PROTOCOL",
+    "SELF_TRAFFIC",
+    "TUN_INGRESS",
+    "NODE_ENDPOINT",
+    "LOCAL_DESTINATION",
+    "REPLY_TRAFFIC",
+    "SERVICE_PORT",
+    "ACCESS_CONTROL",
+    "FAKEIP",
+    "EXPLICIT_DIRECT",
+    "EXPLICIT_PROXY",
+    "CHINA_PASS",
+    "CHINA_POLICY",
+    "DEFAULT_POLICY",
+    "INVALID_CONFIGURATION"
+  ],
+  "packet_context_dimensions": {
+    "family": [
+      "IPv4",
+      "IPv6"
+    ],
+    "direction": [
+      "LAN_INGRESS",
+      "ROUTER_OUTPUT",
+      "TUN_INGRESS",
+      "UNKNOWN"
+    ],
+    "protocol": [
+      "TCP",
+      "UDP",
+      "ICMP",
+      "ICMPv6",
+      "OTHER"
+    ],
+    "backend_mode": [
+      "TUN",
+      "TPROXY",
+      "REDIRECT"
+    ],
+    "source_properties": [
+      "LAN",
+      "ROUTER",
+      "SELF_PROCESS",
+      "UNKNOWN"
+    ],
+    "destination_properties": [
+      "NODE_ENDPOINT",
+      "LOCAL_PRIVATE",
+      "WAN_HOST",
+      "LAN_PREFIX",
+      "DELEGATED_PREFIX",
+      "CHINA",
+      "USER_DIRECT",
+      "USER_PROXY",
+      "FAKEIP",
+      "PUBLIC"
+    ],
+    "service": [
+      "DNS",
+      "DHCP",
+      "DHCPv6",
+      "NTP",
+      "OTHER"
+    ],
+    "connection": [
+      "REPLY",
+      "NEW",
+      "UNKNOWN"
+    ],
+    "owner": [
+      "OPENKILL",
+      "MIHOMO",
+      "DISABLED",
+      "UNKNOWN"
+    ]
+  },
+  "current_precedence": [
+    {
+      "order": 0,
+      "match_reason": "OWNER_DISABLED",
+      "decision": "NOT_OWNED",
+      "position": "ownership gate",
+      "change": "NO"
+    },
+    {
+      "order": 1,
+      "match_reason": "DNS",
+      "decision": "DNS_SPECIAL",
+      "position": "fw4 dstnat/nat_output outer rule",
+      "change": "NO"
+    },
+    {
+      "order": 2,
+      "match_reason": "ACCESS_CONTROL",
+      "decision": "BYPASS/ACCESS_DENY",
+      "position": "custom lan_ac_traffic inserted position 0",
+      "change": "YES"
+    },
+    {
+      "order": 3,
+      "match_reason": "NODE_ENDPOINT",
+      "decision": "BYPASS",
+      "position": "apply_node_endpoint_sets insert",
+      "change": "NO"
+    },
+    {
+      "order": 4,
+      "match_reason": "SELF_TRAFFIC",
+      "decision": "BYPASS",
+      "position": "skgid 65534 in output/post chains",
+      "change": "YES"
+    },
+    {
+      "order": 5,
+      "match_reason": "TUN_INGRESS",
+      "decision": "BYPASS",
+      "position": "iifname utun in TUN mangle (v4)",
+      "change": "YES"
+    },
+    {
+      "order": 6,
+      "match_reason": "LOCAL_DESTINATION",
+      "decision": "BYPASS",
+      "position": "localnetwork/localnetwork6",
+      "change": "NO"
+    },
+    {
+      "order": 7,
+      "match_reason": "REPLY_TRAFFIC",
+      "decision": "BYPASS",
+      "position": "ct direction reply",
+      "change": "NO"
+    },
+    {
+      "order": 8,
+      "match_reason": "SERVICE_PORT",
+      "decision": "BYPASS",
+      "position": "openkill_service_ports",
+      "change": "NO"
+    },
+    {
+      "order": 9,
+      "match_reason": "CONTROL_PROTOCOL",
+      "decision": "BYPASS",
+      "position": "IPv6 mangle only, after service rules",
+      "change": "YES"
+    },
+    {
+      "order": 10,
+      "match_reason": "ACCESS_CONTROL",
+      "decision": "BYPASS",
+      "position": "LAN/WAN ACL rules",
+      "change": "NO"
+    },
+    {
+      "order": 11,
+      "match_reason": "FAKEIP",
+      "decision": "PROXY",
+      "position": "synthetic destination rule",
+      "change": "NO"
+    },
+    {
+      "order": 12,
+      "match_reason": "CHINA_PASS",
+      "decision": "PROXY",
+      "position": "excluded from China return, then fall-through",
+      "change": "YES"
+    },
+    {
+      "order": 13,
+      "match_reason": "CHINA_POLICY",
+      "decision": "DIRECT",
+      "position": "china_ip*_route return",
+      "change": "NO"
+    },
+    {
+      "order": 14,
+      "match_reason": "DEFAULT_POLICY",
+      "decision": "PROXY",
+      "position": "final mark/redirect",
+      "change": "NO"
+    }
+  ],
+  "target_precedence": [
+    {
+      "order": 0,
+      "match_reason": "OWNER_DISABLED",
+      "decision": "NOT_OWNED",
+      "position": "ownership gate",
+      "change": "NO"
+    },
+    {
+      "order": 1,
+      "match_reason": "DNS",
+      "decision": "DNS_SPECIAL",
+      "position": "special classifier entry",
+      "change": "NO"
+    },
+    {
+      "order": 2,
+      "match_reason": "CONTROL_PROTOCOL",
+      "decision": "BYPASS",
+      "position": "safety/control layer",
+      "change": "YES"
+    },
+    {
+      "order": 3,
+      "match_reason": "SELF_TRAFFIC",
+      "decision": "BYPASS",
+      "position": "self/engine loop guard",
+      "change": "YES"
+    },
+    {
+      "order": 4,
+      "match_reason": "TUN_INGRESS",
+      "decision": "BYPASS",
+      "position": "proxy underlay return",
+      "change": "YES"
+    },
+    {
+      "order": 5,
+      "match_reason": "NODE_ENDPOINT",
+      "decision": "BYPASS",
+      "position": "native node underlay",
+      "change": "YES"
+    },
+    {
+      "order": 6,
+      "match_reason": "LOCAL_DESTINATION",
+      "decision": "BYPASS",
+      "position": "local topology",
+      "change": "NO"
+    },
+    {
+      "order": 7,
+      "match_reason": "REPLY_TRAFFIC",
+      "decision": "BYPASS",
+      "position": "connection reply",
+      "change": "NO"
+    },
+    {
+      "order": 8,
+      "match_reason": "SERVICE_PORT",
+      "decision": "BYPASS",
+      "position": "OpenKill service control",
+      "change": "NO"
+    },
+    {
+      "order": 9,
+      "match_reason": "ACCESS_CONTROL",
+      "decision": "BYPASS/ACCESS_DENY",
+      "position": "access layer before routing policy",
+      "change": "YES"
+    },
+    {
+      "order": 10,
+      "match_reason": "FAKEIP",
+      "decision": "PROXY",
+      "position": "synthetic address safety",
+      "change": "NO"
+    },
+    {
+      "order": 11,
+      "match_reason": "EXPLICIT_DIRECT",
+      "decision": "DIRECT",
+      "position": "user direct policy",
+      "change": "YES"
+    },
+    {
+      "order": 12,
+      "match_reason": "EXPLICIT_PROXY",
+      "decision": "PROXY",
+      "position": "user proxy policy",
+      "change": "YES"
+    },
+    {
+      "order": 13,
+      "match_reason": "CHINA_PASS",
+      "decision": "PROXY",
+      "position": "explicit regional exception",
+      "change": "YES"
+    },
+    {
+      "order": 14,
+      "match_reason": "CHINA_POLICY",
+      "decision": "DIRECT",
+      "position": "regional default policy",
+      "change": "NO"
+    },
+    {
+      "order": 15,
+      "match_reason": "DEFAULT_POLICY",
+      "decision": "PROXY",
+      "position": "default policy",
+      "change": "NO"
+    }
+  ],
+  "cases": [
+    {
+      "id": "v4_loopback",
+      "category": "LOCAL",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "LOCAL_DESTINATION"
+      ],
+      "parity_pair": "loopback",
+      "expected_current": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_loopback",
+      "category": "LOCAL",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "LOCAL_DESTINATION"
+      ],
+      "parity_pair": "loopback",
+      "expected_current": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_private",
+      "category": "LOCAL",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "LOCAL_DESTINATION"
+      ],
+      "parity_pair": "private",
+      "expected_current": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_private",
+      "category": "LOCAL",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "LOCAL_DESTINATION"
+      ],
+      "parity_pair": "private",
+      "expected_current": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_link_local",
+      "category": "LOCAL",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "UDP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "LOCAL_DESTINATION"
+      ],
+      "parity_pair": "link_local",
+      "expected_current": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_link_local",
+      "category": "LOCAL",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "UDP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "LOCAL_DESTINATION"
+      ],
+      "parity_pair": "link_local",
+      "expected_current": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_multicast",
+      "category": "LOCAL",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "UDP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "LOCAL_DESTINATION"
+      ],
+      "parity_pair": "multicast",
+      "expected_current": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_multicast",
+      "category": "LOCAL",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "UDP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "LOCAL_DESTINATION"
+      ],
+      "parity_pair": "multicast",
+      "expected_current": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_lan_prefix",
+      "category": "LOCAL",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "LOCAL_DESTINATION"
+      ],
+      "parity_pair": "lan_prefix",
+      "expected_current": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_lan_prefix",
+      "category": "LOCAL",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "LOCAL_DESTINATION"
+      ],
+      "parity_pair": "lan_prefix",
+      "expected_current": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_wan_host",
+      "category": "LOCAL",
+      "family": "IPv4",
+      "direction": "ROUTER_OUTPUT",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "LOCAL_DESTINATION"
+      ],
+      "parity_pair": "wan_host",
+      "expected_current": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_wan_host",
+      "category": "LOCAL",
+      "family": "IPv6",
+      "direction": "ROUTER_OUTPUT",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "LOCAL_DESTINATION"
+      ],
+      "parity_pair": "wan_host",
+      "expected_current": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_delegated_prefix",
+      "category": "LOCAL",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "LOCAL_DESTINATION"
+      ],
+      "parity_pair": "delegated_prefix",
+      "expected_current": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_delegated_prefix",
+      "category": "LOCAL",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "LOCAL_DESTINATION"
+      ],
+      "parity_pair": "delegated_prefix",
+      "expected_current": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_ula",
+      "category": "LOCAL",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "LOCAL_DESTINATION"
+      ],
+      "parity_pair": "ula",
+      "notes": "ULA is local only when represented by an internal prefix/set.",
+      "expected_current": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_reply",
+      "category": "CONTROL",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "REPLY_TRAFFIC"
+      ],
+      "parity_pair": "reply",
+      "expected_current": {
+        "reason": "REPLY_TRAFFIC",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "REPLY_TRAFFIC",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_service_port",
+      "category": "CONTROL",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "SERVICE_PORT"
+      ],
+      "parity_pair": "service",
+      "expected_current": {
+        "reason": "SERVICE_PORT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "SERVICE_PORT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_reply",
+      "category": "CONTROL",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "REPLY_TRAFFIC"
+      ],
+      "parity_pair": "reply",
+      "expected_current": {
+        "reason": "REPLY_TRAFFIC",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "REPLY_TRAFFIC",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_service_port",
+      "category": "CONTROL",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "SERVICE_PORT"
+      ],
+      "parity_pair": "service",
+      "expected_current": {
+        "reason": "SERVICE_PORT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "SERVICE_PORT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_dhcpv6",
+      "category": "IPv6_CONTROL",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "UDP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [],
+      "service": "DHCPv6",
+      "parity_pair": "control_dhcpv6",
+      "expected_current": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_rs",
+      "category": "IPv6_CONTROL",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "ICMPv6",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CONTROL_PROTOCOL"
+      ],
+      "icmpv6_type": "RS",
+      "parity_pair": "control_nd",
+      "expected_current": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_ra",
+      "category": "IPv6_CONTROL",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "ICMPv6",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CONTROL_PROTOCOL"
+      ],
+      "icmpv6_type": "RA",
+      "parity_pair": "control_nd",
+      "expected_current": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_ns",
+      "category": "IPv6_CONTROL",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "ICMPv6",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CONTROL_PROTOCOL"
+      ],
+      "icmpv6_type": "NS",
+      "parity_pair": "control_nd",
+      "expected_current": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_na",
+      "category": "IPv6_CONTROL",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "ICMPv6",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CONTROL_PROTOCOL"
+      ],
+      "icmpv6_type": "NA",
+      "parity_pair": "control_nd",
+      "expected_current": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_ptb",
+      "category": "IPv6_CONTROL",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "ICMPv6",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CONTROL_PROTOCOL"
+      ],
+      "icmpv6_type": "PTB",
+      "parity_pair": "control_errors",
+      "expected_current": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_dest_unreachable",
+      "category": "IPv6_CONTROL",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "ICMPv6",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CONTROL_PROTOCOL"
+      ],
+      "icmpv6_type": "Destination Unreachable",
+      "parity_pair": "control_errors",
+      "expected_current": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_time_exceeded",
+      "category": "IPv6_CONTROL",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "ICMPv6",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CONTROL_PROTOCOL"
+      ],
+      "icmpv6_type": "Time Exceeded",
+      "parity_pair": "control_errors",
+      "expected_current": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_parameter_problem",
+      "category": "IPv6_CONTROL",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "ICMPv6",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CONTROL_PROTOCOL"
+      ],
+      "icmpv6_type": "Parameter Problem",
+      "parity_pair": "control_errors",
+      "expected_current": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_self_output",
+      "category": "SELF",
+      "family": "IPv4",
+      "direction": "ROUTER_OUTPUT",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "SELF_TRAFFIC"
+      ],
+      "parity_pair": "self",
+      "expected_current": {
+        "reason": "SELF_TRAFFIC",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "SELF_TRAFFIC",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_tun_ingress",
+      "category": "SELF",
+      "family": "IPv4",
+      "direction": "TUN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "TUN_INGRESS"
+      ],
+      "parity_pair": "tun",
+      "expected_current": {
+        "reason": "TUN_INGRESS",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "TUN_INGRESS",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_node_literal",
+      "category": "NODE",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "NODE_ENDPOINT"
+      ],
+      "parity_pair": "node_literal",
+      "expected_current": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_node_domain",
+      "category": "NODE",
+      "family": "IPv4",
+      "direction": "ROUTER_OUTPUT",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "NODE_ENDPOINT"
+      ],
+      "parity_pair": "node_domain",
+      "notes": "Domain resolution is outside packet classification.",
+      "expected_current": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_self_output",
+      "category": "SELF",
+      "family": "IPv6",
+      "direction": "ROUTER_OUTPUT",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "SELF_TRAFFIC"
+      ],
+      "parity_pair": "self",
+      "expected_current": {
+        "reason": "SELF_TRAFFIC",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "SELF_TRAFFIC",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_tun_ingress",
+      "category": "SELF",
+      "family": "IPv6",
+      "direction": "TUN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "TUN_INGRESS"
+      ],
+      "parity_pair": "tun",
+      "notes": "Current IPv6 mangle has no explicit utun ingress return; target requires family parity.",
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "TUN_INGRESS",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_node_literal",
+      "category": "NODE",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "NODE_ENDPOINT"
+      ],
+      "parity_pair": "node_literal",
+      "expected_current": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_node_domain",
+      "category": "NODE",
+      "family": "IPv6",
+      "direction": "ROUTER_OUTPUT",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "NODE_ENDPOINT"
+      ],
+      "parity_pair": "node_domain",
+      "notes": "Domain resolution is outside packet classification.",
+      "expected_current": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_access_bypass",
+      "category": "ACCESS",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "ACCESS_CONTROL"
+      ],
+      "parity_pair": "access",
+      "expected_current": {
+        "reason": "ACCESS_CONTROL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "ACCESS_CONTROL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_custom_access_deny",
+      "category": "ACCESS",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "UDP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CUSTOM_ACCESS",
+        "ACCESS_DENY"
+      ],
+      "parity_pair": "access_deny",
+      "notes": "Access outcome is separate from routing policy.",
+      "expected_current": {
+        "reason": "ACCESS_CONTROL",
+        "decision": "ACCESS_DENY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "ACCESS_CONTROL",
+        "decision": "ACCESS_DENY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_fakeip",
+      "category": "FAKEIP",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "FAKEIP"
+      ],
+      "parity_pair": "fakeip",
+      "expected_current": {
+        "reason": "FAKEIP",
+        "decision": "PROXY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "FAKEIP",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_access_bypass",
+      "category": "ACCESS",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "ACCESS_CONTROL"
+      ],
+      "parity_pair": "access",
+      "expected_current": {
+        "reason": "ACCESS_CONTROL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "ACCESS_CONTROL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_custom_access_deny",
+      "category": "ACCESS",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "UDP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CUSTOM_ACCESS",
+        "ACCESS_DENY"
+      ],
+      "parity_pair": "access_deny",
+      "notes": "Access outcome is separate from routing policy.",
+      "expected_current": {
+        "reason": "ACCESS_CONTROL",
+        "decision": "ACCESS_DENY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "ACCESS_CONTROL",
+        "decision": "ACCESS_DENY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_fakeip",
+      "category": "FAKEIP",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "FAKEIP"
+      ],
+      "parity_pair": "fakeip",
+      "expected_current": {
+        "reason": "FAKEIP",
+        "decision": "PROXY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "FAKEIP",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_china_mainland",
+      "category": "CHINA",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CHINA_POLICY"
+      ],
+      "china_policy": "BYPASS_MAINLAND",
+      "parity_pair": "china",
+      "expected_current": {
+        "reason": "CHINA_POLICY",
+        "decision": "DIRECT",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "CHINA_POLICY",
+        "decision": "DIRECT",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_china_pass",
+      "category": "CHINA",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CHINA_POLICY",
+        "CHINA_PASS"
+      ],
+      "china_policy": "BYPASS_MAINLAND",
+      "parity_pair": "china_pass",
+      "notes": "Pass entries are excluded from the China return and fall through to proxy today.",
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "CHINA_PASS",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_china_overseas",
+      "category": "CHINA",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [],
+      "china_policy": "BYPASS_OVERSEAS",
+      "parity_pair": "china_overseas",
+      "expected_current": {
+        "reason": "CHINA_POLICY",
+        "decision": "DIRECT",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "CHINA_POLICY",
+        "decision": "DIRECT",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_china_mainland",
+      "category": "CHINA",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CHINA_POLICY"
+      ],
+      "china_policy": "BYPASS_MAINLAND",
+      "parity_pair": "china",
+      "expected_current": {
+        "reason": "CHINA_POLICY",
+        "decision": "DIRECT",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "CHINA_POLICY",
+        "decision": "DIRECT",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_china_pass",
+      "category": "CHINA",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CHINA_POLICY",
+        "CHINA_PASS"
+      ],
+      "china_policy": "BYPASS_MAINLAND",
+      "parity_pair": "china_pass",
+      "notes": "Pass entries are excluded from the China return and fall through to proxy today.",
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "CHINA_PASS",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_china_overseas",
+      "category": "CHINA",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [],
+      "china_policy": "BYPASS_OVERSEAS",
+      "parity_pair": "china_overseas",
+      "expected_current": {
+        "reason": "CHINA_POLICY",
+        "decision": "DIRECT",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "CHINA_POLICY",
+        "decision": "DIRECT",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_default_tcp",
+      "category": "DEFAULT",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [],
+      "parity_pair": "default_tcp",
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_default_udp",
+      "category": "DEFAULT",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "UDP",
+      "owner": "OPENKILL",
+      "backend_mode": "TPROXY",
+      "flags": [],
+      "parity_pair": "default_udp",
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_default_icmp",
+      "category": "DEFAULT",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "ICMP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [],
+      "parity_pair": "default_icmp",
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_default_other",
+      "category": "DEFAULT",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "OTHER",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [],
+      "parity_pair": "default_other",
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_dns_lan",
+      "category": "DNS",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "UDP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [],
+      "service": "DNS",
+      "parity_pair": "dns",
+      "expected_current": {
+        "reason": "DNS",
+        "decision": "DNS_SPECIAL",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "DNS",
+        "decision": "DNS_SPECIAL",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_dns_router_output",
+      "category": "DNS",
+      "family": "IPv4",
+      "direction": "ROUTER_OUTPUT",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [],
+      "service": "DNS",
+      "parity_pair": "dns",
+      "expected_current": {
+        "reason": "DNS",
+        "decision": "DNS_SPECIAL",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "DNS",
+        "decision": "DNS_SPECIAL",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_user_direct",
+      "category": "USER_DIRECT",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "EXPLICIT_DIRECT"
+      ],
+      "parity_pair": "user_direct",
+      "notes": "No standalone firewall user-direct classifier exists in current production.",
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "CURRENT_UNDEFINED"
+      },
+      "expected_target": {
+        "reason": "EXPLICIT_DIRECT",
+        "decision": "DIRECT",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_user_proxy",
+      "category": "USER_PROXY",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "EXPLICIT_PROXY"
+      ],
+      "parity_pair": "user_proxy",
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "CURRENT_UNDEFINED"
+      },
+      "expected_target": {
+        "reason": "EXPLICIT_PROXY",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_default_tcp",
+      "category": "DEFAULT",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [],
+      "parity_pair": "default_tcp",
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_default_udp",
+      "category": "DEFAULT",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "UDP",
+      "owner": "OPENKILL",
+      "backend_mode": "TPROXY",
+      "flags": [],
+      "parity_pair": "default_udp",
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_default_icmp",
+      "category": "DEFAULT",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "ICMP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [],
+      "parity_pair": "default_icmp",
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_default_other",
+      "category": "DEFAULT",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "OTHER",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [],
+      "parity_pair": "default_other",
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_dns_lan",
+      "category": "DNS",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "UDP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [],
+      "service": "DNS",
+      "parity_pair": "dns",
+      "expected_current": {
+        "reason": "DNS",
+        "decision": "DNS_SPECIAL",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "DNS",
+        "decision": "DNS_SPECIAL",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_dns_router_output",
+      "category": "DNS",
+      "family": "IPv6",
+      "direction": "ROUTER_OUTPUT",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [],
+      "service": "DNS",
+      "parity_pair": "dns",
+      "expected_current": {
+        "reason": "DNS",
+        "decision": "DNS_SPECIAL",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "DNS",
+        "decision": "DNS_SPECIAL",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_user_direct",
+      "category": "USER_DIRECT",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "EXPLICIT_DIRECT"
+      ],
+      "parity_pair": "user_direct",
+      "notes": "No standalone firewall user-direct classifier exists in current production.",
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "CURRENT_UNDEFINED"
+      },
+      "expected_target": {
+        "reason": "EXPLICIT_DIRECT",
+        "decision": "DIRECT",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v6_user_proxy",
+      "category": "USER_PROXY",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "EXPLICIT_PROXY"
+      ],
+      "parity_pair": "user_proxy",
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "CURRENT_UNDEFINED"
+      },
+      "expected_target": {
+        "reason": "EXPLICIT_PROXY",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "v4_dhcp_default",
+      "category": "CONTROL",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "UDP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [],
+      "service": "DHCP",
+      "notes": "No OpenKill-owned IPv4 DHCP control return is generated.",
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_access_node_v4",
+      "category": "OVERLAP",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CUSTOM_ACCESS",
+        "NODE_ENDPOINT"
+      ],
+      "overlap": [
+        "ACCESS_CONTROL",
+        "NODE"
+      ],
+      "notes": "Custom lan_ac_traffic is inserted at position 0 after normal generation.",
+      "expected_current": {
+        "reason": "ACCESS_CONTROL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_access_node_v6",
+      "category": "OVERLAP",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CUSTOM_ACCESS",
+        "NODE_ENDPOINT"
+      ],
+      "overlap": [
+        "ACCESS_CONTROL",
+        "NODE"
+      ],
+      "expected_current": {
+        "reason": "ACCESS_CONTROL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_node_local_v4",
+      "category": "OVERLAP",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "NODE_ENDPOINT",
+        "LOCAL_DESTINATION"
+      ],
+      "parity_pair": "overlap_node_local",
+      "overlap": [
+        "NODE",
+        "LOCAL"
+      ],
+      "expected_current": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_node_local_v6",
+      "category": "OVERLAP",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "NODE_ENDPOINT",
+        "LOCAL_DESTINATION"
+      ],
+      "parity_pair": "overlap_node_local",
+      "overlap": [
+        "NODE",
+        "LOCAL"
+      ],
+      "expected_current": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_node_china_v4",
+      "category": "OVERLAP",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "NODE_ENDPOINT",
+        "CHINA_POLICY"
+      ],
+      "china_policy": "BYPASS_MAINLAND",
+      "overlap": [
+        "NODE",
+        "CHINA"
+      ],
+      "expected_current": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_node_user_proxy_v4",
+      "category": "OVERLAP",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "NODE_ENDPOINT",
+        "EXPLICIT_PROXY"
+      ],
+      "overlap": [
+        "NODE",
+        "USER_PROXY"
+      ],
+      "expected_current": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_node_user_proxy_v6",
+      "category": "OVERLAP",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "NODE_ENDPOINT",
+        "EXPLICIT_PROXY"
+      ],
+      "overlap": [
+        "NODE",
+        "USER_PROXY"
+      ],
+      "expected_current": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_fakeip_china_v4",
+      "category": "OVERLAP",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "FAKEIP",
+        "CHINA_POLICY"
+      ],
+      "china_policy": "BYPASS_MAINLAND",
+      "overlap": [
+        "FAKEIP",
+        "CHINA"
+      ],
+      "expected_current": {
+        "reason": "FAKEIP",
+        "decision": "PROXY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "FAKEIP",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_fakeip_user_direct_v4",
+      "category": "OVERLAP",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "FAKEIP",
+        "EXPLICIT_DIRECT"
+      ],
+      "overlap": [
+        "FAKEIP",
+        "USER_DIRECT"
+      ],
+      "expected_current": {
+        "reason": "FAKEIP",
+        "decision": "PROXY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "FAKEIP",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_fakeip_user_direct_v6",
+      "category": "OVERLAP",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "FAKEIP",
+        "EXPLICIT_DIRECT"
+      ],
+      "overlap": [
+        "FAKEIP",
+        "USER_DIRECT"
+      ],
+      "expected_current": {
+        "reason": "FAKEIP",
+        "decision": "PROXY",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "FAKEIP",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_user_proxy_china_v4",
+      "category": "OVERLAP",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "EXPLICIT_PROXY",
+        "CHINA_POLICY"
+      ],
+      "china_policy": "BYPASS_MAINLAND",
+      "overlap": [
+        "USER_PROXY",
+        "CHINA"
+      ],
+      "notes": "Target explicit proxy precedence is a pending behavior change.",
+      "expected_current": {
+        "reason": "CHINA_POLICY",
+        "decision": "DIRECT",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "EXPLICIT_PROXY",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_user_proxy_china_v6",
+      "category": "OVERLAP",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "EXPLICIT_PROXY",
+        "CHINA_POLICY"
+      ],
+      "china_policy": "BYPASS_MAINLAND",
+      "overlap": [
+        "USER_PROXY",
+        "CHINA"
+      ],
+      "expected_current": {
+        "reason": "CHINA_POLICY",
+        "decision": "DIRECT",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "EXPLICIT_PROXY",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_user_direct_china_v4",
+      "category": "OVERLAP",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "EXPLICIT_DIRECT",
+        "CHINA_POLICY"
+      ],
+      "china_policy": "BYPASS_MAINLAND",
+      "overlap": [
+        "USER_DIRECT",
+        "CHINA"
+      ],
+      "expected_current": {
+        "reason": "CHINA_POLICY",
+        "decision": "DIRECT",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "EXPLICIT_DIRECT",
+        "decision": "DIRECT",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_user_direct_china_pass_v4",
+      "category": "OVERLAP",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "EXPLICIT_DIRECT",
+        "CHINA_POLICY",
+        "CHINA_PASS"
+      ],
+      "china_policy": "BYPASS_MAINLAND",
+      "overlap": [
+        "USER_DIRECT",
+        "CHINA_PASS"
+      ],
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "CURRENT_UNDEFINED"
+      },
+      "expected_target": {
+        "reason": "EXPLICIT_DIRECT",
+        "decision": "DIRECT",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_user_direct_proxy_invalid_v4",
+      "category": "OVERLAP",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "EXPLICIT_DIRECT",
+        "EXPLICIT_PROXY"
+      ],
+      "overlap": [
+        "USER_DIRECT",
+        "USER_PROXY"
+      ],
+      "notes": "Mutually exclusive user policy; no precedence is invented.",
+      "expected_current": {
+        "reason": "INVALID_CONFIGURATION",
+        "decision": null,
+        "status": "INVALID_CONFIGURATION"
+      },
+      "expected_target": {
+        "reason": "INVALID_CONFIGURATION",
+        "decision": null,
+        "status": "INVALID_CONFIGURATION"
+      }
+    },
+    {
+      "id": "overlap_local_user_proxy_v4",
+      "category": "OVERLAP",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "LOCAL_DESTINATION",
+        "EXPLICIT_PROXY"
+      ],
+      "overlap": [
+        "LOCAL",
+        "USER_PROXY"
+      ],
+      "expected_current": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_local_user_proxy_v6",
+      "category": "OVERLAP",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "LOCAL_DESTINATION",
+        "EXPLICIT_PROXY"
+      ],
+      "overlap": [
+        "LOCAL",
+        "USER_PROXY"
+      ],
+      "expected_current": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "LOCAL_DESTINATION",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_control_user_proxy_v6",
+      "category": "OVERLAP",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "ICMPv6",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CONTROL_PROTOCOL",
+        "EXPLICIT_PROXY"
+      ],
+      "icmpv6_type": "RS",
+      "overlap": [
+        "CONTROL",
+        "USER_PROXY"
+      ],
+      "expected_current": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_self_user_proxy_v4",
+      "category": "OVERLAP",
+      "family": "IPv4",
+      "direction": "ROUTER_OUTPUT",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "SELF_TRAFFIC",
+        "EXPLICIT_PROXY"
+      ],
+      "overlap": [
+        "SELF",
+        "USER_PROXY"
+      ],
+      "expected_current": {
+        "reason": "SELF_TRAFFIC",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "SELF_TRAFFIC",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_reply_user_proxy_v6",
+      "category": "OVERLAP",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "REPLY_TRAFFIC",
+        "EXPLICIT_PROXY"
+      ],
+      "overlap": [
+        "REPLY",
+        "USER_PROXY"
+      ],
+      "expected_current": {
+        "reason": "REPLY_TRAFFIC",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "REPLY_TRAFFIC",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_access_user_proxy_v4",
+      "category": "OVERLAP",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "ACCESS_CONTROL",
+        "EXPLICIT_PROXY"
+      ],
+      "overlap": [
+        "ACCESS_CONTROL",
+        "USER_PROXY"
+      ],
+      "expected_current": {
+        "reason": "ACCESS_CONTROL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "ACCESS_CONTROL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_node_self_v4",
+      "category": "OVERLAP",
+      "family": "IPv4",
+      "direction": "ROUTER_OUTPUT",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "NODE_ENDPOINT",
+        "SELF_TRAFFIC"
+      ],
+      "overlap": [
+        "NODE",
+        "SELF"
+      ],
+      "notes": "Current node insertion wins the diagnostic reason; target preserves SELF as the broader loop guard.",
+      "expected_current": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "SELF_TRAFFIC",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_china_pass_proxy_v4",
+      "category": "OVERLAP",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CHINA_POLICY",
+        "CHINA_PASS",
+        "EXPLICIT_PROXY"
+      ],
+      "china_policy": "BYPASS_MAINLAND",
+      "overlap": [
+        "CHINA_PASS",
+        "USER_PROXY"
+      ],
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "CURRENT_UNDEFINED"
+      },
+      "expected_target": {
+        "reason": "EXPLICIT_PROXY",
+        "decision": "PROXY",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_control_fakeip_v6",
+      "category": "OVERLAP",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CONTROL_PROTOCOL",
+        "FAKEIP"
+      ],
+      "icmpv6_type": "PTB",
+      "overlap": [
+        "CONTROL",
+        "FAKEIP"
+      ],
+      "expected_current": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_dns_user_proxy_v4",
+      "category": "OVERLAP",
+      "family": "IPv4",
+      "direction": "LAN_INGRESS",
+      "protocol": "UDP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "EXPLICIT_PROXY"
+      ],
+      "service": "DNS",
+      "overlap": [
+        "DNS",
+        "USER_PROXY"
+      ],
+      "expected_current": {
+        "reason": "DNS",
+        "decision": "DNS_SPECIAL",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "DNS",
+        "decision": "DNS_SPECIAL",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_owner_mihomo_v4",
+      "category": "OVERLAP",
+      "family": "IPv4",
+      "direction": "ROUTER_OUTPUT",
+      "protocol": "TCP",
+      "owner": "MIHOMO",
+      "backend_mode": "TUN",
+      "flags": [
+        "EXPLICIT_PROXY"
+      ],
+      "overlap": [
+        "OWNER",
+        "USER_PROXY"
+      ],
+      "expected_current": {
+        "reason": "OWNER_DISABLED",
+        "decision": "NOT_OWNED",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "OWNER_DISABLED",
+        "decision": "NOT_OWNED",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_tun_node_v6",
+      "category": "OVERLAP",
+      "family": "IPv6",
+      "direction": "TUN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "TUN_INGRESS",
+        "NODE_ENDPOINT"
+      ],
+      "overlap": [
+        "TUN",
+        "NODE"
+      ],
+      "expected_current": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "TUN_INGRESS",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_service_control_v6",
+      "category": "OVERLAP",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "UDP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "SERVICE_PORT",
+        "CONTROL_PROTOCOL"
+      ],
+      "service": "DHCPv6",
+      "overlap": [
+        "SERVICE",
+        "CONTROL"
+      ],
+      "expected_current": {
+        "reason": "SERVICE_PORT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "CONTROL_PROTOCOL",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_china_user_direct_v6",
+      "category": "OVERLAP",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CHINA_POLICY",
+        "EXPLICIT_DIRECT"
+      ],
+      "china_policy": "BYPASS_MAINLAND",
+      "overlap": [
+        "USER_DIRECT",
+        "CHINA"
+      ],
+      "expected_current": {
+        "reason": "CHINA_POLICY",
+        "decision": "DIRECT",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "EXPLICIT_DIRECT",
+        "decision": "DIRECT",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_self_node_v6",
+      "category": "OVERLAP",
+      "family": "IPv6",
+      "direction": "ROUTER_OUTPUT",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "SELF_TRAFFIC",
+        "NODE_ENDPOINT"
+      ],
+      "overlap": [
+        "SELF",
+        "NODE"
+      ],
+      "expected_current": {
+        "reason": "NODE_ENDPOINT",
+        "decision": "BYPASS",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "SELF_TRAFFIC",
+        "decision": "BYPASS",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_china_pass_user_direct_v6",
+      "category": "OVERLAP",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "TCP",
+      "owner": "OPENKILL",
+      "backend_mode": "TUN",
+      "flags": [
+        "CHINA_POLICY",
+        "CHINA_PASS",
+        "EXPLICIT_DIRECT"
+      ],
+      "china_policy": "BYPASS_MAINLAND",
+      "overlap": [
+        "USER_DIRECT",
+        "CHINA_PASS"
+      ],
+      "expected_current": {
+        "reason": "DEFAULT_POLICY",
+        "decision": "PROXY",
+        "status": "CURRENT_UNDEFINED"
+      },
+      "expected_target": {
+        "reason": "EXPLICIT_DIRECT",
+        "decision": "DIRECT",
+        "status": "VALID"
+      }
+    },
+    {
+      "id": "overlap_owner_disabled_v6",
+      "category": "OVERLAP",
+      "family": "IPv6",
+      "direction": "LAN_INGRESS",
+      "protocol": "UDP",
+      "owner": "DISABLED",
+      "backend_mode": "TUN",
+      "flags": [
+        "EXPLICIT_DIRECT"
+      ],
+      "overlap": [
+        "OWNER",
+        "USER_DIRECT"
+      ],
+      "expected_current": {
+        "reason": "OWNER_DISABLED",
+        "decision": "NOT_OWNED",
+        "status": "VALID"
+      },
+      "expected_target": {
+        "reason": "OWNER_DISABLED",
+        "decision": "NOT_OWNED",
+        "status": "VALID"
+      }
+    }
+  ]
+}
