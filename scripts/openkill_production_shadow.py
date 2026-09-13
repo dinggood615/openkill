@@ -967,6 +967,168 @@ def _reason_positions(intent: Mapping[str, Any], chain: str) -> Dict[str, int]:
     return positions
 
 
+def _expression_matches_packet(expression: str, packet: Mapping[str, Any]) -> bool:
+    """Apply only explicit family/transport qualifiers from an intent rule.
+
+    This is deliberately a narrow observation helper for the old command
+    recorder and the new syntax AST.  It does not evaluate addresses, sets,
+    or policy precedence; those facts are compared by the semantic fixture
+    and the order dimension above.
+    """
+
+    lower = str(expression or "").lower()
+    family = str(packet.get("family", "")).upper()
+    protocol = str(packet.get("protocol", "")).upper()
+    if family == "IPV4" and ("nfproto ipv6" in lower or "ip6 " in lower or "ip6 daddr" in lower or "ip6 nexthdr" in lower):
+        return False
+    if family == "IPV6" and ("nfproto ipv4" in lower or re.search(r"\bip\s+(?:saddr|daddr|protocol)\b", lower)):
+        return False
+    # A rule with an explicit TCP/UDP/ICMP qualifier must agree with the
+    # synthetic packet.  Unqualified rules are retained for the packet; the
+    # helper is not a classifier and never invents a default protocol.
+    if protocol == "TCP":
+        if re.search(r"\budp\b", lower) and not re.search(r"\btcp\b", lower):
+            return False
+    elif protocol == "UDP":
+        if re.search(r"\btcp\b", lower) and not re.search(r"\budp\b", lower):
+            return False
+    elif protocol == "ICMPV6":
+        if re.search(r"\b(?:tcp|udp|icmp)\b", lower) and "icmpv6" not in lower:
+            return False
+    elif protocol == "ICMP":
+        if "icmpv6" in lower or re.search(r"\b(?:tcp|udp)\b", lower):
+            return False
+    return True
+
+
+def _attachment_target(attachment: Mapping[str, Any]) -> Optional[str]:
+    target = attachment.get("to_chain")
+    if target:
+        return str(target)
+    expression = str(attachment.get("expression") or attachment.get("match_expression") or "")
+    match = re.search(r"\bjump\s+([A-Za-z0-9_.-]+)", expression)
+    return match.group(1) if match else None
+
+
+def _reachable_chains(intent: Mapping[str, Any], packet: Mapping[str, Any]) -> List[str]:
+    """Return final classifier chains reachable for the packet facts."""
+
+    direction = str(packet.get("direction", "")).upper()
+    source_by_direction = {
+        "LAN_INGRESS": {"dstnat", "mangle_prerouting", "prerouting"},
+        "ROUTER_OUTPUT": {"nat_output", "mangle_output", "output"},
+        # TUN ingress is represented as a classifier-chain fact rather than
+        # a base-chain attachment in the current fixtures.
+        "TUN_INGRESS": {"mangle_prerouting", "mangle_output", "openkill_mangle", "openkill_mangle_v6"},
+    }
+    allowed_sources = source_by_direction.get(direction)
+    chains: List[str] = []
+    for attachment in intent.get("attachments", ()):
+        source = str(attachment.get("chain") or attachment.get("from_chain") or "")
+        if allowed_sources is not None and source not in allowed_sources:
+            continue
+        expression = attachment.get("expression") or attachment.get("match_expression")
+        if not _expression_matches_packet(str(expression or ""), packet):
+            continue
+        target = _attachment_target(attachment)
+        if target and target not in chains:
+            chains.append(target)
+    return chains
+
+
+def _proxy_action_signature(intent: Mapping[str, Any], packet: Mapping[str, Any]) -> List[Dict[str, Any]]:
+    """Observe transport-qualified proxy actions on the reachable path.
+
+    The returned values are facts extracted from already-generated intent;
+    this function does not choose a winning rule.  It exists to catch a
+    production/current renderer divergence such as TCP redirect versus UDP
+    TPROXY, or a different TPROXY listener port.
+    """
+
+    reachable = set(_reachable_chains(intent, packet))
+    if not reachable:
+        # Some fixture intents are already scoped to one classifier chain and
+        # do not carry an attachment.  Keep that representation observable.
+        selected = _active_chain_for_packet(packet)
+        if selected:
+            reachable.add(selected)
+    family = str(packet.get("family", "")).upper()
+    protocol = str(packet.get("protocol", "")).upper()
+    result: List[Dict[str, Any]] = []
+    for rule in intent.get("rules", ()):
+        chain = str(rule.get("chain") or "")
+        if chain not in reachable:
+            continue
+        action = str(rule.get("action") or rule.get("action_type") or "")
+        if action not in {"MARK_PROXY", "TPROXY_PROXY", "REDIRECT_PROXY"}:
+            continue
+        match_expression = str(rule.get("expression") or rule.get("match_expression") or "")
+        if not _expression_matches_packet(match_expression, packet):
+            continue
+        action_expression = str(rule.get("action_expression") or "")
+        combined = (match_expression + " " + action_expression).lower()
+        port: Optional[int] = None
+        if action == "TPROXY_PROXY":
+            # Both current production forms (127.0.0.1:7893 and :7893) and
+            # the development renderer form (:12345) are accepted.
+            matches = re.findall(r"\b(?:tproxy|to)\b[^\n;]*?(?::|port\s+)(\d+)\b", combined)
+            if matches:
+                try:
+                    port = int(matches[-1])
+                except ValueError:
+                    port = None
+        elif action == "REDIRECT_PROXY":
+            match = re.search(r"\bredirect\s+to\s*:?(\d+)\b", combined)
+            if match:
+                port = int(match.group(1))
+        mark_match = re.search(r"\b(?:meta\s+)?mark(?:\s+set)?\s+(0x[0-9a-f]+|\d+)\b", combined)
+        mark = mark_match.group(1).lower() if mark_match else None
+        result.append(
+            {
+                "chain": chain,
+                "family": family,
+                "protocol": protocol,
+                "action": action,
+                "port": port,
+                "mark": mark,
+                "order": rule.get("order"),
+            }
+        )
+    # A stable, duplicate-free action fact list is sufficient for parity;
+    # rule order remains the responsibility of compare_intent_dimensions.
+    unique: Dict[Tuple[Any, ...], Dict[str, Any]] = {}
+    for item in result:
+        key = (item["chain"], item["family"], item["protocol"], item["action"], item["port"], item["mark"])
+        unique.setdefault(key, item)
+    return sorted(unique.values(), key=lambda item: (item["chain"], item["action"], item["port"] or 0, item["mark"] or ""))
+
+
+def compare_proxy_transport(
+    state: Mapping[str, Any],
+    packet: Mapping[str, Any],
+    old_intent: Mapping[str, Any],
+    new_intent: Mapping[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """Compare transport action facts for the current TPROXY profile."""
+
+    if str(state.get("run_mode", "")).upper() != "TPROXY":
+        return None
+    old_actions = _proxy_action_signature(old_intent, packet)
+    new_actions = _proxy_action_signature(new_intent, packet)
+    old_core = sorted({(item["action"], item["family"], item["protocol"], item["port"], item["mark"]) for item in old_actions})
+    new_core = sorted({(item["action"], item["family"], item["protocol"], item["port"], item["mark"]) for item in new_actions})
+    return {
+        "family": packet.get("family"),
+        "protocol": packet.get("protocol"),
+        "direction": packet.get("direction"),
+        "old_reachable_chains": _reachable_chains(old_intent, packet),
+        "new_reachable_chains": _reachable_chains(new_intent, packet),
+        "old_actions": old_core,
+        "new_actions": new_core,
+        "equivalent": old_core == new_core,
+    }
+
+
 def compare_intent_dimensions(
     packet: Mapping[str, Any],
     intent_case: Mapping[str, Any],
@@ -1094,6 +1256,19 @@ def compare_current_case(
             "behavior_change_candidate": "BC-02" if {"NODE_ENDPOINT", "ACCESS_CONTROL"}.issubset(set(dimensions.get("shared_reasons", ()))) else None,
             "detail": dimensions,
         }
+    transport = compare_proxy_transport(state, packet, old_intent, new_context_intent or new_intent)
+    if transport is not None and not transport.get("equivalent"):
+        # Transport action type, family, protocol, mark, and listener port
+        # are observable dataplane intent.  Keep this separate from policy
+        # precedence so a backend mismatch cannot be hidden as a structural
+        # difference or reinterpreted as a target behavior change.
+        classification = "SEMANTIC_MISMATCH"
+        mismatch = {
+            "type": "SEMANTIC_SPEC_DEFECT",
+            "dimension": "proxy_action",
+            "likely_root_cause": "PRODUCTION_BUG_CANDIDATE",
+            "detail": transport,
+        }
     return {
         "id": intent_case["id"],
         "classification": classification,
@@ -1108,6 +1283,7 @@ def compare_current_case(
         "old_rule_count": len(old_intent.get("rules", ())),
         "new_rule_count": len(new_intent.get("rules", ())),
         "dimensions": dimensions,
+        "transport": transport,
     }
 
 
@@ -1444,6 +1620,7 @@ def run_shadow_comparison(
         "EXACT_STRUCTURAL_MATCH", "SEMANTIC_EQUIVALENT_STRUCTURAL_DIFF", "KNOWN_CURRENT_GAP",
         "UNSUPPORTED_CURRENT_CASE", "SEMANTIC_MISMATCH", "UNKNOWN", "OLD_HARNESS_DEFECT", "OLD_NORMALIZER_DEFECT", "NEW_RENDERER_DEFECT",
     )}
+    transport_results = [item.get("transport") for item in results if item.get("transport") is not None]
     return {
         "schema": PHASE_3C_SCHEMA,
         "profile": CURRENT_PROFILE,
@@ -1457,6 +1634,12 @@ def run_shadow_comparison(
         "function_hashes": production_function_hashes(root_path),
         "unknown_mismatch_count": sum(1 for item in results if item.get("classification") == "UNKNOWN"),
         "semantic_mismatch_count": sum(1 for item in results if item.get("classification") == "SEMANTIC_MISMATCH"),
+        "tproxy_parity": {
+            "scenarios": len(transport_results),
+            "equivalent": sum(1 for item in transport_results if item.get("equivalent")),
+            "mismatches": sum(1 for item in transport_results if not item.get("equivalent")),
+            "results": transport_results,
+        },
     }
 
 
@@ -1470,6 +1653,7 @@ __all__ = [
     "build_production_scenarios",
     "coverage_summary",
     "compare_current_case",
+    "compare_proxy_transport",
     "dns_scope_signature",
     "extract_shell_function",
     "normalize_new_renderer_intent",

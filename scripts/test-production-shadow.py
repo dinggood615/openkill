@@ -145,24 +145,51 @@ class ProductionShadowTests(unittest.TestCase):
         # extracted production code inserts the node return at position zero,
         # so Phase 3C must surface this unresolved BC-02 discrepancy rather
         # than silently blessing either side.
-        self.assertEqual(self.report["semantic_mismatch_count"], 2)
+        # The order audit also keeps the two transport mismatches visible:
+        # the current production TPROXY branch uses 7893/redirect 7892,
+        # while the development renderer fixture still uses its independent
+        # 12345 placeholder and emits a broader router/TCP path.
+        self.assertEqual(self.report["semantic_mismatch_count"], 10)
         self.assertEqual(self.report["unknown_mismatch_count"], 0)
         mismatches = {
             item["id"] for item in self.report["results"] if item["classification"] == "SEMANTIC_MISMATCH"
         }
         self.assertEqual(
             mismatches,
-            {"SHADOW-066-overlap_access_node_v4", "SHADOW-067-overlap_access_node_v6"},
+            {
+                "SHADOW-066-overlap_access_node_v4", "SHADOW-067-overlap_access_node_v6",
+                "P3C-TPROXY-01", "P3C-TPROXY-02", "P3C-TPROXY-03", "P3C-TPROXY-04",
+                "P3C-TPROXY-05", "P3C-TPROXY-06", "P3C-TPROXY-07", "P3C-TPROXY-08",
+            },
         )
         for item in self.report["results"]:
-            if item["id"] in mismatches:
+            if item["id"] in {"SHADOW-066-overlap_access_node_v4", "SHADOW-067-overlap_access_node_v6"}:
                 self.assertEqual(item["mismatch"]["dimension"], "rule_order")
                 self.assertEqual(item["mismatch"]["behavior_change_candidate"], "BC-02")
+            elif item["id"].startswith("P3C-TPROXY-"):
+                self.assertEqual(item["mismatch"]["dimension"], "proxy_action")
+                self.assertFalse(item["transport"]["equivalent"])
         allowed = {"EXACT_STRUCTURAL_MATCH", "SEMANTIC_EQUIVALENT_STRUCTURAL_DIFF", "KNOWN_CURRENT_GAP", "UNSUPPORTED_CURRENT_CASE"}
         allowed |= {"SEMANTIC_MISMATCH"}
         self.assertTrue(set(item["classification"] for item in self.report["results"]) <= allowed)
         self.assertIn("SEMANTIC_EQUIVALENT_STRUCTURAL_DIFF", self.report["comparison_classes"])
         self.assertIn("KNOWN_CURRENT_GAP", self.report["comparison_classes"])
+
+    def test_tproxy_transport_parity_is_explicit(self):
+        tproxy = [item for item in self.report["results"] if item["id"].startswith("P3C-TPROXY-")]
+        self.assertEqual(len(tproxy), 8)
+        self.assertEqual(self.report["tproxy_parity"]["scenarios"], 8)
+        self.assertEqual(self.report["tproxy_parity"]["mismatches"], 8)
+        self.assertEqual(sum(1 for item in tproxy if item["transport"] is not None), 8)
+        self.assertEqual(sum(1 for item in tproxy if item["transport"]["equivalent"]), 0)
+        # Every mismatch retains family/protocol, reachable-chain, mark and
+        # listener-port evidence for the final report.
+        for item in tproxy:
+            detail = item["mismatch"]["detail"]
+            self.assertIn(detail["family"], {"IPv4", "IPv6"})
+            self.assertIn(detail["protocol"], {"TCP", "UDP"})
+            self.assertIn("old_actions", detail)
+            self.assertIn("new_actions", detail)
 
     def test_order_dimension_is_recorded_independently(self):
         by_id = {item["id"]: item for item in self.report["results"]}

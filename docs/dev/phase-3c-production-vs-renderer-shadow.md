@@ -66,7 +66,19 @@ mangle/DNS-router path, for both families.  The equal hashes observed in the
 earlier syntax phase came from hashing a scope-free fragment; they did not
 prove equal packet scope.  Phase 3C records the physical paths explicitly.
 
+The transport audit also compares the final reachable path for each TPROXY
+probe.  It found eight current-profile mismatches.  The production fixture
+uses a 7893 TPROXY listener (and a 7892 TCP redirect in the mixed TPROXY
+branch), while the development renderer uses its 12345 development default;
+the production IPv4 LAN TCP probe follows the redirect chain, and the
+production TPROXY fixture has no router-output attachment.  These are reported
+as `SEMANTIC_MISMATCH` with `dimension=proxy_action`; no port, protocol, or
+attachment was silently normalized away.  The normalized state schema does not
+yet carry proxy listener ports, so this remains a production-neutral design
+gap for a later approval rather than a renderer or production fix in 3C.
+
 The comparison remains `profile=current`; target rendering is diagnostic only.
 BC-01 through BC-07 remain `PRODUCTION_NOT_APPROVED`.  A future Phase 3D must
-first resolve the BC-02 discrepancy (and review the remaining documented
-cleanup and external-fw4 risks) before any production wiring is considered.
+first resolve the BC-02 and TPROXY action discrepancies (and review the
+remaining documented cleanup and external-fw4 risks) before any production
+wiring is considered.
