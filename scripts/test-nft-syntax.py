@@ -176,9 +176,9 @@ class NFTSyntaxTests(unittest.TestCase):
         self.assertIn("meta mark set 0x162", mark_text)
         tproxy = copy.deepcopy(cases["v4_default_udp"])
         tproxy_text = render_nft(render_context(tproxy))
-        self.assertIn("tproxy to :12345 meta mark set 0x162", tproxy_text)
+        self.assertIn("tproxy ip to :12345 meta mark set 0x162", tproxy_text)
         v6_tproxy = copy.deepcopy(cases["v6_default_udp"])
-        self.assertIn("tproxy to :12345 meta mark set 0x162", render_nft(render_context(v6_tproxy)))
+        self.assertIn("tproxy ip6 to :12345 meta mark set 0x162", render_nft(render_context(v6_tproxy)))
         redirect = copy.deepcopy(cases["v4_default_tcp"])
         redirect["backend_mode"] = "REDIRECT"
         self.assertIn("redirect to :12345", render_nft(render_context(redirect)))
@@ -192,7 +192,7 @@ class NFTSyntaxTests(unittest.TestCase):
 
     def test_control_and_invalid_value_matrix(self):
         control_text = render_nft(render_state(self.state_by_id["STATE-02-IPV6-SOURCE-SPECIFIC"]))
-        self.assertIn("icmpv6 type {router-solicitation, router-advertisement, neighbor-solicitation, neighbor-advertisement, packet-too-big, destination-unreachable, time-exceeded, parameter-problem}", control_text)
+        self.assertIn("icmpv6 type {nd-router-solicit, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, packet-too-big, destination-unreachable, time-exceeded, parameter-problem}", control_text)
         self.assertIn("udp dport { 546, 547 }", control_text)
         invalid_values = (
             (("not-an-ip",), "ADDRESS", "IPv4"),
@@ -216,6 +216,8 @@ class NFTSyntaxTests(unittest.TestCase):
         for bad in ("line\nfeed", "line\rfeed", "nul\x00"):
             with self.assertRaises(NftSyntaxValidationError):
                 quote_comment(bad)
+        with self.assertRaises(NftSyntaxValidationError):
+            quote_comment("x" * 129)
         for bad in (
             "flush ruleset\n",
             "delete table inet fw4\n",
@@ -258,6 +260,9 @@ class NFTSyntaxTests(unittest.TestCase):
         self.assertNotIn("TEST_SCAFFOLD", production)
         self.assertNotIn("TEST_ONLY", production)
         self.assertIn("nat_output { type nat hook output priority -1; }", production)
+        self.assertNotIn("output jump nat_output", production)
+        self.assertIn("nat_output meta nfproto ipv4 ip protocol tcp jump openkill_output", production)
+        self.assertIn("nat_output meta nfproto ipv6 jump openkill_output_v6", production)
         self.assertIn("external FW4 reference", production)
         self.assertIn("meta nfproto ipv4 jump openkill_mangle", production)
         self.assertIn("meta nfproto ipv6 jump openkill_mangle_v6", production)
@@ -369,20 +374,41 @@ class NFTSyntaxTests(unittest.TestCase):
         self.assertNotIn("add chain", render_nft(ir))
 
     def test_nft_check_matrix_or_explicit_unavailable(self):
+        cases = self.classifier_fixture["cases"]
+        case_by_id = {case["id"]: case for case in cases}
+        empty_nodes = copy.deepcopy(self.state_by_id["STATE-04-NODES"])
+        empty_nodes["node4"], empty_nodes["node6"] = [], []
         scenarios = {
-            "basic_ipv4_tun": self.state_by_id["STATE-01-BASIC-V4"],
-            "basic_ipv6_tun_current": self.state_by_id["STATE-02-IPV6-SOURCE-SPECIFIC"],
-            "dual_stack_tun": self.state_by_id["STATE-03-DUAL-STACK"],
-            "node4_node6": self.state_by_id["STATE-04-NODES"],
-            "china": self.state_by_id["STATE-05-CHINA-DIRECT"],
-            "china_pass": self.state_by_id["STATE-06-CHINA-PASS"],
-            "fakeip": self.state_by_id["STATE-07-FAKE-IP"],
-            "acl": self.state_by_id["STATE-08-LAN-ACL"],
-            "tproxy": self.state_by_id["STATE-12-TPROXY"],
+            "basic_ipv4_tun": render_state(self.state_by_id["STATE-01-BASIC-V4"]),
+            "basic_ipv6_tun_current": render_state(self.state_by_id["STATE-02-IPV6-SOURCE-SPECIFIC"]),
+            "dual_stack_tun": render_state(self.state_by_id["STATE-03-DUAL-STACK"]),
+            "ipv4_tproxy_tcp": render_context({**case_by_id["v4_default_tcp"], "backend_mode": "TPROXY"}),
+            "ipv4_tproxy_udp": render_context({**case_by_id["v4_default_udp"], "backend_mode": "TPROXY"}),
+            "ipv6_tproxy_tcp": render_context({**case_by_id["v6_default_tcp"], "backend_mode": "TPROXY"}),
+            "ipv6_tproxy_udp": render_context({**case_by_id["v6_default_udp"], "backend_mode": "TPROXY"}),
+            "redirect_tcp": render_context({**case_by_id["v4_default_tcp"], "backend_mode": "REDIRECT"}),
+            "dns_lan_v4": render_context(case_by_id["v4_dns_lan"]),
+            "dns_lan_v6": render_context(case_by_id["v6_dns_lan"]),
+            "dns_router_v4": render_context(case_by_id["v4_dns_router_output"]),
+            "dns_router_v6": render_context(case_by_id["v6_dns_router_output"]),
+            "node4": render_context(case_by_id["v4_node_literal"]),
+            "node6": render_context(case_by_id["v6_node_literal"]),
+            "empty_node_sets": render_state(empty_nodes),
+            "local4": render_context(case_by_id["v4_private"]),
+            "local6": render_context(case_by_id["v6_private"]),
+            "delegated6": render_context(case_by_id["v6_delegated_prefix"]),
+            "china4": render_context(case_by_id["v4_china_mainland"]),
+            "china6": render_context(case_by_id["v6_china_mainland"]),
+            "china_pass4": render_context(case_by_id["v4_china_pass"]),
+            "china_pass6": render_context(case_by_id["v6_china_pass"]),
+            "acl": render_state(self.state_by_id["STATE-08-LAN-ACL"]),
+            "service_ports": render_context(case_by_id["v4_service_port"]),
+            "mihomo_owner": render_state(self.state_by_id["STATE-11-MIHOMO-OWNER"]),
         }
-        for name, state in scenarios.items():
+        self.assertEqual(len(scenarios), 25)
+        for name, ir in scenarios.items():
             with self.subTest(scenario=name):
-                text = render_check_file(render_state(state))
+                text = render_check_file(ir)
                 self.assertIn("TEST_SCAFFOLD", text)
                 if not self.nft_path:
                     continue

@@ -37,6 +37,7 @@ NFT_SYNTAX_SCHEMA = "OPENKILL_NFT_SYNTAX_V1"
 NFT_AST_SCHEMA = "OPENKILL_NFT_AST_V1"
 OWNERSHIP_MANIFEST_VERSION = 1
 OWNERSHIP_MANIFEST_SCHEMA = "OPENKILL_NFT_MANIFEST_V1"
+NFT_COMMENT_MAX = 128
 DEFAULT_RENDERER_PROFILE = "current"
 SUPPORTED_PROFILES = ("current", "target")
 SUPPORTED_BACKEND = "ABSTRACT_NFT"
@@ -136,6 +137,11 @@ def quote_comment(value: Any) -> str:
         _fail("control/newline character in comment")
     if "\r" in value or "\n" in value:
         _fail("newline in comment")
+    # nft limits a comment payload to 128 characters.  Use the UTF-8 byte
+    # length as the conservative check so non-ASCII diagnostics cannot be
+    # accepted here and rejected later by the real parser.
+    if len(value.encode("utf-8")) > NFT_COMMENT_MAX:
+        _fail("comment exceeds nft {} character limit".format(NFT_COMMENT_MAX))
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
@@ -286,19 +292,48 @@ def _set_nft_type(element_type: str, family: str) -> Tuple[str, List[str]]:
 
 
 def _owned_comment(obj: Mapping[str, Any], *, source_logical_id: Optional[str] = None) -> str:
-    values = [
-        "OpenKill",
-        "logical_id={}".format(obj.get("logical_id", "")),
-        "component={}".format(obj.get("component", "")),
-    ]
-    if source_logical_id and source_logical_id != obj.get("logical_id"):
-        values.append("source={}".format(source_logical_id))
-    if obj.get("semantic_reason"):
-        values.append("reason={}".format(obj["semantic_reason"]))
-    if obj.get("decision"):
-        values.append("decision={}".format(obj["decision"]))
-    values.append("owner=OPENKILL")
-    return quote_comment(" ".join(values))
+    logical_id = str(obj.get("logical_id", ""))
+    component = str(obj.get("component", ""))
+    reason = obj.get("semantic_reason")
+    decision = obj.get("decision")
+    source = source_logical_id if source_logical_id and source_logical_id != logical_id else None
+
+    # Keep human-readable field names whenever the nft limit allows them.  A
+    # derived rule's logical_id already identifies its source, so source is
+    # optional metadata and is omitted before required trace fields are
+    # abbreviated.  Every fallback still carries logical id, component,
+    # reason, decision, and owner for diagnostics.
+    full = ["OpenKill", "logical_id={}".format(logical_id), "component={}".format(component)]
+    if source:
+        full.append("source={}".format(source))
+    if reason:
+        full.append("reason={}".format(reason))
+    if decision:
+        full.append("decision={}".format(decision))
+    full.append("owner=OPENKILL")
+    candidates = [full]
+    without_source = [item for item in full if not item.startswith("source=")]
+    if without_source != full:
+        candidates.append(without_source)
+    compact = ["OpenKill", "logical_id={}".format(logical_id), "component={}".format(component)]
+    if reason:
+        compact.append("r={}".format(reason))
+    if decision:
+        compact.append("d={}".format(decision))
+    compact.append("o=OPENKILL")
+    candidates.append(compact)
+    candidates.append(
+        ["OpenKill", "id={}".format(logical_id), "c={}".format(component)]
+        + (["r={}".format(reason)] if reason else [])
+        + (["d={}".format(decision)] if decision else [])
+        + ["o=OPENKILL"]
+    )
+    for values in candidates:
+        text = " ".join(values)
+        if len(text.encode("utf-8")) <= NFT_COMMENT_MAX:
+            return quote_comment(text)
+    _fail("owned comment exceeds nft {} character limit".format(NFT_COMMENT_MAX))
+    return ""
 
 
 def audit_dependency_graph(dependencies: Mapping[str, Any]) -> Dict[str, Any]:
@@ -484,6 +519,21 @@ _ICMPV6_CONTROL_NAMES = (
     "parameter-problem",
 )
 
+# The semantic contract uses descriptive names.  nftables uses the shorter
+# RFC 4861 ``nd-*`` spellings for the four Neighbor Discovery messages; keep
+# that translation in the syntax lowering layer so the classifier contract
+# remains backend-neutral.
+_ICMPV6_NFT_NAMES = {
+    "router-solicitation": "nd-router-solicit",
+    "router-advertisement": "nd-router-advert",
+    "neighbor-solicitation": "nd-neighbor-solicit",
+    "neighbor-advertisement": "nd-neighbor-advert",
+    "packet-too-big": "packet-too-big",
+    "destination-unreachable": "destination-unreachable",
+    "time-exceeded": "time-exceeded",
+    "parameter-problem": "parameter-problem",
+}
+
 
 def _base_match_expressions(rule: Mapping[str, Any], family: str) -> List[str]:
     match = rule.get("match", {})
@@ -573,11 +623,20 @@ def _match_variants(
             protocol_options = ["tcp", "udp"]
         elif port_ref and not protocol:
             protocol_options = ["tcp", "udp"]
+        elif rule.get("action_type") == "TPROXY_PROXY" and not protocol and not service and not port_ref:
+            # nft requires a transport-protocol match for tproxy.  A
+            # protocol-neutral semantic PROXY rule therefore lowers to its
+            # TCP and UDP variants; it does not broaden policy to ICMP.
+            protocol_options = ["tcp", "udp"]
         for p in protocol_options:
             extra: List[str] = []
             if control and family == "IPv6":
                 if p == "icmpv6":
-                    extra.append("icmpv6 type {" + ", ".join(_ICMPV6_CONTROL_NAMES) + "}")
+                    extra.append(
+                        "icmpv6 type {"
+                        + ", ".join(_ICMPV6_NFT_NAMES[name] for name in _ICMPV6_CONTROL_NAMES)
+                        + "}"
+                    )
                 elif p == "udp":
                     extra.append("udp dport { 546, 547 }")
             elif service == "DNS":
@@ -593,7 +652,11 @@ def _match_variants(
                 if set_expression:
                     parts.append(set_expression)
                 if p and not extra:
-                    parts.append(p)
+                    # A bare ``tcp``/``udp`` token is not a complete nft
+                    # protocol match.  Use the generic l4 protocol
+                    # primitive when no transport header expression (such as
+                    # dport) follows it.
+                    parts.append("meta l4proto {}".format(p))
                 parts.extend(extra)
                 result.append(("{}{}{}".format(suffix, "_" if suffix and p else "", p), " ".join(parts)))
     if not result:
@@ -609,6 +672,7 @@ def _action_expression(
     chain: Optional[str] = None,
     target_chain: Optional[str] = None,
     protocol: str = "",
+    family: Optional[str] = None,
     tproxy_port: int = DEFAULT_TPROXY_PORT,
     redirect_port: int = DEFAULT_REDIRECT_PORT,
 ) -> Optional[str]:
@@ -619,7 +683,16 @@ def _action_expression(
     if action_type == "TPROXY_PROXY":
         if not 1 <= int(tproxy_port) <= 65535:
             _fail("invalid TProxy port")
-        return "tproxy to :{} meta mark set {}".format(int(tproxy_port), MARK_ABI["mark"])
+        if protocol not in {"tcp", "udp"}:
+            raise UnsupportedNftAction("TPROXY_PROXY requires a TCP or UDP match")
+        if family not in {"IPv4", "IPv6"}:
+            _fail("TPROXY_PROXY requires an IP family")
+        address_family = "ip6" if family == "IPv6" else "ip"
+        return "tproxy {} to :{} meta mark set {}".format(
+            address_family,
+            int(tproxy_port),
+            MARK_ABI["mark"],
+        )
     if action_type == "REDIRECT_PROXY":
         if protocol != "tcp":
             raise UnsupportedNftAction("REDIRECT_PROXY is only valid for TCP")
@@ -736,6 +809,7 @@ def _lower_rule_variants(
                 chain=chain,
                 target_chain=target,
                 protocol=protocol,
+                family=family,
                 tproxy_port=tproxy_port,
                 redirect_port=redirect_port,
             )
@@ -915,6 +989,58 @@ def _lower_jump(
     }
 
 
+def _lower_current_nat_output_jumps(
+    jump: Mapping[str, Any],
+    *,
+    chains: Mapping[str, Mapping[str, Any]],
+    external: Mapping[str, Mapping[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Lower the current nat_output hook without jumping into a base chain.
+
+    nftables rejects a jump whose target is itself a hooked (base) chain.  The
+    production OpenKill topology instead hooks ``nat_output`` directly and
+    jumps from that chain into the family-specific regular output chain.  The
+    IR keeps one logical current attachment, so the syntax layer expands it
+    into the two deterministic family attachments here.
+    """
+
+    parent_id = validate_logical_id(jump.get("logical_id"))
+    source = _physical_chain("OPENKILL_NAT_OUTPUT_CURRENT", chains, external)
+    lowered: List[Dict[str, Any]] = []
+    for family, suffix in (("IPv4", "V4"), ("IPv6", "V6")):
+        target = _physical_chain("OPENKILL_OUTPUT_PROXY_" + suffix, chains, external)
+        logical_id = parent_id + "_" + suffix
+        match = (
+            "meta nfproto ipv4 ip protocol tcp"
+            if family == "IPv4"
+            else "meta nfproto ipv6"
+        )
+        lowered.append(
+            {
+                "object_type": "attachment",
+                "logical_id": logical_id,
+                "physical_name": validate_nft_identifier("jump_nat_output_" + suffix.lower(), kind="attachment"),
+                "owner": "OPENKILL",
+                "ownership": "OWNED",
+                "parent_owner": "FW4",
+                "parent_table": "inet fw4",
+                "component": jump.get("component"),
+                "family": family,
+                "from_chain": source,
+                "to_chain": target,
+                "match_expression": match,
+                "action_type": "JUMP",
+                "action_expression": "jump " + target,
+                "source_logical_id": parent_id,
+                "trace_comment": _owned_comment(
+                    {**jump, "logical_id": logical_id},
+                    source_logical_id=parent_id,
+                ),
+            }
+        )
+    return lowered
+
+
 def _manifest(objects: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
     entries = []
     for obj in objects:
@@ -1013,7 +1139,12 @@ def lower_nft_ir(
     attachments = []
     for jump in normalized["static_topology"].get("jumps", ()):
         if jump.get("owner") == "OPENKILL":
-            attachments.append(_lower_jump(jump, chains=chains, external=external))
+            if jump.get("logical_id") == "ATTACH_NAT_OUTPUT_CURRENT":
+                attachments.extend(
+                    _lower_current_nat_output_jumps(jump, chains=chains, external=external)
+                )
+            else:
+                attachments.append(_lower_jump(jump, chains=chains, external=external))
     attachments.sort(key=lambda item: item["logical_id"])
 
     external_refs = []
@@ -1107,6 +1238,12 @@ def _serialize_rule_text(rule: Mapping[str, Any]) -> str:
 
 
 def _serialize_attachment_text(item: Mapping[str, Any]) -> str:
+    # ``nat_output`` is already a hooked base chain.  nftables does not allow
+    # a rule in another base chain to jump into it (the parser reports
+    # ``Operation not supported``).  The current OpenKill topology hooks this
+    # chain directly and dispatches to the regular family output chains, so
+    # the expanded family attachments produced by _lower_current_nat_output_jumps
+    # are serialized normally below.
     match = str(item.get("match_expression", "")).strip()
     return "add rule inet fw4 {} {} comment {}".format(
         validate_nft_identifier(item["from_chain"], kind="attachment source"),
@@ -1393,6 +1530,12 @@ def parse_normalized_intent(text: str) -> Dict[str, Any]:
             if "=" in token:
                 key, value = token.split("=", 1)
                 fields[key] = value
+        # Long rule IDs can require the compact diagnostic spelling used by
+        # _owned_comment.  Normalize those aliases so parsed intent keeps the
+        # same field contract regardless of comment length.
+        for short, long in (("id", "logical_id"), ("c", "component"), ("r", "reason"), ("d", "decision"), ("o", "owner")):
+            if short in fields and long not in fields:
+                fields[long] = fields[short]
         if fields:
             records.append(fields)
     records.sort(key=lambda item: (item.get("logical_id", ""), item.get("component", "")))
@@ -1460,6 +1603,7 @@ __all__ = [
     "NFT_AST_SCHEMA",
     "OWNERSHIP_MANIFEST_VERSION",
     "OWNERSHIP_MANIFEST_SCHEMA",
+    "NFT_COMMENT_MAX",
     "DEFAULT_RENDERER_PROFILE",
     "SUPPORTED_PROFILES",
     "SUPPORTED_BACKEND",
