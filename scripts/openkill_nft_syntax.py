@@ -700,9 +700,11 @@ def _action_expression(
             _fail("invalid redirect port")
         return "redirect to :{}".format(int(redirect_port))
     if action_type == "DNS_REDIRECT":
-        if not target_chain:
-            _fail("DNS_REDIRECT requires a DNS chain target")
-        return "jump {}".format(validate_nft_identifier(target_chain, kind="DNS chain"))
+        if target_chain:
+            return "jump {}".format(validate_nft_identifier(target_chain, kind="DNS chain"))
+        if not 1 <= int(redirect_port) <= 65535:
+            _fail("invalid DNS redirect port")
+        return "redirect to :{}".format(int(redirect_port))
     if action_type == "JUMP":
         if not target_chain:
             _fail("JUMP requires a target chain")
@@ -732,6 +734,9 @@ def _chain_targets_for_rule(
     external: Mapping[str, Mapping[str, Any]],
 ) -> List[Tuple[str, Optional[str]]]:
     action = rule.get("action_type")
+    explicit_chain = rule.get("context_execution_chain_ref")
+    if explicit_chain:
+        return [(_physical_chain(str(explicit_chain), chains, external), None)]
     if action == "DNS_REDIRECT":
         # DNS is an independent entry point: LAN traffic is sent to the LAN
         # hijack chain and router output to the router redirect chain.
@@ -885,6 +890,7 @@ def _lower_action_ir(
 
     context = ir.get("context")
     actions = ir.get("action_ir", ())
+    execution = ir.get("context_execution") or {}
     if not context or not actions:
         return []
     if ir.get("static_topology", {}).get("owner_state") != "OPENKILL":
@@ -892,7 +898,21 @@ def _lower_action_ir(
         # OpenKill syntax object should be invented for their classification.
         return []
     action = actions[0]
-    action_type = action.get("action_type")
+    action_type = execution.get("action_type") or action.get("action_type")
+    # ACCESS_DENY_REQUIRED is intentionally unsupported for the current
+    # modern backend.  Check the action before honoring a NO_ACTION execution
+    # status so the development/current corpus cannot silently lower an
+    # unapproved deny into an absent rule.
+    if action_type == "ACCESS_DENY_REQUIRED":
+        raise UnsupportedNftAction("ACCESS_DENY_REQUIRED has no approved current verdict")
+    if execution.get("status") in {"NO_ACTION", "PREVIEW_GENERIC"} and execution.get("status") == "NO_ACTION":
+        return []
+    if action_type == "UNSUPPORTED_ACTION":
+        raise UnsupportedNftAction("current backend execution is unsupported for this context")
+    # DNS mode 1 and router-self DNS are emitted as complete parent-chain
+    # attachments.  Only mode 2 LAN DNS has an owned body rule to lower here.
+    if execution.get("kind") == "DNS" and not execution.get("body_chain_ref"):
+        return []
     if action_type in {"NOT_OWNED", "UNRESOLVED_SEMANTIC"}:
         return []
     family_value = str(context.get("family", "")).upper().replace("-", "_")
@@ -901,10 +921,12 @@ def _lower_action_ir(
         _fail("context family missing")
     suffix = "V4" if family == "IPv4" else "V6"
     direction = context.get("direction")
-    if direction == "ROUTER_OUTPUT":
-        chain_id = "OPENKILL_OUTPUT_MANGLE_" + suffix
-    else:
-        chain_id = "OPENKILL_PREROUTING_MANGLE_" + suffix
+    chain_id = execution.get("chain_ref")
+    if not chain_id:
+        if direction == "ROUTER_OUTPUT":
+            chain_id = "OPENKILL_OUTPUT_MANGLE_" + suffix
+        else:
+            chain_id = "OPENKILL_PREROUTING_MANGLE_" + suffix
     chain = _physical_chain(chain_id, chains, external)
     reason = action.get("reason")
     match: Dict[str, Any] = {
@@ -961,16 +983,24 @@ def _lower_action_ir(
         "semantic_reason": action.get("reason"),
         "possible_decisions": [action.get("decision")] if action.get("decision") else [],
         "precedence_index": action.get("precedence_index"),
+        "context_execution_chain_ref": chain_id,
     }
     if reason == "DNS":
         source_rule["dns_scope"] = "DNS_ROUTER" if direction == "ROUTER_OUTPUT" else "DNS_LAN"
+    if execution.get("kind") == "DNS" and execution.get("body_chain_ref"):
+        source_rule["context_execution_chain_ref"] = execution["body_chain_ref"]
     return _lower_rule_variants(
         source_rule,
         chains=chains,
         external=external,
         sets=sets,
-        tproxy_port=tproxy_port,
-        redirect_port=redirect_port,
+        tproxy_port=int(execution.get("tproxy_port", tproxy_port)),
+        redirect_port=int(
+            execution.get(
+                "dns_port" if execution.get("kind") == "DNS" else "redirect_port",
+                redirect_port,
+            )
+        ),
     )
 
 
@@ -1058,6 +1088,136 @@ def _lower_current_nat_output_jumps(
     return lowered
 
 
+def _lower_context_attachments(
+    ir: Mapping[str, Any],
+    *,
+    chains: Mapping[str, Mapping[str, Any]],
+    external: Mapping[str, Mapping[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Lower packet-scoped current attachments without resolving policy.
+
+    The selected semantic reason/action is already present in
+    ``context_execution``.  This helper only materializes the production
+    entry point for that action (for example ``dstnat`` versus ``nat_output``
+    for DNS, or the IPv4 TCP redirect jump).
+    """
+
+    execution = ir.get("context_execution") or {}
+    if execution.get("status") != "READY":
+        return []
+    family = execution.get("family")
+    suffix = "V4" if family == "IPv4" else "V6"
+    kind = execution.get("kind")
+    result: List[Dict[str, Any]] = []
+
+    def owned_attachment(
+        logical_id: str,
+        physical_name: str,
+        source_ref: str,
+        match_expression: str,
+        action_type: str,
+        action_expression: str,
+        *,
+        target_ref: Optional[str] = None,
+        component: str = "PROXY_ACTION",
+    ) -> Dict[str, Any]:
+        source = _physical_chain(source_ref, chains, external)
+        target = _physical_chain(target_ref, chains, external) if target_ref else None
+        return {
+            "object_type": "attachment",
+            "logical_id": validate_logical_id(logical_id),
+            "physical_name": validate_nft_identifier(physical_name, kind="attachment"),
+            "owner": "OPENKILL",
+            "ownership": "OWNED",
+            "parent_owner": "FW4",
+            "parent_table": "inet fw4",
+            "component": component,
+            "family": family,
+            "from_chain": source,
+            "to_chain": target,
+            "match_expression": match_expression,
+            "action_type": action_type,
+            "action_expression": action_expression,
+            "semantic_reason": execution.get("reason"),
+            "decision": execution.get("decision"),
+            "source_logical_id": "CONTEXT_EXECUTION",
+            "trace_comment": _owned_comment(
+                {
+                    "logical_id": logical_id,
+                    "component": component,
+                    "semantic_reason": execution.get("reason"),
+                    "decision": execution.get("decision"),
+                }
+            ),
+        }
+
+    if kind == "DNS":
+        protocol_match = "meta l4proto {tcp,udp} th dport 53"
+        family_match = "meta nfproto {}".format("ipv4" if family == "IPv4" else "ipv6")
+        if execution.get("dns_scope") == "DNS_LAN":
+            source = _physical_chain("FW4_DSTNAT", chains, external)
+            if str(execution.get("dns_mode")) == "1":
+                result.append(
+                    owned_attachment(
+                        "ATTACH_DNS_LAN_CURRENT_" + suffix,
+                        "jump_dns_lan_current_" + suffix.lower(),
+                        "FW4_DSTNAT",
+                        family_match + " " + protocol_match,
+                        "DNS_REDIRECT",
+                        "redirect to :{}".format(int(execution["dns_port"])),
+                        component="DNS",
+                    )
+                )
+            else:
+                target = _physical_chain(str(execution["body_chain_ref"]), chains, external)
+                result.append(
+                    owned_attachment(
+                        "ATTACH_DNS_LAN_CURRENT_" + suffix,
+                        "jump_dns_lan_current_" + suffix.lower(),
+                        "FW4_DSTNAT",
+                        family_match + " " + protocol_match,
+                        "JUMP",
+                        "jump " + target,
+                        target_ref=str(execution["body_chain_ref"]),
+                        component="DNS",
+                    )
+                )
+        elif execution.get("dns_scope") == "DNS_ROUTER":
+            family_tail = "ip daddr {127.0.0.1}" if family == "IPv4" else "ip6 daddr {::1}"
+            result.append(
+                owned_attachment(
+                    "ATTACH_DNS_ROUTER_CURRENT_" + suffix,
+                    "dns_router_current_" + suffix.lower(),
+                    "OPENKILL_NAT_OUTPUT_CURRENT",
+                    "meta skgid != 65534 " + family_match + " " + protocol_match + " " + family_tail,
+                    "DNS_REDIRECT",
+                    "redirect to :{}".format(int(execution["dns_port"])),
+                    component="DNS",
+                )
+            )
+        return result
+
+    parent_ref = execution.get("parent_chain_ref")
+    if parent_ref == "FW4_DSTNAT":
+        proto = str(execution.get("protocol", "")).lower()
+        proto_match = "ip protocol {}".format(proto) if proto in {"tcp", "udp", "icmp"} else "meta l4proto {}".format(proto)
+        family_match = "meta nfproto {}".format("ipv4" if family == "IPv4" else "ipv6")
+        target_ref = str(execution.get("chain_ref"))
+        target = _physical_chain(target_ref, chains, external)
+        result.append(
+            owned_attachment(
+                "ATTACH_CONTEXT_PREROUTING_" + suffix,
+                "jump_context_prerouting_" + suffix.lower(),
+                "FW4_DSTNAT",
+                family_match + " " + proto_match,
+                "JUMP",
+                "jump " + target,
+                target_ref=target_ref,
+            )
+        )
+    return result
+
+
 def _manifest(objects: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
     entries = []
     for obj in objects:
@@ -1137,6 +1297,14 @@ def lower_nft_ir(
         # state renderer (without context) retains the complete static plan.
         if context_record and rule.get("semantic_reason") == "DNS":
             continue
+        # Packet-scoped rendering uses the single selected execution action
+        # below.  Static proxy rules are still present in state-level IR, but
+        # emitting them here would create phantom TPROXY/redirect paths (for
+        # example router output when router_self_proxy is disabled).
+        if context_record and rule.get("action_type") in {
+            "MARK_PROXY", "TPROXY_PROXY", "REDIRECT_PROXY"
+        }:
+            continue
         rules.extend(
             _lower_rule_variants(
                 rule,
@@ -1170,6 +1338,9 @@ def lower_nft_ir(
                 )
             else:
                 attachments.append(_lower_jump(jump, chains=chains, external=external))
+    attachments.extend(
+        _lower_context_attachments(normalized, chains=chains, external=external)
+    )
     attachments.sort(key=lambda item: item["logical_id"])
 
     external_refs = []

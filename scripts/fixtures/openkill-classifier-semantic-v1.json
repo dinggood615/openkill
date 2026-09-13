@@ -111,17 +111,17 @@
     },
     {
       "order": 2,
-      "match_reason": "ACCESS_CONTROL",
-      "decision": "BYPASS/ACCESS_DENY",
-      "position": "custom lan_ac_traffic inserted position 0",
-      "change": "YES"
+      "match_reason": "NODE_ENDPOINT",
+      "decision": "BYPASS",
+      "position": "apply_node_endpoint_sets insert position 0",
+      "change": "NO"
     },
     {
       "order": 3,
-      "match_reason": "NODE_ENDPOINT",
-      "decision": "BYPASS",
-      "position": "apply_node_endpoint_sets insert",
-      "change": "NO"
+      "match_reason": "ACCESS_CONTROL",
+      "decision": "BYPASS/ACCESS_DENY",
+      "position": "custom lan_ac_traffic after node endpoint insertion",
+      "change": "YES"
     },
     {
       "order": 4,
@@ -1829,9 +1829,9 @@
         "ACCESS_CONTROL",
         "NODE"
       ],
-      "notes": "Custom lan_ac_traffic is inserted at position 0 after normal generation.",
+      "notes": "The exact node endpoint updater inserts at position 0 in the final chain, ahead of custom access rules.",
       "expected_current": {
-        "reason": "ACCESS_CONTROL",
+        "reason": "NODE_ENDPOINT",
         "decision": "BYPASS",
         "status": "VALID"
       },
@@ -1858,7 +1858,7 @@
         "NODE"
       ],
       "expected_current": {
-        "reason": "ACCESS_CONTROL",
+        "reason": "NODE_ENDPOINT",
         "decision": "BYPASS",
         "status": "VALID"
       },

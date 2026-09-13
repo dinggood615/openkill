@@ -174,7 +174,10 @@ class ClassifierContractTests(unittest.TestCase):
                 self.assertNotEqual(
                     compact(classify(case, "current")), compact(classify(case, "target")), case["id"]
                 )
-        self.assertEqual(changed, 13)
+        # The current production baseline inserts NODE_ENDPOINT at position
+        # zero, so the current and target tables now differ for eleven
+        # overlap cases (the two access+node cases were a baseline erratum).
+        self.assertEqual(changed, 11)
 
     def test_selected_reason_and_precedence_are_machine_readable(self):
         for case in self.cases:

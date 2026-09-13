@@ -902,6 +902,212 @@ def _semantic_action(classification: Any, context: Mapping[str, Any]) -> Dict[st
     }
 
 
+def _current_backend_execution(
+    context: Mapping[str, Any],
+    classification: Any,
+    state: Optional[Mapping[str, Any]],
+    profile: str,
+) -> Dict[str, Any]:
+    """Describe the audited current backend execution contract.
+
+    The classifier still owns the semantic decision.  This development-only
+    table selects the production listener/action from normalized execution
+    facts (mode, family, protocol, direction and router-self scope).  It is
+    deliberately separate from precedence and never changes ``PROXY`` into a
+    backend-specific semantic reason.
+    """
+
+    if profile != "current":
+        return {"status": "PREVIEW_GENERIC", "action_type": None}
+    owner = str(context.get("owner", "")).upper()
+    decision = getattr(classification, "decision", None)
+    reason = getattr(classification, "reason", None)
+    family = str(context.get("family", "")).upper()
+    suffix = "V4" if family == "IPV4" else "V6"
+    direction = str(context.get("direction", "")).upper()
+    protocol = str(context.get("protocol", "")).upper()
+    mode = str((state or {}).get("run_mode", context.get("backend_mode", "TUN"))).upper()
+    self_proxy = bool((state or {}).get("router_self_proxy", False))
+    ports = (state or {}).get("proxy_ports", {}) if isinstance((state or {}).get("proxy_ports", {}), Mapping) else {}
+    # A packet context without a normalized production state is the generic
+    # Phase 3B development API and retains its historical placeholder
+    # listeners.  Shadow/production comparisons always pass normalized state
+    # and therefore use the configured fixture ports.
+    default_redirect = 7892 if state is not None else 12345
+    default_tproxy = 7893 if state is not None else 12345
+    default_dns = 7874
+    redirect_port = int(ports.get("redirect", default_redirect))
+    tproxy_port = int(ports.get("tproxy", default_tproxy))
+    dns_port = int(ports.get("dns", default_dns))
+
+    base: Dict[str, Any] = {
+        "status": "NO_ACTION",
+        "reason": reason,
+        "decision": decision,
+        "family": "IPv4" if family == "IPV4" else "IPv6" if family == "IPV6" else family,
+        "direction": direction,
+        "protocol": protocol,
+        "run_mode": mode,
+        "router_self_proxy": self_proxy,
+        "redirect_port": redirect_port,
+        "tproxy_port": tproxy_port,
+        "dns_port": dns_port,
+        "route_required": False,
+    }
+    if owner != "OPENKILL" or decision in {None, "NOT_OWNED", "BYPASS", "DIRECT"}:
+        return base
+
+    # DNS has its own packet path.  The mode and scope are facts from the
+    # normalized state; no routing-policy precedence is performed here.
+    if reason == "DNS" or decision == "DNS_SPECIAL":
+        if state is None:
+            # Preserve the original Phase 3B context-only API: without a
+            # production state fixture, a DNS context represents the
+            # historical hijack-chain form.  State-backed shadow renders
+            # below use the normalized dns_mode and configured scope.
+            if direction == "LAN_INGRESS":
+                return {
+                    **base,
+                    "status": "READY",
+                    "kind": "DNS",
+                    "dns_scope": "DNS_LAN",
+                    "dns_mode": "2",
+                    "parent_chain_ref": "FW4_DSTNAT",
+                    "body_chain_ref": "OPENKILL_DNS_LAN_" + suffix,
+                    "action_type": "DNS_REDIRECT",
+                }
+            if direction == "ROUTER_OUTPUT":
+                return {
+                    **base,
+                    "status": "READY",
+                    "kind": "DNS",
+                    "dns_scope": "DNS_ROUTER",
+                    "dns_mode": "2",
+                    "parent_chain_ref": "OPENKILL_NAT_OUTPUT_CURRENT",
+                    "action_type": "DNS_REDIRECT",
+                    "router_scope_guard": "SELF_PROCESS_EXCLUDED",
+                }
+        dns_mode = str((state or {}).get("dns_mode", "0"))
+        if dns_mode == "0" or (direction == "ROUTER_OUTPUT" and not self_proxy):
+            return {**base, "status": "NO_ACTION", "kind": "DNS", "dns_mode": dns_mode}
+        if direction == "LAN_INGRESS":
+            result = {**base, "status": "READY", "kind": "DNS", "dns_scope": "DNS_LAN", "dns_mode": dns_mode}
+            if dns_mode == "1":
+                result.update({"parent_chain_ref": "FW4_DSTNAT", "action_type": "DNS_REDIRECT"})
+            else:
+                result.update(
+                    {
+                        "parent_chain_ref": "FW4_DSTNAT",
+                        # The audited modern production path uses one
+                        # inet-table ``openkill_dns_redirect`` chain for
+                        # both families; each rule carries its own family
+                        # guard.  Keep the current packet path shared even
+                        # though the static topology also exposes a
+                        # family-specific preview object for future
+                        # refactoring.
+                        "body_chain_ref": "OPENKILL_DNS_ROUTER_V4",
+                        "action_type": "DNS_REDIRECT",
+                    }
+                )
+            return result
+        if direction == "ROUTER_OUTPUT":
+            return {
+                **base,
+                "status": "READY",
+                "kind": "DNS",
+                "dns_scope": "DNS_ROUTER",
+                "dns_mode": dns_mode,
+                "parent_chain_ref": "OPENKILL_NAT_OUTPUT_CURRENT",
+                "action_type": "DNS_REDIRECT",
+                "router_scope_guard": "SELF_PROCESS_EXCLUDED",
+            }
+        return {**base, "kind": "DNS"}
+
+    if decision != "PROXY":
+        return base
+
+    # TUN mode marks LAN traffic.  Router output is only marked when the
+    # router-self gate is enabled, except Fake-IP's explicit synthetic
+    # destination path which production creates independently.
+    if mode == "TUN":
+        if direction == "LAN_INGRESS":
+            return {
+                **base,
+                "status": "READY",
+                "action_type": "MARK_PROXY",
+                "chain_ref": "OPENKILL_PREROUTING_MANGLE_" + suffix,
+                "route_required": True,
+            }
+        if direction == "ROUTER_OUTPUT" and (self_proxy or reason == "FAKEIP"):
+            return {
+                **base,
+                "status": "READY",
+                "action_type": "MARK_PROXY",
+                "chain_ref": "OPENKILL_OUTPUT_MANGLE_" + suffix,
+                "route_required": True,
+            }
+        return base
+
+    # The current TPROXY branch is intentionally hybrid: IPv4 TCP remains a
+    # nat/redirect action, while IPv4 UDP and all IPv6 transports use the
+    # mangle TPROXY listener.  Router output has no proxy action unless the
+    # explicit self-proxy gate is enabled.
+    if mode == "TPROXY":
+        if direction == "LAN_INGRESS":
+            if family == "IPV4" and protocol == "TCP":
+                return {
+                    **base,
+                    "status": "READY",
+                    "action_type": "REDIRECT_PROXY",
+                    "chain_ref": "OPENKILL_PREROUTING_PROXY_V4",
+                    "parent_chain_ref": "FW4_DSTNAT",
+                    "route_required": False,
+                }
+            if protocol in {"TCP", "UDP"}:
+                return {
+                    **base,
+                    "status": "READY",
+                    "action_type": "TPROXY_PROXY",
+                    "chain_ref": "OPENKILL_PREROUTING_MANGLE_" + suffix,
+                    "route_required": True,
+                }
+            return {**base, "status": "UNSUPPORTED", "action_type": "UNSUPPORTED_ACTION"}
+        if direction == "ROUTER_OUTPUT" and self_proxy:
+            if family == "IPV4" and protocol == "TCP":
+                return {
+                    **base,
+                    "status": "READY",
+                    "action_type": "REDIRECT_PROXY",
+                    "chain_ref": "OPENKILL_OUTPUT_PROXY_V4",
+                    "parent_chain_ref": "OPENKILL_NAT_OUTPUT_CURRENT",
+                    "route_required": False,
+                }
+            if protocol in {"TCP", "UDP"}:
+                return {
+                    **base,
+                    "status": "READY",
+                    "action_type": "MARK_PROXY",
+                    "chain_ref": "OPENKILL_OUTPUT_MANGLE_" + suffix,
+                    "route_required": True,
+                }
+        return base
+
+    # Redirect mode is only safe for TCP.  The current comparison corpus
+    # keeps unresolved redirect policy cases explicit; UDP is never silently
+    # converted to another action.
+    if mode == "REDIRECT":
+        if protocol == "TCP" and direction == "LAN_INGRESS":
+            return {
+                **base,
+                "status": "READY",
+                "action_type": "REDIRECT_PROXY",
+                "chain_ref": "OPENKILL_PREROUTING_PROXY_" + suffix,
+            }
+        if protocol == "UDP":
+            return {**base, "status": "UNSUPPORTED", "action_type": "UNSUPPORTED_ACTION"}
+    return base
+
+
 def _base_metadata(profile: str, backend: str, *, target_preview: bool, state_id: Optional[str] = None) -> Dict[str, Any]:
     metadata = {
         "semantic_spec_version": SEMANTIC_SPEC_VERSION,
@@ -998,6 +1204,7 @@ def _ir(
     ]
     context_record = None
     classification_record = None
+    context_execution: Optional[Dict[str, Any]] = None
     if context is not None and classification is not None:
         # Only serialize the contract fields.  Fixture annotations (for
         # example a human note containing the word "position") are not part
@@ -1023,6 +1230,7 @@ def _ir(
         context_record["flags"] = sorted(context_record.get("flags", ()))
         classification_record = classification.to_record(include_trace=True)
         action_items.append(_semantic_action(classification, context))
+        context_execution = _current_backend_execution(context, classification, state, profile)
     ir: Dict[str, Any] = {
         "schema": NFT_IR_SCHEMA,
         "ir_version": NFT_IR_VERSION,
@@ -1038,6 +1246,7 @@ def _ir(
         "action_ir": action_items,
         "context": context_record,
         "classification": classification_record,
+        "context_execution": context_execution,
         "dependencies": _build_dependencies(),
         "runtime_audit": {
             "actual_state_schema": "OPENKILL_ACTUAL_NFT_STATE_V1",
@@ -1559,6 +1768,7 @@ __all__ = [
     "build_dynamic_sets",
     "build_rule_plan",
     "map_backend_action",
+    "_current_backend_execution",
     "backend_action",
     "render_context",
     "render",

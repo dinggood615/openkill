@@ -2653,7 +2653,7 @@
       "independent_expected_current": {
         "classifier": {
           "decision": "BYPASS",
-          "reason": "ACCESS_CONTROL",
+          "reason": "NODE_ENDPOINT",
           "status": "VALID"
         },
         "confidence": "MEDIUM",
@@ -2699,7 +2699,7 @@
       "independent_expected_current": {
         "classifier": {
           "decision": "BYPASS",
-          "reason": "ACCESS_CONTROL",
+          "reason": "NODE_ENDPOINT",
           "status": "VALID"
         },
         "confidence": "MEDIUM",

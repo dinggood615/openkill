@@ -22,6 +22,18 @@ SHADOW_STATE_SCHEMA = "OPENKILL_SHADOW_STATE_V1"
 SHADOW_PACKET_SCHEMA = "OPENKILL_SHADOW_PACKET_V1"
 SHADOW_FIXTURE_SCHEMA = "OPENKILL_SHADOW_FIXTURE_V1"
 SHADOW_CONTRACT_VERSION = 1
+# The execution fields below are an additive development-side extension of
+# the Phase 2C state contract.  They describe configured listeners; they do
+# not change semantic decisions and are never read by production runtime.
+SHADOW_EXECUTION_CONTRACT_VERSION = 1
+DEFAULT_PROXY_PORTS = {
+    "redirect": 7892,
+    # The production get_config() fallback is 7895.  Individual shadow
+    # states may override this with their explicitly normalized fixture
+    # listener (for example the Phase 3C TPROXY baseline uses 7893).
+    "tproxy": 7895,
+    "dns": 7874,
+}
 
 SHADOW_RESULTS: Tuple[str, ...] = (
     "MATCH",
@@ -178,6 +190,41 @@ def _canonical_dns_scope(value: Any) -> str:
     return candidate
 
 
+def _canonical_dns_mode(value: Any, scope: str) -> str:
+    """Normalize the production DNS switch without inferring packet policy."""
+
+    if value is None or value == "":
+        return {
+            "NONE": "0",
+            "LAN": "1",
+            "ROUTER_ONLY": "1",
+            "LAN_AND_ROUTER": "2",
+        }[scope]
+    candidate = str(value).strip()
+    if candidate not in {"0", "1", "2"}:
+        raise ShadowValidationError("unknown dns_mode: {!r}".format(value))
+    return candidate
+
+
+def _canonical_proxy_ports(value: Any) -> Dict[str, int]:
+    """Return validated listener ports in a stable, explicit shape."""
+
+    if value is None:
+        value = {}
+    if not isinstance(value, Mapping):
+        raise ShadowValidationError("proxy_ports must be an object")
+    result: Dict[str, int] = {}
+    for key, default in DEFAULT_PROXY_PORTS.items():
+        raw = value.get(key, default)
+        if isinstance(raw, bool) or not isinstance(raw, int) or not 1 <= raw <= 65535:
+            raise ShadowValidationError("invalid {} proxy port: {!r}".format(key, raw))
+        result[key] = int(raw)
+    unknown = set(value) - set(DEFAULT_PROXY_PORTS)
+    if unknown:
+        raise ShadowValidationError("unknown proxy port field: {!r}".format(sorted(unknown)))
+    return result
+
+
 def _canonical_network(value: Any, family: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise ShadowValidationError("network entry must be a non-empty string")
@@ -254,6 +301,13 @@ def normalize_state(raw: Mapping[str, Any]) -> Dict[str, Any]:
     owner = _canonical_owner(raw.get("owner"))
     run_mode = _canonical_run_mode(raw.get("run_mode"))
     dns_scope = _canonical_dns_scope(raw.get("dns_scope"))
+    dns_mode = _canonical_dns_mode(raw.get("dns_mode"), dns_scope)
+    execution_contract_version = raw.get(
+        "execution_contract_version", SHADOW_EXECUTION_CONTRACT_VERSION
+    )
+    if execution_contract_version != SHADOW_EXECUTION_CONTRACT_VERSION:
+        raise ShadowValidationError("shadow execution contract version mismatch")
+    proxy_ports = _canonical_proxy_ports(raw.get("proxy_ports"))
     china_policy = _norm(raw.get("china_policy") or "OFF")
     if china_policy not in CHINA_POLICIES:
         raise ShadowValidationError("unknown china_policy: {!r}".format(raw.get("china_policy")))
@@ -273,7 +327,10 @@ def normalize_state(raw: Mapping[str, Any]) -> Dict[str, Any]:
         "router_self_proxy": self_proxy,
         "tun_interface": tun_interface.strip(),
         "dns_scope": dns_scope,
+        "dns_mode": dns_mode,
         "china_policy": china_policy,
+        "execution_contract_version": SHADOW_EXECUTION_CONTRACT_VERSION,
+        "proxy_ports": proxy_ports,
     }
     for field in ("wan4", "node4", "wan6", "node6"):
         family = "IPv4" if field.endswith("4") else "IPv6"
@@ -760,6 +817,8 @@ __all__ = [
     "ACCESS_ACTIONS",
     "CONFIDENCE_VALUES",
     "SHADOW_CONTRACT_VERSION",
+    "SHADOW_EXECUTION_CONTRACT_VERSION",
+    "DEFAULT_PROXY_PORTS",
     "SHADOW_FIXTURE_SCHEMA",
     "SHADOW_PACKET_SCHEMA",
     "SHADOW_RESULTS",

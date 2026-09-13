@@ -203,9 +203,9 @@
       "direction_scope": ["LAN_INGRESS", "ROUTER_OUTPUT"],
       "decision_current": "BYPASS_OR_ACCESS_DENY",
       "decision_target": "BYPASS_OR_ACCESS_DENY",
-      "precedence_current": "ACCESS_CONTROL_CUSTOM / ACCESS_CONTROL",
+      "precedence_current": "NODE_ENDPOINT > ACCESS_CONTROL_CUSTOM / ACCESS_CONTROL",
       "precedence_target": "ACCESS_CONTROL",
-      "current_behavior": "Custom access can precede node; generic ACL outcome is backend-dependent.",
+      "current_behavior": "The exact modern updater inserts NODE_ENDPOINT at position 0; custom access follows it. Generic ACL outcome is backend-dependent.",
       "target_behavior": "Access remains its own layer and cannot silently become user routing intent."
     },
     "FAKEIP": {
@@ -300,8 +300,8 @@
       "precedence_labels": [
         "OWNER_DISABLED",
         "DNS",
-        "ACCESS_CONTROL_CUSTOM",
         "NODE_ENDPOINT",
+        "ACCESS_CONTROL_CUSTOM",
         "SELF_TRAFFIC",
         "TUN_INGRESS",
         "LOCAL_DESTINATION",
@@ -315,7 +315,7 @@
         "DEFAULT_POLICY"
       ],
       "notes": [
-        "CUSTOM_ACCESS retains its audited current priority before NODE_ENDPOINT.",
+        "The exact modern node updater inserts NODE_ENDPOINT at position 0, ahead of custom access in the final chain.",
         "TUN_INGRESS is implemented for IPv4; IPv6 remains the recorded current gap.",
         "CHINA_PASS records a match and falls through to the current default behavior.",
         "Explicit user direct/proxy mapping remains CURRENT_UNDEFINED where the oracle records it."
@@ -353,8 +353,8 @@
     "current": [
       {"order": 0, "label": "OWNER_DISABLED", "match_reason": "OWNER_DISABLED", "decision": "NOT_OWNED", "family": "ALL"},
       {"order": 1, "label": "DNS", "match_reason": "DNS", "decision": "DNS_SPECIAL", "family": "ALL"},
-      {"order": 2, "label": "ACCESS_CONTROL_CUSTOM", "match_reason": "ACCESS_CONTROL", "variant": "CUSTOM_ACCESS", "decision": "BYPASS_OR_ACCESS_DENY", "family": "ALL"},
-      {"order": 3, "label": "NODE_ENDPOINT", "match_reason": "NODE_ENDPOINT", "decision": "BYPASS", "family": "ALL"},
+      {"order": 2, "label": "NODE_ENDPOINT", "match_reason": "NODE_ENDPOINT", "decision": "BYPASS", "family": "ALL"},
+      {"order": 3, "label": "ACCESS_CONTROL_CUSTOM", "match_reason": "ACCESS_CONTROL", "variant": "CUSTOM_ACCESS", "decision": "BYPASS_OR_ACCESS_DENY", "family": "ALL"},
       {"order": 4, "label": "SELF_TRAFFIC", "match_reason": "SELF_TRAFFIC", "decision": "BYPASS", "family": "ALL"},
       {"order": 5, "label": "TUN_INGRESS", "match_reason": "TUN_INGRESS", "decision": "BYPASS", "family": "IPv4", "ipv6_status": "CURRENT_GAP"},
       {"order": 6, "label": "LOCAL_DESTINATION", "match_reason": "LOCAL_DESTINATION", "decision": "BYPASS", "family": "ALL"},
@@ -607,19 +607,19 @@
     },
     {
       "id": "BC-02",
-      "current_behavior": "CUSTOM_ACCESS may be evaluated before NODE_ENDPOINT.",
+      "current_behavior": "Exact modern production insertion already places NODE_ENDPOINT before CUSTOM_ACCESS in the final chain.",
       "target_behavior": "NODE_ENDPOINT safety precedes ordinary access policy.",
-      "motivation": "Prevent node underlay traffic from being captured by a broad user ACL.",
-      "safety_impact": "Reduces proxy underlay loop risk.",
-      "compatibility_impact": "A custom ACL that currently matches a node may change outcome/reason.",
+      "motivation": "Record the verified current underlay ordering without changing production.",
+      "safety_impact": "The current ordering reduces proxy underlay loop risk.",
+      "compatibility_impact": "No packet behavior change remains for the audited modern NODE+ACCESS overlap.",
       "legacy_impact": "Legacy ACL order must be checked independently.",
       "modern_impact": "Modern set order must preserve node safety.",
-      "packet_path_impact": "PACKET_BEHAVIOR_CHANGE only for NODE+ACCESS overlap.",
-      "rollback_risk": "Low to medium; isolated precedence entry.",
-      "type": ["SAFETY_FIX", "COMPATIBILITY_CHANGE"],
+      "packet_path_impact": "NO_PACKET_BEHAVIOR_CHANGE for the audited modern current path; baseline correction only.",
+      "rollback_risk": "Low; development oracle correction with production unchanged.",
+      "type": ["CURRENT_BASELINE_CORRECTION"],
       "production_approval_status": "PRODUCTION_NOT_APPROVED",
       "recommended_decision": "APPROVE",
-      "recommendation_reason": "Underlay safety is stronger than a broad user ACL, subject to explicit compatibility testing."
+      "recommendation_reason": "Exact production evidence already shows the safe ordering; retain as a recorded baseline and keep approval status explicit."
     },
     {
       "id": "BC-03",

@@ -24,6 +24,7 @@ from openkill_shadow_adapter import adapt, normalize_state, validate_intent_fixt
 from openkill_production_shadow import (
     COMMAND_ALLOWLIST,
     MISMATCH_CLASSES,
+    audit_tproxy_router_self,
     build_production_scenarios,
     coverage_summary,
     dns_scope_audit,
@@ -139,74 +140,113 @@ class ProductionShadowTests(unittest.TestCase):
         self.assertGreaterEqual(dual, 5)
         self.assertEqual(self.report["unknown_mismatch_count"], 0)
 
-    def test_comparison_surfaces_production_order_mismatches(self):
-        # The independent current-intent fixture records ACCESS_CONTROL as
-        # the current oracle for the two access+node overlap cases.  Exact
-        # extracted production code inserts the node return at position zero,
-        # so Phase 3C must surface this unresolved BC-02 discrepancy rather
-        # than silently blessing either side.
-        # The order audit also keeps the two transport mismatches visible:
-        # the current production TPROXY branch uses 7893/redirect 7892,
-        # while the development renderer fixture still uses its independent
-        # 12345 placeholder and emits a broader router/TCP path.
-        self.assertEqual(self.report["semantic_mismatch_count"], 10)
+    def test_comparison_reconciles_current_production_baseline(self):
+        # The exact extracted production updater inserts NODE_ENDPOINT at
+        # position zero.  The current oracle and renderer now record that
+        # observed order, while target behavior remains locked separately.
+        # The execution contract also carries the production hybrid listener
+        # actions (redirect 7892 versus TPROXY 7893) and router-self gate.
+        self.assertEqual(self.report["semantic_mismatch_count"], 0)
         self.assertEqual(self.report["unknown_mismatch_count"], 0)
         mismatches = {
             item["id"] for item in self.report["results"] if item["classification"] == "SEMANTIC_MISMATCH"
         }
-        self.assertEqual(
-            mismatches,
-            {
-                "SHADOW-066-overlap_access_node_v4", "SHADOW-067-overlap_access_node_v6",
-                "P3C-TPROXY-01", "P3C-TPROXY-02", "P3C-TPROXY-03", "P3C-TPROXY-04",
-                "P3C-TPROXY-05", "P3C-TPROXY-06", "P3C-TPROXY-07", "P3C-TPROXY-08",
-            },
-        )
+        self.assertEqual(mismatches, set())
         for item in self.report["results"]:
             if item["id"] in {"SHADOW-066-overlap_access_node_v4", "SHADOW-067-overlap_access_node_v6"}:
-                self.assertEqual(item["mismatch"]["dimension"], "rule_order")
-                self.assertEqual(item["mismatch"]["behavior_change_candidate"], "BC-02")
+                self.assertEqual(item["dimensions"]["old_selected_reason"], "NODE_ENDPOINT")
+                self.assertEqual(item["dimensions"]["new_selected_reason"], "NODE_ENDPOINT")
+                self.assertFalse(item["dimensions"]["relative_order_changed"])
             elif item["id"].startswith("P3C-TPROXY-"):
-                self.assertEqual(item["mismatch"]["dimension"], "proxy_action")
-                self.assertFalse(item["transport"]["equivalent"])
+                self.assertTrue(item["transport"]["equivalent"])
         allowed = {"EXACT_STRUCTURAL_MATCH", "SEMANTIC_EQUIVALENT_STRUCTURAL_DIFF", "KNOWN_CURRENT_GAP", "UNSUPPORTED_CURRENT_CASE"}
         allowed |= {"SEMANTIC_MISMATCH"}
         self.assertTrue(set(item["classification"] for item in self.report["results"]) <= allowed)
         self.assertIn("SEMANTIC_EQUIVALENT_STRUCTURAL_DIFF", self.report["comparison_classes"])
         self.assertIn("KNOWN_CURRENT_GAP", self.report["comparison_classes"])
+        self.assertEqual(self.report["comparison_classes"]["NEW_RENDERER_DEFECT"], 0)
+        self.assertEqual(len(self.report["unsupported_current_cases"]), 10)
+        self.assertFalse(self.report["unbounded_unsupported_current_case"])
+        self.assertEqual(
+            {item["id"] for item in self.report["unsupported_current_cases"]},
+            {
+                "SHADOW-038-v4_custom_access_deny", "SHADOW-041-v6_custom_access_deny",
+                "P3C-SYN-ACCESS-050-038-v4_custom_access_deny",
+                "P3C-SYN-ACCESS-052-041-v6_custom_access_deny",
+                "P3C-SYN-ACCESS-054-038-v4_custom_access_deny",
+                "P3C-SYN-ACCESS-056-041-v6_custom_access_deny",
+                "P3C-REDIRECT-01", "P3C-REDIRECT-02", "P3C-REDIRECT-03", "P3C-REDIRECT-04",
+            },
+        )
 
     def test_tproxy_transport_parity_is_explicit(self):
         tproxy = [item for item in self.report["results"] if item["id"].startswith("P3C-TPROXY-")]
         self.assertEqual(len(tproxy), 8)
         self.assertEqual(self.report["tproxy_parity"]["scenarios"], 8)
-        self.assertEqual(self.report["tproxy_parity"]["mismatches"], 8)
+        self.assertEqual(self.report["tproxy_parity"]["mismatches"], 0)
         self.assertEqual(sum(1 for item in tproxy if item["transport"] is not None), 8)
-        self.assertEqual(sum(1 for item in tproxy if item["transport"]["equivalent"]), 0)
-        # Every mismatch retains family/protocol, reachable-chain, mark and
-        # listener-port evidence for the final report.
+        self.assertEqual(sum(1 for item in tproxy if item["transport"]["equivalent"]), 8)
+        self.assertEqual(
+            tproxy[0]["transport"]["configured_ports"],
+            {"dns": 7874, "redirect": 7892, "tproxy": 7893},
+        )
+        # Every transport result retains family/protocol, reachable-chain,
+        # mark and listener-port evidence for the final report.
         for item in tproxy:
-            detail = item["mismatch"]["detail"]
+            detail = item["transport"]
             self.assertIn(detail["family"], {"IPv4", "IPv6"})
             self.assertIn(detail["protocol"], {"TCP", "UDP"})
             self.assertIn("old_actions", detail)
             self.assertIn("new_actions", detail)
+
+        router_self = self.report["tproxy_router_self"]
+        self.assertEqual(router_self["scenarios"], 4)
+        self.assertEqual(router_self["equivalent"], 4)
+        self.assertEqual(router_self["mismatches"], 0)
+        self.assertTrue(all(row["router_self_proxy"] for row in router_self["rows"]))
+        by_transport = {(row["family"], row["protocol"]): row for row in router_self["rows"]}
+        self.assertEqual(by_transport[("IPv4", "TCP")]["new_actions"][0][0], "REDIRECT_PROXY")
+        self.assertEqual(by_transport[("IPv4", "UDP")]["new_actions"][0][0], "MARK_PROXY")
+        self.assertEqual(by_transport[("IPv6", "TCP")]["new_actions"][0][0], "MARK_PROXY")
+        self.assertEqual(by_transport[("IPv6", "UDP")]["new_actions"][0][0], "MARK_PROXY")
 
     def test_order_dimension_is_recorded_independently(self):
         by_id = {item["id"]: item for item in self.report["results"]}
         for case_id in ("SHADOW-066-overlap_access_node_v4", "SHADOW-067-overlap_access_node_v6"):
             dimensions = by_id[case_id]["dimensions"]
             self.assertEqual(dimensions["old_selected_reason"], "NODE_ENDPOINT")
-            self.assertEqual(dimensions["new_selected_reason"], "ACCESS_CONTROL")
-            self.assertTrue(dimensions["relative_order_changed"])
-            self.assertTrue(dimensions["winner_conflict"])
+            self.assertEqual(dimensions["new_selected_reason"], "NODE_ENDPOINT")
+            self.assertFalse(dimensions["relative_order_changed"])
+            self.assertFalse(dimensions["winner_conflict"])
+
+    def test_acl_node_audit_covers_all_family_chains(self):
+        audit = self.report["acl_node_audit"]
+        self.assertEqual(audit["classification"], "CURRENT_SEMANTIC_BASELINE_DEFECT")
+        self.assertTrue(audit["all_node_before_access"])
+        self.assertEqual(
+            audit["chains"],
+            [
+                "openkill", "openkill_mangle", "openkill_output", "openkill_mangle_output",
+                "openkill_v6", "openkill_mangle_v6", "openkill_output_v6", "openkill_mangle_output_v6",
+            ],
+        )
+        rows = [row for row in audit["rows"] if row["winner"] != "NOT_APPLICABLE"]
+        self.assertTrue(rows)
+        self.assertTrue(all(row["final_node_index"] < row["final_access_index"] for row in rows))
 
     def test_dns_scope_is_physical_and_not_metadata_only(self):
         audit = dns_scope_audit(self.states, self.intent, root=ROOT)
         self.assertEqual(audit["dns_scope_distinctness"], "PASS")
+        self.assertEqual(audit["dns_packet_action_body_parity"], "PASS")
+        self.assertEqual(audit["dns_current_hook_parity"], "PASS")
         self.assertNotEqual(audit["records"]["LAN_V4"]["new"]["chains"], audit["records"]["ROUTER_V4"]["new"]["chains"])
         self.assertNotEqual(audit["records"]["LAN_V6"]["new"]["chains"], audit["records"]["ROUTER_V6"]["new"]["chains"])
         self.assertIn("dstnat", audit["records"]["LAN_V4"]["old"]["chains"])
         self.assertIn("nat_output", audit["records"]["ROUTER_V4"]["old"]["chains"])
+        for label in ("LAN_V4_MODE2", "LAN_V6_MODE2"):
+            self.assertEqual(audit["records"][label]["old"]["path_signature"]["attachment_action"], "JUMP")
+            self.assertEqual(audit["records"][label]["new"]["path_signature"]["attachment_action"], "JUMP")
+            self.assertTrue(audit["records"][label]["packet_action_body_equivalent"])
 
     def test_current_profile_and_bc_leakage(self):
         for item in self.report["results"]:

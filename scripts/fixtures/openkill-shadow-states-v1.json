@@ -4260,6 +4260,11 @@
       "node4": [],
       "node6": [],
       "owner": "OPENKILL",
+      "proxy_ports": {
+        "dns": 7874,
+        "redirect": 7892,
+        "tproxy": 7893
+      },
       "router_self_proxy": false,
       "run_mode": "TPROXY",
       "schema": "OPENKILL_SHADOW_STATE_V1",

@@ -258,7 +258,15 @@ def _state_values(state: Mapping[str, Any], packet: Optional[Mapping[str, Any]] 
     # LAN-and-router scope.  Keep ROUTER_ONLY on mode 1 with the explicit
     # router_self_proxy gate.
     default_dns_mode = "2" if scope == "LAN_AND_ROUTER" else ("1" if scope in {"LAN", "ROUTER_ONLY"} else "0")
-    dns_mode = str(state.get("dns_mode", default_dns_mode))
+    # ``normalize_state`` owns the development execution extension and
+    # supplies the same listener values that the production fixture models.
+    # Keep the shell variables scalar: the harness must never interpolate a
+    # Python mapping into Bash.
+    dns_mode = str(normalized.get("dns_mode", default_dns_mode))
+    proxy_ports = normalized.get("proxy_ports", {})
+    proxy_port_value = int(proxy_ports.get("redirect", 7892))
+    tproxy_port_value = int(proxy_ports.get("tproxy", 7895))
+    dns_port_value = int(proxy_ports.get("dns", 7874))
     fake4 = normalized.get("fake_ip4") or ["198.18.0.0/15"]
     fake6 = normalized.get("fake_ip6") or ["fd00:ffff::/96"]
     # Values are all fixture data and are quoted again by the harness before
@@ -281,6 +289,10 @@ def _state_values(state: Mapping[str, Any], packet: Optional[Mapping[str, Any]] 
         "lan_ac_mode": 1 if any(e.get("action") == "ALLOW" for e in normalized.get("access4", ()) + normalized.get("access6", ())) else 0,
         "common_ports": 0,
         "router_self_proxy": 1 if normalized.get("router_self_proxy") else 0,
+        "proxy_port": proxy_port_value,
+        "tproxy_port": tproxy_port_value,
+        "dns_port": dns_port_value,
+        "DNSPORT": dns_port_value,
         "bypass_gateway_compatible": 0,
         "intranet_allowed": 0,
         "enable_udp_proxy": 1 if mode == "TPROXY" else 0,
@@ -347,11 +359,18 @@ def _stub_header(values: Mapping[str, Any], sandbox: str, *, node_apply: bool = 
         # not guarantee atomic append for those concurrent writers and can
         # corrupt a diagnostic line.  Their status is still deterministic,
         # while all mutating intent commands remain recorded below.
-        "nft(){ case \"$*\" in list\\ chain*) return 0;; list\\ sets*|list\\ table*) return 1;; esac; record nft \"$@\"; return 0; }",
+        # Model only the chain-existence queries needed by the extracted
+        # production body.  An unknown chain fails closed, while add-chain
+        # intent registers the new name for subsequent list queries.  This
+        # prevents the standalone node updater from inventing rules for
+        # chains that the preceding firewall setup did not create.
+        "KNOWN_CHAINS='dstnat mangle_prerouting mangle_output output srcnat input forward'",
+        "chain_known(){ local _needle=\"$1\" _item; for _item in $KNOWN_CHAINS; do [ \"$_item\" = \"$_needle\" ] && return 0; done; return 1; }",
+        "nft(){ local _cmd=\"$*\" _chain; case \"$_cmd\" in list\\ chain\\ inet\\ fw4\\ *) _chain=\"${_cmd#list chain inet fw4 }\"; _chain=\"${_chain%% *}\"; chain_known \"$_chain\"; return $?;; list\\ sets*|list\\ table*) return 1;; add\\ chain\\ inet\\ fw4\\ *) _chain=\"${_cmd#add chain inet fw4 }\"; _chain=\"${_chain%% *}\"; chain_known \"$_chain\" || KNOWN_CHAINS=\"$KNOWN_CHAINS $_chain\"; record nft \"$@\"; return 0;; esac; record nft \"$@\"; return 0; }",
         "iptables(){ record iptables \"$@\"; return 1; }",
         "ip6tables(){ record ip6tables \"$@\"; return 1; }",
         "ipset(){ record ipset \"$@\"; return 0; }",
-        "uci(){ record uci \"$@\"; case \"$*\" in *'dhcp.@dnsmasq[0].port'*) printf '7874';; *get*|*show*) return 1;; esac; return 0; }",
+        "uci(){ record uci \"$@\"; case \"$*\" in *'dhcp.@dnsmasq[0].port'*) printf '%s' \"$DNSPORT\";; *get*|*show*) return 1;; esac; return 0; }",
         "ip(){ record ip \"$@\"; return 0; }",
         "fw4(){ record fw4 \"$@\"; return 0; }",
         "logger(){ record logger \"$@\"; return 0; }",
@@ -421,7 +440,12 @@ def _stub_header(values: Mapping[str, Any], sandbox: str, *, node_apply: bool = 
         [
             "FW4=/usr/sbin/fw4",
             "PROXY_FWMARK=0x162; PROXY_ROUTE_TABLE=354",
-            "proxy_port=7892; tproxy_port=7893; dns_port=7874; DNSPORT=7874",
+            "proxy_port={}; tproxy_port={}; dns_port={}; DNSPORT={}".format(
+                values.get("proxy_port", 7892),
+                values.get("tproxy_port", 7895),
+                values.get("dns_port", 7874),
+                values.get("DNSPORT", values.get("dns_port", 7874)),
+            ),
             "wan_int=wan; wan6_int=wan6; wan_ints=wan; wan6_ints=wan6",
             "upnp_lease_file=\"$SANDBOX/upnp\"",
             "CONFIG_FILE=\"$SANDBOX/config.yaml\"; : > \"$CONFIG_FILE\"",
@@ -430,7 +454,7 @@ def _stub_header(values: Mapping[str, Any], sandbox: str, *, node_apply: bool = 
         ]
     )
     for key, value in values.items():
-        if key in {"dns_scope", "service_ports"}:
+        if key in {"dns_scope", "service_ports", "DNSPORT", "proxy_port", "tproxy_port", "dns_port"}:
             continue
         lines.append("{}={}".format(key, _shell_quote(value)))
     for key, value in cfg.items():
@@ -502,11 +526,24 @@ def run_production_harness(
             function == "set_firewall" and values.get("tun_owner") == "openkill"
         )
         script = _stub_header(values, _linux_path(sandbox), node_apply=use_node_impl)
+        if function == "apply_node_endpoint_sets":
+            # The standalone updater is normally called after set_firewall,
+            # so seed only the family-specific chains that could already
+            # exist in that same normalized fixture.  The recorder still
+            # learns any chain added by the extracted body itself.
+            seeded = [
+                "openkill", "openkill_mangle", "openkill_output", "openkill_mangle_output",
+            ]
+            if int(values.get("ipv6_enable", 0) or 0) == 1:
+                seeded.extend(
+                    ["openkill_v6", "openkill_mangle_v6", "openkill_output_v6", "openkill_mangle_output_v6"]
+                )
+            script += "KNOWN_CHAINS=\"$KNOWN_CHAINS {}\"\n".format(" ".join(seeded))
         # ``set_firewall`` invokes the production node endpoint updater at
         # the end of its modern path.  Include that exact function body in
         # the sandbox so the old intent contains the same dynamic node sets
         # and endpoint-protection rules; the helper commands remain stubs.
-        if function == "set_firewall" and values.get("tun_owner") == "openkill":
+        if use_node_impl:
             node_body = extract_shell_function(source, "apply_node_endpoint_sets")
             _, network_source = _read_source(root_path, "network")
             classifier_match_body = extract_shell_function(network_source, "openkill_classifier_match")
@@ -628,7 +665,12 @@ def _semantic_reason(expression: str) -> Optional[str]:
 
 def _action_kind(expression: str) -> str:
     lower = expression.lower()
-    if "dport 53" in lower and "redirect" in lower:
+    # A mode-2 DNS attachment contains ``jump openkill_dns_redirect``.  The
+    # chain name itself includes the word "redirect", so test the terminal
+    # jump before looking for an actual ``redirect to`` verdict.
+    if re.search(r"\bjump\s+\S+", lower):
+        return "JUMP"
+    if "dport 53" in lower and re.search(r"\bredirect\s+to\b", lower):
         return "DNS_REDIRECT"
     if "tproxy" in lower:
         return "TPROXY_PROXY"
@@ -636,8 +678,6 @@ def _action_kind(expression: str) -> str:
         return "REDIRECT_PROXY"
     if "mark set 0x162" in lower or "set-xmark 0x162" in lower:
         return "MARK_PROXY"
-    if re.search(r"\bjump\s+\S+", lower):
-        return "JUMP"
     if re.search(r"\breject\b", lower):
         return "ACCESS_DENY_REQUIRED"
     if re.search(r"\baccept\b", lower):
@@ -841,6 +881,89 @@ def parse_nft_command_records(
     }
 
 
+def _rule_merge_key(rule: Mapping[str, Any]) -> Tuple[Any, ...]:
+    """Return a command-order-independent identity for one normalized rule."""
+
+    return (
+        rule.get("chain"),
+        rule.get("expression"),
+        rule.get("reason"),
+        rule.get("action"),
+    )
+
+
+def _merge_nft_intent(base: Mapping[str, Any], delta: Mapping[str, Any]) -> Dict[str, Any]:
+    """Merge an independently captured node update into a final old intent.
+
+    ``set_firewall`` already invokes ``apply_node_endpoint_sets`` on the
+    normal OpenKill path.  The separate capture is retained as evidence, but
+    its objects must be merged with insert semantics and deduplicated rather
+    than blindly appended.  This also models a caller that applies the node
+    updater after the initial firewall setup.
+    """
+
+    merged = copy.deepcopy(dict(base))
+    # Sets are state snapshots in the normalized vocabulary.  Unioning
+    # elements is safe for the recorder's add/flush sequence and keeps stable
+    # metadata from the first capture.
+    sets_by_name: Dict[str, Dict[str, Any]] = {
+        str(item.get("name")): dict(item) for item in merged.get("sets", ())
+    }
+    for item in delta.get("sets", ()):
+        name = str(item.get("name"))
+        if name not in sets_by_name:
+            sets_by_name[name] = dict(item)
+            continue
+        current = sets_by_name[name]
+        current["elements"] = sorted(
+            set(current.get("elements", ())) | set(item.get("elements", ())),
+            key=lambda value: (str(type(value)), str(value)),
+        )
+    merged["sets"] = sorted(sets_by_name.values(), key=lambda item: str(item.get("name", "")))
+
+    rules_by_chain: "OrderedDict[str, List[Dict[str, Any]]]" = OrderedDict()
+    for rule in merged.get("rules", ()):
+        chain = str(rule.get("chain", ""))
+        rules_by_chain.setdefault(chain, []).append(dict(rule))
+    known_chains = set(rules_by_chain)
+    known_chains.update(str(item.get("name")) for item in merged.get("chains", ()))
+    existing_keys = {_rule_merge_key(rule) for values in rules_by_chain.values() for rule in values}
+    for rule in delta.get("rules", ()):
+        chain = str(rule.get("chain", ""))
+        # A standalone node updater may report a family chain that the
+        # preceding set_firewall fixture did not create.  It is not part of
+        # the old final intent for this scenario.
+        if chain not in known_chains:
+            continue
+        candidate = dict(rule)
+        key = _rule_merge_key(candidate)
+        if key in existing_keys:
+            continue
+        bucket = rules_by_chain.setdefault(chain, [])
+        if candidate.get("operation") == "insert" and candidate.get("position") in (None, 0):
+            bucket.insert(0, candidate)
+        elif candidate.get("operation") == "insert":
+            try:
+                bucket.insert(max(0, int(candidate.get("position")) - 1), candidate)
+            except (TypeError, ValueError):
+                bucket.insert(0, candidate)
+        else:
+            bucket.append(candidate)
+        existing_keys.add(key)
+    normalized_rules: List[Dict[str, Any]] = []
+    for chain, values in rules_by_chain.items():
+        for order, rule in enumerate(values):
+            normalized_rules.append({**rule, "chain": chain, "order": order})
+    merged["rules"] = normalized_rules
+    merged["attachments"] = [
+        rule
+        for rule in normalized_rules
+        if rule.get("chain") in {"dstnat", "mangle_prerouting", "mangle_output", "output", "srcnat", "input", "forward", "nat_output"}
+        and rule.get("action") == "JUMP"
+    ]
+    return merged
+
+
 def normalize_new_renderer_intent(state: Mapping[str, Any]) -> Dict[str, Any]:
     """Normalize the current renderer AST into the comparison vocabulary."""
 
@@ -883,7 +1006,27 @@ def normalize_new_context_intent(
         "table": ast["table"],
         "chains": [dict(item, name=item["physical_name"], owner="OPENKILL", ownership="OWNED") for item in ast.get("owned_chains", ())],
         "sets": [dict(item, name=item["physical_name"], owner="OPENKILL", ownership="OWNED") for item in ast.get("sets", ())],
-        "rules": [dict(item, chain=item["chain"], reason=item.get("semantic_reason"), action=item.get("action_type"), order=index) for index, item in enumerate(ast.get("rules", ()))],
+        # Attachments are part of packet intent as well as topology.  Keep a
+        # normalized pseudo-rule view so DNS scope and reason-presence checks
+        # observe the complete parent-chain path instead of only the owned
+        # body chain.
+        "rules": [
+            *[
+                dict(item, chain=item["chain"], reason=item.get("semantic_reason"), action=item.get("action_type"), order=index)
+                for index, item in enumerate(ast.get("rules", ()))
+            ],
+            *[
+                dict(
+                    item,
+                    chain=item.get("from_chain") or item.get("chain"),
+                    reason=item.get("semantic_reason"),
+                    action=item.get("action_type"),
+                    order=0,
+                )
+                for item in ast.get("attachments", ())
+                if item.get("semantic_reason")
+            ],
+        ],
         "attachments": [dict(item, name=item["physical_name"], action=item.get("action_type")) for item in ast.get("attachments", ())],
         "ast": ast,
         "rendered_text": render_nft(ir),
@@ -1125,15 +1268,107 @@ def compare_proxy_transport(
     new_actions = _proxy_action_signature(new_intent, packet)
     old_core = sorted({(item["action"], item["family"], item["protocol"], item["port"], item["mark"]) for item in old_actions})
     new_core = sorted({(item["action"], item["family"], item["protocol"], item["port"], item["mark"]) for item in new_actions})
+    normalized = normalize_state(state)
+    action_chains_old = sorted({item["chain"] for item in old_actions})
+    action_chains_new = sorted({item["chain"] for item in new_actions})
+    action_port_values = sorted({item["port"] for item in old_actions if item.get("port") is not None})
+    new_port_values = sorted({item["port"] for item in new_actions if item.get("port") is not None})
+    marks_old = sorted({item["mark"] for item in old_actions if item.get("mark")})
+    marks_new = sorted({item["mark"] for item in new_actions if item.get("mark")})
+    route_required = any(item["action"] in {"MARK_PROXY", "TPROXY_PROXY"} for item in old_actions)
+    equivalent = action_port_values == new_port_values and old_core == new_core and action_chains_old == action_chains_new
     return {
         "family": packet.get("family"),
         "protocol": packet.get("protocol"),
         "direction": packet.get("direction"),
+        "run_mode": normalized.get("run_mode"),
+        "router_self_proxy": bool(normalized.get("router_self_proxy")),
+        "configured_ports": dict(normalized.get("proxy_ports", {})),
         "old_reachable_chains": _reachable_chains(old_intent, packet),
         "new_reachable_chains": _reachable_chains(new_intent, packet),
+        "old_action_chains": action_chains_old,
+        "new_action_chains": action_chains_new,
         "old_actions": old_core,
         "new_actions": new_core,
-        "equivalent": old_core == new_core,
+        "old_ports": action_port_values,
+        "new_ports": new_port_values,
+        "old_marks": marks_old,
+        "new_marks": marks_new,
+        "route_required": route_required,
+        "action_equivalent": old_core == new_core,
+        "port_equivalent": action_port_values == new_port_values,
+        "chain_equivalent": action_chains_old == action_chains_new,
+        # Transport parity is stricter than matching only the verdict token:
+        # the selected chain and configured listener port are part of the
+        # current execution contract as well.
+        "equivalent": equivalent,
+    }
+
+
+def audit_tproxy_router_self(
+    states: Sequence[Mapping[str, Any]],
+    *,
+    root: Optional[pathlib.Path] = None,
+) -> Dict[str, Any]:
+    """Audit the TPROXY router-self gate for both families and transports.
+
+    The primary 3C corpus keeps ``STATE-12-TPROXY`` with its checked-in
+    ``router_self_proxy=false`` setting.  This bounded companion audit flips
+    only that normalized fact in memory, then captures the exact production
+    function and compares it with the current renderer.  It proves that the
+    no-action gate is not being generalized to self-proxy-enabled output.
+    """
+
+    source_state = next(
+        (state for state in states if normalize_state(state)["id"] == "STATE-12-TPROXY"),
+        None,
+    )
+    if source_state is None:
+        return {"scenarios": 0, "equivalent": 0, "mismatches": 0, "rows": []}
+    variant = copy.deepcopy(dict(source_state))
+    variant["router_self_proxy"] = True
+    rows: List[Dict[str, Any]] = []
+    combos = (("IPv4", "TCP"), ("IPv4", "UDP"), ("IPv6", "TCP"), ("IPv6", "UDP"))
+    for family, protocol in combos:
+        packet = {
+            "schema": "OPENKILL_SHADOW_PACKET_V1",
+            "id": "P3C1-TPROXY-ROUTER-{}-{}".format(family[-1], protocol),
+            "family": family,
+            "direction": "ROUTER_OUTPUT",
+            "protocol": protocol,
+            "src": "192.0.2.10" if family == "IPv4" else "2001:db8:200::10",
+            "dst": "203.0.113.200" if family == "IPv4" else "2001:db8:200::200",
+            "source_kind": "ROUTER",
+            "service": "OTHER",
+            "connection": "UNKNOWN",
+            "self_process": False,
+            "src_port": 40000,
+            "dst_port": 443,
+        }
+        harness = run_production_harness(variant, packet=packet, root=root)
+        old = parse_nft_command_records(
+            harness.get("command_records", ()), file_records=harness.get("file_records")
+        )
+        new = normalize_new_context_intent(variant, packet)
+        transport = compare_proxy_transport(variant, packet, old, new) or {}
+        rows.append(
+            {
+                "family": family,
+                "protocol": protocol,
+                "router_self_proxy": True,
+                "old_actions": transport.get("old_actions", []),
+                "new_actions": transport.get("new_actions", []),
+                "old_action_chains": transport.get("old_action_chains", []),
+                "new_action_chains": transport.get("new_action_chains", []),
+                "configured_ports": transport.get("configured_ports", {}),
+                "equivalent": bool(transport.get("equivalent")),
+            }
+        )
+    return {
+        "scenarios": len(rows),
+        "equivalent": sum(1 for row in rows if row["equivalent"]),
+        "mismatches": sum(1 for row in rows if not row["equivalent"]),
+        "rows": rows,
     }
 
 
@@ -1224,15 +1459,54 @@ def compare_current_case(
     # A current gap is an explicit production fact, not an error in the old
     # command recorder.  Likewise owner-disabled states intentionally have no
     # OpenKill-owned syntax.
+    # A v6 TUN packet is an explicitly recorded current gap (BC-04): the
+    # production oracle deliberately says DEFAULT_POLICY/PROXY while the
+    # current renderer omits the symmetric TUN return.  Keep that as a known
+    # gap instead of mislabelling the absence of a rule as a renderer defect.
+    behavior_change = intent_case.get("behavior_change_candidate") or {}
+    behavior_change_id = behavior_change.get("id") if isinstance(behavior_change, Mapping) else None
+    packet_family = str(packet.get("family", "")).upper()
+    packet_direction = str(packet.get("direction", "")).upper()
+    router_self_proxy = bool(normalize_state(state).get("router_self_proxy"))
     if (new_context_intent or {}).get("unsupported_action"):
+        classification = "UNSUPPORTED_CURRENT_CASE"
+    elif classifier.get("decision") == "ACCESS_DENY":
+        # Modern current production deliberately has no normalized deny
+        # verdict (the legacy backend can reject, while the modern branch may
+        # return/bypass).  Keep every BC-07 case explicit and bounded so it
+        # cannot be mistaken for parity or silently lowered to DROP.
         classification = "UNSUPPORTED_CURRENT_CASE"
     elif str(state.get("run_mode", "")).upper() == "REDIRECT":
         # The current abstract renderer deliberately has no approved
         # redirect-policy lowering for this fixture path.  Keep the scenario
         # visible without treating it as a silent direct/mark fallback.
         classification = "UNSUPPORTED_CURRENT_CASE"
-    elif expected_result in {"EXPECTED_CURRENT_GAP", "INVALID_STATE"} or classifier.get("decision") == "NOT_OWNED":
+    elif (
+        behavior_change_id == "BC-04"
+        and packet_family == "IPV6"
+        and packet_direction == "TUN_INGRESS"
+        and classifier.get("reason") == "DEFAULT_POLICY"
+    ):
+        classification = "KNOWN_CURRENT_GAP"
+    elif (
+        expected_result in {"EXPECTED_CURRENT_GAP", "INVALID_STATE"}
+        or classifier.get("decision") == "NOT_OWNED"
+    ):
         classification = "KNOWN_CURRENT_GAP" if expected_result == "EXPECTED_CURRENT_GAP" else "SEMANTIC_EQUIVALENT_STRUCTURAL_DIFF"
+    elif (
+        not new_has
+        and expected_result == "MATCH"
+        and classifier.get("reason") == "DEFAULT_POLICY"
+        and packet_direction == "ROUTER_OUTPUT"
+        and not router_self_proxy
+    ):
+        # The current production contract intentionally has no router-output
+        # proxy action while router_self_proxy is disabled.  Both sides still
+        # classify the packet as DEFAULT_POLICY/PROXY; the old recorder may
+        # expose a static default marker while the packet-scoped renderer
+        # correctly emits no action.  This is a structural representation
+        # difference, not a policy mismatch.
+        classification = "SEMANTIC_EQUIVALENT_STRUCTURAL_DIFF"
     elif not old_has:
         classification = "OLD_NORMALIZER_DEFECT"
     elif not new_has and reason not in {"TUN_INGRESS"}:
@@ -1318,6 +1592,147 @@ def _dns_family_rules(intent: Mapping[str, Any], family: str) -> List[Dict[str, 
     ]
 
 
+def _dns_protocols(expression: str) -> List[str]:
+    """Extract transport protocols from an old or new DNS match expression."""
+
+    lower = str(expression or "").lower()
+    values: set[str] = set()
+    # Both production spellings (``meta l4proto``/``ip6 nexthdr``) and the
+    # development IR spelling are intentionally accepted.  This is a narrow
+    # normalizer, not a second policy resolver.
+    for token in re.findall(r"\b(?:tcp|udp)\b", lower):
+        values.add(token.upper())
+    return sorted(values)
+
+
+def _dns_port(expression: str) -> Optional[int]:
+    match = re.search(r"\bredirect\s+to\s*:?(\d+)\b", str(expression or "").lower())
+    if match:
+        return int(match.group(1))
+    return None
+
+
+def _dns_jump_target(rule: Mapping[str, Any]) -> Optional[str]:
+    target = rule.get("to_chain")
+    if target:
+        return str(target)
+    expression = str(rule.get("action_expression") or rule.get("expression") or "")
+    match = re.search(r"\bjump\s+([A-Za-z0-9_.-]+)", expression)
+    return match.group(1) if match else None
+
+
+def _dns_rule_expression(rule: Mapping[str, Any]) -> str:
+    # ``expression`` is present on old normalized rules, while syntax AST
+    # records use ``match_expression``.  Prefer the former only when it is a
+    # non-empty string; some attachment pseudo-rules carry a null expression.
+    value = rule.get("expression")
+    if isinstance(value, str) and value:
+        return value
+    return str(rule.get("match_expression") or "")
+
+
+def _dns_action_expression(rule: Mapping[str, Any]) -> str:
+    value = rule.get("action_expression")
+    if isinstance(value, str) and value:
+        return value
+    return str(rule.get("expression") or "")
+
+
+def _dns_parent_rules(intent: Mapping[str, Any], family: str, parent: str) -> List[Dict[str, Any]]:
+    """Return DNS rules on the packet's physical parent chain."""
+
+    return [
+        item
+        for item in _dns_family_rules(intent, family)
+        if str(item.get("chain") or item.get("from_chain") or "") == parent
+    ]
+
+
+def _dns_path_signature(intent: Mapping[str, Any], packet: Mapping[str, Any]) -> Dict[str, Any]:
+    """Build a packet-path signature for DNS parity comparison.
+
+    The old side may contain both LAN and router rules because ``set_firewall``
+    creates the complete dataplane.  Selecting the packet's parent chain here
+    prevents an unrelated LAN rule from making a router comparison look
+    equivalent.  For a jump-based LAN mode, the body chain is followed and its
+    redirect action/port is included in the signature.
+    """
+
+    family_raw = str(packet.get("family", "")).upper()
+    family = "IPv4" if family_raw in {"IPV4", "4"} else "IPv6" if family_raw in {"IPV6", "6"} else family_raw
+    direction = str(packet.get("direction", "")).upper()
+    parent = "dstnat" if direction == "LAN_INGRESS" else "nat_output" if direction == "ROUTER_OUTPUT" else ""
+    parent_rules = _dns_parent_rules(intent, family, parent) if parent else []
+    parent_rule = parent_rules[0] if parent_rules else None
+    if parent_rule is None:
+        return {
+            "family": family,
+            "direction": direction,
+            "parent_chain": parent or None,
+            "attachment_action": None,
+            "attachment_target": None,
+            "body_chain": None,
+            "body_action": None,
+            "target_port": None,
+            "protocols": [],
+            "scope_gate": None,
+            "local_destination": None,
+            "rule_order": [],
+        }
+
+    parent_expression = _dns_rule_expression(parent_rule)
+    parent_action = str(parent_rule.get("action") or parent_rule.get("action_type") or "")
+    parent_target = _dns_jump_target(parent_rule) if parent_action == "JUMP" else None
+    body_rule: Optional[Mapping[str, Any]] = None
+    body_chain = parent_target
+    body_order = 0
+    if body_chain:
+        body_candidates = [
+            item
+            for item in _dns_family_rules(intent, family)
+            if str(item.get("chain") or "") == body_chain
+        ]
+        if body_candidates:
+            body_candidates = sorted(body_candidates, key=lambda item: int(item.get("order", 0)))
+            body_rule = body_candidates[0]
+            # The old complete setup can contain an IPv4 rule before the
+            # IPv6 rule in the shared body chain.  Compare the packet-family
+            # relative order, rather than the absolute mixed-family index.
+            body_order = 0
+
+    body_expression = _dns_rule_expression(body_rule or {})
+    body_action_expression = _dns_action_expression(body_rule or {})
+    direct_action_expression = _dns_action_expression(parent_rule)
+    action_expression = body_action_expression if body_rule else direct_action_expression
+    all_expression = " ".join(part for part in (parent_expression, body_expression) if part)
+    scope_gate = "SELF_PROCESS_EXCLUDED" if "skgid != 65534" in all_expression.lower() else None
+    local_destination = None
+    if "127.0.0.1" in all_expression:
+        local_destination = "127.0.0.1"
+    elif "::1" in all_expression:
+        local_destination = "::1"
+    return {
+        "family": family,
+        "direction": direction,
+        "parent_chain": parent,
+        "attachment_action": parent_action,
+        "attachment_target": parent_target,
+        "body_chain": body_chain,
+        "body_action": str((body_rule or parent_rule).get("action") or (body_rule or parent_rule).get("action_type") or ""),
+        "target_port": _dns_port(action_expression),
+        "protocols": _dns_protocols(all_expression),
+        "scope_gate": scope_gate,
+        "local_destination": local_destination,
+        "rule_order": [
+            {
+                "chain": parent,
+                "order": int(parent_rule.get("order", 0)),
+            },
+            *([{"chain": body_chain, "order": body_order}] if body_rule else []),
+        ],
+    }
+
+
 def dns_scope_audit(
     states: Sequence[Mapping[str, Any]],
     intent_fixture: Mapping[str, Any],
@@ -1333,51 +1748,127 @@ def dns_scope_audit(
         "LAN_V6": "SHADOW-061-v6_dns_lan",
         "ROUTER_V6": "SHADOW-062-v6_dns_router_output",
     }
+    # Add the shared mode-2 fixture as a second packet-path sample.  The
+    # baseline cases above exercise the direct redirect (mode 1); mode 2
+    # proves that the LAN dstnat jump and its owned body remain equivalent on
+    # both families without conflating them with router nat_output.
+    mode2_packets = {
+        "LAN_V4_MODE2": {
+            "state_id": "STATE-09-SELF-PROXY",
+            "packet": {
+                "schema": "OPENKILL_SHADOW_PACKET_V1", "id": "P3C1-DNS-LAN-V4-M2",
+                "family": "IPv4", "direction": "LAN_INGRESS", "protocol": "UDP",
+                "src": "192.0.2.9", "dst": "198.51.100.53", "source_kind": "LAN",
+                "service": "DNS", "connection": "UNKNOWN", "self_process": False,
+                "src_port": 40009, "dst_port": None,
+            },
+        },
+        "ROUTER_V4_MODE2": {
+            "state_id": "STATE-09-SELF-PROXY",
+            "packet": {
+                "schema": "OPENKILL_SHADOW_PACKET_V1", "id": "P3C1-DNS-ROUTER-V4-M2",
+                "family": "IPv4", "direction": "ROUTER_OUTPUT", "protocol": "TCP",
+                "src": "192.0.2.9", "dst": "127.0.0.1", "source_kind": "ROUTER",
+                "service": "DNS", "connection": "UNKNOWN", "self_process": False,
+                "src_port": 40009, "dst_port": None,
+            },
+        },
+        "LAN_V6_MODE2": {
+            "state_id": "STATE-09-SELF-PROXY",
+            "packet": {
+                "schema": "OPENKILL_SHADOW_PACKET_V1", "id": "P3C1-DNS-LAN-V6-M2",
+                "family": "IPv6", "direction": "LAN_INGRESS", "protocol": "UDP",
+                "src": "2001:db8:9::9", "dst": "2001:db8:100::53", "source_kind": "LAN",
+                "service": "DNS", "connection": "UNKNOWN", "self_process": False,
+                "src_port": 40009, "dst_port": None,
+            },
+        },
+        "ROUTER_V6_MODE2": {
+            "state_id": "STATE-09-SELF-PROXY",
+            "packet": {
+                "schema": "OPENKILL_SHADOW_PACKET_V1", "id": "P3C1-DNS-ROUTER-V6-M2",
+                "family": "IPv6", "direction": "ROUTER_OUTPUT", "protocol": "TCP",
+                "src": "2001:db8:9::9", "dst": "::1", "source_kind": "ROUTER",
+                "service": "DNS", "connection": "UNKNOWN", "self_process": False,
+                "src_port": 40009, "dst_port": None,
+            },
+        },
+    }
     records: Dict[str, Any] = {}
+    case_records: Dict[str, Dict[str, Any]] = {}
     for label, case_id in cases.items():
         case = next(item for item in intent_fixture["cases"] if item["id"] == case_id)
-        state = state_by_id[case["state_id"]]
-        harness = run_production_harness(state, packet=case["packet"], root=root)
+        case_records[label] = {"state": state_by_id[case["state_id"]], "packet": case["packet"], "case_id": case_id}
+    for label, value in mode2_packets.items():
+        state = state_by_id.get(value["state_id"])
+        if state is not None:
+            case_records[label] = {"state": state, "packet": value["packet"], "case_id": label}
+    for label, case_info in case_records.items():
+        case = case_info
+        state = case["state"]
+        packet = case["packet"]
+        harness = run_production_harness(state, packet=packet, root=root)
         old = parse_nft_command_records(harness["command_records"], file_records=harness.get("file_records"))
-        new = normalize_new_context_intent(state, case["packet"])
-        family = case["packet"]["family"]
+        new = normalize_new_context_intent(state, packet)
+        family = packet["family"]
         old_rules = _dns_family_rules(old, family)
         new_rules = _dns_family_rules(new, family)
+        old_path = _dns_path_signature(old, packet)
+        new_path = _dns_path_signature(new, packet)
         records[label] = {
-            "case_id": case_id,
+            "case_id": case["case_id"],
             "family": family,
-            "direction": case["packet"]["direction"],
+            "direction": packet["direction"],
             "old": {
                 "chains": sorted({item.get("chain") for item in old_rules}),
                 "actions": sorted({item.get("action") for item in old_rules}),
                 "expressions": [item.get("expression") for item in old_rules],
                 "function_sha256": harness.get("function_sha256"),
+                "path_signature": old_path,
             },
             "new": {
                 "chains": sorted({item.get("chain") for item in new_rules}),
                 "actions": sorted({item.get("action") for item in new_rules}),
-                "expressions": [item.get("expression") for item in new_rules],
+                "expressions": [_dns_rule_expression(item) for item in new_rules],
                 "logical_ids": [item.get("logical_id") for item in new_rules],
+                "path_signature": new_path,
             },
+            "packet_action_body_equivalent": old_path == new_path,
+            "hook_equivalent": old_path.get("parent_chain") == new_path.get("parent_chain"),
         }
-    lan4 = records["LAN_V4"]["new"]
-    router4 = records["ROUTER_V4"]["new"]
-    lan6 = records["LAN_V6"]["new"]
-    router6 = records["ROUTER_V6"]["new"]
-    distinct_new = (
-        lan4["chains"] != router4["chains"]
-        or lan4["logical_ids"] != router4["logical_ids"]
-    ) and (
-        lan6["chains"] != router6["chains"]
-        or lan6["logical_ids"] != router6["logical_ids"]
-    )
+
+    def _pair_distinct(lan_label: str, router_label: str) -> bool:
+        lan = records.get(lan_label, {}).get("new", {}).get("path_signature", {})
+        router = records.get(router_label, {}).get("new", {}).get("path_signature", {})
+        return bool(lan and router and lan != router)
+
+    distinct_new = _pair_distinct("LAN_V4", "ROUTER_V4") and _pair_distinct("LAN_V6", "ROUTER_V6")
+    all_records = list(records.values())
+    packet_parity = all(item.get("packet_action_body_equivalent") for item in all_records)
+    hook_parity = all(item.get("hook_equivalent") for item in all_records)
+    # Explicitly compare the complete path, not only a body-chain hash.  This
+    # closes the Phase 3C DNS blocker where LAN and router bodies happened to
+    # serialize identically despite different physical attachments.
+    dns_paths = {
+        "LAN": {
+            family: records[label]["new"]["path_signature"]
+            for family, label in (("IPv4", "LAN_V4"), ("IPv6", "LAN_V6"))
+        },
+        "ROUTER": {
+            family: records[label]["new"]["path_signature"]
+            for family, label in (("IPv4", "ROUTER_V4"), ("IPv6", "ROUTER_V6"))
+        },
+    }
     return {
         "records": records,
         "dns_scope_distinctness": "PASS" if distinct_new else "FAIL",
+        "dns_packet_action_body_parity": "PASS" if packet_parity else "FAIL",
+        "dns_current_hook_parity": "PASS" if hook_parity else "FAIL",
+        "dns_paths": dns_paths,
         "old_lan_physical_path": records["LAN_V4"]["old"]["chains"] + records["LAN_V6"]["old"]["chains"],
         "old_router_physical_path": records["ROUTER_V4"]["old"]["chains"] + records["ROUTER_V6"]["old"]["chains"],
-        "new_lan_physical_path": lan4["chains"] + lan6["chains"],
-        "new_router_physical_path": router4["chains"] + router6["chains"],
+        "new_lan_physical_path": records["LAN_V4"]["new"]["chains"] + records["LAN_V6"]["new"]["chains"],
+        "new_router_physical_path": records["ROUTER_V4"]["new"]["chains"] + records["ROUTER_V6"]["new"]["chains"],
     }
 
 
@@ -1397,6 +1888,185 @@ def coverage_summary(scenarios: Sequence[Mapping[str, Any]]) -> Dict[str, int]:
     return summary
 
 
+def audit_acl_node_order(
+    states: Sequence[Mapping[str, Any]],
+    intent_fixture: Mapping[str, Any],
+    *,
+    root: Optional[pathlib.Path] = None,
+) -> Dict[str, Any]:
+    """Recover final NODE/ACCESS order for every family classifier chain.
+
+    The audit intentionally runs the exact ``set_firewall`` body through the
+    record-only harness for the two reviewed overlap fixtures.  It then
+    reports operation text *and* final simulated indexes, so a sequence of
+    ``insert ... position 0`` calls cannot be mistaken for source order.
+    """
+
+    state_by_id = {normalize_state(state)["id"]: state for state in states}
+    overlap_ids = ("SHADOW-066-overlap_access_node_v4", "SHADOW-067-overlap_access_node_v6")
+    chains = (
+        "openkill", "openkill_mangle", "openkill_output", "openkill_mangle_output",
+        "openkill_v6", "openkill_mangle_v6", "openkill_output_v6", "openkill_mangle_output_v6",
+    )
+    rows: List[Dict[str, Any]] = []
+    evidence: Dict[str, Any] = {}
+    for case_id in overlap_ids:
+        case = next((item for item in intent_fixture.get("cases", ()) if item.get("id") == case_id), None)
+        if not case:
+            continue
+        state = state_by_id.get(case.get("state_id"))
+        if state is None:
+            continue
+        harness = run_production_harness(state, packet=case.get("packet"), root=root)
+        parsed = parse_nft_command_records(harness.get("command_records", ()), file_records=harness.get("file_records"))
+        evidence[case_id] = {
+            "state_id": normalize_state(state)["id"],
+            "function_sha256": harness.get("function_sha256"),
+            "node_insert_operations": [
+                line for line in harness.get("command_records", ())
+                if "insert rule" in line and "node underlay" in line.lower()
+            ],
+            # Production currently adds ACL rules (rather than inserting
+            # them), while node endpoint updates use ``insert ... position
+            # 0``.  Keep both operation forms in the audit so the final
+            # order is derived from the simulated chain, never from the
+            # spelling of the command.
+            "access_insert_operations": [
+                line for line in harness.get("command_records", ())
+                if ("add rule" in line or "insert rule" in line)
+                and any(token in line.lower() for token in ("lan_ac_", "wan_ac_", "access"))
+            ],
+        }
+        evidence[case_id]["access_operations"] = evidence[case_id]["access_insert_operations"]
+        for chain in chains:
+            chain_rules = [item for item in parsed.get("rules", ()) if item.get("chain") == chain]
+            node = [item for item in chain_rules if item.get("reason") == "NODE_ENDPOINT"]
+            access = [item for item in chain_rules if item.get("reason") == "ACCESS_CONTROL"]
+            node_index = min((int(item.get("order", 0)) for item in node), default=None)
+            access_index = min((int(item.get("order", 0)) for item in access), default=None)
+            if node_index is not None and access_index is not None:
+                winner = "NODE_ENDPOINT" if node_index < access_index else "ACCESS_CONTROL"
+            else:
+                winner = "NOT_APPLICABLE"
+            rows.append(
+                {
+                    "case_id": case_id,
+                    "chain": chain,
+                    "node_insert_operation": evidence[case_id]["node_insert_operations"],
+                    "access_insert_operation": evidence[case_id]["access_insert_operations"],
+                    "access_operation": evidence[case_id]["access_operations"],
+                    "final_node_index": node_index,
+                    "final_access_index": access_index,
+                    "winner": winner,
+                }
+            )
+    both = [row for row in rows if row["winner"] != "NOT_APPLICABLE"]
+    winners = {row["winner"] for row in both}
+    classification = "CURRENT_SEMANTIC_BASELINE_DEFECT" if winners == {"NODE_ENDPOINT"} else (
+        "CURRENT_CHAIN_SPECIFIC_BEHAVIOR" if len(winners) > 1 else "UNRESOLVED"
+    )
+    return {
+        "chains": list(chains),
+        "rows": rows,
+        "evidence": evidence,
+        "winners": sorted(winners),
+        "classification": classification,
+        "all_node_before_access": bool(both) and winners == {"NODE_ENDPOINT"},
+    }
+
+
+def enumerate_unsupported_current_cases(
+    results: Sequence[Mapping[str, Any]],
+    scenarios: Sequence[Mapping[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Classify every bounded current unsupported scenario.
+
+    Unsupported is deliberately explicit.  BC-07 modern deny cases remain
+    reachable production semantics with no approved modern verdict, while
+    REDIRECT probes are development-only synthetic coverage (the checked-in
+    production scenarios use TUN/TPROXY).  Neither category is silently
+    treated as direct or proxy.
+    """
+
+    scenario_by_id = {str(item.get("id")): item for item in scenarios}
+    rows: List[Dict[str, Any]] = []
+    for result in results:
+        if result.get("classification") != "UNSUPPORTED_CURRENT_CASE":
+            continue
+        scenario = scenario_by_id.get(str(result.get("id")), {})
+        state = scenario.get("state", {}) if isinstance(scenario, Mapping) else {}
+        expected = result.get("expected") or {}
+        decision = expected.get("decision")
+        if decision == "ACCESS_DENY":
+            category = "BC-07_KNOWN_UNSUPPORTED"
+            reachable = True
+            fallback = "OLD_PRODUCTION_OR_LEGACY_BACKEND"
+            reason = "Modern current ACCESS_DENY verdict is backend-dependent and not approved for central lowering."
+        elif str(state.get("run_mode", "")).upper() == "REDIRECT":
+            category = "FIXTURE_ONLY_NON_PRODUCTION"
+            reachable = False
+            fallback = "NO_PRODUCTION_HANDOFF"
+            reason = "Synthetic REDIRECT probe has no checked-in production scenario baseline."
+        else:
+            category = "BACKEND_CAPABILITY_UNSUPPORTED"
+            reachable = True
+            fallback = "RETAIN_OLD_IMPLEMENTATION"
+            reason = "Current backend action is not expressible by the development renderer contract."
+        rows.append(
+            {
+                "id": result.get("id"),
+                "reason": reason,
+                "production_reachable": reachable,
+                "classification": category,
+                "future_fallback_required": fallback,
+                "production_reference": scenario.get("production_reference"),
+                "behavior_change_candidate": "BC-07" if decision == "ACCESS_DENY" else None,
+            }
+        )
+    rows.sort(key=lambda item: str(item.get("id", "")))
+    return rows
+
+
+def enumerate_known_current_gaps(
+    results: Sequence[Mapping[str, Any]],
+    scenarios: Sequence[Mapping[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Group known current-gap scenarios by their reviewed BC identifier."""
+
+    scenario_by_id = {str(item.get("id")): item for item in scenarios}
+    groups: Dict[str, Dict[str, Any]] = {}
+    for result in results:
+        if result.get("classification") != "KNOWN_CURRENT_GAP":
+            continue
+        scenario = scenario_by_id.get(str(result.get("id")), {})
+        expected = result.get("expected") or {}
+        gap_id = result.get("known_gap")
+        if not gap_id:
+            candidate = scenario.get("behavior_change_candidate") if isinstance(scenario, Mapping) else None
+            if isinstance(candidate, Mapping):
+                gap_id = candidate.get("id")
+        if not gap_id and str(scenario.get("packet", {}).get("family", "")).upper() == "IPV6" and str(scenario.get("packet", {}).get("direction", "")).upper() == "TUN_INGRESS":
+            gap_id = "BC-04"
+        gap_id = str(gap_id or "UNIDENTIFIED_CURRENT_GAP")
+        group = groups.setdefault(
+            gap_id,
+            {
+                "id": gap_id,
+                "case_ids": [],
+                "reasons": [],
+                "current": expected,
+                "production_reachable": True,
+            },
+        )
+        group["case_ids"].append(result.get("id"))
+        if expected.get("reason") not in group["reasons"]:
+            group["reasons"].append(expected.get("reason"))
+    for group in groups.values():
+        group["case_ids"] = sorted(group["case_ids"])
+        group["reasons"] = sorted(item for item in group["reasons"] if item)
+    return [groups[key] for key in sorted(groups)]
+
+
 def build_production_scenarios(
     states: Sequence[Mapping[str, Any]],
     intent_fixture: Mapping[str, Any],
@@ -1410,7 +2080,24 @@ def build_production_scenarios(
     # Prefer all overlap/DNS/TUN/TProxy/owner cases, then fill with the
     # remaining current corpus in fixture order.  The linkage keeps this
     # phase grounded in already-reviewed semantic expectations.
-    priority = {"OVERLAP": 0, "DNS": 1, "OWNER": 2, "IPv6_CONTROL": 3, "NODE": 4, "TUN": 5, "ACCESS": 6, "CHINA": 7, "FAKEIP": 8}
+    priority = {
+        "OVERLAP": 0,
+        "DNS": 1,
+        "OWNER": 2,
+        "IPv6_CONTROL": 3,
+        # Keep the four explicit-policy current gaps in the primary corpus;
+        # they are production-reachable unresolved mappings and must not be
+        # lost merely because the broad scenario budget is bounded.
+        "USER_DIRECT": 4,
+        "USER_PROXY": 4,
+        # Keep both current ACCESS_DENY oracle cases in the bounded corpus;
+        # they define the explicit BC-07 unsupported boundary.
+        "ACCESS": 4,
+        "NODE": 5,
+        "TUN": 6,
+        "CHINA": 8,
+        "FAKEIP": 9,
+    }
     ordered = sorted(cases, key=lambda case: (priority.get(case.get("category"), 20), case["id"]))
     selected: List[Dict[str, Any]] = []
     # Keep the primary production corpus bounded and add explicit mode/family
@@ -1474,7 +2161,7 @@ def build_production_scenarios(
         if item: extras.append(item)
     dual_state = next((state for state in states if normalize_state(state)["id"] == "STATE-03-DUAL-STACK"), None)
     if dual_state is not None:
-        for index, family in enumerate(("IPv4", "IPv6", "IPv4", "IPv6", "IPv4", "IPv6")):
+        for index, family in enumerate(("IPv4", "IPv6", "IPv4", "IPv6", "IPv4")):
             packet = {
                 "schema": "OPENKILL_SHADOW_PACKET_V1", "id": "P3C-DUAL-{:02d}".format(index + 1),
                 "family": family, "direction": "LAN_INGRESS", "protocol": "TCP",
@@ -1546,7 +2233,13 @@ def build_production_scenarios(
     for source_id in ("SHADOW-053-v4_dns_lan", "SHADOW-054-v4_dns_router_output"):
         item = clone_case(source_id, "DNS", category="DNS")
         if item: extras.append(item)
-    for source_id in ("SHADOW-031-v4_node_literal", "SHADOW-035-v6_node_literal", "SHADOW-032-v4_node_domain", "SHADOW-036-v6_node_domain"):
+    for source_id in (
+        "SHADOW-031-v4_node_literal", "SHADOW-035-v6_node_literal",
+        "SHADOW-032-v4_node_domain", "SHADOW-036-v6_node_domain",
+        # Keep a fifth node probe available when the bounded corpus is
+        # rebalanced to retain all explicit ACCESS_DENY cases.
+        "SHADOW-031-v4_node_literal",
+    ):
         item = clone_case(source_id, "NODE", category="NODE")
         if item: extras.append(item)
     for source_id in ("SHADOW-043-v4_china_mainland", "SHADOW-046-v6_china_mainland", "SHADOW-044-v4_china_pass", "SHADOW-047-v6_china_pass", "SHADOW-045-v4_china_overseas", "SHADOW-048-v6_china_overseas", "SHADOW-043-v4_china_mainland", "SHADOW-046-v6_china_mainland"):
@@ -1606,10 +2299,13 @@ def run_shadow_comparison(
                 node_harness["command_records"], file_records=node_harness.get("file_records")
             )
             node_by_state[state_id] = {"harness": node_harness, "intent": node_intent}
-            # Merge endpoint elements/rules into the old normalized state.
+            # Merge endpoint elements/rules into the old normalized state
+            # with the same insert-at-zero semantics as the production
+            # updater.  The set_firewall body already includes the updater on
+            # the OpenKill path; _merge_nft_intent therefore deduplicates
+            # those objects instead of double-counting them.
+            old_by_state[key] = _merge_nft_intent(old_by_state[key], node_intent)
             old_intent = old_by_state[key]
-            old_intent["sets"] = sorted(old_intent.get("sets", []) + node_intent.get("sets", []), key=lambda item: item.get("name", ""))
-            old_intent["rules"] = old_intent.get("rules", []) + node_intent.get("rules", [])
         new_intent = normalize_new_renderer_intent(state)
         new_context_intent = normalize_new_context_intent(state, scenario["packet"])
         by_key[scenario["case_id"]] = {"old": old_intent, "new": new_intent, "new_context": new_context_intent}
@@ -1629,6 +2325,11 @@ def run_shadow_comparison(
         "UNSUPPORTED_CURRENT_CASE", "SEMANTIC_MISMATCH", "UNKNOWN", "OLD_HARNESS_DEFECT", "OLD_NORMALIZER_DEFECT", "NEW_RENDERER_DEFECT",
     )}
     transport_results = [item.get("transport") for item in results if item.get("transport") is not None]
+    unsupported_cases = enumerate_unsupported_current_cases(results, scenarios)
+    known_current_gaps = enumerate_known_current_gaps(results, scenarios)
+    acl_node_audit = audit_acl_node_order(states, validated_intent, root=root_path)
+    dns_audit = dns_scope_audit(states, validated_intent, root=root_path)
+    tproxy_router_self = audit_tproxy_router_self(states, root=root_path)
     return {
         "schema": PHASE_3C_SCHEMA,
         "profile": CURRENT_PROFILE,
@@ -1648,6 +2349,20 @@ def run_shadow_comparison(
             "mismatches": sum(1 for item in transport_results if not item.get("equivalent")),
             "results": transport_results,
         },
+        "tproxy_router_self": tproxy_router_self,
+        "acl_node_audit": acl_node_audit,
+        "unsupported_current_cases": unsupported_cases,
+        "known_current_gaps": known_current_gaps,
+        "unbounded_unsupported_current_case": any(
+            item.get("production_reachable") and item.get("classification") not in {
+                "BC-07_KNOWN_UNSUPPORTED", "BACKEND_CAPABILITY_UNSUPPORTED"
+            }
+            for item in unsupported_cases
+        ),
+        "dns_audit": dns_audit,
+        "bc_target_leakage_count": sum(
+            1 for item in results if "TARGET" in json.dumps(item, sort_keys=True, default=str)
+        ),
     }
 
 
@@ -1662,6 +2377,10 @@ __all__ = [
     "coverage_summary",
     "compare_current_case",
     "compare_proxy_transport",
+    "audit_tproxy_router_self",
+    "audit_acl_node_order",
+    "enumerate_unsupported_current_cases",
+    "enumerate_known_current_gaps",
     "dns_scope_signature",
     "extract_shell_function",
     "normalize_new_renderer_intent",
