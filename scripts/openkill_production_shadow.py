@@ -979,9 +979,17 @@ def _expression_matches_packet(expression: str, packet: Mapping[str, Any]) -> bo
     lower = str(expression or "").lower()
     family = str(packet.get("family", "")).upper()
     protocol = str(packet.get("protocol", "")).upper()
-    if family == "IPV4" and ("nfproto ipv6" in lower or "ip6 " in lower or "ip6 daddr" in lower or "ip6 nexthdr" in lower):
+    if family == "IPV4" and (
+        re.search(r"nfproto\s*\{?\s*ipv6\b", lower)
+        or "ip6 " in lower
+        or "ip6 daddr" in lower
+        or "ip6 nexthdr" in lower
+    ):
         return False
-    if family == "IPV6" and ("nfproto ipv4" in lower or re.search(r"\bip\s+(?:saddr|daddr|protocol)\b", lower)):
+    if family == "IPV6" and (
+        re.search(r"nfproto\s*\{?\s*ipv4\b", lower)
+        or re.search(r"\bip\s+(?:saddr|daddr|protocol)\b", lower)
+    ):
         return False
     # A rule with an explicit TCP/UDP/ICMP qualifier must agree with the
     # synthetic packet.  Unqualified rules are retained for the packet; the
