@@ -1,0 +1,4491 @@
+{
+  "cases": [
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_loopback",
+      "id": "SHADOW-001-v4_loopback",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.1",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-001",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_loopback",
+      "state_id": "STATE-CASE-001"
+    },
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_loopback",
+      "id": "SHADOW-002-v6_loopback",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::2",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-002",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_loopback",
+      "state_id": "STATE-CASE-002"
+    },
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_private",
+      "id": "SHADOW-003-v4_private",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.3",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-003",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_private",
+      "state_id": "STATE-CASE-003"
+    },
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_private",
+      "id": "SHADOW-004-v6_private",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::4",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-004",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_private",
+      "state_id": "STATE-CASE-004"
+    },
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_link_local",
+      "id": "SHADOW-005-v4_link_local",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.5",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-005",
+        "protocol": "UDP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_link_local",
+      "state_id": "STATE-CASE-005"
+    },
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_link_local",
+      "id": "SHADOW-006-v6_link_local",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::6",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-006",
+        "protocol": "UDP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_link_local",
+      "state_id": "STATE-CASE-006"
+    },
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_multicast",
+      "id": "SHADOW-007-v4_multicast",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.7",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-007",
+        "protocol": "UDP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_multicast",
+      "state_id": "STATE-CASE-007"
+    },
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_multicast",
+      "id": "SHADOW-008-v6_multicast",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::8",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-008",
+        "protocol": "UDP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_multicast",
+      "state_id": "STATE-CASE-008"
+    },
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_lan_prefix",
+      "id": "SHADOW-009-v4_lan_prefix",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.9",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-009",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_lan_prefix",
+      "state_id": "STATE-CASE-009"
+    },
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_lan_prefix",
+      "id": "SHADOW-010-v6_lan_prefix",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::10",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-010",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_lan_prefix",
+      "state_id": "STATE-CASE-010"
+    },
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "ROUTER_OUTPUT"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_wan_host",
+      "id": "SHADOW-011-v4_wan_host",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "ROUTER_OUTPUT",
+        "dst": "198.51.100.11",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-011",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "ROUTER",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_wan_host",
+      "state_id": "STATE-CASE-011"
+    },
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "ROUTER_OUTPUT"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_wan_host",
+      "id": "SHADOW-012-v6_wan_host",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "ROUTER_OUTPUT",
+        "dst": "2001:db8:100::12",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-012",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "ROUTER",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_wan_host",
+      "state_id": "STATE-CASE-012"
+    },
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_delegated_prefix",
+      "id": "SHADOW-013-v4_delegated_prefix",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.13",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-013",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_delegated_prefix",
+      "state_id": "STATE-CASE-013"
+    },
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_delegated_prefix",
+      "id": "SHADOW-014-v6_delegated_prefix",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::14",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-014",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_delegated_prefix",
+      "state_id": "STATE-CASE-014"
+    },
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_ula",
+      "id": "SHADOW-015-v6_ula",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::15",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-015",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_ula",
+      "state_id": "STATE-CASE-015"
+    },
+    {
+      "category": "CONTROL",
+      "coverage": [
+        "CONTROL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_reply",
+      "id": "SHADOW-016-v4_reply",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "REPLY_TRAFFIC",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "REPLY_TRAFFIC"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "REPLY",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.16",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-016",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_reply",
+      "state_id": "STATE-CASE-016"
+    },
+    {
+      "category": "CONTROL",
+      "coverage": [
+        "CONTROL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_service_port",
+      "id": "SHADOW-017-v4_service_port",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "SERVICE_PORT",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "SERVICE_PORT"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.17",
+        "dst_port": 123,
+        "family": "IPv4",
+        "id": "PACKET-017",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_service_port",
+      "state_id": "STATE-CASE-017"
+    },
+    {
+      "category": "CONTROL",
+      "coverage": [
+        "CONTROL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_reply",
+      "id": "SHADOW-018-v6_reply",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "REPLY_TRAFFIC",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "REPLY_TRAFFIC"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "REPLY",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::18",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-018",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_reply",
+      "state_id": "STATE-CASE-018"
+    },
+    {
+      "category": "CONTROL",
+      "coverage": [
+        "CONTROL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_service_port",
+      "id": "SHADOW-019-v6_service_port",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "SERVICE_PORT",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "SERVICE_PORT"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::19",
+        "dst_port": 123,
+        "family": "IPv6",
+        "id": "PACKET-019",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_service_port",
+      "state_id": "STATE-CASE-019"
+    },
+    {
+      "category": "IPv6_CONTROL",
+      "coverage": [
+        "IPv6_CONTROL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_dhcpv6",
+      "id": "SHADOW-020-v6_dhcpv6",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "CONTROL_PROTOCOL",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "CONTROL_PROTOCOL"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::20",
+        "dst_port": 547,
+        "family": "IPv6",
+        "id": "PACKET-020",
+        "protocol": "UDP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "DHCPv6",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": 546
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_dhcpv6",
+      "state_id": "STATE-CASE-020"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-03",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "IPv6_CONTROL",
+      "coverage": [
+        "IPv6_CONTROL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_rs",
+      "id": "SHADOW-021-v6_rs",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "CONTROL_PROTOCOL",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "CONTROL_PROTOCOL"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::21",
+        "dst_port": null,
+        "family": "IPv6",
+        "icmpv6_type": "RS",
+        "id": "PACKET-021",
+        "protocol": "ICMPv6",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_rs",
+      "state_id": "STATE-CASE-021"
+    },
+    {
+      "category": "IPv6_CONTROL",
+      "coverage": [
+        "IPv6_CONTROL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_ra",
+      "id": "SHADOW-022-v6_ra",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "CONTROL_PROTOCOL",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "CONTROL_PROTOCOL"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::22",
+        "dst_port": null,
+        "family": "IPv6",
+        "icmpv6_type": "RA",
+        "id": "PACKET-022",
+        "protocol": "ICMPv6",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_ra",
+      "state_id": "STATE-CASE-022"
+    },
+    {
+      "category": "IPv6_CONTROL",
+      "coverage": [
+        "IPv6_CONTROL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_ns",
+      "id": "SHADOW-023-v6_ns",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "CONTROL_PROTOCOL",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "CONTROL_PROTOCOL"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::23",
+        "dst_port": null,
+        "family": "IPv6",
+        "icmpv6_type": "NS",
+        "id": "PACKET-023",
+        "protocol": "ICMPv6",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_ns",
+      "state_id": "STATE-CASE-023"
+    },
+    {
+      "category": "IPv6_CONTROL",
+      "coverage": [
+        "IPv6_CONTROL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_na",
+      "id": "SHADOW-024-v6_na",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "CONTROL_PROTOCOL",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "CONTROL_PROTOCOL"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::24",
+        "dst_port": null,
+        "family": "IPv6",
+        "icmpv6_type": "NA",
+        "id": "PACKET-024",
+        "protocol": "ICMPv6",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_na",
+      "state_id": "STATE-CASE-024"
+    },
+    {
+      "category": "IPv6_CONTROL",
+      "coverage": [
+        "IPv6_CONTROL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_ptb",
+      "id": "SHADOW-025-v6_ptb",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "CONTROL_PROTOCOL",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "CONTROL_PROTOCOL"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::25",
+        "dst_port": null,
+        "family": "IPv6",
+        "icmpv6_type": "PTB",
+        "id": "PACKET-025",
+        "protocol": "ICMPv6",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_ptb",
+      "state_id": "STATE-CASE-025"
+    },
+    {
+      "category": "IPv6_CONTROL",
+      "coverage": [
+        "IPv6_CONTROL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_dest_unreachable",
+      "id": "SHADOW-026-v6_dest_unreachable",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "CONTROL_PROTOCOL",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "CONTROL_PROTOCOL"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::26",
+        "dst_port": null,
+        "family": "IPv6",
+        "icmpv6_type": "Destination Unreachable",
+        "id": "PACKET-026",
+        "protocol": "ICMPv6",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_dest_unreachable",
+      "state_id": "STATE-CASE-026"
+    },
+    {
+      "category": "IPv6_CONTROL",
+      "coverage": [
+        "IPv6_CONTROL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_time_exceeded",
+      "id": "SHADOW-027-v6_time_exceeded",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "CONTROL_PROTOCOL",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "CONTROL_PROTOCOL"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::27",
+        "dst_port": null,
+        "family": "IPv6",
+        "icmpv6_type": "Time Exceeded",
+        "id": "PACKET-027",
+        "protocol": "ICMPv6",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_time_exceeded",
+      "state_id": "STATE-CASE-027"
+    },
+    {
+      "category": "IPv6_CONTROL",
+      "coverage": [
+        "IPv6_CONTROL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_parameter_problem",
+      "id": "SHADOW-028-v6_parameter_problem",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "CONTROL_PROTOCOL",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "CONTROL_PROTOCOL"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::28",
+        "dst_port": null,
+        "family": "IPv6",
+        "icmpv6_type": "Parameter Problem",
+        "id": "PACKET-028",
+        "protocol": "ICMPv6",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_parameter_problem",
+      "state_id": "STATE-CASE-028"
+    },
+    {
+      "category": "SELF",
+      "coverage": [
+        "SELF",
+        "ROUTER_OUTPUT"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_self_output",
+      "id": "SHADOW-029-v4_self_output",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "SELF_TRAFFIC",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "SELF_TRAFFIC"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "ROUTER_OUTPUT",
+        "dst": "198.51.100.29",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-029",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": true,
+        "service": "OTHER",
+        "source_kind": "SELF_PROCESS",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_self_output",
+      "state_id": "STATE-CASE-029"
+    },
+    {
+      "category": "SELF",
+      "coverage": [
+        "SELF"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_tun_ingress",
+      "id": "SHADOW-030-v4_tun_ingress",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "TUN_INGRESS",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "TUN_INGRESS"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "TUN_INGRESS",
+        "dst": "198.51.100.30",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-030",
+        "iifname": "utun",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "UNKNOWN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_tun_ingress",
+      "state_id": "STATE-CASE-030"
+    },
+    {
+      "category": "NODE",
+      "coverage": [
+        "NODE",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_node_literal",
+      "id": "SHADOW-031-v4_node_literal",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "NODE_ENDPOINT",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "NODE_ENDPOINT"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.31",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-031",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_node_literal",
+      "state_id": "STATE-CASE-031"
+    },
+    {
+      "category": "NODE",
+      "coverage": [
+        "NODE",
+        "ROUTER_OUTPUT"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_node_domain",
+      "id": "SHADOW-032-v4_node_domain",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "NODE_ENDPOINT",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "NODE_ENDPOINT"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "ROUTER_OUTPUT",
+        "dst": "198.51.100.32",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-032",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "ROUTER",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_node_domain",
+      "state_id": "STATE-CASE-032"
+    },
+    {
+      "category": "SELF",
+      "coverage": [
+        "SELF",
+        "ROUTER_OUTPUT"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_self_output",
+      "id": "SHADOW-033-v6_self_output",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "SELF_TRAFFIC",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "SELF_TRAFFIC"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "ROUTER_OUTPUT",
+        "dst": "2001:db8:100::33",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-033",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": true,
+        "service": "OTHER",
+        "source_kind": "SELF_PROCESS",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_self_output",
+      "state_id": "STATE-CASE-033"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-04",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "SELF",
+      "coverage": [
+        "SELF"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_tun_ingress",
+      "id": "SHADOW-034-v6_tun_ingress",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "TUN_INGRESS"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "TUN_INGRESS",
+        "dst": "2001:db8:100::34",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-034",
+        "iifname": "utun",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "UNKNOWN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_tun_ingress",
+      "state_id": "STATE-CASE-034"
+    },
+    {
+      "category": "NODE",
+      "coverage": [
+        "NODE",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_node_literal",
+      "id": "SHADOW-035-v6_node_literal",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "NODE_ENDPOINT",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "NODE_ENDPOINT"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::35",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-035",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_node_literal",
+      "state_id": "STATE-CASE-035"
+    },
+    {
+      "category": "NODE",
+      "coverage": [
+        "NODE",
+        "ROUTER_OUTPUT"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_node_domain",
+      "id": "SHADOW-036-v6_node_domain",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "NODE_ENDPOINT",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "NODE_ENDPOINT"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "ROUTER_OUTPUT",
+        "dst": "2001:db8:100::36",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-036",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "ROUTER",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_node_domain",
+      "state_id": "STATE-CASE-036"
+    },
+    {
+      "category": "ACCESS",
+      "coverage": [
+        "ACCESS",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_access_bypass",
+      "id": "SHADOW-037-v4_access_bypass",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "ACCESS_CONTROL",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "ACCESS_CONTROL",
+          "CUSTOM_ACCESS"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.37",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-037",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_access_bypass",
+      "state_id": "STATE-CASE-037"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-07",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "ACCESS",
+      "coverage": [
+        "ACCESS",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_custom_access_deny",
+      "id": "SHADOW-038-v4_custom_access_deny",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "ACCESS_DENY",
+          "reason": "ACCESS_CONTROL",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "ACCESS_CONTROL",
+          "CUSTOM_ACCESS",
+          "ACCESS_DENY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.38",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-038",
+        "protocol": "UDP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_custom_access_deny",
+      "state_id": "STATE-CASE-038"
+    },
+    {
+      "category": "FAKEIP",
+      "coverage": [
+        "FAKEIP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_fakeip",
+      "id": "SHADOW-039-v4_fakeip",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "FAKEIP",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "FAKEIP"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.39",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-039",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_fakeip",
+      "state_id": "STATE-CASE-039"
+    },
+    {
+      "category": "ACCESS",
+      "coverage": [
+        "ACCESS",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_access_bypass",
+      "id": "SHADOW-040-v6_access_bypass",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "ACCESS_CONTROL",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "ACCESS_CONTROL",
+          "CUSTOM_ACCESS"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::40",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-040",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_access_bypass",
+      "state_id": "STATE-CASE-040"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-07",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "ACCESS",
+      "coverage": [
+        "ACCESS",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_custom_access_deny",
+      "id": "SHADOW-041-v6_custom_access_deny",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "ACCESS_DENY",
+          "reason": "ACCESS_CONTROL",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "ACCESS_CONTROL",
+          "CUSTOM_ACCESS",
+          "ACCESS_DENY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::41",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-041",
+        "protocol": "UDP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_custom_access_deny",
+      "state_id": "STATE-CASE-041"
+    },
+    {
+      "category": "FAKEIP",
+      "coverage": [
+        "FAKEIP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_fakeip",
+      "id": "SHADOW-042-v6_fakeip",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "FAKEIP",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "FAKEIP"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::42",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-042",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_fakeip",
+      "state_id": "STATE-CASE-042"
+    },
+    {
+      "category": "CHINA",
+      "coverage": [
+        "CHINA",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_china_mainland",
+      "id": "SHADOW-043-v4_china_mainland",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "DIRECT",
+          "reason": "CHINA_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "CHINA_POLICY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.43",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-043",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_china_mainland",
+      "state_id": "STATE-CASE-043"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-06",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "CHINA",
+      "coverage": [
+        "CHINA",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_china_pass",
+      "id": "SHADOW-044-v4_china_pass",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "CHINA_PASS",
+          "CHINA_POLICY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.44",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-044",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_china_pass",
+      "state_id": "STATE-CASE-044"
+    },
+    {
+      "category": "CHINA",
+      "coverage": [
+        "CHINA",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_china_overseas",
+      "id": "SHADOW-045-v4_china_overseas",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "DIRECT",
+          "reason": "CHINA_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.45",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-045",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_china_overseas",
+      "state_id": "STATE-CASE-045"
+    },
+    {
+      "category": "CHINA",
+      "coverage": [
+        "CHINA",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_china_mainland",
+      "id": "SHADOW-046-v6_china_mainland",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "DIRECT",
+          "reason": "CHINA_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "CHINA_POLICY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::46",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-046",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_china_mainland",
+      "state_id": "STATE-CASE-046"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-06",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "CHINA",
+      "coverage": [
+        "CHINA",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_china_pass",
+      "id": "SHADOW-047-v6_china_pass",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "CHINA_PASS",
+          "CHINA_POLICY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::47",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-047",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_china_pass",
+      "state_id": "STATE-CASE-047"
+    },
+    {
+      "category": "CHINA",
+      "coverage": [
+        "CHINA",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_china_overseas",
+      "id": "SHADOW-048-v6_china_overseas",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "DIRECT",
+          "reason": "CHINA_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::48",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-048",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_china_overseas",
+      "state_id": "STATE-CASE-048"
+    },
+    {
+      "category": "DEFAULT",
+      "coverage": [
+        "DEFAULT",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_default_tcp",
+      "id": "SHADOW-049-v4_default_tcp",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.49",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-049",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_default_tcp",
+      "state_id": "STATE-CASE-049"
+    },
+    {
+      "category": "DEFAULT",
+      "coverage": [
+        "DEFAULT",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_default_udp",
+      "id": "SHADOW-050-v4_default_udp",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.50",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-050",
+        "protocol": "UDP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_default_udp",
+      "state_id": "STATE-CASE-050"
+    },
+    {
+      "category": "DEFAULT",
+      "coverage": [
+        "DEFAULT",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_default_icmp",
+      "id": "SHADOW-051-v4_default_icmp",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.51",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-051",
+        "protocol": "ICMP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_default_icmp",
+      "state_id": "STATE-CASE-051"
+    },
+    {
+      "category": "DEFAULT",
+      "coverage": [
+        "DEFAULT",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_default_other",
+      "id": "SHADOW-052-v4_default_other",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.52",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-052",
+        "protocol": "OTHER",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_default_other",
+      "state_id": "STATE-CASE-052"
+    },
+    {
+      "category": "DNS",
+      "coverage": [
+        "DNS",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_dns_lan",
+      "id": "SHADOW-053-v4_dns_lan",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "DNS_SPECIAL",
+          "reason": "DNS",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "DNS"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.53",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-053",
+        "protocol": "UDP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "DNS",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_dns_lan",
+      "state_id": "STATE-CASE-053"
+    },
+    {
+      "category": "DNS",
+      "coverage": [
+        "DNS",
+        "ROUTER_OUTPUT"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_dns_router_output",
+      "id": "SHADOW-054-v4_dns_router_output",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "DNS_SPECIAL",
+          "reason": "DNS",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "DNS"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "ROUTER_OUTPUT",
+        "dst": "198.51.100.54",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-054",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "DNS",
+        "source_kind": "ROUTER",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_dns_router_output",
+      "state_id": "STATE-CASE-054"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-01",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "USER_DIRECT",
+      "coverage": [
+        "USER_DIRECT",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_user_direct",
+      "id": "SHADOW-055-v4_user_direct",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "CURRENT_UNDEFINED"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "EXPLICIT_DIRECT"
+        ],
+        "known_gap": "BC-01",
+        "result": "EXPECTED_CURRENT_GAP"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.55",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-055",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_user_direct",
+      "state_id": "STATE-CASE-055"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-01",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "USER_PROXY",
+      "coverage": [
+        "USER_PROXY",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_user_proxy",
+      "id": "SHADOW-056-v4_user_proxy",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "CURRENT_UNDEFINED"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "EXPLICIT_PROXY"
+        ],
+        "known_gap": "BC-01",
+        "result": "EXPECTED_CURRENT_GAP"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.56",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-056",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_user_proxy",
+      "state_id": "STATE-CASE-056"
+    },
+    {
+      "category": "DEFAULT",
+      "coverage": [
+        "DEFAULT",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_default_tcp",
+      "id": "SHADOW-057-v6_default_tcp",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::57",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-057",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_default_tcp",
+      "state_id": "STATE-CASE-057"
+    },
+    {
+      "category": "DEFAULT",
+      "coverage": [
+        "DEFAULT",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_default_udp",
+      "id": "SHADOW-058-v6_default_udp",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::58",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-058",
+        "protocol": "UDP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_default_udp",
+      "state_id": "STATE-CASE-058"
+    },
+    {
+      "category": "DEFAULT",
+      "coverage": [
+        "DEFAULT",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_default_icmp",
+      "id": "SHADOW-059-v6_default_icmp",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::59",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-059",
+        "protocol": "ICMP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_default_icmp",
+      "state_id": "STATE-CASE-059"
+    },
+    {
+      "category": "DEFAULT",
+      "coverage": [
+        "DEFAULT",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_default_other",
+      "id": "SHADOW-060-v6_default_other",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::60",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-060",
+        "protocol": "OTHER",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_default_other",
+      "state_id": "STATE-CASE-060"
+    },
+    {
+      "category": "DNS",
+      "coverage": [
+        "DNS",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_dns_lan",
+      "id": "SHADOW-061-v6_dns_lan",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "DNS_SPECIAL",
+          "reason": "DNS",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "DNS"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::61",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-061",
+        "protocol": "UDP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "DNS",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_dns_lan",
+      "state_id": "STATE-CASE-061"
+    },
+    {
+      "category": "DNS",
+      "coverage": [
+        "DNS",
+        "ROUTER_OUTPUT"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_dns_router_output",
+      "id": "SHADOW-062-v6_dns_router_output",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "DNS_SPECIAL",
+          "reason": "DNS",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "DNS"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "ROUTER_OUTPUT",
+        "dst": "2001:db8:100::62",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-062",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "DNS",
+        "source_kind": "ROUTER",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_dns_router_output",
+      "state_id": "STATE-CASE-062"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-01",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "USER_DIRECT",
+      "coverage": [
+        "USER_DIRECT",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_user_direct",
+      "id": "SHADOW-063-v6_user_direct",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "CURRENT_UNDEFINED"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "EXPLICIT_DIRECT"
+        ],
+        "known_gap": "BC-01",
+        "result": "EXPECTED_CURRENT_GAP"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::63",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-063",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_user_direct",
+      "state_id": "STATE-CASE-063"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-01",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "USER_PROXY",
+      "coverage": [
+        "USER_PROXY",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_user_proxy",
+      "id": "SHADOW-064-v6_user_proxy",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "CURRENT_UNDEFINED"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "EXPLICIT_PROXY"
+        ],
+        "known_gap": "BC-01",
+        "result": "EXPECTED_CURRENT_GAP"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::64",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-064",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_user_proxy",
+      "state_id": "STATE-CASE-064"
+    },
+    {
+      "category": "CONTROL",
+      "coverage": [
+        "CONTROL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_dhcp_default",
+      "id": "SHADOW-065-v4_dhcp_default",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.65",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-065",
+        "protocol": "UDP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "DHCP",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_dhcp_default",
+      "state_id": "STATE-CASE-065"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-02",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_access_node_v4",
+      "id": "SHADOW-066-overlap_access_node_v4",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "ACCESS_CONTROL",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "NODE_ENDPOINT",
+          "ACCESS_CONTROL",
+          "CUSTOM_ACCESS"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.66",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-066",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_access_node_v4",
+      "state_id": "STATE-CASE-066"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-02",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_access_node_v6",
+      "id": "SHADOW-067-overlap_access_node_v6",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "ACCESS_CONTROL",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "NODE_ENDPOINT",
+          "ACCESS_CONTROL",
+          "CUSTOM_ACCESS"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::67",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-067",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_access_node_v6",
+      "state_id": "STATE-CASE-067"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_node_local_v4",
+      "id": "SHADOW-068-overlap_node_local_v4",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "NODE_ENDPOINT",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "NODE_ENDPOINT",
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.68",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-068",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_node_local_v4",
+      "state_id": "STATE-CASE-068"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_node_local_v6",
+      "id": "SHADOW-069-overlap_node_local_v6",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "NODE_ENDPOINT",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "NODE_ENDPOINT",
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::69",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-069",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_node_local_v6",
+      "state_id": "STATE-CASE-069"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_node_china_v4",
+      "id": "SHADOW-070-overlap_node_china_v4",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "NODE_ENDPOINT",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "NODE_ENDPOINT",
+          "CHINA_POLICY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.70",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-070",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_node_china_v4",
+      "state_id": "STATE-CASE-070"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_node_user_proxy_v4",
+      "id": "SHADOW-071-overlap_node_user_proxy_v4",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "NODE_ENDPOINT",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "NODE_ENDPOINT",
+          "EXPLICIT_PROXY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.71",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-071",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_node_user_proxy_v4",
+      "state_id": "STATE-CASE-071"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_node_user_proxy_v6",
+      "id": "SHADOW-072-overlap_node_user_proxy_v6",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "NODE_ENDPOINT",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "NODE_ENDPOINT",
+          "EXPLICIT_PROXY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::72",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-072",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_node_user_proxy_v6",
+      "state_id": "STATE-CASE-072"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_fakeip_china_v4",
+      "id": "SHADOW-073-overlap_fakeip_china_v4",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "FAKEIP",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "FAKEIP",
+          "CHINA_POLICY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.73",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-073",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_fakeip_china_v4",
+      "state_id": "STATE-CASE-073"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_fakeip_user_direct_v4",
+      "id": "SHADOW-074-overlap_fakeip_user_direct_v4",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "FAKEIP",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "FAKEIP",
+          "EXPLICIT_DIRECT"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.74",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-074",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_fakeip_user_direct_v4",
+      "state_id": "STATE-CASE-074"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_fakeip_user_direct_v6",
+      "id": "SHADOW-075-overlap_fakeip_user_direct_v6",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "FAKEIP",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "FAKEIP",
+          "EXPLICIT_DIRECT"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::75",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-075",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_fakeip_user_direct_v6",
+      "state_id": "STATE-CASE-075"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-01",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_user_proxy_china_v4",
+      "id": "SHADOW-076-overlap_user_proxy_china_v4",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "DIRECT",
+          "reason": "CHINA_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "EXPLICIT_PROXY",
+          "CHINA_POLICY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.76",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-076",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_user_proxy_china_v4",
+      "state_id": "STATE-CASE-076"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-01",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_user_proxy_china_v6",
+      "id": "SHADOW-077-overlap_user_proxy_china_v6",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "DIRECT",
+          "reason": "CHINA_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "EXPLICIT_PROXY",
+          "CHINA_POLICY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::77",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-077",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_user_proxy_china_v6",
+      "state_id": "STATE-CASE-077"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_user_direct_china_v4",
+      "id": "SHADOW-078-overlap_user_direct_china_v4",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "DIRECT",
+          "reason": "CHINA_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "EXPLICIT_DIRECT",
+          "CHINA_POLICY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.78",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-078",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_user_direct_china_v4",
+      "state_id": "STATE-CASE-078"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-06",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_user_direct_china_pass_v4",
+      "id": "SHADOW-079-overlap_user_direct_china_pass_v4",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "CURRENT_UNDEFINED"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "EXPLICIT_DIRECT",
+          "CHINA_PASS",
+          "CHINA_POLICY"
+        ],
+        "known_gap": "BC-06",
+        "result": "EXPECTED_CURRENT_GAP"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.79",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-079",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_user_direct_china_pass_v4",
+      "state_id": "STATE-CASE-079"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_user_direct_proxy_invalid_v4",
+      "id": "SHADOW-080-overlap_user_direct_proxy_invalid_v4",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": null,
+          "reason": "INVALID_CONFIGURATION",
+          "status": "INVALID_CONFIGURATION"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "EXPLICIT_DIRECT",
+          "EXPLICIT_PROXY"
+        ],
+        "result": "INVALID_STATE"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.80",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-080",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_user_direct_proxy_invalid_v4",
+      "state_id": "STATE-CASE-080"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_local_user_proxy_v4",
+      "id": "SHADOW-081-overlap_local_user_proxy_v4",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "LOCAL_DESTINATION",
+          "EXPLICIT_PROXY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.81",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-081",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_local_user_proxy_v4",
+      "state_id": "STATE-CASE-081"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_local_user_proxy_v6",
+      "id": "SHADOW-082-overlap_local_user_proxy_v6",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "LOCAL_DESTINATION",
+          "EXPLICIT_PROXY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::82",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-082",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_local_user_proxy_v6",
+      "state_id": "STATE-CASE-082"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-03",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_control_user_proxy_v6",
+      "id": "SHADOW-083-overlap_control_user_proxy_v6",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "CONTROL_PROTOCOL",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "CONTROL_PROTOCOL",
+          "EXPLICIT_PROXY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::83",
+        "dst_port": null,
+        "family": "IPv6",
+        "icmpv6_type": "RS",
+        "id": "PACKET-083",
+        "protocol": "ICMPv6",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_control_user_proxy_v6",
+      "state_id": "STATE-CASE-083"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "ROUTER_OUTPUT"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_self_user_proxy_v4",
+      "id": "SHADOW-084-overlap_self_user_proxy_v4",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "SELF_TRAFFIC",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "SELF_TRAFFIC",
+          "EXPLICIT_PROXY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "ROUTER_OUTPUT",
+        "dst": "198.51.100.84",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-084",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": true,
+        "service": "OTHER",
+        "source_kind": "SELF_PROCESS",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_self_user_proxy_v4",
+      "state_id": "STATE-CASE-084"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_reply_user_proxy_v6",
+      "id": "SHADOW-085-overlap_reply_user_proxy_v6",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "REPLY_TRAFFIC",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "REPLY_TRAFFIC",
+          "EXPLICIT_PROXY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "REPLY",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::85",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-085",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_reply_user_proxy_v6",
+      "state_id": "STATE-CASE-085"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_access_user_proxy_v4",
+      "id": "SHADOW-086-overlap_access_user_proxy_v4",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "ACCESS_CONTROL",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "ACCESS_CONTROL",
+          "CUSTOM_ACCESS",
+          "EXPLICIT_PROXY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.86",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-086",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_access_user_proxy_v4",
+      "state_id": "STATE-CASE-086"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-05",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "ROUTER_OUTPUT"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_node_self_v4",
+      "id": "SHADOW-087-overlap_node_self_v4",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "NODE_ENDPOINT",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "SELF_TRAFFIC",
+          "NODE_ENDPOINT"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "ROUTER_OUTPUT",
+        "dst": "198.51.100.87",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-087",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": true,
+        "service": "OTHER",
+        "source_kind": "SELF_PROCESS",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_node_self_v4",
+      "state_id": "STATE-CASE-087"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-06",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_china_pass_proxy_v4",
+      "id": "SHADOW-088-overlap_china_pass_proxy_v4",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "CURRENT_UNDEFINED"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "EXPLICIT_PROXY",
+          "CHINA_PASS",
+          "CHINA_POLICY"
+        ],
+        "known_gap": "BC-06",
+        "result": "EXPECTED_CURRENT_GAP"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.88",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-088",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_china_pass_proxy_v4",
+      "state_id": "STATE-CASE-088"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_control_fakeip_v6",
+      "id": "SHADOW-089-overlap_control_fakeip_v6",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "CONTROL_PROTOCOL",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "CONTROL_PROTOCOL",
+          "FAKEIP"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::89",
+        "dst_port": null,
+        "family": "IPv6",
+        "icmpv6_type": "PTB",
+        "id": "PACKET-089",
+        "protocol": "ICMPv6",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_control_fakeip_v6",
+      "state_id": "STATE-CASE-089"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_dns_user_proxy_v4",
+      "id": "SHADOW-090-overlap_dns_user_proxy_v4",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "DNS_SPECIAL",
+          "reason": "DNS",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "DNS",
+          "EXPLICIT_PROXY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.90",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-090",
+        "protocol": "UDP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "DNS",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_dns_user_proxy_v4",
+      "state_id": "STATE-CASE-090"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "ROUTER_OUTPUT"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_owner_mihomo_v4",
+      "id": "SHADOW-091-overlap_owner_mihomo_v4",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "NOT_OWNED",
+          "reason": "OWNER_DISABLED",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "EXPLICIT_PROXY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "ROUTER_OUTPUT",
+        "dst": "198.51.100.91",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-091",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "ROUTER",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_owner_mihomo_v4",
+      "state_id": "STATE-CASE-091"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-04",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_tun_node_v6",
+      "id": "SHADOW-092-overlap_tun_node_v6",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "NODE_ENDPOINT",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "TUN_INGRESS",
+          "NODE_ENDPOINT"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "TUN_INGRESS",
+        "dst": "2001:db8:100::92",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-092",
+        "iifname": "utun",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "UNKNOWN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_tun_node_v6",
+      "state_id": "STATE-CASE-092"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_service_control_v6",
+      "id": "SHADOW-093-overlap_service_control_v6",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "SERVICE_PORT",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "CONTROL_PROTOCOL",
+          "SERVICE_PORT"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::93",
+        "dst_port": 547,
+        "family": "IPv6",
+        "id": "PACKET-093",
+        "protocol": "UDP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "DHCPv6",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": 546
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_service_control_v6",
+      "state_id": "STATE-CASE-093"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_china_user_direct_v6",
+      "id": "SHADOW-094-overlap_china_user_direct_v6",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "DIRECT",
+          "reason": "CHINA_POLICY",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "EXPLICIT_DIRECT",
+          "CHINA_POLICY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::94",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-094",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_china_user_direct_v6",
+      "state_id": "STATE-CASE-094"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-05",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "ROUTER_OUTPUT"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_self_node_v6",
+      "id": "SHADOW-095-overlap_self_node_v6",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "NODE_ENDPOINT",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "SELF_TRAFFIC",
+          "NODE_ENDPOINT"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "ROUTER_OUTPUT",
+        "dst": "2001:db8:100::95",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-095",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": true,
+        "service": "OTHER",
+        "source_kind": "SELF_PROCESS",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_self_node_v6",
+      "state_id": "STATE-CASE-095"
+    },
+    {
+      "behavior_change_candidate": {
+        "id": "BC-06",
+        "status": "PRODUCTION_NOT_APPROVED"
+      },
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_china_pass_user_direct_v6",
+      "id": "SHADOW-096-overlap_china_pass_user_direct_v6",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "PROXY",
+          "reason": "DEFAULT_POLICY",
+          "status": "CURRENT_UNDEFINED"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "EXPLICIT_DIRECT",
+          "CHINA_PASS",
+          "CHINA_POLICY"
+        ],
+        "known_gap": "BC-06",
+        "result": "EXPECTED_CURRENT_GAP"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::96",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-096",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_china_pass_user_direct_v6",
+      "state_id": "STATE-CASE-096"
+    },
+    {
+      "category": "OVERLAP",
+      "coverage": [
+        "OVERLAP",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case overlap_owner_disabled_v6",
+      "id": "SHADOW-097-overlap_owner_disabled_v6",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "NOT_OWNED",
+          "reason": "OWNER_DISABLED",
+          "status": "VALID"
+        },
+        "confidence": "MEDIUM",
+        "expected_matches": [
+          "EXPLICIT_DIRECT"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::97",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-097",
+        "protocol": "UDP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-overlap_owner_disabled_v6",
+      "state_id": "STATE-CASE-097"
+    },
+    {
+      "category": "OWNER",
+      "coverage": [
+        "OWNER",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case owner_extra_mihomo_1",
+      "id": "SHADOW-098-owner_extra_mihomo_1",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "NOT_OWNED",
+          "reason": "OWNER_DISABLED",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "EXPLICIT_PROXY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.98",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-098",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-owner_extra_mihomo_1",
+      "state_id": "STATE-CASE-098"
+    },
+    {
+      "category": "OWNER",
+      "coverage": [
+        "OWNER",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case owner_extra_disabled_2",
+      "id": "SHADOW-099-owner_extra_disabled_2",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "NOT_OWNED",
+          "reason": "OWNER_DISABLED",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "EXPLICIT_PROXY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.99",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-099",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-owner_extra_disabled_2",
+      "state_id": "STATE-CASE-099"
+    },
+    {
+      "category": "OWNER",
+      "coverage": [
+        "OWNER",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case owner_extra_unknown_3",
+      "id": "SHADOW-100-owner_extra_unknown_3",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "NOT_OWNED",
+          "reason": "OWNER_DISABLED",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "EXPLICIT_PROXY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.100",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-100",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-owner_extra_unknown_3",
+      "state_id": "STATE-CASE-100"
+    },
+    {
+      "category": "OWNER",
+      "coverage": [
+        "OWNER",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case owner_extra_mihomo_4",
+      "id": "SHADOW-101-owner_extra_mihomo_4",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "NOT_OWNED",
+          "reason": "OWNER_DISABLED",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "EXPLICIT_PROXY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.101",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-101",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-owner_extra_mihomo_4",
+      "state_id": "STATE-CASE-101"
+    },
+    {
+      "category": "OWNER",
+      "coverage": [
+        "OWNER",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case owner_extra_disabled_5",
+      "id": "SHADOW-102-owner_extra_disabled_5",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "NOT_OWNED",
+          "reason": "OWNER_DISABLED",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "EXPLICIT_PROXY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.102",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-102",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-owner_extra_disabled_5",
+      "state_id": "STATE-CASE-102"
+    },
+    {
+      "category": "OWNER",
+      "coverage": [
+        "OWNER",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case owner_extra_unknown_6",
+      "id": "SHADOW-103-owner_extra_unknown_6",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "NOT_OWNED",
+          "reason": "OWNER_DISABLED",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "EXPLICIT_PROXY"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.103",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-103",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-owner_extra_unknown_6",
+      "state_id": "STATE-CASE-103"
+    },
+    {
+      "category": "DNS",
+      "coverage": [
+        "DNS",
+        "ROUTER_OUTPUT"
+      ],
+      "evidence": "Phase 2A current-behavior golden case extra_dns_router_udp",
+      "id": "SHADOW-104-extra_dns_router_udp",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "DNS_SPECIAL",
+          "reason": "DNS",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "DNS"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "ROUTER_OUTPUT",
+        "dst": "198.51.100.104",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-104",
+        "protocol": "UDP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "DNS",
+        "source_kind": "ROUTER",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-extra_dns_router_udp",
+      "state_id": "STATE-CASE-104"
+    },
+    {
+      "category": "DNS",
+      "coverage": [
+        "DNS",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case extra_dns6_lan_tcp",
+      "id": "SHADOW-105-extra_dns6_lan_tcp",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "DNS_SPECIAL",
+          "reason": "DNS",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "DNS"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::105",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-105",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "DNS",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-extra_dns6_lan_tcp",
+      "state_id": "STATE-CASE-105"
+    },
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v4_wan_host",
+      "id": "SHADOW-106-v4_wan_host",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "198.51.100.106",
+        "dst_port": null,
+        "family": "IPv4",
+        "id": "PACKET-106",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "192.0.2.2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v4_wan_host",
+      "state_id": "STATE-CASE-106"
+    },
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_wan_host",
+      "id": "SHADOW-107-v6_wan_host",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::107",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-107",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_wan_host",
+      "state_id": "STATE-CASE-107"
+    },
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_lan_prefix",
+      "id": "SHADOW-108-v6_lan_prefix",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::108",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-108",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_lan_prefix",
+      "state_id": "STATE-CASE-108"
+    },
+    {
+      "category": "LOCAL",
+      "coverage": [
+        "LOCAL",
+        "LAN_INGRESS"
+      ],
+      "evidence": "Phase 2A current-behavior golden case v6_delegated_prefix",
+      "id": "SHADOW-109-v6_delegated_prefix",
+      "independent_expected_current": {
+        "classifier": {
+          "decision": "BYPASS",
+          "reason": "LOCAL_DESTINATION",
+          "status": "VALID"
+        },
+        "confidence": "HIGH",
+        "expected_matches": [
+          "LOCAL_DESTINATION"
+        ],
+        "result": "MATCH"
+      },
+      "packet": {
+        "connection": "UNKNOWN",
+        "direction": "LAN_INGRESS",
+        "dst": "2001:db8:100::109",
+        "dst_port": null,
+        "family": "IPv6",
+        "id": "PACKET-109",
+        "protocol": "TCP",
+        "schema": "OPENKILL_SHADOW_PACKET_V1",
+        "self_process": false,
+        "service": "OTHER",
+        "source_kind": "LAN",
+        "src": "2001:db8:200::2",
+        "src_port": null
+      },
+      "production_component": "set_firewall",
+      "production_reference": "/etc/init.d/openkill:set_firewall:current semantic rule order",
+      "source_audit_id": "P2A-v6_delegated_prefix",
+      "state_id": "STATE-CASE-109"
+    }
+  ],
+  "contract_version": 1,
+  "description": "Independent current production semantic intent oracle; expected values are audited, not generated at replay time.",
+  "oracle_revision": "phase-2c-p2a-current-v1",
+  "schema": "OPENKILL_CURRENT_INTENT_V1"
+}
