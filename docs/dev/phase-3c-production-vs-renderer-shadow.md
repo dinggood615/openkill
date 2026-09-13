@@ -46,6 +46,8 @@ tests are:
 | `load_ip_route_pass` | same | `3b5a265ec4ac4251719b6a0b2627df6334ee5c5553cabd037649bc07f682019a` |
 | `change_dnsmasq` | same | `16e2846ddde3eb67086e8dd53280b88b1bf805cfeebe7f928305e80ce3fa4a6d` |
 | `openkill_render_dns_set_rules` | `luci-app-openkill/root/usr/share/openkill/openkill_network.sh` | `283ea49e0cb94d08baf9513b2d28e645822c4e1a978cb743dec43e347fd113b0` |
+| `openkill_classifier_match` | same network helper | `086c04ec6bfe748524cf44d6fd79b87fae4e1fd932409b6f1a1597334e4dd647` |
+| `openkill_render_classifier_rule` | same network helper | `8fbf64723d96b66dcd451eb496af31dcc787f282ed96895847df8f4a207f278d` |
 
 The audit deliberately reports a current discrepancy instead of changing the
 Phase 2 contract.  In the two access-plus-node overlap cases, the extracted
