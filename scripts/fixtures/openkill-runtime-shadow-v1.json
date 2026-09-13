@@ -1,0 +1,75 @@
+{
+  "schema": "OPENKILL_RUNTIME_SHADOW_V1",
+  "protocol_version": 1,
+  "compare_schema_version": 1,
+  "state_schema_version": 1,
+  "renderer_version": 1,
+  "default": "OFF",
+  "input_schema": "SHELL_RENDERER_INPUT_V1",
+  "input_version": 1,
+  "profile": "current",
+  "writer": "legacy_production",
+  "new_writer": false,
+  "statuses": [
+    "MATCH",
+    "KNOWN_CURRENT_GAP",
+    "UNSUPPORTED_CURRENT_STATE",
+    "MISMATCH",
+    "INPUT_ERROR",
+    "RENDER_ERROR",
+    "COMPARE_ERROR",
+    "SOURCE_DRIFT",
+    "DISABLED",
+    "STALE"
+  ],
+  "scenarios": [
+    "SH-01 shadow disabled normal start",
+    "SH-02 shadow enabled MATCH",
+    "SH-03 renderer error",
+    "SH-04 input error",
+    "SH-05 semantic mismatch",
+    "SH-06 BC01 unsupported",
+    "SH-07 BC07 unsupported",
+    "SH-08 source drift",
+    "SH-09 stale generation",
+    "SH-10 owner Mihomo",
+    "SH-11 disabled owner",
+    "SH-12 NO_ACTION reconcile",
+    "SH-13 old production failure",
+    "SH-14 reload success",
+    "SH-15 repeated identical mismatch"
+  ],
+  "source_drift": {
+    "policy": "fail_closed_on_explicit_baseline_mismatch",
+    "old_writer_continues": true
+  },
+  "production_source_hashes": {
+    "set_firewall": "00d1ea473c7d9096e60b99316deeb209376ac88236a5aa00977affde5a0dad17",
+    "apply_node_endpoint_sets": "6cb03454c06772265c887aac10afc66dbb947fce0b76c8d933dd18238a218617",
+    "change_dnsmasq": "16e2846ddde3eb67086e8dd53280b88b1bf805cfeebe7f928305e80ce3fa4a6d",
+    "fw4_dns_hijack_ready": "d1937fd74d49645e4cf68a0ec98d757e319022a26ba67475c34d278bb270f776",
+    "fw4_has_dns_hijack_rule": "e175ab7a7ed628f5694594ef456605762d374adec1f4ca4fdecd4a6861791c0e",
+    "openkill_classifier_match": "086c04ec6bfe748524cf44d6fd79b87fae4e1fd932409b6f1a1597334e4dd647",
+    "openkill_render_classifier_rule": "8fbf64723d96b66dcd451eb496af31dcc787f282ed96895847df8f4a207f278d",
+    "openkill_render_dns_set_rules": "283ea49e0cb94d08baf9513b2d28e645822c4e1a978cb743dec43e347fd113b0"
+  },
+  "callsite": {
+    "entry": "check_core_status_after_authoritative_apply_and_ready_token_or_reload_no_action",
+    "function": "openkill_shadow_compare_nft",
+    "old_writer_unchanged": true,
+    "failure_isolated": true,
+    "stop_connected": false,
+    "watchdog_connected": false,
+    "fw4_worker_connected": false
+  },
+  "side_effects": {
+    "new_firewall_write": false,
+    "route_write": false,
+    "dns_write": false,
+    "service_write": false,
+    "network": false,
+    "python_runtime": false,
+    "nft_runtime_mutation": false,
+    "telemetry_scope": "/tmp/openkill-shadow"
+  }
+}

@@ -11,6 +11,8 @@ SOURCE = (ROOT / "scripts/install-openkill.sh").read_text(encoding="utf-8")
 CORE_SOURCE = (ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_core.sh").read_text(encoding="utf-8")
 RENDERER_PATH = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_nft_renderer.sh"
 RENDERER_SOURCE = RENDERER_PATH.read_text(encoding="utf-8")
+SHADOW_PATH = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_nft_shadow.sh"
+SHADOW_SOURCE = SHADOW_PATH.read_text(encoding="utf-8")
 MAKEFILE_SOURCE = (ROOT / "luci-app-openkill/Makefile").read_text(encoding="utf-8")
 SETTINGS_SOURCE = (ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua").read_text(encoding="utf-8")
 SETTINGS_THEME = (ROOT / "luci-app-openkill/luasrc/view/openkill/settings_theme.htm").read_text(encoding="utf-8")
@@ -103,12 +105,17 @@ chosen=$(select_newest_manifest "$WORK_DIR/rows")
         self.assertNotIn('MetaCubeX/mihomo@${CORE_LV}', CORE_SOURCE)
         self.assertNotIn('cdn.jsdelivr.net/gh/MetaCubeX/mihomo', CORE_SOURCE)
 
-    def test_unwired_shell_renderer_is_packaged_without_runtime_callsite(self):
+    def test_shadow_observer_and_renderer_are_packaged_without_writer_wiring(self):
         self.assertTrue(RENDERER_PATH.is_file())
         self.assertTrue(RENDERER_SOURCE.startswith("#!/bin/sh\n"))
+        self.assertTrue(SHADOW_PATH.is_file())
+        self.assertTrue(SHADOW_SOURCE.startswith("#!/bin/sh\n"))
         self.assertIn("chmod -R 0755 $(PKG_BUILD_DIR)/root/usr/share/openkill/", MAKEFILE_SOURCE)
         self.assertNotIn("#!/bin/bash", RENDERER_SOURCE)
         self.assertNotIn("eval", RENDERER_SOURCE)
+        self.assertNotIn("#!/bin/bash", SHADOW_SOURCE)
+        self.assertIn("OPENKILL_NFT_SHADOW=1", SHADOW_SOURCE)
+        self.assertIn("openkill_shadow_compare_nft", (ROOT / "luci-app-openkill/root/etc/init.d/openkill").read_text(encoding="utf-8"))
         runtime_paths = (
             ROOT / "luci-app-openkill/root/etc/init.d/openkill",
             ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_network.sh",
@@ -119,6 +126,8 @@ chosen=$(select_newest_manifest "$WORK_DIR/rows")
             runtime_source = path.read_text(encoding="utf-8")
             self.assertNotIn("openkill_render_nft_desired", runtime_source)
             self.assertNotIn("openkill_nft_renderer.sh", runtime_source)
+        self.assertNotRegex(SHADOW_SOURCE, r"(?m)^\s*(?:uci|ubus|ip|ip6tables|iptables|nft|fw4|service|nslookup|resolveip|curl)\b")
+        self.assertNotRegex(SHADOW_SOURCE, r"nft\s+(?:-f|add|insert|delete|replace|flush)\b")
 
     def test_settings_keep_six_categories_and_embedded_update(self):
         expected = (
