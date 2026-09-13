@@ -594,20 +594,30 @@ openkill_network_fingerprint_native_routes_compatible()
     legacy_file="$2"
     current_routes=$(openkill_snapshot_value NATIVE_IPV6_ROUTES "$current_file")
     legacy_routes=$(openkill_snapshot_value NATIVE_IPV6_ROUTES "$legacy_file")
+    [ "$current_routes" = "$legacy_routes" ] && return 0
     case "$legacy_routes" in
         *" dev utun"*)
-            # Old fingerprints may contain native records followed by the
-            # OpenKill TUN records on one flattened line. Require the complete
-            # current native payload to remain present, so a real route/gateway
-            # change cannot be hidden by migration.
+            # Legacy values flatten route records.  Require the current native
+            # payload and account for every old `dev utun` record; a route
+            # count delta rejects migration instead of hiding a real change.
+            route_stats=$(printf '%s\n%s\n' "$current_routes" "$legacy_routes" | awk '
+                function count(    i) { total=0; tun=0; for (i=1; i<NF; i++) if ($i == "dev") { total++; if ($(i + 1) == "utun") tun++ } }
+                NR == 1 { count(); current_total=total; current_tun=tun; next }
+                { count(); print current_total ":" current_tun ":" total ":" tun }
+            ')
+            current_route_count="${route_stats%%:*}"; route_stats="${route_stats#*:}"
+            current_tun_count="${route_stats%%:*}"; route_stats="${route_stats#*:}"
+            legacy_route_count="${route_stats%%:*}"; legacy_tun_count="${route_stats#*:}"
+            [ "$current_tun_count" -eq 0 ] 2>/dev/null || return 1
+            [ "$legacy_tun_count" -gt 0 ] 2>/dev/null || return 1
+            [ "$legacy_route_count" -eq $((current_route_count + legacy_tun_count)) ] 2>/dev/null || return 1
             if [ -n "$current_routes" ]; then
                 case " $legacy_routes " in
                     *" $current_routes "*) return 0 ;;
                     *) return 1 ;;
                 esac
             fi
-            legacy_without_tun=$(printf '%s\n' "$legacy_routes" | sed -e 's/[[:space:]][[:space:]]*dev[[:space:]][[:space:]]*utun.*$//')
-            [ -z "$legacy_without_tun" ]
+            [ "$legacy_route_count" -eq "$legacy_tun_count" ]
         ;;
         *)
             [ "$current_routes" = "$legacy_routes" ]
@@ -674,6 +684,15 @@ openkill_can_migrate_network_fingerprint()
         return 1
     }
 
+    # Fingerprint equality alone never authorizes a baseline overwrite.
+    [ -n "$migration_desired_file" ] &&
+    [ -n "$migration_network_applied_file" ] &&
+    [ -n "$migration_config_file" ] &&
+    [ -n "$migration_config_applied_file" ] || {
+        OPENKILL_FINGERPRINT_MIGRATION_REASON="state-context-missing"
+        return 1
+    }
+
     # The production caller has already performed the runtime verifier.  When
     # state files are supplied, repeat the semantic desired/config checks here
     # so this helper cannot be used as an unconditional overwrite shortcut.
@@ -681,18 +700,12 @@ openkill_can_migrate_network_fingerprint()
         OPENKILL_FINGERPRINT_MIGRATION_REASON="runtime-unknown"
         return 1
     }
-    if [ -n "$migration_desired_file" ]; then
-        [ -n "$migration_network_applied_file" ] || {
-            OPENKILL_FINGERPRINT_MIGRATION_REASON="applied-state-missing"
-            return 1
-        }
-        openkill_network_noop_ready \
-            "$migration_desired_file" "$migration_network_applied_file" "" \
-            "$migration_config_file" "$migration_config_applied_file" "" "$migration_legacy_file" >/dev/null 2>&1 || {
-            OPENKILL_FINGERPRINT_MIGRATION_REASON="state-not-healthy"
-            return 1
-        }
-    fi
+    openkill_network_noop_ready \
+        "$migration_desired_file" "$migration_network_applied_file" "" \
+        "$migration_config_file" "$migration_config_applied_file" >/dev/null 2>&1 || {
+        OPENKILL_FINGERPRINT_MIGRATION_REASON="state-not-healthy"
+        return 1
+    }
 
     openkill_network_fingerprint_semantically_equal "$migration_current_file" "$migration_legacy_file" || {
         OPENKILL_FINGERPRINT_MIGRATION_REASON="semantic-fingerprint-changed"

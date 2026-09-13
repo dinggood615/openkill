@@ -243,6 +243,36 @@ class NetworkModelTests(unittest.TestCase):
             )
             self.assertNotEqual(rejected.returncode, 0)
 
+            # A substring-only route check would incorrectly accept an old
+            # baseline that contains an additional native route before its
+            # OpenKill TUN route.  Migration must reject that state.
+            legacy_extra = td / "legacy-extra"
+            legacy_extra.write_text(
+                base +
+                "NATIVE_IPV6_ROUTES=default from 2001:db8:10::/62 via fe80::1 dev eth1 "
+                "2001:db8:99::/64 dev eth1 default dev utun\n",
+                encoding="utf-8",
+            )
+            rejected_extra = run_helper_env(
+                "openkill_can_migrate_network_fingerprint",
+                current, legacy_extra, desired, applied, config, config_applied, env=env, check=False,
+            )
+            self.assertNotEqual(rejected_extra.returncode, 0)
+
+            # Likewise, the current payload must not be allowed to grow a
+            # native route that was absent from the legacy baseline.
+            legacy_missing = td / "legacy-missing"
+            legacy_missing.write_text(
+                base +
+                "NATIVE_IPV6_ROUTES=default dev utun\n",
+                encoding="utf-8",
+            )
+            rejected_missing = run_helper_env(
+                "openkill_can_migrate_network_fingerprint",
+                current, legacy_missing, desired, applied, config, config_applied, env=env, check=False,
+            )
+            self.assertNotEqual(rejected_missing.returncode, 0)
+
     def test_legacy_migration_rejects_runtime_unknown_and_current_schema_mismatch(self):
         with tempfile.TemporaryDirectory() as td:
             td = pathlib.Path(td)
@@ -321,19 +351,134 @@ class NetworkModelTests(unittest.TestCase):
             td = pathlib.Path(td)
             current = td / "current"
             legacy = td / "legacy"
+            desired = td / "desired"
+            applied = td / "applied"
+            config = td / "config"
+            config_applied = td / "config.applied"
             current.write_text("SCHEMA=2\nWAN6_ADDRESSES=2001:db8::1\n", encoding="utf-8")
             legacy_payload = "WAN6_ADDRESSES=2001:db8::1\n"
             legacy.write_text(legacy_payload, encoding="utf-8")
+            desired.write_text("LOCALNETWORK6_PREFIXES=fd00::/8\n", encoding="utf-8")
+            applied.write_text(desired.read_text(encoding="utf-8"), encoding="utf-8")
+            config.write_text("mode=fake-ip\n", encoding="utf-8")
+            config_applied.write_text(config.read_text(encoding="utf-8"), encoding="utf-8")
             fake_bin = td / "bin"
             fake_bin.mkdir()
             fake_mv = fake_bin / "mv"
             fake_mv.write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
             fake_mv.chmod(0o755)
-            env = {**os.environ, "PATH": f"{fake_bin}:/bin:/usr/bin", "OPENKILL_RUNTIME_HEALTHY": "1"}
-            failed = run_helper_env("openkill_migrate_network_fingerprint", current, legacy, env=env, check=False)
+            env = {
+                **os.environ,
+                "PATH": f"{fake_bin}:/bin:/usr/bin",
+                "OPENKILL_RUNTIME_HEALTHY": "1",
+                "OPENKILL_NETWORK_PENDING_FILE": str(td / "pending"),
+            }
+            failed = run_helper_env(
+                "openkill_migrate_network_fingerprint",
+                current, legacy, desired, applied, config, config_applied, env=env, check=False,
+            )
             self.assertNotEqual(failed.returncode, 0)
             self.assertEqual(legacy.read_text(encoding="utf-8"), legacy_payload)
             self.assertFalse(list(td.glob("legacy.migration.tmp.*")))
+
+    def test_legacy_migration_requires_complete_state_context(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            current = td / "current"
+            legacy = td / "legacy"
+            current.write_text("SCHEMA=2\nWAN6_ADDRESSES=2001:db8::1\n", encoding="utf-8")
+            legacy.write_text("WAN6_ADDRESSES=2001:db8::1\n", encoding="utf-8")
+            env = {**os.environ, "OPENKILL_RUNTIME_HEALTHY": "1", "OPENKILL_NETWORK_PENDING_FILE": str(td / "pending")}
+            result = run_helper_env(
+                "openkill_can_migrate_network_fingerprint", current, legacy, env=env, check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+
+    def test_legacy_migration_rejects_pending_transition_and_restart_states(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            current = td / "current"
+            legacy = td / "legacy"
+            desired = td / "desired"
+            applied = td / "applied"
+            config = td / "config"
+            config_applied = td / "config.applied"
+            current.write_text("SCHEMA=2\nWAN6_ADDRESSES=2001:db8::1\n", encoding="utf-8")
+            legacy.write_text("WAN6_ADDRESSES=2001:db8::1\n", encoding="utf-8")
+            desired.write_text("LOCALNETWORK6_PREFIXES=fd00::/8\n", encoding="utf-8")
+            applied.write_text(desired.read_text(encoding="utf-8"), encoding="utf-8")
+            config.write_text("mode=fake-ip\n", encoding="utf-8")
+            config_applied.write_text(config.read_text(encoding="utf-8"), encoding="utf-8")
+            base_env = {
+                **os.environ,
+                "OPENKILL_RUNTIME_HEALTHY": "1",
+                "OPENKILL_NETWORK_PENDING_FILE": str(td / "pending"),
+            }
+            for flag in (
+                "OPENKILL_OWNER_TRANSITION_ACTIVE",
+                "OPENKILL_RESTART_REQUIRED",
+                "OPENKILL_PENDING_COMPONENT_FAILURE",
+            ):
+                env = {**base_env, flag: "1"}
+                result = run_helper_env(
+                    "openkill_can_migrate_network_fingerprint",
+                    current, legacy, desired, applied, config, config_applied, env=env, check=False,
+                )
+                self.assertNotEqual(result.returncode, 0, flag)
+
+            (td / "pending").write_text("1\n", encoding="utf-8")
+            result = run_helper_env(
+                "openkill_can_migrate_network_fingerprint",
+                current, legacy, desired, applied, config, config_applied,
+                env=base_env, check=False,
+            )
+            self.assertNotEqual(result.returncode, 0)
+
+    def test_legacy_migration_rejects_network_semantic_changes(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            current = td / "current"
+            legacy = td / "legacy"
+            desired = td / "desired"
+            applied = td / "applied"
+            config = td / "config"
+            config_applied = td / "config.applied"
+            base = (
+                "WAN4_INTERFACE=WAN\nWAN4_L3_DEVICE=eth1\nWAN4_ADDRESSES=192.0.2.1\n"
+                "WAN6_INTERFACE=WAN6\nWAN6_L3_DEVICE=eth1\nWAN6_ADDRESSES=2001:db8::1/64\n"
+                "INTERNAL_IPV4_PREFIXES=192.0.2.0/24\nINTERNAL_IPV6_PREFIXES=2001:db8:10::/62\n"
+                "DNS_SERVERS=192.0.2.53\nNODE4_ENDPOINTS=198.51.100.1\nNODE6_ENDPOINTS=2001:db8::10\n"
+                "TUN_OWNER=openkill\nIPV4_ENABLED=1\nIPV6_ENABLED=1\n"
+            )
+            current.write_text("SCHEMA=2\n" + base, encoding="utf-8")
+            legacy.write_text(base, encoding="utf-8")
+            desired.write_text("LOCALNETWORK6_PREFIXES=2001:db8:10::/62\n", encoding="utf-8")
+            applied.write_text(desired.read_text(encoding="utf-8"), encoding="utf-8")
+            config.write_text("mode=fake-ip\n", encoding="utf-8")
+            config_applied.write_text(config.read_text(encoding="utf-8"), encoding="utf-8")
+            env = {
+                **os.environ,
+                "OPENKILL_RUNTIME_HEALTHY": "1",
+                "OPENKILL_NETWORK_PENDING_FILE": str(td / "pending"),
+            }
+            for field, old, new in (
+                ("WAN4_ADDRESSES", "192.0.2.1", "192.0.2.2"),
+                ("WAN6_ADDRESSES", "2001:db8::1/64", "2001:db8::2/64"),
+                ("INTERNAL_IPV6_PREFIXES", "2001:db8:10::/62", "2001:db8:11::/62"),
+                ("DNS_SERVERS", "192.0.2.53", "192.0.2.54"),
+                ("NODE4_ENDPOINTS", "198.51.100.1", "198.51.100.2"),
+                ("NODE6_ENDPOINTS", "2001:db8::10", "2001:db8::11"),
+            ):
+                changed = td / (field.lower() + ".changed")
+                changed.write_text(
+                    current.read_text(encoding="utf-8").replace(f"{field}={old}", f"{field}={new}"),
+                    encoding="utf-8",
+                )
+                result = run_helper_env(
+                    "openkill_can_migrate_network_fingerprint",
+                    changed, legacy, desired, applied, config, config_applied, env=env, check=False,
+                )
+                self.assertNotEqual(result.returncode, 0, field)
 
     def test_ipv6_cidr_helper_handles_compressed_and_non_boundary_prefixes(self):
         self.assertNotEqual(
