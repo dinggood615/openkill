@@ -1,0 +1,382 @@
+{
+  "schema": "OPENKILL_CENTRAL_WIRING_V1",
+  "version": 1,
+  "versions": {
+    "semantic_spec": 1,
+    "classifier_contract": 1,
+    "shadow_state_schema": 1,
+    "nft_ir": 1,
+    "ownership_manifest": 1,
+    "mark_abi": 1
+  },
+  "default_engine": "legacy",
+  "default_state": "LEGACY_AUTHORITATIVE",
+  "default_production_profile": "current",
+  "mark_abi": {
+    "version": 1,
+    "mark": "0x162",
+    "mask": "0xffffffff",
+    "route_table": 354,
+    "rule_preference": 1888
+  },
+  "engine_modes": ["legacy", "shadow", "central"],
+  "states": [
+    "LEGACY_AUTHORITATIVE",
+    "SHADOW_COMPARE",
+    "CENTRAL_PRECHECK",
+    "CENTRAL_ACTIVE",
+    "ROLLBACK",
+    "BLOCKED"
+  ],
+  "failure_classes": [
+    "PRECHECK_FAIL",
+    "NFT_CHECK_FAIL",
+    "APPLY_FAIL",
+    "POST_VERIFY_FAIL",
+    "MANIFEST_COMMIT_FAIL",
+    "OLD_FALLBACK_FAIL"
+  ],
+  "profiles": {
+    "production": "current",
+    "target": "development_preview_only",
+    "unknown": "reject"
+  },
+  "behavior_change_guards": [
+    {"id": "BC-01", "status": "NOT_APPROVED", "central_guard": true, "rule": "unresolved explicit policy blocks central"},
+    {"id": "BC-02", "status": "BASELINE_CORRECTION", "central_guard": true, "rule": "preserve verified NODE > ACCESS current order without a feature flag"},
+    {"id": "BC-03", "status": "NOT_APPROVED", "central_guard": true, "rule": "preserve current IPv6 control ordering"},
+    {"id": "BC-04", "status": "NOT_APPROVED", "central_guard": true, "rule": "preserve IPv6 TUN current gap; do not add a return"},
+    {"id": "BC-05", "status": "NOT_APPROVED", "central_guard": true, "rule": "SELF/NODE reason refinement cannot change packet action"},
+    {"id": "BC-06", "status": "NOT_APPROVED", "central_guard": true, "rule": "China-pass reason refinement cannot change packet action"},
+    {"id": "BC-07", "status": "NOT_APPROVED", "central_guard": true, "rule": "modern ACCESS_DENY remains unsupported; never invent DROP"}
+  ],
+  "modes": {
+    "legacy": {
+      "state": "LEGACY_AUTHORITATIVE",
+      "old_writer": true,
+      "new_compute": false,
+      "new_writer": false,
+      "authority": "old_production",
+      "failure": "keep_legacy"
+    },
+    "shadow": {
+      "state": "SHADOW_COMPARE",
+      "old_writer": true,
+      "new_compute": true,
+      "new_writer": false,
+      "authority": "old_production",
+      "failure": "keep_legacy_and_record_bounded_mismatch"
+    },
+    "central": {
+      "state": "CENTRAL_ACTIVE",
+      "old_writer": false,
+      "new_compute": true,
+      "new_writer": true,
+      "authority": "central_current_renderer",
+      "requires": "CENTRAL_PRECHECK",
+      "failure": "rollback_or_legacy_fallback"
+    }
+  },
+  "transitions": [
+    {"from": "LEGACY_AUTHORITATIVE", "to": "LEGACY_AUTHORITATIVE"},
+    {"from": "LEGACY_AUTHORITATIVE", "to": "SHADOW_COMPARE"},
+    {"from": "SHADOW_COMPARE", "to": "SHADOW_COMPARE"},
+    {"from": "SHADOW_COMPARE", "to": "LEGACY_AUTHORITATIVE"},
+    {"from": "SHADOW_COMPARE", "to": "CENTRAL_PRECHECK"},
+    {"from": "SHADOW_COMPARE", "to": "BLOCKED"},
+    {"from": "CENTRAL_PRECHECK", "to": "CENTRAL_PRECHECK"},
+    {"from": "CENTRAL_PRECHECK", "to": "CENTRAL_ACTIVE", "requires": ["CENTRAL_RENDERER_ELIGIBLE", "NFT_CHECK_PASS"]},
+    {"from": "CENTRAL_PRECHECK", "to": "SHADOW_COMPARE"},
+    {"from": "CENTRAL_PRECHECK", "to": "BLOCKED"},
+    {"from": "CENTRAL_ACTIVE", "to": "CENTRAL_ACTIVE"},
+    {"from": "CENTRAL_ACTIVE", "to": "SHADOW_COMPARE", "requires": ["controlled_handoff", "old_writer_stopped"]},
+    {"from": "CENTRAL_ACTIVE", "to": "ROLLBACK"},
+    {"from": "CENTRAL_ACTIVE", "to": "BLOCKED"},
+    {"from": "ROLLBACK", "to": "ROLLBACK"},
+    {"from": "ROLLBACK", "to": "LEGACY_AUTHORITATIVE"},
+    {"from": "ROLLBACK", "to": "SHADOW_COMPARE"},
+    {"from": "ROLLBACK", "to": "BLOCKED"},
+    {"from": "BLOCKED", "to": "BLOCKED"},
+    {"from": "BLOCKED", "to": "LEGACY_AUTHORITATIVE", "requires": ["operator_review"]},
+    {"from": "BLOCKED", "to": "SHADOW_COMPARE", "requires": ["operator_review"]}
+  ],
+  "illegal_transitions": [
+    {"from": "LEGACY_AUTHORITATIVE", "to": "CENTRAL_ACTIVE", "reason": "precheck cannot be skipped"},
+    {"from": "LEGACY_AUTHORITATIVE", "to": "CENTRAL_PRECHECK", "reason": "shadow evidence is required first"},
+    {"from": "CENTRAL_ACTIVE", "to": "LEGACY_AUTHORITATIVE", "reason": "leave central through rollback"},
+    {"from": "MIHOMO", "to": "CENTRAL_ACTIVE", "reason": "OpenKill is not the owner"}
+  ],
+  "single_writer": {
+    "invariant": "SINGLE_DATAPLANE_WRITER",
+    "max_mutating_implementations": 1,
+    "legacy": "old production only",
+    "shadow": "old production only; central is read/compare only",
+    "central": "central renderer only after eligibility and handoff",
+    "watchdog": "observer_or_requester; never a second central writer",
+    "fw4_worker": "request_reconcile; never a second central writer",
+    "stale_worker": "activation_token_and_reconcile_lock_reject_stale_writes"
+  },
+  "eligibility": {
+    "function": "CENTRAL_RENDERER_ELIGIBLE",
+    "all_or_nothing": true,
+    "target_profile_allowed": false,
+    "required_checks": [
+      "fw4_present",
+      "nft_capability_supported",
+      "backend_is_modern_fw4_nft",
+      "owner_is_OPENKILL",
+      "profile_is_current",
+      "semantic_spec_version_known",
+      "classifier_contract_version_known",
+      "shadow_state_schema_version_known",
+      "nft_ir_version_known",
+      "manifest_version_known",
+      "current_state_supported",
+      "bc07_inactive",
+      "explicit_policy_unresolved_false",
+      "bc02_current_order_verified",
+      "bc03_current_order_preserved",
+      "bc04_current_gap_preserved",
+      "bc05_diagnostic_only",
+      "bc06_diagnostic_only",
+      "listener_ports_valid",
+      "mark_abi_exact",
+      "nft_check_pass_on_exact_payload",
+      "runtime_healthy",
+      "owner_transition_false",
+      "pending_fw4_reconcile_false",
+      "component_failure_false",
+      "restart_required_false",
+      "same_name_foreign_collision_false",
+      "watchdog_single_writer_ready",
+      "fw4_worker_single_writer_ready",
+      "no_old_writer_active",
+      "manifest_ready"
+    ],
+    "fail_action": "CENTRAL_ELIGIBLE_NO_AND_KEEP_OLD_AUTHORITY"
+  },
+  "unsupported_blockers": [
+    {
+      "id": "BC-01",
+      "condition": "explicit direct/proxy fact affects a packet and current mapping is unresolved",
+      "central_eligibility": "BLOCK",
+      "fallback": "legacy"
+    },
+    {
+      "id": "BC-07",
+      "condition": "modern ACCESS_DENY is required by current state",
+      "central_eligibility": "BLOCK",
+      "fallback": "legacy",
+      "status": "NOT_APPROVED"
+    },
+    {
+      "id": "BC-04",
+      "condition": "IPv6 TUN current gap is faithfully preserved",
+      "central_eligibility": "ALLOW_IF_PARITY",
+      "status": "NOT_APPROVED"
+    },
+    {
+      "id": "FIXTURE_ONLY_REDIRECT",
+      "condition": "development-only redirect probe is not production reachable",
+      "central_eligibility": "NO_BLOCK",
+      "fallback": "development_only"
+    },
+    {
+      "id": "LEGACY_BACKEND",
+      "condition": "fw4/nft is absent or backend is iptables/ipset",
+      "central_eligibility": "BLOCK",
+      "fallback": "legacy_backend"
+    },
+    {
+      "id": "MIHOMO_OWNER",
+      "condition": "owner is MIHOMO",
+      "central_eligibility": "BLOCK",
+      "fallback": "not_owned"
+    },
+    {
+      "id": "UNKNOWN_VERSION",
+      "condition": "any semantic, IR, shadow, or manifest version is unknown",
+      "central_eligibility": "BLOCK",
+      "fallback": "legacy"
+    },
+    {
+      "id": "FOREIGN_COLLISION",
+      "condition": "same-name foreign object cannot be proven OpenKill-owned",
+      "central_eligibility": "BLOCK",
+      "fallback": "legacy"
+    }
+  ],
+  "backend_execution_contract": {
+    "semantic_decision": "PROXY remains the classifier result",
+    "inputs": ["run_mode", "family", "direction", "protocol", "router_self_proxy", "listener_ports", "owner", "mark_abi"],
+    "outputs": ["backend_action", "chain_role", "listener_target", "route_dependency"],
+    "listener_port_source": "normalized_desired_state.listener_ports",
+    "port_policy": "missing_or_invalid_port_blocks_central",
+    "actions": {
+      "TUN": "MARK_PROXY or RETURN_NATIVE according to CURRENT execution contract",
+      "TPROXY": "TPROXY_PROXY with exact family/protocol listener and MARK_ABI_V1",
+      "REDIRECT_TCP": "REDIRECT_PROXY with configured redirect port",
+      "REDIRECT_UDP": "UNSUPPORTED_ACTION; never silently downgrade",
+      "ACCESS_DENY": "current modern ambiguity blocks central; no invented DROP",
+      "DNS": "DNS_REDIRECT with LAN/router scope and configured DNS port"
+    },
+    "route_dependency": "NFT renderer declares requirement; route component owns table 354/pref 1888"
+  },
+  "input_ownership": {
+    "flow": ["config_or_netifd", "snapshot", "normalized_desired_state", "semantic_facts", "classifier_current", "backend_execution_contract", "nft_ir", "central_renderer"],
+    "renderer_reads": ["normalized_desired_state", "semantic_facts", "classifier_result", "execution_contract"],
+    "renderer_must_not_read": ["uci", "ubus", "runtime_node_resolution", "ad_hoc_china_files", "packet_capture"],
+    "sources": {
+      "snapshot": "native network facts; proxy-owned utun routes excluded",
+      "desired": "single normalized desired-state producer",
+      "node": "node desired/applied state, shared with underlay resolver",
+      "china": "normalized desired China and China-pass sets",
+      "acl": "normalized UCI policy facts",
+      "dns": "normalized DNS mode/config",
+      "ports": "normalized configured listener ports"
+    }
+  },
+  "source_drift_gate": {
+    "purpose": "migration-period protection only",
+    "functions": [
+      "set_firewall",
+      "apply_node_endpoint_sets",
+      "change_dnsmasq",
+      "fw4_dns_hijack_ready",
+      "fw4_has_dns_hijack_rule",
+      "openkill_classifier_match",
+      "openkill_render_classifier_rule",
+      "openkill_render_dns_set_rules"
+    ],
+    "baseline_sha256": {
+      "set_firewall": "00d1ea473c7d9096e60b99316deeb209376ac88236a5aa00977affde5a0dad17",
+      "apply_node_endpoint_sets": "6cb03454c06772265c887aac10afc66dbb947fce0b76c8d933dd18238a218617",
+      "change_dnsmasq": "16e2846ddde3eb67086e8dd53280b88b1bf805cfeebe7f928305e80ce3fa4a6d",
+      "fw4_dns_hijack_ready": "d1937fd74d49645e4cf68a0ec98d757e319022a26ba67475c34d278bb270f776",
+      "fw4_has_dns_hijack_rule": "e175ab7a7ed628f5694594ef456605762d374adec1f4ca4fdecd4a6861791c0e",
+      "openkill_classifier_match": "086c04ec6bfe748524cf44d6fd79b87fae4e1fd932409b6f1a1597334e4dd647",
+      "openkill_render_classifier_rule": "8fbf64723d96b66dcd451eb496af31dcc787f282ed96895847df8f4a207f278d",
+      "openkill_render_dns_set_rules": "283ea49e0cb94d08baf9513b2d28e645822c4e1a978cb743dec43e347fd113b0"
+    },
+    "on_mismatch": "CENTRAL_ELIGIBLE_NO_NEEDS_RESHADOW",
+    "long_term": "remove old-source dependency only after central is independently authoritative"
+  },
+  "transaction": {
+    "steps": ["prepare_desired", "validate_versions", "evaluate_eligibility", "render", "nft_check_exact_payload", "derive_owned_apply_plan", "atomic_apply_if_supported", "post_verify", "commit_manifest"],
+    "preflight_before_first_write": true,
+    "same_payload_hash_for_check_and_apply": true,
+    "forbidden": ["flush ruleset", "flush table inet fw4", "delete foreign object", "partial_old_new_writes"],
+    "runtime_mutation": "not implemented in Phase 3D"
+  },
+  "apply_integrity": {
+    "desired_hash": "NFT_DESIRED_HASH over canonical semantic owned state",
+    "payload_hash": "NFT_APPLY_PAYLOAD_HASH over exact canonical batch",
+    "no_hash_inputs": ["timestamp", "pid", "random_id", "temporary_path"],
+    "drift_rule": "recompute or abort if desired or payload hash changes between check and apply"
+  },
+  "ownership_manifest": {
+    "schema": "OPENKILL_NFT_MANIFEST_V1",
+    "runtime_creation": "future only; not implemented in Phase 3D",
+    "fields": ["generation", "semantic_spec_version", "renderer_version", "logical_id", "physical_name", "object_type", "component", "render_fingerprint"],
+    "authoritative_for_cleanup": true,
+    "commit_after": ["nft_apply_success", "runtime_verify_success"],
+    "missing_or_corrupt": "block central and require adoption/recovery",
+    "adoption": "only when provenance, type, structure, and source baseline prove OpenKill ownership",
+    "same_name_foreign": "fail closed; never delete or claim"
+  },
+  "migration_strategies": [
+    {"id": "A_DESTROY_BUILD", "interruption": "high", "rollback": "weak", "recommendation": "REJECT"},
+    {"id": "B_SIDE_BY_SIDE_SWITCH", "interruption": "medium", "rollback": "complex", "condition": "only one attachment may be active", "recommendation": "DEFER"},
+    {"id": "C_IN_PLACE_OWNED_RECONCILE", "interruption": "lowest", "rollback": "bounded", "condition": "ownership manifest/adoption and atomic plan required", "recommendation": "RECOMMEND"}
+  ],
+  "ownership_transitions": [
+    {"from": "legacy", "to": "shadow", "old_writer": true, "new_writer": false, "precondition": "shadow model available", "first_write": "none", "verify": "compare only", "failure": "remain legacy"},
+    {"from": "shadow", "to": "central", "old_writer": false, "new_writer": true, "precondition": "precheck and eligibility pass; handoff lock", "first_write": "exact checked payload", "verify": "owned runtime audit", "failure": "rollback or legacy"},
+    {"from": "central", "to": "shadow", "old_writer": true, "new_writer": false, "precondition": "controlled handoff; central quiesced", "first_write": "old only after handoff", "verify": "old desired compare", "failure": "blocked/legacy"},
+    {"from": "central", "to": "legacy", "old_writer": true, "new_writer": false, "precondition": "rollback state completed", "first_write": "old only after rollback", "verify": "legacy health", "failure": "BLOCKED"},
+    {"from": "OPENKILL", "to": "MIHOMO", "old_writer": false, "new_writer": false, "precondition": "owner transition review", "first_write": "none", "verify": "not-owned", "failure": "BLOCKED"}
+  ],
+  "rollback": {
+    "bounded": true,
+    "no_retry_loop": true,
+    "failure_classes": ["PRECHECK_FAIL", "NFT_CHECK_FAIL", "APPLY_FAIL", "POST_VERIFY_FAIL", "MANIFEST_COMMIT_FAIL", "OLD_FALLBACK_FAIL"],
+    "actions": {
+      "PRECHECK_FAIL": "runtime untouched; old authority unchanged; block/legacy",
+      "NFT_CHECK_FAIL": "runtime untouched; old authority unchanged; block/legacy",
+      "APPLY_FAIL": "inspect atomicity; rollback owned changes if needed",
+      "POST_VERIFY_FAIL": "rollback owned state; fallback old",
+      "MANIFEST_COMMIT_FAIL": "freeze activation; recover/adopt manifest; do not blind reapply",
+      "OLD_FALLBACK_FAIL": "BLOCKED with bounded escalation"
+    }
+  },
+  "dns_boundary": {
+    "nft": "central renderer owns only DNS interception intent",
+    "lan": "dstnat path, DNS_LAN scope",
+    "router": "nat_output path, DNS_ROUTER and router_self_proxy gate",
+    "dnsmasq": "lifecycle/config remains separate until an approved phase",
+    "mihomo": "DNS lifecycle remains separate",
+    "hook_migration": "no mangle migration in first current wiring"
+  },
+  "watchdog_boundary": {
+    "current": "direct writer exists in legacy and makes central ineligible",
+    "central_requirement": "disable direct nft writes in central mode",
+    "future_phase4": "watchdog becomes request_reconcile observer/requester",
+    "stale_write_protection": "activation token plus shared reconcile lock"
+  },
+  "fw4_worker_boundary": {
+    "current": "legacy worker may write",
+    "central_requirement": "worker is request-only; no direct set_firewall rebuild",
+    "future_phase4": "fw4 reload event requests component-scoped central repair"
+  },
+  "stop_cleanup": {
+    "phase3d": "design only; keep legacy cleanup until ownership migration is proven",
+    "future": "owned-manifest cleanup, no broad revert or foreign deletion",
+    "transition": "separate from start/reload migration"
+  },
+  "boot_recovery": {
+    "default": "legacy",
+    "central_resume_requires": ["complete_manifest", "matching_versions", "last_verify_pass", "eligibility_pass", "no_pending_transition"],
+    "uncertain_state": "fail safe to legacy and block central"
+  },
+  "failure_injection": [
+    {"case": "unknown_semantic_version", "expected": "central blocked; no write; old unchanged"},
+    {"case": "unsupported_access_deny", "expected": "central blocked; legacy remains authority"},
+    {"case": "missing_listener_port", "expected": "precheck fail; no write"},
+    {"case": "nft_check_failure", "expected": "runtime untouched; block central"},
+    {"case": "same_name_foreign_object", "expected": "fail closed; do not adopt/delete"},
+    {"case": "manifest_missing_or_corrupt", "expected": "block central; adoption/recovery required"},
+    {"case": "fw4_reload_during_shadow", "expected": "old writes; bounded compare/reconcile request"},
+    {"case": "owner_transition", "expected": "block central; no dual ownership"},
+    {"case": "renderer_timeout", "expected": "precheck/apply abort; old authority unchanged"},
+    {"case": "disk_write_failure", "expected": "manifest not committed; freeze and recover"}
+  ],
+  "rollout": {
+    "3D_IMPLEMENTATION_A": "design shadow wiring",
+    "3D_IMPLEMENTATION_B": "design guarded apply",
+    "3D_IMPLEMENTATION_C": "design stop/cleanup migration",
+    "first_runtime_step": "SHADOW_ONLY",
+    "old_authority_during_shadow": true,
+    "central_default": "OFF",
+    "user_facing_flag": "none in Phase 3D; future internal NFT_ENGINE only",
+    "recommended_order": ["PRODUCTION_SHELL_RENDERER_FIRST", "LOCAL_PARITY", "RUNTIME_SHADOW", "GUARDED_APPLY", "STEADY_STATE", "CLEANUP_MIGRATION"]
+  },
+  "phase_boundaries": {
+    "phase3d": "design only; no production feature flag, hook, renderer call, or runtime mutation",
+    "phase3d2": "production shell renderer, if required, still local-only",
+    "phase3e": "runtime shadow implementation, old authority, local/device gate separately",
+    "phase4": "single-writer reconcile, watchdog/fw4 request conversion, component repair",
+    "phase5": "target OpenWrt capability validation",
+    "real_packet_path": "NOT_TESTED"
+  },
+  "runtime_impact": {
+    "NFT_RUNTIME_CHANGED": "NO",
+    "IPTABLES_RUNTIME_CHANGED": "NO",
+    "FIREWALL_RUNTIME_CHANGED": "NO",
+    "ROUTE_RUNTIME_CHANGED": "NO",
+    "DNS_RUNTIME_CHANGED": "NO",
+    "WATCHDOG_CHANGED": "NO",
+    "PRODUCTION_RENDERER_WIRING": "NO",
+    "DEVICE_ACCESS": "NO",
+    "DEVICE_CHANGED": "NO"
+  }
+}
