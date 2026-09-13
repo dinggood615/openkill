@@ -1,0 +1,56 @@
+{
+  "schema": "SHELL_RENDERER_INPUT_V1",
+  "version": 1,
+  "renderer_version": 1,
+  "semantic_spec_version": 1,
+  "classifier_contract_version": 1,
+  "nft_ir_version": 1,
+  "ownership_manifest_version": 1,
+  "profile": "current",
+  "supported_profiles": ["current"],
+  "backend": "modern_fw4_nft",
+  "format": "tab-separated line records; expressions are fields and never shell-evaluated",
+  "metadata": [
+    "profile", "owner", "backend", "run_mode",
+    "semantic_spec_version", "classifier_contract_version", "nft_ir_version",
+    "ownership_manifest_version", "redirect_port", "tproxy_port", "dns_port",
+    "mark", "mask", "route_table", "rule_pref", "router_self_proxy",
+    "component_state"
+  ],
+  "record_types": {
+    "CHAIN": ["logical_id", "physical_name", "family", "component", "role", "base_chain", "type", "hook", "priority"],
+    "SET": ["logical_id", "physical_name", "family", "element_type", "flags", "elements_csv", "component"],
+    "ATTACH": ["logical_id", "component", "family", "from_chain", "match_expression", "action_type", "action_expression", "to_chain"],
+    "RULE": ["logical_id", "component", "family", "chain", "order", "match_expression", "action_type", "action_expression", "reason", "decision", "known_gap"],
+    "UNSUPPORTED": ["code", "detail"]
+  },
+  "exit_codes": {
+    "success": 0,
+    "invalid_input": 64,
+    "unsupported_current_state": 65,
+    "version_or_profile_mismatch": 66,
+    "render_failure": 67
+  },
+  "mark_abi": {
+    "version": 1,
+    "mark": "0x162",
+    "mask": "0xffffffff",
+    "route_table": 354,
+    "rule_preference": 1888
+  },
+  "ownership": {
+    "parent_table": "inet fw4",
+    "parent_owner": "FW4",
+    "child_owner": "OPENKILL",
+    "manifest": "OPENKILL_NFT_MANIFEST_V1",
+    "foreign_objects": "preserved; never adopted from input"
+  },
+  "side_effects": {
+    "nft": "NONE",
+    "network": "NONE",
+    "route": "NONE",
+    "dns": "NONE",
+    "filesystem": "caller-selected output only"
+  },
+  "production_wiring": "NONE"
+}

@@ -20,6 +20,7 @@ for file in \
   scripts/check-openkill-i18n.sh \
   luci-app-openkill/root/etc/init.d/openkill \
   luci-app-openkill/root/usr/share/openkill/openkill_core.sh \
+  luci-app-openkill/root/usr/share/openkill/openkill_nft_renderer.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_update.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_watchdog.sh \
   luci-app-openkill/root/usr/share/openkill/openkill_watchdog_stream.sh \
@@ -54,6 +55,7 @@ for file in \
   "$ROOT_DIR/scripts/check-openkill-i18n.sh" \
   "$ROOT_DIR/luci-app-openkill/root/etc/init.d/openkill" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_core.sh" \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_nft_renderer.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_update.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_watchdog.sh" \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/openkill_watchdog_stream.sh" \

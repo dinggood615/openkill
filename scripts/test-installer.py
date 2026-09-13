@@ -9,6 +9,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 BASH = shutil.which("bash") or "C:/Program Files/Git/bin/bash.exe"
 SOURCE = (ROOT / "scripts/install-openkill.sh").read_text(encoding="utf-8")
 CORE_SOURCE = (ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_core.sh").read_text(encoding="utf-8")
+RENDERER_PATH = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_nft_renderer.sh"
+RENDERER_SOURCE = RENDERER_PATH.read_text(encoding="utf-8")
+MAKEFILE_SOURCE = (ROOT / "luci-app-openkill/Makefile").read_text(encoding="utf-8")
 SETTINGS_SOURCE = (ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua").read_text(encoding="utf-8")
 SETTINGS_THEME = (ROOT / "luci-app-openkill/luasrc/view/openkill/settings_theme.htm").read_text(encoding="utf-8")
 VERSION_BUMP_CHECK = ROOT / "scripts/check-version-bump.sh"
@@ -100,6 +103,23 @@ chosen=$(select_newest_manifest "$WORK_DIR/rows")
         self.assertNotIn('MetaCubeX/mihomo@${CORE_LV}', CORE_SOURCE)
         self.assertNotIn('cdn.jsdelivr.net/gh/MetaCubeX/mihomo', CORE_SOURCE)
 
+    def test_unwired_shell_renderer_is_packaged_without_runtime_callsite(self):
+        self.assertTrue(RENDERER_PATH.is_file())
+        self.assertTrue(RENDERER_SOURCE.startswith("#!/bin/sh\n"))
+        self.assertIn("chmod -R 0755 $(PKG_BUILD_DIR)/root/usr/share/openkill/", MAKEFILE_SOURCE)
+        self.assertNotIn("#!/bin/bash", RENDERER_SOURCE)
+        self.assertNotIn("eval", RENDERER_SOURCE)
+        runtime_paths = (
+            ROOT / "luci-app-openkill/root/etc/init.d/openkill",
+            ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_network.sh",
+            ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_watchdog.sh",
+            ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_fw4_reload.sh",
+        )
+        for path in runtime_paths:
+            runtime_source = path.read_text(encoding="utf-8")
+            self.assertNotIn("openkill_render_nft_desired", runtime_source)
+            self.assertNotIn("openkill_nft_renderer.sh", runtime_source)
+
     def test_settings_keep_six_categories_and_embedded_update(self):
         expected = (
             's:tab("basic", translate("Runtime & Services"))',
@@ -178,6 +198,7 @@ chosen=$(select_newest_manifest "$WORK_DIR/rows")
         for name in ("install-openkill.sh", "check-version-bump.sh", "publish-package.sh"):
             subprocess.run([BASH, "-n", str(ROOT / "scripts" / name)], check=True)
         subprocess.run([BASH, "-n", str(ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_core.sh")], check=True)
+        subprocess.run([BASH, "-n", str(RENDERER_PATH)], check=True)
 
 if __name__ == "__main__":
     unittest.main()
