@@ -83,3 +83,15 @@ development oracle and is not a runtime dependency.
 
 The test-only generation helper remains available to the older explicit bundle
 fixtures, but it is not a production ABI and cannot affect an automatic token.
+
+## BusyBox enum normalization
+
+The automatic producer accepts the documented case-insensitive owner values
+(`OPENKILL`, `MIHOMO`, `DISABLED`, and `UNKNOWN`) and the finite run-mode
+values (`TUN`, `TPROXY`, and `REDIRECT`).  These values are canonicalized with
+exact POSIX `case` patterns.  The producer deliberately does not use
+`tr '[:lower:]' '[:upper:]'`: the OpenWrt BusyBox build used for device
+validation interpreted that character-class form as a literal transliteration
+(`openkill` became `ppenkiuu`).  Unknown enum values remain fail-closed, and
+the continuity token is computed from the raw committed sources before this
+presentation normalization.

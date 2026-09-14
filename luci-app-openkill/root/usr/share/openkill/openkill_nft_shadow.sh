@@ -59,6 +59,41 @@ openkill_shadow_safe_value()
    return 0
 }
 
+# BusyBox tr does not implement the POSIX character-class transliteration
+# used by some host implementations consistently.  Shadow enums are finite,
+# so normalize them with exact POSIX shell patterns and reject every unknown
+# value instead of applying a broad case conversion.
+openkill_shadow_normalize_owner()
+{
+   case "$1" in
+      [Oo][Pp][Ee][Nn][Kk][Ii][Ll][Ll]) printf '%s\n' OPENKILL ;;
+      [Mm][Ii][Hh][Oo][Mm][Oo]) printf '%s\n' MIHOMO ;;
+      [Dd][Ii][Ss][Aa][Bb][Ll][Ee][Dd]) printf '%s\n' DISABLED ;;
+      [Uu][Nn][Kk][Nn][Oo][Ww][Nn]) printf '%s\n' UNKNOWN ;;
+      *) return 1 ;;
+   esac
+}
+
+openkill_shadow_normalize_run_mode()
+{
+   case "$1" in
+      [Tt][Uu][Nn]) printf '%s\n' TUN ;;
+      [Tt][Pp][Rr][Oo][Xx][Yy]) printf '%s\n' TPROXY ;;
+      [Rr][Ee][Dd][Ii][Rr][Ee][Cc][Tt]) printf '%s\n' REDIRECT ;;
+      *) return 1 ;;
+   esac
+}
+
+openkill_shadow_is_unsupported_true()
+{
+   case "$1" in
+      1|[Yy][Ee][Ss]|[Tt][Rr][Uu][Ee]|[Aa][Cc][Tt][Ii][Vv][Ee]|[Uu][Nn][Ss][Uu][Pp][Pp][Oo][Rr][Tt][Ee][Dd]|[Rr][Ee][Qq][Uu][Ii][Rr][Ee][Dd])
+         return 0
+         ;;
+      *) return 1 ;;
+   esac
+}
+
 openkill_shadow_state_value()
 {
    openkill_shadow_key=$1
@@ -753,8 +788,7 @@ openkill_shadow_auto_continuity_snapshot()
 openkill_shadow_auto_owner()
 {
    openkill_shadow_auto_field OWNER TUN_OWNER || return 1
-   openkill_shadow_auto_owner_value=$(printf '%s' "$openkill_shadow_auto_field_value" | tr '[:lower:]' '[:upper:]')
-   case "$openkill_shadow_auto_owner_value" in OPENKILL|MIHOMO|DISABLED|UNKNOWN) ;; *) return 1 ;; esac
+   openkill_shadow_auto_owner_value=$(openkill_shadow_normalize_owner "$openkill_shadow_auto_field_value") || return 1
    printf '%s\n' "$openkill_shadow_auto_owner_value"
 }
 
@@ -801,12 +835,8 @@ openkill_shadow_build_auto_input()
       openkill_shadow_auto_unsupported_rc=$?
       case "$openkill_shadow_auto_unsupported_rc" in
          0)
-            openkill_shadow_auto_unsupported_value=$(printf '%s' "$openkill_shadow_auto_value" | tr '[:lower:]' '[:upper:]')
-            case "$openkill_shadow_auto_unsupported_value" in
-               1|YES|TRUE|ACTIVE|UNSUPPORTED|REQUIRED)
-                  return "$OPENKILL_NFT_SHADOW_RC_UNSUPPORTED"
-               ;;
-            esac
+            openkill_shadow_is_unsupported_true "$openkill_shadow_auto_value" &&
+               return "$OPENKILL_NFT_SHADOW_RC_UNSUPPORTED"
          ;;
          "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP") return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP" ;;
       esac
@@ -828,8 +858,7 @@ openkill_shadow_build_auto_input()
    esac
 
    openkill_shadow_auto_field RUN_MODE || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
-   openkill_shadow_auto_run_mode=$(printf '%s' "$openkill_shadow_auto_field_value" | tr '[:lower:]' '[:upper:]')
-   case "$openkill_shadow_auto_run_mode" in TUN|TPROXY|REDIRECT) ;; *) return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP" ;; esac
+   openkill_shadow_auto_run_mode=$(openkill_shadow_normalize_run_mode "$openkill_shadow_auto_field_value") || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
    openkill_shadow_auto_field REDIRECT_PORT PROXY_PORT || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
    openkill_shadow_auto_redirect_port=$openkill_shadow_auto_field_value
    openkill_shadow_auto_field TPROXY_PORT || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
