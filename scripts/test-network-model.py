@@ -756,6 +756,12 @@ INTERNAL_IPV6_PREFIXES=2001:db8:2::/62
             domains.write_text("node.example.test\n", encoding="utf-8")
             v4.write_text("\n", encoding="utf-8"); v6.write_text("\n", encoding="utf-8")
             fake = td / "bin"; fake.mkdir()
+            # Keep this branch genuinely getent-unavailable. A WSL host may
+            # expose /usr/bin/getent (and resolve this test-only domain), so
+            # provide only the applets needed by the helper and omit getent.
+            for name, target in (("sh", "/bin/sh"), ("awk", "/usr/bin/awk"), ("sort", "/usr/bin/sort"), ("tr", "/usr/bin/tr")):
+                (fake / name).write_text(f"#!/bin/sh\nexec {target} \"$@\"\n", encoding="utf-8")
+                (fake / name).chmod(0o755)
             (fake / "timeout").write_text("#!/bin/sh\nshift; exec \"$@\"\n", encoding="utf-8")
             (fake / "nslookup").write_text(
                 "#!/bin/sh\nprintf '%s\\n' 'Server: 192.0.2.53' 'Address 1: 192.0.2.53' 'Name: node.example.test' 'Address 1: 192.0.2.2' 'Address 2: 2001:db8::2'\n",
@@ -764,7 +770,7 @@ INTERNAL_IPV6_PREFIXES=2001:db8:2::/62
             for name in ("timeout", "nslookup"):
                 (fake / name).chmod(0o755)
             env = os.environ.copy()
-            env["PATH"] = f"{fake}:/bin:/usr/bin"
+            env["PATH"] = str(fake)
             env["OPENKILL_NODE_DNS_SERVERS"] = "192.0.2.53"
             env["OPENKILL_FAKEIP_RANGE4"] = "198.18.0.0/15"
             env["OPENKILL_FAKEIP_RANGE6"] = "fdfe:dcba:9876::/64"
@@ -801,7 +807,10 @@ INTERNAL_IPV6_PREFIXES=2001:db8:2::/62
             (fake / "timeout").write_text("#!/bin/sh\nshift; exec \"$@\"\n", encoding="utf-8")
             (fake / "nslookup").write_text(
                 "#!/bin/sh\nprintf '%s\\n' 'Name: node.example.test' 'Address 1: FD00:ABCD::2'\n", encoding="utf-8")
-            for name in ("timeout", "nslookup"):
+            # A present-but-empty getent must not fall through to the host
+            # resolver and turn the fixture into a false success.
+            (fake / "getent").write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+            for name in ("timeout", "nslookup", "getent"):
                 (fake / name).chmod(0o755)
             env = {**os.environ, "PATH": f"{fake}:/bin:/usr/bin", "OPENKILL_NODE_DNS_SERVERS": "192.0.2.53", "OPENKILL_FAKEIP_RANGE6": "FD00:ABCD::/64"}
             result = run_helper_env("openkill_resolve_node_domains", domains, v4, v6, env=env, check=False)
@@ -819,7 +828,8 @@ INTERNAL_IPV6_PREFIXES=2001:db8:2::/62
             (fake / "nslookup").write_text(
                 "#!/bin/sh\nprintf '%s\\n' 'Name: node.example.test' 'Address 1: 2001:db8:1234::2'\n",
                 encoding="utf-8")
-            for name in ("timeout", "nslookup"):
+            (fake / "getent").write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+            for name in ("timeout", "nslookup", "getent"):
                 (fake / name).chmod(0o755)
             env = {**os.environ, "PATH": f"{fake}:/bin:/usr/bin", "OPENKILL_NODE_DNS_SERVERS": "192.0.2.53"}
             result = run_helper_env(
