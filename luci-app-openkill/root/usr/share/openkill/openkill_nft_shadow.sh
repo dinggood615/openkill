@@ -732,11 +732,17 @@ openkill_shadow_parse_nft_capture()
          if (line ~ /^chain[[:space:]]/) {
             # Preserve the one currently-owned hooked chain declaration.  FW4
             # base-chain declarations are never captured as owned objects.
-            if (owned(chain) && line ~ /type[[:space:]]+nat[[:space:]]+hook[[:space:]]+output[[:space:]]+priority[[:space:]]+-1/) print "HOOK", chain, "nat", "output", "-1"
+            if (owned(chain) && match(line, /type[[:space:]]+nat[[:space:]]+hook[[:space:]]+output[[:space:]]+priority[[:space:]]+-?[0-9]+/)) {
+               openkill_hook=substr(line, RSTART, RLENGTH)
+               sub(/^.*priority[[:space:]]+/, "", openkill_hook)
+               print "HOOK", chain, "nat", "output", openkill_hook
+            }
             next
          }
-         if (owned(chain) && line ~ /^type[[:space:]]+nat[[:space:]]+hook[[:space:]]+output[[:space:]]+priority[[:space:]]+-1/) {
-            print "HOOK", chain, "nat", "output", "-1"
+         if (owned(chain) && match(line, /^type[[:space:]]+nat[[:space:]]+hook[[:space:]]+output[[:space:]]+priority[[:space:]]+-?[0-9]+/)) {
+            openkill_hook=substr(line, RSTART, RLENGTH)
+            sub(/^.*priority[[:space:]]+/, "", openkill_hook)
+            print "HOOK", chain, "nat", "output", openkill_hook
             next
          }
          line=clean_rule(line)
@@ -1022,13 +1028,18 @@ openkill_shadow_compare_auto_intent()
          if (line ~ /^add chain /) {
             name=$5
             if (owned_chain(name)) old_chain[name]=1
-            if (line ~ /type nat hook output priority -1/ && !(name in new_chain)) bad=1
+            if (owned_chain(name) && match(line, /type[[:space:]]+nat[[:space:]]+hook[[:space:]]+output[[:space:]]+priority[[:space:]]+-?[0-9]+/)) {
+               old_hook[name]=line
+               old_hook_priority[name]=substr(line, RSTART, RLENGTH)
+               sub(/^.*priority[[:space:]]+/, "", old_hook_priority[name])
+            }
             next
          }
          if (line ~ /^add rule /) { add_old_rule($5, substr(line, index(line,$6))); next }
       }
       END {
          for (name in old_chain) if (!(name in new_chain)) bad=1
+         for (name in old_hook) if (old_hook_priority[name] != "-1" || !(name in new_chain) || new_chain[name] !~ /type nat hook output priority[[:space:]]+-1/) bad=1
          for (name in old_set_seen) if (!(name in new_set) || !same_set(old_set[name], new_set[name])) bad=1
          for (chain in old_count) {
             cursor=1
@@ -1193,7 +1204,7 @@ openkill_shadow_compare_nft()
       fi
       # A required object that disappeared during a bounded read is not an
       # empty object.  Partial capture can never produce a false MATCH.
-      if grep -Eq '^MISSING\t' "$openkill_shadow_capture_intent"; then
+      if grep -Eq '^MISSING[[:space:]]' "$openkill_shadow_capture_intent"; then
          openkill_shadow_publish CAPTURE_ERROR - - "$openkill_shadow_generation_for_log" required-object-missing || true
          exit "$OPENKILL_NFT_SHADOW_RC_CAPTURE_ERROR"
       fi

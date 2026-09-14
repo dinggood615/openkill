@@ -449,6 +449,16 @@ OBJECT_END
         self.assertIn("RC=10", process.stdout)
         self.assertIn("UNKNOWN_OWNED_RULE", intent.read_text(encoding="utf-8"))
 
+    def test_missing_capture_object_fails_closed(self) -> None:
+        missing = self.harness.root / "missing.capture"
+        _write_lf(
+            missing,
+            "MISSING\tchain\topenkill_output\n" + CAPTURE.read_text(encoding="utf-8"),
+        )
+        result = self._coordinator(capture=missing)
+        self.assertEqual(result["rc"], 9)
+        self.assertEqual(result["status"].get("status"), "CAPTURE_ERROR")
+
     def test_tproxy_capture_keeps_transport_family_port_and_mark(self) -> None:
         intent = self.harness.root / "tproxy.intent"
         payload = self.harness.root / "tproxy.payload"
@@ -461,6 +471,14 @@ OBJECT_END
         text = payload.read_text(encoding="utf-8")
         self.assertIn("meta l4proto tcp tproxy ip to :7895 meta mark set 0x162", text)
         self.assertIn("meta l4proto udp tproxy ip6 to :7895 meta mark set 0x162", text)
+        mutated = self.harness.root / "tproxy-port-mutated"
+        _write_lf(mutated, text.replace(":7895", ":7896", 1))
+        compare = (
+            f"openkill_shadow_compare_auto_intent {_quote(_wsl_path(mutated))} "
+            f"{_quote(_wsl_path(payload))}; printf 'RC=%s\\n' \"$?\""
+        )
+        process, _ = self.harness.run(compare)
+        self.assertIn("RC=1", process.stdout)
 
     def test_auto_match_mismatch_and_sensitive_telemetry(self) -> None:
         match = self._coordinator()
@@ -532,6 +550,8 @@ OBJECT_END
             "mark": ("meta mark set 0x162", "meta mark set 0x163"),
             "node": ("198.51.100.10", "198.51.100.99"),
             "dns": ("jump openkill_dns_hijack", "jump openkill_dns_redirect"),
+            "port": ("tcp dport 53 jump", "tcp dport 54 jump"),
+            "hook": ("type nat hook output priority -1", "type nat hook output priority 0"),
             "order": (
                 "meta nfproto ipv4 ip protocol tcp jump openkill_output\n  meta nfproto ipv6 jump openkill_output_v6",
                 "meta nfproto ipv6 jump openkill_output_v6\n  meta nfproto ipv4 ip protocol tcp jump openkill_output",
