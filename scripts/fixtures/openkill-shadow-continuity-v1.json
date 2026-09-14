@@ -1,0 +1,48 @@
+{
+  "schema": "OPENKILL_SHADOW_CONTINUITY_V1",
+  "token": "SHADOW_CONTINUITY_TOKEN_V1",
+  "production_generation_file_required": false,
+  "source_order": [
+    "desired",
+    "applied",
+    "snapshot",
+    "node4",
+    "node6",
+    "shell_scalars"
+  ],
+  "required_sources": ["applied"],
+  "conditional_sources": ["desired", "snapshot", "node4", "node6"],
+  "scalar_inputs": [
+    "owner",
+    "run_mode",
+    "router_self_proxy",
+    "redirect_port",
+    "tproxy_port",
+    "dns_port",
+    "mark",
+    "mask",
+    "route_table",
+    "rule_pref",
+    "ipv6_ready",
+    "unsupported_current_state_flags"
+  ],
+  "volatile_excluded": [
+    "mtime",
+    "wall_clock",
+    "pid",
+    "temporary_lock",
+    "telemetry",
+    "packet_counter",
+    "nft_handle",
+    "test_generation_file"
+  ],
+  "race_protocol": ["T0", "coherent_private_snapshot", "T1", "T2"],
+  "existing_fingerprint": {
+    "path": "/tmp/openkill-network.fingerprint",
+    "production_created": true,
+    "coverage": "native network roles, addresses, routes, DNS servers, readiness and TUN owner",
+    "shadow_token_source": false,
+    "classification": "EXISTING_FINGERPRINT_PARTIAL"
+  },
+  "statuses": ["STALE", "INPUT_SOURCE_GAP", "INPUT_ERROR", "MATCH", "MISMATCH"]
+}

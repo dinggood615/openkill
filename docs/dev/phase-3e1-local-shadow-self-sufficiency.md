@@ -53,10 +53,10 @@ not silently discarded.
 
 With shadow enabled, the coordinator builds the input, captures the legacy
 actual state, renders the current desired state, compares both projections,
-and performs a second generation read.  A generation change returns `STALE`.
+and performs a T0/T1/T2 continuity-token check.  A committed-state change returns `STALE`; the test-only generation file is not a production source.
 Capture, input, and renderer failures publish additive status values and do
 not replace the old writer's return code.  Telemetry contains only bounded
-hashes, counts/status, and generation; endpoint, LAN, and MAC values are not
+hashes, counts/status, and the short continuity token; endpoint, LAN, and MAC values are not
 written to the status or mismatch key.
 
 The helper has no Python dependency and no production central-write callsite.
@@ -68,7 +68,8 @@ atomic shadow telemetry directory.
 
 The fixture suite covers automatic input, source conflicts and unsupported
 current facts, bounded list-only capture, foreign and unknown-owned rules,
-actual mark/node/DNS/order mismatches, owner skip, stale generation, and the
+actual mark/node/DNS/order mismatches, owner skip, stale continuity-token
+fixtures, and the
 default-off zero-read path.  It also runs 1,000 deterministic producer
 serializations for the no-owner path plus rich-state smoke iterations, and
 checks reordered set input for byte stability.  The source-derived capture

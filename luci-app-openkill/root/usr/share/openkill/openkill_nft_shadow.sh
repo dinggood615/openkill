@@ -24,6 +24,11 @@ OPENKILL_NFT_SHADOW_TIMEOUT_DEFAULT=10
 OPENKILL_NFT_SHADOW_AUTO_STATE_VERSION=1
 OPENKILL_NFT_SHADOW_LEGACY_INTENT_VERSION=1
 OPENKILL_NFT_SHADOW_CAPTURE_VERSION=1
+# The file under /tmp/openkill-network-reconcile is a development helper
+# token, not a production lifecycle ABI.  Runtime shadow continuity is based
+# on this content-derived token instead.
+OPENKILL_NFT_SHADOW_CONTINUITY_TOKEN_VERSION=1
+OPENKILL_NFT_SHADOW_CONTINUITY_TOKEN_SCHEMA="SHADOW_CONTINUITY_TOKEN_V1"
 
 # Stable status/exit vocabulary for callers and tests.  A non-zero result is
 # intentionally safe to ignore at the production callsite; old writer return
@@ -246,8 +251,9 @@ openkill_shadow_auto_lookup()
    [ -r "$openkill_shadow_auto_primary_file" ] || openkill_shadow_auto_primary_file=${OPENKILL_NETWORK_APPLIED_FILE:-/tmp/openkill-network.applied}
    case "$openkill_shadow_auto_key" in
       NODE4_ENDPOINTS|NODE6_ENDPOINTS)
-         openkill_shadow_auto_node_file=/tmp/openkill-node4.desired
-         [ "$openkill_shadow_auto_key" = NODE6_ENDPOINTS ] && openkill_shadow_auto_node_file=/tmp/openkill-node6.desired
+         openkill_shadow_auto_node_file=${OPENKILL_NFT_SHADOW_NODE4_FILE:-/tmp/openkill-node4.desired}
+         [ "$openkill_shadow_auto_key" = NODE6_ENDPOINTS ] && openkill_shadow_auto_node_file=${OPENKILL_NFT_SHADOW_NODE6_FILE:-/tmp/openkill-node6.desired}
+         openkill_shadow_safe_path "$openkill_shadow_auto_node_file" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
          if [ -r "$openkill_shadow_auto_node_file" ]; then
             openkill_shadow_auto_value=$(tr '\n' ' ' < "$openkill_shadow_auto_node_file" | awk '{$1=$1; print}')
             openkill_shadow_safe_value "$openkill_shadow_auto_value" || return 1
@@ -301,7 +307,6 @@ openkill_shadow_auto_lookup()
       MASK|OPENKILL_FWMASK) openkill_shadow_auto_value=${OPENKILL_FWMASK:-} ;;
       ROUTE_TABLE|OPENKILL_ROUTE_TABLE) openkill_shadow_auto_value=${OPENKILL_ROUTE_TABLE:-${PROXY_ROUTE_TABLE:-}} ;;
       RULE_PREF|OPENKILL_RULE_PREF) openkill_shadow_auto_value=${OPENKILL_RULE_PREF:-} ;;
-      GENERATION) openkill_shadow_auto_value=${OPENKILL_NFT_SHADOW_GENERATION:-} ;;
       IPV6_READY) openkill_shadow_auto_value=${OPENKILL_IPV6_READY:-} ;;
       *) openkill_shadow_auto_value= ;;
    esac
@@ -355,6 +360,396 @@ openkill_shadow_auto_list()
       awk 'BEGIN { first=1 } { if (!first) printf ","; printf "%s", $0; first=0 } END { if (first) print "-"; else print "" }'
 }
 
+# 3E.2D0A continuity contract -------------------------------------------------
+#
+# `/tmp/openkill-network-reconcile/generation` was created by a development
+# helper and is not part of the production lifecycle.  The automatic shadow
+# path therefore derives a token from the same committed files and normalized
+# shell values that its producer consumes.  The source list and its order are
+# fixed here so the token is deterministic and does not become a second
+# classifier or a timestamp/PID based generation counter.
+
+openkill_shadow_continuity_state_key()
+{
+   case "$1" in
+      OWNER|TUN_OWNER|RUN_MODE|ROUTER_SELF_PROXY|REDIRECT_PORT|PROXY_PORT|TPROXY_PORT|DNS_PORT|MARK|OPENKILL_FWMARK|MASK|OPENKILL_FWMASK|ROUTE_TABLE|OPENKILL_ROUTE_TABLE|RULE_PREF|OPENKILL_RULE_PREF|IPV6_READY|BC01_UNSUPPORTED|BC_01_UNSUPPORTED|CURRENT_UNDEFINED|EXPLICIT_POLICY_CURRENT_UNDEFINED|CURRENT_ACCESS_DENY|BC07_UNSUPPORTED|BC_07_UNSUPPORTED|ACCESS_DENY_REQUIRED|ACCESS4_ALLOW|LAN_AC_WHITE_V4|USER_DIRECT_V4|ACCESS4_BYPASS|ACCESS4_DENY|LAN_AC_BLACK_V4|ACCESS6_ALLOW|LAN_AC_WHITE_V6|USER_DIRECT_V6|ACCESS6_BYPASS|ACCESS6_DENY|LAN_AC_BLACK_V6|CHINA_PASS4|CHINA_PASS6|CHINA4|CHINA6|COMMON_PORTS|SERVICE_PORTS|DELEGATED6|PD6|DELEGATED_IPV6_PREFIXES|FAKE_IP4|FAKEIP4|FAKE_IP6|FAKEIP6|LAN4|LAN_IPV4_PREFIXES|LAN6|LAN_IPV6_PREFIXES|LOCAL4|LOCAL_V4|LOCALNETWORK4|LOCALNETWORK4_PREFIXES|INTERNAL_IPV4_PREFIXES|LOCAL6|LOCAL_V6|LOCALNETWORK6|LOCALNETWORK6_PREFIXES|INTERNAL_IPV6_PREFIXES|NODE4|NODE4_ENDPOINTS|NODE6|NODE6_ENDPOINTS|SERVICE_PORTS|USER_DIRECT4|USER_DIRECT_V6|USER_DIRECT6|USER_PROXY4|USER_PROXY6|WAN4|WAN_HOST4|WAN4_HOST|WAN4_HOST_ADDRESSES|WAN4_ADDRESSES|WAN6|WAN_HOST6|WAN6_HOST|WAN6_HOST_ADDRESSES|WAN6_ADDRESSES|WAN_AC_BLACK_PORTS|WAN_AC_BLACK_V4|WAN_AC_BLACK_V6|OPENKILL_NFT_SHADOW_AUTO_STATE_V1|OPENKILL_SHADOW_SOURCE_V1|SHELL_RENDERER_STATE_V1)
+         return 0
+      ;;
+   esac
+   return 1
+}
+
+openkill_shadow_continuity_list_key()
+{
+   case "$1" in
+      ACCESS4_ALLOW|LAN_AC_WHITE_V4|USER_DIRECT_V4|ACCESS4_BYPASS|ACCESS4_DENY|LAN_AC_BLACK_V4|ACCESS6_ALLOW|LAN_AC_WHITE_V6|USER_DIRECT_V6|ACCESS6_BYPASS|ACCESS6_DENY|LAN_AC_BLACK_V6|CHINA_PASS4|CHINA_PASS6|CHINA4|CHINA6|COMMON_PORTS|SERVICE_PORTS|DELEGATED6|PD6|DELEGATED_IPV6_PREFIXES|FAKE_IP4|FAKEIP4|FAKE_IP6|FAKEIP6|LAN4|LAN_IPV4_PREFIXES|LAN6|LAN_IPV6_PREFIXES|LOCAL4|LOCAL_V4|LOCALNETWORK4|LOCALNETWORK4_PREFIXES|INTERNAL_IPV4_PREFIXES|LOCAL6|LOCAL_V6|LOCALNETWORK6|LOCALNETWORK6_PREFIXES|INTERNAL_IPV6_PREFIXES|NODE4|NODE4_ENDPOINTS|NODE6|NODE6_ENDPOINTS|SERVICE_PORTS|USER_DIRECT4|USER_DIRECT_V6|USER_DIRECT6|USER_PROXY4|USER_PROXY6|WAN4|WAN_HOST4|WAN4_HOST|WAN4_HOST_ADDRESSES|WAN4_ADDRESSES|WAN6|WAN_HOST6|WAN6_HOST|WAN6_HOST_ADDRESSES|WAN6_ADDRESSES|WAN_AC_BLACK_PORTS|WAN_AC_BLACK_V4|WAN_AC_BLACK_V6)
+         return 0
+      ;;
+   esac
+   return 1
+}
+
+openkill_shadow_continuity_canonicalize_file()
+{
+   openkill_shadow_continuity_input=$1
+   openkill_shadow_continuity_output=$2
+   [ -r "$openkill_shadow_continuity_input" ] || return 1
+   openkill_shadow_safe_path "$openkill_shadow_continuity_input" || return 1
+   openkill_shadow_safe_path "$openkill_shadow_continuity_output" || return 1
+   openkill_shadow_continuity_header=$(sed -n '1p' "$openkill_shadow_continuity_input") || return 1
+   case "$openkill_shadow_continuity_header" in
+      OPENKILL_NFT_SHADOW_AUTO_STATE_V1=1|OPENKILL_SHADOW_SOURCE_V1=1|SHELL_RENDERER_STATE_V1=1|SNAPSHOT_VERSION=1) ;;
+      OPENKILL_NFT_SHADOW_AUTO_STATE_V1=*|OPENKILL_SHADOW_SOURCE_V1=*|SHELL_RENDERER_STATE_V1=*|SNAPSHOT_VERSION=*|*_VERSION=*|*_V[0-9]*=*) return 1 ;;
+   esac
+   # Keep this one-pass and shell-portable: repeated per-line command
+   # substitutions made the continuity read needlessly expensive on ash. The
+   # allow-list is the producer's field surface; unknown keys do not become a
+   # second source of truth. List values are canonicalized in awk so set
+   # element order cannot change the token.
+   openkill_shadow_continuity_raw=${openkill_shadow_continuity_output}.raw.$$
+   openkill_shadow_safe_path "$openkill_shadow_continuity_raw" || return 1
+   awk -F '=' -v listkeys='|ACCESS4_ALLOW|LAN_AC_WHITE_V4|USER_DIRECT_V4|ACCESS4_BYPASS|ACCESS4_DENY|LAN_AC_BLACK_V4|ACCESS6_ALLOW|LAN_AC_WHITE_V6|USER_DIRECT_V6|USER_DIRECT6|ACCESS6_BYPASS|ACCESS6_DENY|LAN_AC_BLACK_V6|CHINA_PASS4|CHINA_PASS6|CHINA4|CHINA6|COMMON_PORTS|SERVICE_PORTS|DELEGATED6|PD6|DELEGATED_IPV6_PREFIXES|FAKE_IP4|FAKEIP4|FAKE_IP6|FAKEIP6|LAN4|LAN_IPV4_PREFIXES|LAN6|LAN_IPV6_PREFIXES|LOCAL4|LOCAL_V4|LOCALNETWORK4|LOCALNETWORK4_PREFIXES|INTERNAL_IPV4_PREFIXES|LOCAL6|LOCAL_V6|LOCALNETWORK6|LOCALNETWORK6_PREFIXES|INTERNAL_IPV6_PREFIXES|NODE4|NODE4_ENDPOINTS|NODE6|NODE6_ENDPOINTS|USER_DIRECT4|USER_DIRECT_V6|USER_DIRECT6|USER_PROXY4|USER_PROXY6|WAN4|WAN_HOST4|WAN4_HOST|WAN4_HOST_ADDRESSES|WAN4_ADDRESSES|WAN6|WAN_HOST6|WAN6_HOST|WAN6_HOST_ADDRESSES|WAN6_ADDRESSES|WAN_AC_BLACK_PORTS|WAN_AC_BLACK_V4|WAN_AC_BLACK_V6|' '
+      function allowed(k) {
+         return index("|OWNER|TUN_OWNER|RUN_MODE|ROUTER_SELF_PROXY|REDIRECT_PORT|PROXY_PORT|TPROXY_PORT|DNS_PORT|MARK|OPENKILL_FWMARK|MASK|OPENKILL_FWMASK|ROUTE_TABLE|OPENKILL_ROUTE_TABLE|RULE_PREF|OPENKILL_RULE_PREF|IPV6_READY|BC01_UNSUPPORTED|BC_01_UNSUPPORTED|CURRENT_UNDEFINED|EXPLICIT_POLICY_CURRENT_UNDEFINED|CURRENT_ACCESS_DENY|BC07_UNSUPPORTED|BC_07_UNSUPPORTED|ACCESS_DENY_REQUIRED|ACCESS4_ALLOW|LAN_AC_WHITE_V4|USER_DIRECT_V4|ACCESS4_BYPASS|ACCESS4_DENY|LAN_AC_BLACK_V4|ACCESS6_ALLOW|LAN_AC_WHITE_V6|USER_DIRECT_V6|USER_DIRECT6|ACCESS6_BYPASS|ACCESS6_DENY|LAN_AC_BLACK_V6|CHINA_PASS4|CHINA_PASS6|CHINA4|CHINA6|COMMON_PORTS|SERVICE_PORTS|DELEGATED6|PD6|DELEGATED_IPV6_PREFIXES|FAKE_IP4|FAKEIP4|FAKE_IP6|FAKEIP6|LAN4|LAN_IPV4_PREFIXES|LAN6|LAN_IPV6_PREFIXES|LOCAL4|LOCAL_V4|LOCALNETWORK4|LOCALNETWORK4_PREFIXES|INTERNAL_IPV4_PREFIXES|LOCAL6|LOCAL_V6|LOCALNETWORK6|LOCALNETWORK6_PREFIXES|INTERNAL_IPV6_PREFIXES|NODE4|NODE4_ENDPOINTS|NODE6|NODE6_ENDPOINTS|USER_DIRECT4|USER_DIRECT_V6|USER_DIRECT6|USER_PROXY4|USER_PROXY6|WAN4|WAN_HOST4|WAN4_HOST|WAN4_HOST_ADDRESSES|WAN4_ADDRESSES|WAN6|WAN_HOST6|WAN6_HOST|WAN6_HOST_ADDRESSES|WAN6_ADDRESSES|WAN_AC_BLACK_PORTS|WAN_AC_BLACK_V4|WAN_AC_BLACK_V6|OPENKILL_NFT_SHADOW_AUTO_STATE_V1|OPENKILL_SHADOW_SOURCE_V1|SHELL_RENDERER_STATE_V1|", "|" k "|") > 0
+      }
+      function islist(k) { return index(listkeys, "|" k "|") > 0 }
+      function listcanon(v, a,n,i,j,t,out) {
+         gsub(/[[:space:],]+/, " ", v); gsub(/^ +| +$/, "", v)
+         if (v == "") return "-"
+         n=split(v,a,/ +/)
+         for (i=1; i<=n; i++) { t=a[i]; j=i; while (j>1 && a[j-1] > t) { a[j]=a[j-1]; j-- } a[j]=t }
+         out=""; t=""
+         for (i=1; i<=n; i++) if (a[i] != t) { if (out != "") out=out ","; out=out a[i]; t=a[i] }
+         return out
+      }
+      { sub(/\r$/, "") }
+      /^[A-Z0-9_]+=/{ key=$1; value=substr($0,index($0,"=")+1); if (allowed(key)) { if (islist(key)) value=listcanon(value); print key "=" value } }
+   ' "$openkill_shadow_continuity_input" > "$openkill_shadow_continuity_raw"
+   openkill_shadow_continuity_awk_rc=$?
+   if [ "$openkill_shadow_continuity_awk_rc" -ne 0 ]; then
+      rm -f "$openkill_shadow_continuity_raw" "$openkill_shadow_continuity_output"
+      return 1
+   fi
+   LC_ALL=C sort -u "$openkill_shadow_continuity_raw" > "$openkill_shadow_continuity_output"
+   openkill_shadow_continuity_sort_rc=$?
+   rm -f "$openkill_shadow_continuity_raw"
+   [ "$openkill_shadow_continuity_sort_rc" -eq 0 ] || { rm -f "$openkill_shadow_continuity_output"; return 1; }
+   [ -s "$openkill_shadow_continuity_output" ] || { rm -f "$openkill_shadow_continuity_output"; return 1; }
+   return 0
+}
+
+openkill_shadow_continuity_canonicalize_node_file()
+{
+   openkill_shadow_continuity_input=$1
+   openkill_shadow_continuity_output=$2
+   [ -r "$openkill_shadow_continuity_input" ] || return 1
+   openkill_shadow_safe_path "$openkill_shadow_continuity_input" || return 1
+   openkill_shadow_safe_path "$openkill_shadow_continuity_output" || return 1
+   openkill_shadow_continuity_node_value=$(tr '\n' ' ' < "$openkill_shadow_continuity_input" | awk '{$1=$1; print}') || return 1
+   openkill_shadow_continuity_node_value=$(openkill_shadow_auto_list "$openkill_shadow_continuity_node_value") || return 1
+   printf 'NODE_LIST=%s\n' "$openkill_shadow_continuity_node_value" > "$openkill_shadow_continuity_output" || return 1
+   return 0
+}
+
+openkill_shadow_continuity_shell_scalars()
+{
+   openkill_shadow_continuity_scalars_output=$1
+   openkill_shadow_safe_path "$openkill_shadow_continuity_scalars_output" || return 1
+   : > "$openkill_shadow_continuity_scalars_output" || return 1
+   for openkill_shadow_continuity_scalar_value in \
+      "${tun_owner:-${OPENKILL_TUN_OWNER:-}}" "${OPENKILL_TUN_OWNER:-}" \
+      "${OPENKILL_RUN_MODE:-}" "${en_mode_tun:-}" "${enable_udp_proxy:-}" \
+      "${router_self_proxy:-}" "${OPENKILL_ROUTER_SELF_PROXY:-}" \
+      "${proxy_port:-}" "${OPENKILL_PROXY_PORT:-}" "${tproxy_port:-}" "${OPENKILL_TPROXY_PORT:-}" \
+      "${dns_port:-${DNSPORT:-}}" "${OPENKILL_DNS_PORT:-}" \
+      "${OPENKILL_FWMARK:-${PROXY_FWMARK:-}}" "${OPENKILL_FWMARK:-}" "${OPENKILL_FWMASK:-}" \
+      "${OPENKILL_ROUTE_TABLE:-${PROXY_ROUTE_TABLE:-}}" "${OPENKILL_ROUTE_TABLE:-}" \
+      "${OPENKILL_RULE_PREF:-}" "${OPENKILL_IPV6_READY:-}" \
+      "${BC01_UNSUPPORTED:-}" "${CURRENT_UNDEFINED:-}" "${BC07_UNSUPPORTED:-}" "${ACCESS_DENY_REQUIRED:-}"; do
+      openkill_shadow_safe_value "$openkill_shadow_continuity_scalar_value" || return 1
+   done
+   {
+      printf 'OWNER=%s\n' "${tun_owner:-${OPENKILL_TUN_OWNER:-}}"
+      printf 'OPENKILL_TUN_OWNER=%s\n' "${OPENKILL_TUN_OWNER:-}"
+      printf 'RUN_MODE=%s\n' "${OPENKILL_RUN_MODE:-}"
+      printf 'EN_MODE_TUN=%s\n' "${en_mode_tun:-}"
+      printf 'ENABLE_UDP_PROXY=%s\n' "${enable_udp_proxy:-}"
+      printf 'ROUTER_SELF_PROXY=%s\n' "${router_self_proxy:-}"
+      printf 'OPENKILL_ROUTER_SELF_PROXY=%s\n' "${OPENKILL_ROUTER_SELF_PROXY:-}"
+      printf 'REDIRECT_PORT=%s\n' "${proxy_port:-}"
+      printf 'OPENKILL_PROXY_PORT=%s\n' "${OPENKILL_PROXY_PORT:-}"
+      printf 'TPROXY_PORT=%s\n' "${tproxy_port:-}"
+      printf 'OPENKILL_TPROXY_PORT=%s\n' "${OPENKILL_TPROXY_PORT:-}"
+      printf 'DNS_PORT=%s\n' "${dns_port:-${DNSPORT:-}}"
+      printf 'OPENKILL_DNS_PORT=%s\n' "${OPENKILL_DNS_PORT:-}"
+      printf 'MARK=%s\n' "${OPENKILL_FWMARK:-${PROXY_FWMARK:-}}"
+      printf 'OPENKILL_FWMARK=%s\n' "${OPENKILL_FWMARK:-}"
+      printf 'MASK=%s\n' "${OPENKILL_FWMASK:-}"
+      printf 'OPENKILL_FWMASK=%s\n' "${OPENKILL_FWMASK:-}"
+      printf 'ROUTE_TABLE=%s\n' "${OPENKILL_ROUTE_TABLE:-${PROXY_ROUTE_TABLE:-}}"
+      printf 'OPENKILL_ROUTE_TABLE=%s\n' "${OPENKILL_ROUTE_TABLE:-}"
+      printf 'RULE_PREF=%s\n' "${OPENKILL_RULE_PREF:-}"
+      printf 'OPENKILL_RULE_PREF=%s\n' "${OPENKILL_RULE_PREF:-}"
+      printf 'IPV6_READY=%s\n' "${OPENKILL_IPV6_READY:-}"
+      printf 'BC01_UNSUPPORTED=%s\n' "${BC01_UNSUPPORTED:-}"
+      printf 'CURRENT_UNDEFINED=%s\n' "${CURRENT_UNDEFINED:-}"
+      printf 'BC07_UNSUPPORTED=%s\n' "${BC07_UNSUPPORTED:-}"
+      printf 'ACCESS_DENY_REQUIRED=%s\n' "${ACCESS_DENY_REQUIRED:-}"
+   } >> "$openkill_shadow_continuity_scalars_output" || return 1
+   return 0
+}
+
+openkill_shadow_continuity_add_file()
+{
+   openkill_shadow_continuity_id=$1
+   openkill_shadow_continuity_path=$2
+   openkill_shadow_continuity_required=$3
+   openkill_shadow_continuity_kind=$4
+   openkill_shadow_continuity_work=$5
+   openkill_shadow_continuity_components=$6
+   if [ -z "$openkill_shadow_continuity_path" ]; then
+      [ "$openkill_shadow_continuity_required" = 1 ] && return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+      printf '%s\tABSENT_ALLOWED\t-\n' "$openkill_shadow_continuity_id" >> "$openkill_shadow_continuity_components"
+      return 0
+   fi
+   openkill_shadow_safe_path "$openkill_shadow_continuity_path" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   if [ ! -r "$openkill_shadow_continuity_path" ]; then
+      [ "$openkill_shadow_continuity_required" = 1 ] && return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+      printf '%s\tABSENT_ALLOWED\t-\n' "$openkill_shadow_continuity_id" >> "$openkill_shadow_continuity_components"
+      return 0
+   fi
+   openkill_shadow_continuity_size=$(wc -c < "$openkill_shadow_continuity_path") || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   [ "$openkill_shadow_continuity_size" -le "$OPENKILL_NFT_SHADOW_MAX_PAYLOAD_BYTES" ] || return "$OPENKILL_NFT_SHADOW_RC_INPUT"
+   openkill_shadow_continuity_canonical=$openkill_shadow_continuity_work/$openkill_shadow_continuity_id.canonical
+   case "$openkill_shadow_continuity_kind" in
+      node) openkill_shadow_continuity_canonicalize_node_file "$openkill_shadow_continuity_path" "$openkill_shadow_continuity_canonical" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP" ;;
+      state) openkill_shadow_continuity_canonicalize_file "$openkill_shadow_continuity_path" "$openkill_shadow_continuity_canonical" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP" ;;
+      *) return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP" ;;
+   esac
+   openkill_shadow_continuity_hash=$(openkill_shadow_hash_file "$openkill_shadow_continuity_canonical" 2>/dev/null) || return "$OPENKILL_NFT_SHADOW_RC_COMPARE"
+   openkill_shadow_valid_hash "$openkill_shadow_continuity_hash" || return "$OPENKILL_NFT_SHADOW_RC_COMPARE"
+   printf '%s\tPRESENT\t%s\n' "$openkill_shadow_continuity_id" "$openkill_shadow_continuity_hash" >> "$openkill_shadow_continuity_components"
+   return 0
+}
+
+openkill_shadow_auto_continuity_token()
+{
+   # Arguments: output token file, work directory, desired, applied, snapshot,
+   # node4, node6.  The caller supplies the original live paths explicitly so
+   # the final T2 read cannot accidentally inspect the private snapshot.
+   openkill_shadow_continuity_token_output_file=$1
+   openkill_shadow_continuity_work=$2
+   openkill_shadow_continuity_desired=$3
+   openkill_shadow_continuity_applied=$4
+   openkill_shadow_continuity_snapshot=$5
+   openkill_shadow_continuity_node4=$6
+   openkill_shadow_continuity_node6=$7
+   [ -n "$openkill_shadow_continuity_token_output_file" ] && [ -n "$openkill_shadow_continuity_work" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_continuity_token_output_file" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_continuity_work" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   # All continuity material is transient and may contain hashes of sensitive
+   # control-plane state.  The coordinator runs in a subshell, so tightening
+   # the umask here cannot alter the caller's production umask.
+   umask 077
+   mkdir -p "$openkill_shadow_continuity_work" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   chmod 700 "$openkill_shadow_continuity_work" 2>/dev/null || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   openkill_shadow_continuity_components=$openkill_shadow_continuity_work/components
+   openkill_shadow_safe_path "$openkill_shadow_continuity_components" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   : > "$openkill_shadow_continuity_components" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   printf '%s=%s\n' "$OPENKILL_NFT_SHADOW_CONTINUITY_TOKEN_SCHEMA" "$OPENKILL_NFT_SHADOW_CONTINUITY_TOKEN_VERSION" >> "$openkill_shadow_continuity_components"
+   printf 'profile\tPRESENT\tcurrent\n' >> "$openkill_shadow_continuity_components"
+   openkill_shadow_continuity_add_file desired "$openkill_shadow_continuity_desired" 0 state "$openkill_shadow_continuity_work" "$openkill_shadow_continuity_components" || return $?
+   openkill_shadow_continuity_add_file applied "$openkill_shadow_continuity_applied" 1 state "$openkill_shadow_continuity_work" "$openkill_shadow_continuity_components" || return $?
+   openkill_shadow_continuity_add_file snapshot "$openkill_shadow_continuity_snapshot" 0 state "$openkill_shadow_continuity_work" "$openkill_shadow_continuity_components" || return $?
+   openkill_shadow_continuity_add_file node4 "$openkill_shadow_continuity_node4" 0 node "$openkill_shadow_continuity_work" "$openkill_shadow_continuity_components" || return $?
+   openkill_shadow_continuity_add_file node6 "$openkill_shadow_continuity_node6" 0 node "$openkill_shadow_continuity_work" "$openkill_shadow_continuity_components" || return $?
+   openkill_shadow_continuity_scalars=$openkill_shadow_continuity_work/scalars
+   openkill_shadow_continuity_shell_scalars "$openkill_shadow_continuity_scalars" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   openkill_shadow_continuity_scalar_hash=$(openkill_shadow_hash_file "$openkill_shadow_continuity_scalars" 2>/dev/null) || return "$OPENKILL_NFT_SHADOW_RC_COMPARE"
+   openkill_shadow_valid_hash "$openkill_shadow_continuity_scalar_hash" || return "$OPENKILL_NFT_SHADOW_RC_COMPARE"
+   printf 'shell_scalars\tPRESENT\t%s\n' "$openkill_shadow_continuity_scalar_hash" >> "$openkill_shadow_continuity_components"
+   # Components are emitted in fixed source order above.  Do not sort this
+   # file: changing source enumeration order in a caller must not change V1.
+   openkill_shadow_continuity_token=$(openkill_shadow_hash_file "$openkill_shadow_continuity_components" 2>/dev/null) || return "$OPENKILL_NFT_SHADOW_RC_COMPARE"
+   openkill_shadow_valid_hash "$openkill_shadow_continuity_token" || return "$OPENKILL_NFT_SHADOW_RC_COMPARE"
+   openkill_shadow_continuity_token_tmp=${openkill_shadow_continuity_token_output_file}.tmp.$$
+   openkill_shadow_safe_path "$openkill_shadow_continuity_token_tmp" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   printf '%s\n' "$openkill_shadow_continuity_token" > "$openkill_shadow_continuity_token_tmp" || {
+      rm -f "$openkill_shadow_continuity_token_tmp"
+      return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   }
+   mv -f "$openkill_shadow_continuity_token_tmp" "$openkill_shadow_continuity_token_output_file" || {
+      rm -f "$openkill_shadow_continuity_token_tmp"
+      return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   }
+   printf '%s\n' "$openkill_shadow_continuity_token"
+   return 0
+}
+
+openkill_shadow_continuity_token()
+{
+   openkill_shadow_auto_continuity_token "$@"
+}
+
+openkill_shadow_auto_continuity_copy()
+{
+   openkill_shadow_continuity_copy_source=$1
+   openkill_shadow_continuity_copy_target=$2
+   [ -n "$openkill_shadow_continuity_copy_source" ] && [ -n "$openkill_shadow_continuity_copy_target" ] || return 1
+   openkill_shadow_safe_path "$openkill_shadow_continuity_copy_source" || return 1
+   openkill_shadow_safe_path "$openkill_shadow_continuity_copy_target" || return 1
+   [ -r "$openkill_shadow_continuity_copy_source" ] || return 1
+   openkill_shadow_continuity_copy_tmp=${openkill_shadow_continuity_copy_target}.tmp.$$
+   openkill_shadow_safe_path "$openkill_shadow_continuity_copy_tmp" || return 1
+   cp "$openkill_shadow_continuity_copy_source" "$openkill_shadow_continuity_copy_tmp" || { rm -f "$openkill_shadow_continuity_copy_tmp"; return 1; }
+   chmod 600 "$openkill_shadow_continuity_copy_tmp" 2>/dev/null || { rm -f "$openkill_shadow_continuity_copy_tmp"; return 1; }
+   mv -f "$openkill_shadow_continuity_copy_tmp" "$openkill_shadow_continuity_copy_target" || { rm -f "$openkill_shadow_continuity_copy_tmp"; return 1; }
+   return 0
+}
+
+openkill_shadow_continuity_copy_matches()
+{
+   # Verify that the private copy is exactly one of the source components
+   # hashed for T0.  T0/T1 catches ordinary updates; this additional check
+   # closes an update-and-revert window during the copy itself.
+   openkill_shadow_continuity_match_id=$1
+   openkill_shadow_continuity_match_source=$2
+   openkill_shadow_continuity_match_kind=$3
+   openkill_shadow_continuity_match_copy=$4
+   openkill_shadow_continuity_match_components=$5
+   [ -r "$openkill_shadow_continuity_match_copy" ] || return 1
+   openkill_shadow_safe_path "$openkill_shadow_continuity_match_copy" || return 1
+   openkill_shadow_safe_path "$openkill_shadow_continuity_match_components" || return 1
+   openkill_shadow_continuity_match_expected=$(awk -F '\t' -v id="$openkill_shadow_continuity_match_id" '$1 == id && $2 == "PRESENT" { print $3; exit }' "$openkill_shadow_continuity_match_components") || return 1
+   openkill_shadow_valid_hash "$openkill_shadow_continuity_match_expected" || return 1
+   openkill_shadow_continuity_match_canonical=${openkill_shadow_continuity_match_copy}.canonical.$$
+   openkill_shadow_safe_path "$openkill_shadow_continuity_match_canonical" || return 1
+   case "$openkill_shadow_continuity_match_kind" in
+      node) openkill_shadow_continuity_canonicalize_node_file "$openkill_shadow_continuity_match_copy" "$openkill_shadow_continuity_match_canonical" || { rm -f "$openkill_shadow_continuity_match_canonical"; return 1; } ;;
+      state) openkill_shadow_continuity_canonicalize_file "$openkill_shadow_continuity_match_copy" "$openkill_shadow_continuity_match_canonical" || { rm -f "$openkill_shadow_continuity_match_canonical"; return 1; } ;;
+      *) rm -f "$openkill_shadow_continuity_match_canonical"; return 1 ;;
+   esac
+   openkill_shadow_continuity_match_actual=$(openkill_shadow_hash_file "$openkill_shadow_continuity_match_canonical" 2>/dev/null) || {
+      rm -f "$openkill_shadow_continuity_match_canonical"
+      return 1
+   }
+   rm -f "$openkill_shadow_continuity_match_canonical"
+   [ "$openkill_shadow_continuity_match_actual" = "$openkill_shadow_continuity_match_expected" ]
+}
+
+openkill_shadow_auto_continuity_snapshot()
+{
+   openkill_shadow_continuity_root=$1
+   [ -n "$openkill_shadow_continuity_root" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_continuity_root" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   openkill_shadow_continuity_state_dir=$openkill_shadow_continuity_root/auto-state
+   openkill_shadow_safe_path "$openkill_shadow_continuity_state_dir" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   mkdir -p "$openkill_shadow_continuity_state_dir" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   chmod 700 "$openkill_shadow_continuity_state_dir" 2>/dev/null || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+
+   openkill_shadow_continuity_live_desired=${OPENKILL_NETWORK_DESIRED:-}
+   openkill_shadow_continuity_live_applied=${OPENKILL_NETWORK_APPLIED_FILE:-/tmp/openkill-network.applied}
+   openkill_shadow_continuity_live_snapshot=${OPENKILL_NETWORK_SNAPSHOT:-/tmp/openkill-network.snapshot}
+   openkill_shadow_continuity_live_node4=${OPENKILL_NFT_SHADOW_NODE4_FILE:-/tmp/openkill-node4.desired}
+   openkill_shadow_continuity_live_node6=${OPENKILL_NFT_SHADOW_NODE6_FILE:-/tmp/openkill-node6.desired}
+   [ -n "$openkill_shadow_continuity_live_applied" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_continuity_live_applied" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_continuity_live_snapshot" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_continuity_live_node4" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_continuity_live_node6" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   if [ -n "$openkill_shadow_continuity_live_desired" ]; then
+      openkill_shadow_safe_path "$openkill_shadow_continuity_live_desired" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   fi
+
+   openkill_shadow_continuity_t0_work=$openkill_shadow_continuity_state_dir/t0
+   openkill_shadow_continuity_t1_work=$openkill_shadow_continuity_state_dir/t1
+   openkill_shadow_continuity_t0=$openkill_shadow_continuity_state_dir/t0.token
+   openkill_shadow_continuity_t1=$openkill_shadow_continuity_state_dir/t1.token
+   openkill_shadow_auto_continuity_token "$openkill_shadow_continuity_t0" "$openkill_shadow_continuity_t0_work" \
+      "$openkill_shadow_continuity_live_desired" "$openkill_shadow_continuity_live_applied" \
+      "$openkill_shadow_continuity_live_snapshot" "$openkill_shadow_continuity_live_node4" "$openkill_shadow_continuity_live_node6" > "$openkill_shadow_continuity_state_dir/t0.stdout" || return $?
+   chmod 600 "$openkill_shadow_continuity_state_dir/t0.stdout" 2>/dev/null || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   openkill_shadow_continuity_t0_value=$(sed -n '1p' "$openkill_shadow_continuity_t0") || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+
+   openkill_shadow_continuity_copy_dir=$openkill_shadow_continuity_state_dir/copy
+   mkdir -p "$openkill_shadow_continuity_copy_dir" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   chmod 700 "$openkill_shadow_continuity_copy_dir" 2>/dev/null || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   openkill_shadow_continuity_applied_copy=$openkill_shadow_continuity_copy_dir/applied
+   openkill_shadow_auto_continuity_copy "$openkill_shadow_continuity_live_applied" "$openkill_shadow_continuity_applied_copy" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   if [ -n "$openkill_shadow_continuity_live_desired" ] && [ -r "$openkill_shadow_continuity_live_desired" ]; then
+      openkill_shadow_continuity_desired_copy=$openkill_shadow_continuity_copy_dir/desired
+      openkill_shadow_auto_continuity_copy "$openkill_shadow_continuity_live_desired" "$openkill_shadow_continuity_desired_copy" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   else
+      openkill_shadow_continuity_desired_copy=
+   fi
+   if [ -r "$openkill_shadow_continuity_live_snapshot" ]; then
+      openkill_shadow_continuity_snapshot_copy=$openkill_shadow_continuity_copy_dir/snapshot
+      openkill_shadow_auto_continuity_copy "$openkill_shadow_continuity_live_snapshot" "$openkill_shadow_continuity_snapshot_copy" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   else
+      openkill_shadow_continuity_snapshot_copy=
+   fi
+   if [ -r "$openkill_shadow_continuity_live_node4" ]; then
+      openkill_shadow_continuity_node4_copy=$openkill_shadow_continuity_copy_dir/node4
+      openkill_shadow_auto_continuity_copy "$openkill_shadow_continuity_live_node4" "$openkill_shadow_continuity_node4_copy" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   else
+      openkill_shadow_continuity_node4_copy=
+   fi
+   if [ -r "$openkill_shadow_continuity_live_node6" ]; then
+      openkill_shadow_continuity_node6_copy=$openkill_shadow_continuity_copy_dir/node6
+      openkill_shadow_auto_continuity_copy "$openkill_shadow_continuity_live_node6" "$openkill_shadow_continuity_node6_copy" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+    else
+       openkill_shadow_continuity_node6_copy=
+    fi
+
+    openkill_shadow_continuity_copy_matches applied "$openkill_shadow_continuity_live_applied" state "$openkill_shadow_continuity_applied_copy" "$openkill_shadow_continuity_t0_work/components" || return "$OPENKILL_NFT_SHADOW_RC_STALE"
+    if [ -n "$openkill_shadow_continuity_desired_copy" ]; then
+       openkill_shadow_continuity_copy_matches desired "$openkill_shadow_continuity_live_desired" state "$openkill_shadow_continuity_desired_copy" "$openkill_shadow_continuity_t0_work/components" || return "$OPENKILL_NFT_SHADOW_RC_STALE"
+    fi
+    if [ -n "$openkill_shadow_continuity_snapshot_copy" ]; then
+       openkill_shadow_continuity_copy_matches snapshot "$openkill_shadow_continuity_live_snapshot" state "$openkill_shadow_continuity_snapshot_copy" "$openkill_shadow_continuity_t0_work/components" || return "$OPENKILL_NFT_SHADOW_RC_STALE"
+    fi
+    if [ -n "$openkill_shadow_continuity_node4_copy" ]; then
+       openkill_shadow_continuity_copy_matches node4 "$openkill_shadow_continuity_live_node4" node "$openkill_shadow_continuity_node4_copy" "$openkill_shadow_continuity_t0_work/components" || return "$OPENKILL_NFT_SHADOW_RC_STALE"
+    fi
+    if [ -n "$openkill_shadow_continuity_node6_copy" ]; then
+       openkill_shadow_continuity_copy_matches node6 "$openkill_shadow_continuity_live_node6" node "$openkill_shadow_continuity_node6_copy" "$openkill_shadow_continuity_t0_work/components" || return "$OPENKILL_NFT_SHADOW_RC_STALE"
+    fi
+
+   # Explicitly opt-in test hooks are used only to exercise the race contract;
+   # production never sets them and no arbitrary command is executed.
+   if [ "${OPENKILL_NFT_SHADOW_TEST_HOOK:-0}" = 1 ] && [ -n "${OPENKILL_NFT_SHADOW_TEST_AFTER_COPY_FILE:-}" ]; then
+      openkill_shadow_safe_path "$OPENKILL_NFT_SHADOW_TEST_AFTER_COPY_FILE" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+      # Keep the fixture syntactically valid while adding a distinct
+      # committed-state record.  The duplicate key is intentional: the
+      # canonicalizer includes both values, so an update cannot be hidden by
+      # replacing the whole source with malformed test text.
+      printf '%s\n' "${OPENKILL_NFT_SHADOW_TEST_AFTER_COPY_VALUE:-MARK=0x163}" >> "$OPENKILL_NFT_SHADOW_TEST_AFTER_COPY_FILE" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   fi
+
+   openkill_shadow_auto_continuity_token "$openkill_shadow_continuity_t1" "$openkill_shadow_continuity_t1_work" \
+      "$openkill_shadow_continuity_live_desired" "$openkill_shadow_continuity_live_applied" \
+      "$openkill_shadow_continuity_live_snapshot" "$openkill_shadow_continuity_live_node4" "$openkill_shadow_continuity_live_node6" > "$openkill_shadow_continuity_state_dir/t1.stdout" || return $?
+   chmod 600 "$openkill_shadow_continuity_state_dir/t1.stdout" 2>/dev/null || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   openkill_shadow_continuity_t1_value=$(sed -n '1p' "$openkill_shadow_continuity_t1") || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   [ "$openkill_shadow_continuity_t0_value" = "$openkill_shadow_continuity_t1_value" ] || return "$OPENKILL_NFT_SHADOW_RC_STALE"
+
+   if [ -n "$openkill_shadow_continuity_desired_copy" ] && ! cmp -s "$openkill_shadow_continuity_desired_copy" "$openkill_shadow_continuity_applied_copy"; then
+      return "$OPENKILL_NFT_SHADOW_RC_STALE"
+   fi
+
+   # Force all subsequent producer reads to the private copies.  The original
+   # paths remain saved above for the final live T2 token calculation.
+   if [ -n "$openkill_shadow_continuity_desired_copy" ]; then OPENKILL_NETWORK_DESIRED=$openkill_shadow_continuity_desired_copy; else OPENKILL_NETWORK_DESIRED=; fi
+   OPENKILL_NETWORK_APPLIED_FILE=$openkill_shadow_continuity_applied_copy
+   if [ -n "$openkill_shadow_continuity_snapshot_copy" ]; then OPENKILL_NETWORK_SNAPSHOT=$openkill_shadow_continuity_snapshot_copy; else OPENKILL_NETWORK_SNAPSHOT=$openkill_shadow_continuity_state_dir/no-snapshot; fi
+   if [ -n "$openkill_shadow_continuity_node4_copy" ]; then OPENKILL_NFT_SHADOW_NODE4_FILE=$openkill_shadow_continuity_node4_copy; else OPENKILL_NFT_SHADOW_NODE4_FILE=$openkill_shadow_continuity_state_dir/no-node4; fi
+   if [ -n "$openkill_shadow_continuity_node6_copy" ]; then OPENKILL_NFT_SHADOW_NODE6_FILE=$openkill_shadow_continuity_node6_copy; else OPENKILL_NFT_SHADOW_NODE6_FILE=$openkill_shadow_continuity_state_dir/no-node6; fi
+   openkill_shadow_continuity_token_value=$openkill_shadow_continuity_t1_value
+   openkill_shadow_continuity_token_t0=$openkill_shadow_continuity_t0_value
+   openkill_shadow_continuity_token_t1=$openkill_shadow_continuity_t1_value
+   return 0
+}
+
 openkill_shadow_auto_owner()
 {
    openkill_shadow_auto_field OWNER TUN_OWNER || return 1
@@ -386,7 +781,8 @@ openkill_shadow_build_auto_input()
    [ -n "$openkill_shadow_auto_output" ] || return "$OPENKILL_NFT_SHADOW_RC_INPUT"
    openkill_shadow_safe_path "$openkill_shadow_auto_output" || return "$OPENKILL_NFT_SHADOW_RC_INPUT"
    openkill_shadow_auto_source_file=
-   if openkill_shadow_auto_source_path >/dev/null 2>&1; then
+   openkill_shadow_auto_source_requested=${OPENKILL_NFT_SHADOW_SOURCE_FILE:-${OPENKILL_NFT_SHADOW_AUTO_STATE_FILE:-${OPENKILL_NFT_SHADOW_STATE_SOURCE:-}}}
+   if [ -n "$openkill_shadow_auto_source_requested" ]; then
       openkill_shadow_auto_source_file=$(openkill_shadow_auto_source_path) || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
       openkill_shadow_auto_header=$(sed -n '1p' "$openkill_shadow_auto_source_file") || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
       case "$openkill_shadow_auto_header" in
@@ -450,14 +846,28 @@ openkill_shadow_build_auto_input()
    openkill_shadow_auto_table=$openkill_shadow_auto_field_value
    openkill_shadow_auto_field RULE_PREF OPENKILL_RULE_PREF || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
    openkill_shadow_auto_pref=$openkill_shadow_auto_field_value
-   openkill_shadow_auto_field GENERATION || {
-      openkill_shadow_auto_generation_file=${OPENKILL_NFT_SHADOW_GENERATION_FILE:-/tmp/openkill-network-reconcile/generation}
-      openkill_shadow_safe_path "$openkill_shadow_auto_generation_file" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
-      [ -r "$openkill_shadow_auto_generation_file" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
-      openkill_shadow_auto_field_value=$(sed -n '1p' "$openkill_shadow_auto_generation_file") || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
-   }
-   openkill_shadow_auto_generation=$openkill_shadow_auto_field_value
-   openkill_shadow_safe_value "$openkill_shadow_auto_generation" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   # GENERATION is retained only for explicit development fixtures.  The
+   # production automatic path receives its content-derived continuity token
+   # from openkill_shadow_auto_continuity_snapshot and never consults the
+   # legacy /tmp/openkill-network-reconcile/generation helper file.
+   openkill_shadow_auto_generation=
+   if [ -n "${openkill_shadow_auto_source_file:-}" ]; then
+      openkill_shadow_auto_field GENERATION
+      openkill_shadow_auto_generation_rc=$?
+      if [ "$openkill_shadow_auto_generation_rc" -eq 0 ]; then
+         openkill_shadow_auto_generation=$openkill_shadow_auto_field_value
+      elif [ -n "${OPENKILL_NFT_SHADOW_GENERATION_FILE:-}" ]; then
+         openkill_shadow_auto_generation_file=$OPENKILL_NFT_SHADOW_GENERATION_FILE
+         openkill_shadow_safe_path "$openkill_shadow_auto_generation_file" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+         [ -r "$openkill_shadow_auto_generation_file" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+         openkill_shadow_auto_generation=$(sed -n '1p' "$openkill_shadow_auto_generation_file") || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+      else
+         return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+      fi
+      openkill_shadow_safe_value "$openkill_shadow_auto_generation" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   elif [ -n "${openkill_shadow_continuity_token_value:-}" ]; then
+      openkill_shadow_auto_generation=$openkill_shadow_continuity_token_value
+   fi
 
    openkill_shadow_auto_template_file=$(openkill_shadow_auto_template "$openkill_shadow_auto_run_mode") || return "$OPENKILL_NFT_SHADOW_RC_INPUT"
    [ "$(sed -n '1p' "$openkill_shadow_auto_template_file")" = 'SHELL_RENDERER_INPUT_V1	1' ] || return "$OPENKILL_NFT_SHADOW_RC_UNSUPPORTED"
@@ -898,25 +1308,45 @@ openkill_shadow_auto_prepare()
    [ -n "$openkill_shadow_auto_prepare_dir" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
    openkill_shadow_safe_path "$openkill_shadow_auto_prepare_dir" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
    openkill_shadow_auto_generation_source_file=
+   openkill_shadow_auto_continuity_mode=0
+   openkill_shadow_auto_generation_fixture=0
+   openkill_shadow_auto_source_file=
+   openkill_shadow_auto_source_requested=${OPENKILL_NFT_SHADOW_SOURCE_FILE:-${OPENKILL_NFT_SHADOW_AUTO_STATE_FILE:-${OPENKILL_NFT_SHADOW_STATE_SOURCE:-}}}
+   if [ -n "$openkill_shadow_auto_source_requested" ]; then
+      openkill_shadow_auto_source_file=$(openkill_shadow_auto_source_path) || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+      openkill_shadow_auto_generation_fixture=1
+   else
+      # Production automatic mode snapshots the live committed sources before
+      # building input.  This is the only path that may create a continuity
+      # token; no generation file is read or written here.
+      openkill_shadow_auto_continuity_snapshot "$openkill_shadow_auto_prepare_dir"
+      openkill_shadow_auto_snapshot_rc=$?
+      [ "$openkill_shadow_auto_snapshot_rc" -eq 0 ] || return "$openkill_shadow_auto_snapshot_rc"
+      openkill_shadow_auto_continuity_mode=1
+   fi
    openkill_shadow_input_file=$openkill_shadow_auto_prepare_dir/auto-input.tsv
    openkill_shadow_safe_path "$openkill_shadow_input_file" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
    openkill_shadow_build_auto_input "$openkill_shadow_input_file"
    openkill_shadow_auto_prepare_rc=$?
    [ "$openkill_shadow_auto_prepare_rc" -eq 0 ] || return "$openkill_shadow_auto_prepare_rc"
-   openkill_shadow_auto_field GENERATION >/dev/null 2>&1
-   if [ "$?" -eq 0 ]; then
-      openkill_shadow_generation=$openkill_shadow_auto_field_value
+   if [ "$openkill_shadow_auto_generation_fixture" -eq 1 ] && [ -z "$openkill_shadow_auto_generation" ]; then
+      openkill_shadow_auto_field GENERATION >/dev/null 2>&1
+      openkill_shadow_auto_generation_rc=$?
+      [ "$openkill_shadow_auto_generation_rc" -eq 0 ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+      openkill_shadow_auto_generation=$openkill_shadow_auto_field_value
+   fi
+   if [ "$openkill_shadow_auto_generation_fixture" -eq 1 ] && [ -n "$openkill_shadow_auto_generation" ]; then
+      openkill_shadow_generation=$openkill_shadow_auto_generation
       openkill_shadow_generation_file=$openkill_shadow_auto_prepare_dir/auto-generation
       # Keep the canonical source visible for the end-of-run race check.  The
       # temporary copy is still used for the first read so the comparison has
       # a stable G1 snapshot; the source is read again before publishing.
       openkill_shadow_auto_generation_source_file=${openkill_shadow_auto_source_file:-}
       printf '%s\n' "$openkill_shadow_generation" > "$openkill_shadow_generation_file" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
-   else
-      openkill_shadow_generation_file=${OPENKILL_NFT_SHADOW_GENERATION_FILE:-/tmp/openkill-network-reconcile/generation}
-      openkill_shadow_safe_path "$openkill_shadow_generation_file" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
-      [ -r "$openkill_shadow_generation_file" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
-      openkill_shadow_generation=
+   elif [ "$openkill_shadow_auto_continuity_mode" -eq 1 ]; then
+      openkill_shadow_generation=$openkill_shadow_continuity_token_value
+      openkill_shadow_safe_value "$openkill_shadow_generation" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+      openkill_shadow_generation_file=
    fi
    return 0
 }
@@ -1003,6 +1433,18 @@ openkill_shadow_short_hash()
    esac
 }
 
+openkill_shadow_generation_telemetry_value()
+{
+   # Preserve the original explicit-bundle wire value.  Only the automatic
+   # path uses the short content-derived token in the legacy generation field;
+   # the additive continuity_token field makes that interpretation explicit.
+   if [ -n "${openkill_shadow_continuity_token_value:-}" ]; then
+      openkill_shadow_short_hash "$1"
+   else
+      printf '%s' "$1"
+   fi
+}
+
 openkill_shadow_publish()
 {
    openkill_shadow_status_value=$1
@@ -1026,7 +1468,13 @@ openkill_shadow_publish()
       printf 'status=%s\n' "$openkill_shadow_status_value"
       printf 'old_hash=%s\n' "$(openkill_shadow_short_hash "$openkill_shadow_old_value")"
       printf 'new_hash=%s\n' "$(openkill_shadow_short_hash "$openkill_shadow_new_value")"
-      printf 'generation=%s\n' "$openkill_shadow_generation_value"
+      printf 'generation=%s\n' "$(openkill_shadow_generation_telemetry_value "$openkill_shadow_generation_value")"
+      # `generation=` remains for wire compatibility with the 3E protocol.
+      # In automatic mode it carries the short continuity token; the explicit
+      # field below makes that meaning unambiguous for new consumers.
+      if [ -n "${openkill_shadow_continuity_token_value:-}" ]; then
+         printf 'continuity_token=%s\n' "$(openkill_shadow_short_hash "$openkill_shadow_continuity_token_value")"
+      fi
       printf 'reason=%s\n' "$openkill_shadow_reason_value"
       printf 'mismatch_count=%s\n' "$openkill_shadow_mismatch_value"
    ) > "$openkill_shadow_tmp" && mv -f "$openkill_shadow_tmp" "$openkill_shadow_dir/status" || {
@@ -1037,7 +1485,7 @@ openkill_shadow_publish()
    # never applied state, and contains no addresses, domains, or credentials.
    case "$openkill_shadow_status_value" in
       MISMATCH|COMPARE_ERROR|RENDER_ERROR|INPUT_ERROR|SOURCE_DRIFT|STALE|UNSUPPORTED_CURRENT_STATE)
-         printf '%s\n' "$openkill_shadow_status_value:$openkill_shadow_old_value:$openkill_shadow_new_value:$openkill_shadow_generation_value" > "$openkill_shadow_dir/last_mismatch.tmp.$$" &&
+         printf '%s\n' "$openkill_shadow_status_value:$openkill_shadow_old_value:$openkill_shadow_new_value:$(openkill_shadow_generation_telemetry_value "$openkill_shadow_generation_value")" > "$openkill_shadow_dir/last_mismatch.tmp.$$" &&
             mv -f "$openkill_shadow_dir/last_mismatch.tmp.$$" "$openkill_shadow_dir/last_mismatch" || true
       ;;
    esac
@@ -1054,7 +1502,7 @@ openkill_shadow_log_bounded()
    openkill_shadow_log_reason=$4
    if command -v LOG_WARN >/dev/null 2>&1; then
       openkill_shadow_log_dir=${OPENKILL_NFT_SHADOW_TELEMETRY_DIR:-$OPENKILL_NFT_SHADOW_TELEMETRY_DEFAULT}
-      openkill_shadow_log_key="$openkill_shadow_log_status:$openkill_shadow_log_old:$openkill_shadow_log_new:${openkill_shadow_generation_for_log:--}"
+      openkill_shadow_log_key="$openkill_shadow_log_status:$openkill_shadow_log_old:$openkill_shadow_log_new:$(openkill_shadow_generation_telemetry_value "${openkill_shadow_generation_for_log:--}")"
       if [ -r "$openkill_shadow_log_dir/last_mismatch" ] &&
          [ "$(sed -n '1p' "$openkill_shadow_log_dir/last_mismatch" 2>/dev/null)" = "$openkill_shadow_log_key" ]; then
          return 0
@@ -1196,6 +1644,8 @@ openkill_shadow_compare_nft()
    openkill_shadow_old_hash_for_log=-
    openkill_shadow_new_hash_for_log=-
    openkill_shadow_generation_for_log=-
+   openkill_shadow_continuity_token_value=
+   openkill_shadow_auto_continuity_mode=0
    openkill_shadow_tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/openkill-shadow.XXXXXX" 2>/dev/null) || {
       openkill_shadow_publish INPUT_ERROR - - - temp-directory-failed || true
       exit "$OPENKILL_NFT_SHADOW_RC_INPUT"
@@ -1215,19 +1665,29 @@ openkill_shadow_compare_nft()
          openkill_shadow_auto_status=INPUT_SOURCE_GAP
          [ "$openkill_shadow_auto_prepare_rc" -eq "$OPENKILL_NFT_SHADOW_RC_INPUT" ] && openkill_shadow_auto_status=INPUT_ERROR
          [ "$openkill_shadow_auto_prepare_rc" -eq "$OPENKILL_NFT_SHADOW_RC_UNSUPPORTED" ] && openkill_shadow_auto_status=UNSUPPORTED_CURRENT_STATE
+         [ "$openkill_shadow_auto_prepare_rc" -eq "$OPENKILL_NFT_SHADOW_RC_STALE" ] && openkill_shadow_auto_status=STALE
+         [ "$openkill_shadow_auto_prepare_rc" -eq "$OPENKILL_NFT_SHADOW_RC_COMPARE" ] && openkill_shadow_auto_status=COMPARE_ERROR
          openkill_shadow_log_bounded "$openkill_shadow_auto_status" - - automatic-state-source || true
          openkill_shadow_publish "$openkill_shadow_auto_status" - - - automatic-state-source || true
          exit "$openkill_shadow_auto_prepare_rc"
       fi
    fi
-   openkill_shadow_generation_for_log=$(openkill_shadow_read_generation 2>/dev/null) || {
-      if [ "${openkill_shadow_auto_mode:-0}" -eq 1 ]; then
-         openkill_shadow_publish INPUT_SOURCE_GAP - - - generation-unavailable || true
+   if [ "${openkill_shadow_auto_mode:-0}" -eq 1 ] && [ "${openkill_shadow_auto_continuity_mode:-0}" -eq 1 ]; then
+      openkill_shadow_generation_for_log=${openkill_shadow_continuity_token_value:-}
+      [ -n "$openkill_shadow_generation_for_log" ] || {
+         openkill_shadow_publish INPUT_SOURCE_GAP - - - continuity-token-unavailable || true
          exit "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
-      fi
-      openkill_shadow_publish INPUT_ERROR - - - generation-unavailable || true
-      exit "$OPENKILL_NFT_SHADOW_RC_INPUT"
-   }
+      }
+   else
+      openkill_shadow_generation_for_log=$(openkill_shadow_read_generation 2>/dev/null) || {
+         if [ "${openkill_shadow_auto_mode:-0}" -eq 1 ]; then
+            openkill_shadow_publish INPUT_SOURCE_GAP - - - generation-unavailable || true
+            exit "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+         fi
+         openkill_shadow_publish INPUT_ERROR - - - generation-unavailable || true
+         exit "$OPENKILL_NFT_SHADOW_RC_INPUT"
+      }
+   fi
 
    # Do not rerun a successful comparison for an unchanged generation unless
    # an internal test explicitly requests it.  Mismatch statuses remain
@@ -1235,7 +1695,7 @@ openkill_shadow_compare_nft()
    if [ "${OPENKILL_NFT_SHADOW_FORCE:-0}" != 1 ] &&
       [ -r "$openkill_shadow_telemetry_dir/status" ] &&
       grep -Eq '^status=MATCH$' "$openkill_shadow_telemetry_dir/status" &&
-      grep -Fq "generation=$openkill_shadow_generation_for_log" "$openkill_shadow_telemetry_dir/status"; then
+       grep -Fq "generation=$(openkill_shadow_generation_telemetry_value "$openkill_shadow_generation_for_log")" "$openkill_shadow_telemetry_dir/status"; then
       exit 0
    fi
 
@@ -1394,35 +1854,56 @@ openkill_shadow_compare_nft()
       exit "$OPENKILL_NFT_SHADOW_RC_COMPARE"
    fi
 
-   openkill_shadow_generation_after=$(openkill_shadow_read_generation 2>/dev/null || true)
-   if [ -z "$openkill_shadow_generation_after" ] || [ "$openkill_shadow_generation_after" != "$openkill_shadow_generation_for_log" ]; then
-      openkill_shadow_log_bounded STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" generation-changed
-      openkill_shadow_publish STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" "$openkill_shadow_generation_for_log" generation-changed || true
-      exit "$OPENKILL_NFT_SHADOW_RC_STALE"
-   fi
-   # When an explicit canonical source supplied GENERATION, compare that
-   # source as well as the temporary G1 copy.  This closes the race where a
-   # fixture/control-plane writer changes its source after auto_prepare; a
-   # test renderer may also mutate the temporary copy to model the same race.
-   if [ "${openkill_shadow_auto_mode:-0}" -eq 1 ]; then
-      openkill_shadow_generation_source_after=
-      if [ -n "${openkill_shadow_auto_generation_source_file:-}" ]; then
-         openkill_shadow_auto_lookup_result=
-         if openkill_shadow_auto_lookup_file GENERATION "$openkill_shadow_auto_generation_source_file" >/dev/null 2>&1; then
-            openkill_shadow_generation_source_after=$openkill_shadow_auto_lookup_result
-         fi
-         if [ -z "$openkill_shadow_generation_source_after" ] || [ "$openkill_shadow_generation_source_after" != "$openkill_shadow_generation_for_log" ]; then
-            openkill_shadow_log_bounded STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" source-generation-changed
-            openkill_shadow_publish STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" "$openkill_shadow_generation_for_log" source-generation-changed || true
+   if [ "${openkill_shadow_auto_mode:-0}" -eq 1 ] && [ "${openkill_shadow_auto_continuity_mode:-0}" -eq 1 ]; then
+      # T2 is always computed from the original live paths.  The renderer and
+      # capture consumed only the private snapshot above; any committed-state
+      # change during those operations wins over a provisional MATCH.
+      openkill_shadow_continuity_t2_work=$openkill_shadow_tmp_dir/t2
+      openkill_shadow_continuity_t2_file=$openkill_shadow_tmp_dir/t2.token
+      openkill_shadow_auto_continuity_token "$openkill_shadow_continuity_t2_file" "$openkill_shadow_continuity_t2_work" \
+         "$openkill_shadow_continuity_live_desired" "$openkill_shadow_continuity_live_applied" \
+         "$openkill_shadow_continuity_live_snapshot" "$openkill_shadow_continuity_live_node4" "$openkill_shadow_continuity_live_node6" > "$openkill_shadow_tmp_dir/t2.stdout" 2>/dev/null || {
+            openkill_shadow_log_bounded STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" continuity-token-unavailable
+            openkill_shadow_publish STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" "$openkill_shadow_generation_for_log" continuity-token-unavailable || true
             exit "$OPENKILL_NFT_SHADOW_RC_STALE"
-         fi
+         }
+      openkill_shadow_continuity_t2_value=$(sed -n '1p' "$openkill_shadow_continuity_t2_file" 2>/dev/null || true)
+      if [ -z "$openkill_shadow_continuity_t2_value" ] || [ "$openkill_shadow_continuity_t2_value" != "$openkill_shadow_generation_for_log" ]; then
+         openkill_shadow_log_bounded STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" continuity-token-changed
+         openkill_shadow_publish STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" "$openkill_shadow_generation_for_log" continuity-token-changed || true
+         exit "$OPENKILL_NFT_SHADOW_RC_STALE"
       fi
-      if [ -n "${openkill_shadow_generation_file:-}" ] && [ -r "$openkill_shadow_generation_file" ]; then
-         openkill_shadow_generation_temp_after=$(sed -n '1p' "$openkill_shadow_generation_file" 2>/dev/null || true)
-         if [ -z "$openkill_shadow_generation_temp_after" ] || [ "$openkill_shadow_generation_temp_after" != "$openkill_shadow_generation_for_log" ]; then
-            openkill_shadow_log_bounded STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" temp-generation-changed
-            openkill_shadow_publish STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" "$openkill_shadow_generation_for_log" temp-generation-changed || true
-            exit "$OPENKILL_NFT_SHADOW_RC_STALE"
+   else
+      openkill_shadow_generation_after=$(openkill_shadow_read_generation 2>/dev/null || true)
+      if [ -z "$openkill_shadow_generation_after" ] || [ "$openkill_shadow_generation_after" != "$openkill_shadow_generation_for_log" ]; then
+         openkill_shadow_log_bounded STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" generation-changed
+         openkill_shadow_publish STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" "$openkill_shadow_generation_for_log" generation-changed || true
+         exit "$OPENKILL_NFT_SHADOW_RC_STALE"
+      fi
+      # When an explicit canonical source supplied GENERATION, compare that
+      # source as well as the temporary G1 copy.  This closes the race where a
+      # fixture/control-plane writer changes its source after auto_prepare; a
+      # test renderer may also mutate the temporary copy to model the same race.
+      if [ "${openkill_shadow_auto_mode:-0}" -eq 1 ]; then
+         openkill_shadow_generation_source_after=
+         if [ -n "${openkill_shadow_auto_generation_source_file:-}" ]; then
+            openkill_shadow_auto_lookup_result=
+            if openkill_shadow_auto_lookup_file GENERATION "$openkill_shadow_auto_generation_source_file" >/dev/null 2>&1; then
+               openkill_shadow_generation_source_after=$openkill_shadow_auto_lookup_result
+            fi
+            if [ -z "$openkill_shadow_generation_source_after" ] || [ "$openkill_shadow_generation_source_after" != "$openkill_shadow_generation_for_log" ]; then
+               openkill_shadow_log_bounded STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" source-generation-changed
+               openkill_shadow_publish STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" "$openkill_shadow_generation_for_log" source-generation-changed || true
+               exit "$OPENKILL_NFT_SHADOW_RC_STALE"
+            fi
+         fi
+         if [ -n "${openkill_shadow_generation_file:-}" ] && [ -r "$openkill_shadow_generation_file" ]; then
+            openkill_shadow_generation_temp_after=$(sed -n '1p' "$openkill_shadow_generation_file" 2>/dev/null || true)
+            if [ -z "$openkill_shadow_generation_temp_after" ] || [ "$openkill_shadow_generation_temp_after" != "$openkill_shadow_generation_for_log" ]; then
+               openkill_shadow_log_bounded STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" temp-generation-changed
+               openkill_shadow_publish STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" "$openkill_shadow_generation_for_log" temp-generation-changed || true
+               exit "$OPENKILL_NFT_SHADOW_RC_STALE"
+            fi
          fi
       fi
    fi

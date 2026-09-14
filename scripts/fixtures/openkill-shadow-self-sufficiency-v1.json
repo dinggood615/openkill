@@ -62,19 +62,19 @@
     },
     "acl": {
       "primary": "source:ACCESS*",
-      "fallback": "committed config-applied semantic state",
+      "fallback": "none in the current producer; applied/snapshot aliases only",
       "required": false,
       "failure": "INPUT_SOURCE_GAP"
     },
     "service_ports": {
       "primary": "source:SERVICE_PORTS/COMMON_PORTS",
-      "fallback": "committed config-applied state",
+      "fallback": "none in the current producer; applied/snapshot aliases only",
       "required": false,
       "failure": "INPUT_SOURCE_GAP"
     },
     "fake_ip_ranges": {
       "primary": "source:FAKE_IP4/FAKE_IP6",
-      "fallback": "committed config-applied state",
+      "fallback": "none in the current producer; applied/snapshot aliases only",
       "required": false,
       "failure": "INPUT_SOURCE_GAP"
     },
@@ -97,10 +97,21 @@
       "failure": "INPUT_SOURCE_GAP"
     },
     "generation": {
-      "primary": "source:GENERATION or /tmp/openkill-network-reconcile/generation",
-      "fallback": "existing applied generation",
+      "primary": "SHADOW_CONTINUITY_TOKEN_V1 derived from committed producer inputs",
+      "fallback": "none in production; explicit test fixture token only",
       "required": true,
       "failure": "STALE"
+    },
+    "continuity_token": {
+      "schema": "SHADOW_CONTINUITY_TOKEN_V1",
+      "sources": [
+        "committed desired state",
+        "committed applied state",
+        "committed native snapshot",
+        "node4/node6 desired endpoints",
+        "normalized owner/mode/router-self/ports/mark ABI/readiness values"
+      ],
+      "legacy_generation_file": "test-artifact-only; ignored by production automatic mode"
     }
   },
   "capture": {
