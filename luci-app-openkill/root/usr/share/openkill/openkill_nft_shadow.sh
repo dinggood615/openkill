@@ -680,12 +680,82 @@ openkill_shadow_parse_nft_capture()
    # This is intentionally a finite parser for the nft list forms emitted by
    # the current OpenKill inventory.  It does not claim to parse arbitrary nft
    # grammar.  Owned-chain expressions outside the known action vocabulary are
-   # surfaced as CAPTURE_UNSUPPORTED instead of being dropped.
+   # surfaced as CAPTURE_UNSUPPORTED instead of being dropped.  The three
+   # device forms accepted here are deliberately narrow: fw4's symbolic
+   # `filter -1` priority for nat_output, the current IPv4 WAN multiport
+   # reject, and its IPv6 icmpv6 port-unreachable counterpart.
    awk -v OFS='\t' '
       function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
       function owned(n) { return n == "nat_output" || n ~ /^openkill/ }
       function base(n) { return n == "dstnat" || n == "mangle_prerouting" || n == "mangle_output" || n == "output" || n == "srcnat" || n == "input" || n == "forward" }
-      function known_rule(s) {
+      function valid_port_list(v, n, i, p) {
+         v=trim(v)
+         # A service multiport is a mathematical set.  Keep the accepted
+         # grammar finite so malformed commas and non-port expressions fail
+         # closed instead of being mistaken for a generic reject rule.
+         if (v !~ /^[0-9]+([[:space:]]*,[[:space:]]*[0-9]+)*$/) return 0
+         n=split(v, p, /[[:space:]]*,[[:space:]]*/)
+         for (i=1; i<=n; i++) if (p[i] !~ /^[0-9]+$/ || (p[i]+0) < 1 || (p[i]+0) > 65535) return 0
+         return n > 0
+      }
+      function valid_multiport(s, expr, body) {
+         if (!match(s, /(^|[[:space:]])(th|tcp|udp)[[:space:]]+dport[[:space:]]*\{[^{}]*\}/)) return 0
+         expr=substr(s, RSTART, RLENGTH)
+         body=expr
+         sub(/^.*\{/, "", body)
+         sub(/\}.*$/, "", body)
+         return valid_port_list(body)
+      }
+      function canonicalize_multiport(s, expr, body, prefix, n, i, j, v, t, joined) {
+         # Canonicalize only a validated numeric dport set.  Other finite nft
+         # forms (named sets, ranges, concatenations) remain untouched and are
+         # judged by known_rule as before.
+         if (match(s, /(^|[[:space:]])(th|tcp|udp)[[:space:]]+dport[[:space:]]*\{[^{}]*\}/)) {
+            expr=substr(s, RSTART, RLENGTH)
+            body=expr
+            sub(/^.*\{/, "", body)
+            sub(/\}.*$/, "", body)
+            if (!valid_port_list(body)) return s
+            n=split(trim(body), p, /[[:space:]]*,[[:space:]]*/)
+            for (i=1; i<=n; i++) {
+               v=p[i]+0
+               j=i
+               while (j > 1 && (p[j-1]+0) > v) { p[j]=p[j-1]; j-- }
+               p[j]=v
+            }
+            # Deduplicate after numeric insertion sort.
+            joined=""
+            last=""
+            for (i=1; i<=n; i++) if (p[i] != last) { if (joined != "") joined=joined ", "; joined=joined p[i]; last=p[i] }
+            prefix=expr
+            sub(/[[:space:]]*\{[^{}]*\}$/, "", prefix)
+            s=substr(s, 1, RSTART-1) prefix " { " joined " }" substr(s, RSTART+RLENGTH)
+         }
+         return s
+      }
+      function valid_ipv6_proto_set(s) {
+         return s ~ /(^|[[:space:]])ip6[[:space:]]+nexthdr[[:space:]]*\{[[:space:]]*(tcp[[:space:]]*,[[:space:]]*udp|udp[[:space:]]*,[[:space:]]*tcp)[[:space:]]*\}/
+      }
+      function known_reject(s, chain) {
+         if (!valid_multiport(s)) return 0
+         if (chain == "openkill_wan_input") {
+            # The frozen v4 inventory has no IPv6 qualifier.  Rejecting an
+            # ip6/meta-ipv6 expression here prevents a family collapse from
+            # being accepted simply because the terminal verdict is `reject`.
+            if (s ~ /(^|[[:space:]])ip6([[:space:]]|$)/ ||
+                s ~ /(^|[[:space:]])meta[[:space:]]+nfproto[[:space:]]+ipv6([[:space:]]|$)/ ||
+                s ~ /(^|[[:space:]])meta[[:space:]]+l4proto[[:space:]]+sctp([[:space:]]|$)/) return 0
+            return s ~ /(^|[[:space:]])reject[[:space:]]*$/ && s !~ /reject[[:space:]]+with/
+         }
+         if (chain == "openkill_wan6_input")
+            return valid_ipv6_proto_set(s) && s ~ /(^|[[:space:]])reject[[:space:]]+with[[:space:]]+icmpv6[[:space:]]+port-unreachable[[:space:]]*$/
+         return 0
+      }
+      function known_rule(s, chain) {
+         # Reject forms must be decided before the older counter vocabulary;
+         # this prevents an unsupported reject subtype or malformed multiport
+         # from being accepted merely because it contains a counter/match.
+         if (s ~ /(^|[[:space:]])reject([[:space:]]|$)/) return known_reject(s, chain)
          return s ~ /(^|[[:space:]])return([[:space:]]|$)/ ||
                 s ~ /(^|[[:space:]])jump[[:space:]]+openkill[_A-Za-z0-9]*([[:space:]]|$)/ ||
                 s ~ /meta[[:space:]]+mark[[:space:]]+set[[:space:]]+0x[0-9A-Fa-f]+/ ||
@@ -695,11 +765,26 @@ openkill_shadow_parse_nft_capture()
                 (s ~ /(^|[[:space:]])counter([[:space:]]|$)/ &&
                  s ~ /(meta[[:space:]]|ip[46]?[[:space:]]|tcp[[:space:]]|udp[[:space:]]|ether[[:space:]]|iifname[[:space:]]|oifname[[:space:]])/)
       }
+      function valid_hook_declaration(s, chain, p) {
+         s=trim(s)
+         hook_priority=""
+         # `filter - 1`, `filter -1`, `filter-1`, and numeric `-1` are the
+         # only accepted spellings of the current output hook.  Policy is
+         # validated when present; accept is the nft default and remains
+         # represented by the existing V1 HOOK record.
+         if (chain != "nat_output") return 0
+         if (s ~ /^type[[:space:]]+nat[[:space:]]+hook[[:space:]]+output[[:space:]]+priority[[:space:]]+(filter[[:space:]]*-[[:space:]]*1|-[[:space:]]*1)[[:space:]]*;([[:space:]]*policy[[:space:]]+accept[[:space:]]*;?)?[[:space:]]*$/) {
+            hook_priority="-1"
+            return 1
+         }
+         return 0
+      }
       function clean_rule(s) {
          s=trim(s)
          sub(/[[:space:]]+#?[[:space:]]*handle[[:space:]]+[0-9]+[[:space:]]*$/, "", s)
          sub(/[[:space:]]+counter[[:space:]]+packets[[:space:]]+[0-9]+[[:space:]]+bytes[[:space:]]+[0-9]+/, "", s)
          sub(/[[:space:]]+comment[[:space:]]+"[^"]*"/, "", s)
+         s=canonicalize_multiport(s)
          return trim(s)
       }
       function finish_set(  body,name,type,flags,elems,x,n,i,v) {
@@ -732,23 +817,34 @@ openkill_shadow_parse_nft_capture()
          if (line ~ /^chain[[:space:]]/) {
             # Preserve the one currently-owned hooked chain declaration.  FW4
             # base-chain declarations are never captured as owned objects.
-            if (owned(chain) && match(line, /type[[:space:]]+nat[[:space:]]+hook[[:space:]]+output[[:space:]]+priority[[:space:]]+-?[0-9]+/)) {
-               openkill_hook=substr(line, RSTART, RLENGTH)
-               sub(/^.*priority[[:space:]]+/, "", openkill_hook)
-               print "HOOK", chain, "nat", "output", openkill_hook
+            if (owned(chain)) {
+               openkill_declaration=line
+               sub(/^.*\{[[:space:]]*/, "", openkill_declaration)
+               sub(/[[:space:]]*\}[[:space:]]*$/, "", openkill_declaration)
+               if (openkill_declaration ~ /^type[[:space:]]+nat[[:space:]]+hook/) {
+                  if (valid_hook_declaration(openkill_declaration, chain)) {
+                     print "HOOK", chain, "nat", "output", hook_priority
+                  } else {
+                     print "UNKNOWN_OWNED_RULE", chain, openkill_declaration
+                     unknown=1
+                  }
+               }
             }
             next
          }
-         if (owned(chain) && match(line, /^type[[:space:]]+nat[[:space:]]+hook[[:space:]]+output[[:space:]]+priority[[:space:]]+-?[0-9]+/)) {
-            openkill_hook=substr(line, RSTART, RLENGTH)
-            sub(/^.*priority[[:space:]]+/, "", openkill_hook)
-            print "HOOK", chain, "nat", "output", openkill_hook
+         if (owned(chain) && line ~ /^type[[:space:]]+nat[[:space:]]+hook/) {
+            if (valid_hook_declaration(line, chain)) {
+               print "HOOK", chain, "nat", "output", hook_priority
+            } else {
+               print "UNKNOWN_OWNED_RULE", chain, line
+               unknown=1
+            }
             next
          }
          line=clean_rule(line)
          if (line == "") next
          if (base(chain) && line !~ /(^|[[:space:]])jump[[:space:]]+openkill[_A-Za-z0-9]*/) next
-         if (owned(chain) && !known_rule(line)) { print "UNKNOWN_OWNED_RULE", chain, line; unknown=1; next }
+         if (owned(chain) && !known_rule(line, chain)) { print "UNKNOWN_OWNED_RULE", chain, line; unknown=1; next }
          order++
          print "RULE", chain, order, line
          if (base(chain) && line ~ /(^|[[:space:]])jump[[:space:]]+openkill[_A-Za-z0-9]*/) print "ATTACH", chain, order, line

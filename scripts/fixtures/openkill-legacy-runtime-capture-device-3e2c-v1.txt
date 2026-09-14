@@ -1,0 +1,61 @@
+LEGACY_RUNTIME_CAPTURE_V1=1
+# DEVICE_CAPTURE_FIXTURE_SOURCE=192.168.1.102_PHASE_3E2C
+# Sanitized: no private addresses, MACs, node endpoints, or credentials.
+OBJECT	chain	nat_output
+table inet fw4 {
+ chain nat_output {
+  type nat hook output priority filter -1; policy accept;
+  meta nfproto ipv4 ip protocol tcp jump openkill_output comment "device nat output" handle 10
+  meta nfproto ipv6 jump openkill_output_v6 counter packets 4 bytes 320 handle 11
+ }
+}
+OBJECT_END
+OBJECT	chain	dstnat
+table inet fw4 {
+ chain dstnat {
+  ip daddr 192.0.2.1 return comment "foreign fw4 rule" handle 20
+  jump openkill_dns_redirect counter packets 0 bytes 0 handle 21
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_output
+table inet fw4 {
+ chain openkill_output {
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_output_v6
+table inet fw4 {
+ chain openkill_output_v6 {
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_dns_redirect
+table inet fw4 {
+ chain openkill_dns_redirect {
+  tcp dport 53 redirect to :7874 comment "OpenKill DNS" handle 30
+  udp dport 53 redirect to :7874 counter packets 0 bytes 0 handle 31
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_wan_input
+table inet fw4 {
+ chain openkill_wan_input {
+  th dport { 7893, 7892, 7891, 7890, 7874, 7895, 9090 } counter packets 0 bytes 0 reject comment "OpenKill WAN v4" handle 40
+ }
+}
+OBJECT_END
+OBJECT	chain	openkill_wan6_input
+table inet fw4 {
+ chain openkill_wan6_input {
+  ip6 nexthdr { tcp, udp } th dport { 7893, 7892, 7891, 7890, 7874, 7895, 9090 } counter packets 0 bytes 0 reject with icmpv6 port-unreachable comment "OpenKill WAN v6" handle 41
+ }
+}
+OBJECT_END
+OBJECT	set	openkill_service_ports
+table inet fw4 {
+ set openkill_service_ports {
+  type inet_service; flags interval; elements = { 7893, 7892, 53, 7892 };
+ }
+}
+OBJECT_END

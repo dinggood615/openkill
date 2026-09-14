@@ -177,7 +177,14 @@ def _run_shell(input_text: str, *, timeout: int = 60) -> Tuple[int, str, str]:
             _wsl_path(RENDERER),
             _wsl_path(input_path),
         ]
-        proc = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+        # WSL on Windows may emit a UTF-16 diagnostic on stderr before the
+        # child process starts.  Decode explicitly and replace that launcher
+        # noise so the renderer result, which is UTF-8/ASCII, remains testable
+        # on hosts whose locale is GBK.
+        proc = subprocess.run(
+            command, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", timeout=timeout,
+        )
         return proc.returncode, proc.stdout, proc.stderr
 
 
@@ -226,6 +233,8 @@ def _run_shell_batch(inputs: Mapping[str, str], *, timeout: int = 180) -> Dict[s
             ["wsl.exe", "-u", "root", "--", "sh", _wsl_path(runner)],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
         )
         result: Dict[str, Tuple[int, str, str]] = {}
@@ -267,6 +276,8 @@ def _nft_check(text: str, ir: Mapping[str, Any]) -> Tuple[int, str]:
             ["wsl.exe", "-u", "root", "--", "nft", "-c", "-f", _wsl_path(path)],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=60,
         )
         return proc.returncode, (proc.stderr or proc.stdout).strip()
@@ -295,6 +306,8 @@ class ShellRendererTests(unittest.TestCase):
             ["wsl.exe", "-u", "root", "--", "sh", "-n", _wsl_path(RENDERER)],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=30,
         )
         self.assertEqual(proc.returncode, 0, proc.stderr)
@@ -303,6 +316,8 @@ class ShellRendererTests(unittest.TestCase):
                 ["wsl.exe", "-u", "root", "--", "command", "-v", applet],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=30,
             )
             self.assertEqual(check.returncode, 0, applet)
@@ -503,6 +518,8 @@ class ShellRendererTests(unittest.TestCase):
                 ["wsl.exe", "-u", "root", "--", "sh", _wsl_path(runner)],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=180,
             )
             self.assertEqual(proc.returncode, 0, proc.stderr)
