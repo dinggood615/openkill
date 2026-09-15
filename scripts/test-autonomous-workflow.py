@@ -2,6 +2,9 @@
 """Regression tests for the autonomous workflow migration contract."""
 from pathlib import Path
 import re
+import os
+import subprocess
+import tempfile
 import unittest
 
 
@@ -54,6 +57,26 @@ class AutonomousWorkflowTests(unittest.TestCase):
         self.assertIn("Require explicit release gate", source)
         self.assertIn("check-version-bump.sh", source)
         self.assertIn("inputs.release_gate == true && inputs.publish == true", source)
+        self.assertNotIn("prune-published-packages.sh", source)
+
+    def test_missing_release_notes_fail_before_external_commands(self):
+        with tempfile.TemporaryDirectory() as directory:
+            env = dict(os.environ, RELEASE_VERSION="9999-9999", PACKAGE_FORMAT="ipk",
+                       GITHUB_REPOSITORY="fixture/fixture", GITHUB_SHA="fixture")
+            command = ["bash", str(ROOT / "scripts/publish-package.sh")]
+            if os.name == "nt":
+                script = (ROOT / "scripts/publish-package.sh").as_posix()
+                script = "/mnt/" + script[0].lower() + script[2:]
+                temp_path = Path(directory).as_posix()
+                temp_path = "/mnt/" + temp_path[0].lower() + temp_path[2:]
+                command = ["wsl.exe", "--cd", temp_path, "--exec", "env", "RELEASE_VERSION=9999-9999", "PACKAGE_FORMAT=ipk",
+                           "GITHUB_REPOSITORY=fixture/fixture", "GITHUB_SHA=fixture", "bash", script]
+            result = subprocess.run(command,
+                                    cwd=ROOT if os.name == "nt" else directory,
+                                    env=env, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Missing reviewed release notes", result.stderr)
+            self.assertEqual(list(Path(directory).iterdir()), [])
 
     def test_version_metadata_is_consistent(self):
         makefile = self.read("luci-app-openkill/Makefile")

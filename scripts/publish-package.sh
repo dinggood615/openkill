@@ -6,6 +6,9 @@ case "$RELEASE_VERSION" in
   *) echo "Invalid release version (expected YYYY-NNNN): $RELEASE_VERSION" >&2; exit 1 ;;
 esac
 case "$PACKAGE_FORMAT" in ipk|apk) ;; *) exit 1;; esac
+# Require reviewed, version-specific notes before any GitHub mutation.
+notes_file="$(pwd)/docs/release/notes/$RELEASE_VERSION.md"
+[ -s "$notes_file" ] || { echo "Missing reviewed release notes: $notes_file" >&2; exit 1; }
 mapfile -t packages < <(find tmp/SDK/bin -type f -name "luci-app-openkill*.$PACKAGE_FORMAT")
 [ "${#packages[@]}" -eq 1 ] || { echo "Expected exactly one package"; exit 1; }
 # APK's package database requires dotted numeric versions; keep the public
@@ -44,7 +47,7 @@ elif grep -Eq 'HTTP 404' "$release_error"; then
     echo "Could not determine whether tag $tag exists." >&2
     exit 1
   fi
-  gh release create "$tag" "$stage/$asset" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest=false --title "OpenKill $RELEASE_VERSION ($PACKAGE_FORMAT)" --notes "Source: $GITHUB_SHA. Independently verified $PACKAGE_FORMAT build."
+  gh release create "$tag" "$stage/$asset" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --latest=false --title "OpenKill $RELEASE_VERSION ($PACKAGE_FORMAT)" --notes-file "$notes_file"
 else
   cat "$release_error" >&2
   echo "Could not determine whether release $tag exists." >&2

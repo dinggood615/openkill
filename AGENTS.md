@@ -43,5 +43,9 @@ instead of hiding them in tests or adding ad-hoc equivalence rules.
   change/publication required). Record the reason and exact resume condition.
   Ordinary test failures are repair work, not human blockers. Do not invent
   product scope to avoid a legitimate gate.
-- This activation forbids device access, version changes and publication.
-  Historical device approvals do not authorize this execution.
+- The user has authorized local delivery and a GitHub release after local
+  and exact-commit CI gates pass. RELEASE_GATE may advance the version and
+  dispatch the formal workflow without asking again. Preserve existing tags
+  and releases; disclose unverified device behavior in versioned release notes.
+- Device access, CENTRAL_ACTIVE and packet-path testing remain forbidden.
+  Defer device-dependent work and continue independent local delivery tasks.

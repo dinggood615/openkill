@@ -68,6 +68,11 @@ jobs:
           esac
           echo "version=$version" >> $GITHUB_OUTPUT
 
+      - name: Require reviewed version-specific release notes
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: test -s "docs/release/notes/$RELEASE_VERSION.md"
+
       - name: Current Published Version
         id: current_version
         shell: bash
@@ -358,16 +363,3 @@ jobs:
           RELEASE_VERSION: ${{ needs.Get-Version.outputs.version }}
           PACKAGE_FORMAT: ${{ matrix.target.name }}
         run: bash scripts/publish-package.sh
-
-  Prune-Old-Releases:
-    runs-on: ubuntu-latest
-    needs: [Compile, Get-Version]
-    if: ${{ success() && inputs.release_gate == true && inputs.publish == true }}
-    steps:
-      - name: Checkout OpenKill Source
-        uses: actions/checkout@v6
-      - name: Remove older published versions
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          RELEASE_VERSION: ${{ needs.Get-Version.outputs.version }}
-        run: bash scripts/prune-published-packages.sh

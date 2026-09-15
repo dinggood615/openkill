@@ -9,7 +9,9 @@ Release is an explicit, reviewable operation.
 4. Dispatch `OpenKill Formal Release` with `release_gate=true` and
    `publish=true`.
 5. Require the version-bump check, runtime compatibility matrix, package
-   audit, artifact upload, publication, and release pruning to pass.
+   audit, artifact upload and publication to pass. Preserve existing releases
+   and tags. Version-specific notes under `docs/release/notes/` are mandatory
+   and must disclose device verification gaps before publication.
 6. Verify the published IPK and package-channel metadata, then record the
    release tag and digest in the execution plan.
 

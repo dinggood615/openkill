@@ -1,3 +1,41 @@
+# Current execution plan: authorized local delivery and GitHub release
+
+## Current authorization and acceptance
+
+The user authorized continuing unfinished local development through an explicit
+RELEASE_GATE and GitHub publication. This supersedes the historical stop at
+RELEASE_GATE below. Devices remain forbidden. Do not enable CENTRAL_ACTIVE,
+apply central output, run packet tests, force push, delete tags/releases, or
+overwrite unknown work. Device-dependent product work is deferred, not passed.
+
+Observed starting HEAD: de9e27b09436e8441c6668e73d391d12e320df02; clean master.
+Exact-commit Development CI passed: run 34977615717.
+
+## Bounded delivery work
+
+1. Audit post-D2C contracts and release transport. D2C local DNS reconciliation
+   is already implemented; do not invent another DNS behavior change.
+2. Fix release transport: preserve existing releases/tags and require reviewed
+   version-specific notes before publication. Test missing-note failure before
+   any external mutation and retained manual release gates.
+3. Run the full local fixture matrix with supported Windows/WSL entry points,
+   the local gate, and exact-commit Development CI; repair failures.
+4. At RELEASE_GATE, select the next unused source version, update the three
+   version authorities, and disclose unverified device behavior in notes.
+5. Commit/push, verify exact-commit CI, explicitly dispatch the formal IPK
+   release, verify downloaded asset SHA256 and package channel source identity.
+6. Record outcome and stop after verified delivery. No automatic Phase 4.
+
+## Remaining device-only gaps
+
+Post-D2C actual-device semantic parity remains PENDING. Local frozen fixtures
+cannot close it. TUN BC-04 remains the documented CURRENT behavior; Access
+and TPROXY device coverage remain NOT_OBSERVED. REAL_PACKET_PATH=NOT_TESTED.
+The release retains legacy writer authority and default-off shadow. These
+limitations are mandatory release notes, not evidence of device readiness.
+
+## Historical checkpoints (authorization below has been superseded)
+
 # Current execution plan: post-D2C autonomous activation
 
 ## Active checkpoint
@@ -16,8 +54,8 @@
 - Baseline Development CI: PASS, run 34974224074 for the observed hash.
 - Branch protection: absent (GitHub API); this executor must enforce gates
   before pushing. Repository-side enforcement remains a known limitation.
-- Version frozen: `2026-1127`. No device access, release dispatch or Phase 4
-  writer handoff is authorized.
+- Version before this release gate: `2026-1127`; the authorized release candidate
+  is `2026-1128`. No device access or Phase 4 writer handoff is authorized.
 
 ## Next autonomous action
 
