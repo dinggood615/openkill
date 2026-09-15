@@ -1183,10 +1183,14 @@ INTERNAL_IPV6_PREFIXES=2001:db8:a::/60 2001:db8:b::/64 2001:db8:c::/64
             fake.mkdir()
             (fake / "getent").write_text("#!/bin/sh\ncase \"$1\" in ahostsv4) echo '192.0.2.2 STREAM node';; ahostsv6) echo '2001:db8::2 STREAM node';; esac\n", encoding="utf-8")
             (fake / "timeout").write_text("#!/bin/sh\nshift; exec \"$@\"\n", encoding="utf-8")
-            for name in ("getent", "timeout"):
+            # Exercise getent fallback without consulting runner DNS or network.
+            for name in ("nslookup", "resolveip"):
+                (fake / name).write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+            for name in ("getent", "timeout", "nslookup", "resolveip"):
                 (fake / name).chmod(0o755)
             env = os.environ.copy()
             env["PATH"] = f"{fake}:{env['PATH']}"
+            env["OPENKILL_NODE_DNS_SERVERS"] = "192.0.2.53"
             subprocess.run(["sh", "-c", f'. "{HELPER}"; openkill_refresh_node_endpoints "$1" "$2" "$3" "$4" "$5"', "model", str(static4), str(static6), str(domains), str(applied4), str(applied6)], check=True, env=env)
             self.assertEqual(applied4.read_text().strip(), "192.0.2.2")
             self.assertEqual(applied6.read_text().strip(), "2001:db8::2")

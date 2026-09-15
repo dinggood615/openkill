@@ -126,3 +126,12 @@ or republish it.
   check-only nft matrix. Neither result is live-device validation.
 - Workflow/source gate and diff whitespace review passed. Source version
   remains 2026-1127. Commit/push and exact-commit CI verification are next.
+
+## CI repair iteration
+
+Activation commit `ee282e36b59b26df778c26ae38757ca8b71bc341` reached CI
+run 34977232002. Its new network suite exposed a fixture dependency on the
+runner's DNS servers. The repair supplies a documentation-range resolver and
+stubs nslookup/resolveip so the existing getent fallback and timeout-preserves-
+old-state assertions run deterministically without live DNS. This changes
+only the test environment. Exact-commit CI must pass before gate closure.
