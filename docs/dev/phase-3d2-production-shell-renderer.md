@@ -23,6 +23,15 @@ versions, TARGET, UNKNOWN owner, malformed records, unresolved explicit policy,
 modern ACCESS_DENY, and other unsupported CURRENT states fail closed before
 any output is emitted.  No development fallback port is applied.
 
+Before parsing the already bounded line-oriented input, the renderer performs
+a byte preflight with `od -An -v -tx1` and rejects an actual `00` byte.  The
+`-v` keeps `od` from folding repeated blocks, so every input byte is checked.
+The text grammar is then checked with portable awk; it does not use awk `\xNN`
+character escapes, whose meaning is not portable across BusyBox releases.
+This keeps literal text such as the four characters `\x00` distinct from a
+binary NUL while preserving the existing structural and ABI fail-closed
+checks.  The preflight never stores input bytes in a shell variable.
+
 The emitted batch references the external `inet fw4` table and existing fw4
 base chains.  It declares only OpenKill-owned child chains and sets, emits
 stable attachment/rule order, and contains no table/ruleset flush, delete,
@@ -46,6 +55,12 @@ injection and unsupported-action handling, checks deterministic output and
 component-local diffs, and runs every unique supported payload through local
 `nft -c -f` only.  The Python implementation remains the CI/reference oracle;
 no Python runtime dependency is added to OpenWrt.
+
+`scripts/test-busybox-renderer-compatibility.py` is the focused portability
+regression.  It forces BusyBox `awk`, `od`, `sed`, and `sort`, preserves a
+pre-fix host-output golden comparison, rejects real NUL bytes at each input
+boundary, treats literal `\x00` text according to the existing grammar, and
+checks that malformed ABI values reach the original ABI guard.
 
 This phase adds a production-capable package file while keeping
 `PRODUCTION_RENDERER_CALLSITES=0`, `PRODUCTION_RUNTIME_BEHAVIOR_CHANGED=NO`,

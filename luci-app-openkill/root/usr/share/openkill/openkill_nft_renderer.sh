@@ -230,10 +230,37 @@ okr_validate_action()
 	return 0
 }
 
+okr_input_has_nul_byte()
+{
+	# Do not put input bytes in a shell variable.  `od` emits only printable
+	# hex tokens, and the small awk filter below therefore remains safe on
+	# BusyBox ash as well as host awk.  The marker makes an od failure
+	# distinguishable from a clean file without relying on pipefail.
+	okr_nul_input=$1
+	{
+		od -An -v -tx1 "$okr_nul_input" 2>/dev/null || printf '%s\n' OPENKILL_OD_ERROR
+	} | awk '
+		$0 == "OPENKILL_OD_ERROR" { failed=1; next }
+		{ for (i=1; i<=NF; i++) if ($i == "00") found=1 }
+		END {
+			if (failed) exit 2
+			if (found) exit 0
+			exit 1
+		}
+	'
+}
+
 okr_validate_input()
 {
 	OKR_INPUT=$1
 	[ -r "$OKR_INPUT" ] || okr_die 64 'input is not readable'
+	okr_input_has_nul_byte "$OKR_INPUT"
+	okr_nul_status=$?
+	case "$okr_nul_status" in
+		0) okr_die 64 'malformed input record' ;;
+		1) ;;
+		*) okr_die 64 'cannot scan input bytes' ;;
+	esac
 	okr_header=$(sed -n '1p' "$OKR_INPUT") || okr_die 64 'cannot read input header'
 	[ "$okr_header" = "SHELL_RENDERER_INPUT_V1${OKR_TAB}1" ] || okr_die 66 'input version mismatch'
 
@@ -308,7 +335,7 @@ EOF
 		}
 		NR == 1 { next }
 		{
-			if ($0 ~ /\r/ || $0 ~ /\x00/ || index($0, "|") > 0) bad=1
+			if ($0 ~ /\r/ || index($0, "|") > 0) bad=1
 			if ($1 == "META") { if (NF != 3 || !allowed_meta[$2] || seen_meta[$2]++) bad=1; next }
 			if ($1 == "CHAIN" && NF != 10) bad=1
 			else if ($1 == "SET" && NF != 8) bad=1
