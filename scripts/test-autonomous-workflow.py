@@ -31,10 +31,16 @@ class AutonomousWorkflowTests(unittest.TestCase):
         self.assertIn("  pull_request:", source)
         self.assertNotIn("publish-package.sh", source)
         self.assertNotIn("release_gate", source)
+        self.assertIn("  contents: read", source)
+        self.assertNotIn("contents: write", source)
+        self.assertIn("sh scripts/local-gate.sh", source)
+        self.assertIn("autonomous-workflow", source)
 
     def test_rc_build_is_manual_and_never_publishes(self):
         source = self.read(".github/workflows/build-openkill.yml")
         self.assertIn("name: OpenKill RC Build", source)
+        self.assertNotRegex(source, r"(?m)^  (push|pull_request|schedule|workflow_run):")
+        self.assertIn("  contents: read", source)
         self.assertIn("  workflow_dispatch:", source)
         self.assertNotIn("publish-package.sh", source)
 

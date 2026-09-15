@@ -1,8 +1,8 @@
 name: OpenKill RC Build (OpenWrt SDK Audit)
 
 on:
-  # This is an opt-in SDK audit build. The release workflow owns master pushes
-  # and already performs the package build required for publication.
+  # This is an opt-in, artifact-only SDK audit build. Development owns
+  # ordinary pushes; only the separate manual formal gate may publish.
   workflow_dispatch:
 
 permissions:

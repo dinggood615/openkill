@@ -24,7 +24,23 @@ class StageD(unittest.TestCase):
             self.assertIn('add element inet fw4 openkill_node4 { 203.0.113.1 }', text)
             self.assertNotIn('flush ruleset', text)
             self.assertNotIn('flush table inet fw4', text)
-            self.assertEqual(run('openkill_validate_nft_batch', out), '')
+            # Use a record-only CLI: this fixture has no host fw4 tables.
+            stub = p / 'nft'
+            calls = p / 'nft-calls'
+            stub.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$NFT_CALLS"\nexit "${NFT_EXIT:-0}"\n')
+            stub.chmod(0o755)
+            env = dict(os.environ, PATH=str(p) + os.pathsep + os.environ['PATH'],
+                       NFT_CALLS=str(calls), OPENKILL_NFT_VALIDATE='1')
+            self.assertEqual(run('openkill_validate_nft_batch', out, env=env), '')
+            self.assertEqual(calls.read_text().splitlines(), ['-c', '-f', str(out)])
+            with self.assertRaises(subprocess.CalledProcessError):
+                run('openkill_validate_nft_batch', out, env=dict(env, NFT_EXIT='1'))
+            for forbidden in ('flush ruleset', 'flush table inet fw4', 'delete table inet fw4'):
+                calls.unlink(missing_ok=True)
+                out.write_text(forbidden + '\n')
+                with self.assertRaises(subprocess.CalledProcessError):
+                    run('openkill_validate_nft_batch', out, env=env)
+                self.assertFalse(calls.exists(), 'unsafe batch must fail before CLI invocation')
 
     def test_dynamic_set_batch_is_stable_and_scoped(self):
         with tempfile.TemporaryDirectory() as d:

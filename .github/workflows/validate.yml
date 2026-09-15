@@ -15,9 +15,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Validate shell, YAML and version metadata
+      - name: Validate local and workflow gates
         shell: bash
-        run: sh scripts/validate-openkill.sh
+        run: sh scripts/local-gate.sh
+      - name: Local semantic and autonomy contracts
+        shell: bash
+        run: |
+          set -eu
+          for suite in autonomous-workflow classifier-contract dataplane-semantic-spec nft-ir shadow-context-adapter shadow-semantic-model dns-current-intent network-model snapshot-fw4 stage-d; do
+            python3 "scripts/test-${suite}.py"
+          done
 
   runtime:
     name: Runtime and compatibility matrix
