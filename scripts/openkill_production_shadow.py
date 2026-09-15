@@ -32,6 +32,20 @@ from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional,
 from openkill_nft_ir import render_context, render_state
 from openkill_nft_syntax import UnsupportedNftAction, lower_nft_ir, render_nft
 from openkill_shadow_adapter import adapt, normalize_state, shadow_compare, validate_intent_fixture
+from openkill_shadow_semantic_model import (
+    COMPONENTS as SEMANTIC_COMPONENTS,
+    DNS_FIELDS,
+    OWNERSHIP_CLASSES,
+    SEMANTIC_MODEL_SCHEMA,
+    SemanticModelError,
+    build_dns_fields_from_intent,
+    build_dns_semantic_intent,
+    build_semantic_projection,
+    classify_object_ownership,
+    compare_dns_semantics,
+    compare_semantic_intents,
+    semantic_hash,
+)
 
 
 PHASE_3C_SCHEMA = "OPENKILL_PRODUCTION_SHADOW_V1"
@@ -119,6 +133,32 @@ MISMATCH_CLASSES = frozenset(
 
 class ProductionShadowError(RuntimeError):
     """A fail-closed production-source or harness error."""
+
+
+def compare_current_semantic_intents(
+    actual: Mapping[str, Any],
+    desired: Mapping[str, Any],
+    *,
+    mode: str = "TUN",
+    formal_inventory: Any = None,
+    dns_actual: Optional[Mapping[str, Any]] = None,
+    dns_desired: Optional[Mapping[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Run the D2B ownership-aware CURRENT semantic comparison.
+
+    This thin development-only adapter keeps the production-shadow module's
+    public entry point stable while the model itself remains isolated from
+    the device coordinator, parser, renderer, and writer paths.
+    """
+
+    return compare_semantic_intents(
+        actual,
+        desired,
+        mode=mode,
+        formal_inventory=formal_inventory,
+        dns_actual=dns_actual,
+        dns_desired=dns_desired,
+    )
 
 
 def _repo_root(root: Optional[pathlib.Path] = None) -> pathlib.Path:
@@ -2368,6 +2408,19 @@ def run_shadow_comparison(
 
 __all__ = [
     "COMMAND_ALLOWLIST",
+    "SEMANTIC_COMPONENTS",
+    "DNS_FIELDS",
+    "OWNERSHIP_CLASSES",
+    "SEMANTIC_MODEL_SCHEMA",
+    "SemanticModelError",
+    "build_dns_fields_from_intent",
+    "build_dns_semantic_intent",
+    "build_semantic_projection",
+    "classify_object_ownership",
+    "compare_dns_semantics",
+    "compare_semantic_intents",
+    "compare_current_semantic_intents",
+    "semantic_hash",
     "CURRENT_PROFILE",
     "FUNCTION_SOURCES",
     "MISMATCH_CLASSES",

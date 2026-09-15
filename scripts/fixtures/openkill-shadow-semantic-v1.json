@@ -1,0 +1,244 @@
+{
+  "schema": "OPENKILL_SHADOW_SEMANTIC_FIXTURE_V1",
+  "source": "sanitized frozen .102 observation and CURRENT renderer contract",
+  "mode": "TUN",
+  "frozen_device_evidence": {
+    "actual_observation_hash": "4980fcafaf9a10fc404c479f9365d2127648c050ba853560992ebcf1181570db",
+    "central_observation_hash": "5a75bf202244c2b2baa1af66088e2776fccb4ec4519911be736e47254ab4fa26",
+    "continuity_short_hash": "e7f4fc26650a",
+    "stable_mismatch_cycles": 5,
+    "dns_previous_status": "COMPARATOR_MODEL_GAP",
+    "wan_safety": ["legacy input attachments", "openkill_wan_input", "openkill_wan6_input"],
+    "bounded_capture": {
+      "chain_probes": 25,
+      "set_probes": 23,
+      "required_current_missing": 0,
+      "conditional_or_inventory_missing": 24
+    }
+  },
+  "formal_inventory": [
+    {
+      "logical_id": "CURRENT_LOCAL_CHAIN",
+      "physical_name": "openkill_local",
+      "component": "LOCAL",
+      "ownership_class": "CURRENT_OWNED"
+    },
+    {
+      "logical_id": "LEGACY_WAN_INPUT_V4",
+      "physical_name": "openkill_wan_input",
+      "component": "WAN_INPUT",
+      "ownership_class": "LEGACY_ONLY_SAFETY"
+    },
+    {
+      "logical_id": "LEGACY_WAN_INPUT_V6",
+      "physical_name": "openkill_wan6_input",
+      "component": "WAN_INPUT",
+      "ownership_class": "LEGACY_ONLY_SAFETY"
+    },
+    {
+      "logical_id": "LEGACY_WAN_ATTACHMENT_V4",
+      "physical_name": "fw4_input_to_openkill_wan_input",
+      "object_type": "attachment",
+      "component": "WAN_INPUT",
+      "ownership_class": "LEGACY_ONLY_SAFETY"
+    },
+    {
+      "logical_id": "LEGACY_WAN_ATTACHMENT_V6",
+      "physical_name": "fw4_input6_to_openkill_wan6_input",
+      "object_type": "attachment",
+      "component": "WAN_INPUT",
+      "ownership_class": "LEGACY_ONLY_SAFETY"
+    },
+    {
+      "logical_id": "TPROXY_ONLY_RULE",
+      "physical_name": "openkill_tproxy_only",
+      "component": "BACKEND",
+      "ownership_class": "CONDITIONAL_CURRENT",
+      "active_modes": ["TPROXY"],
+      "required_modes": ["TPROXY"]
+    },
+    {
+      "logical_id": "UPNP_OBSERVATION",
+      "physical_name": "openkill_upnp",
+      "component": "UPNP",
+      "ownership_class": "OPTIONAL_OBSERVATION"
+    }
+  ],
+  "actual_intent": {
+    "schema": "OPENKILL_LEGACY_RUNTIME_INTENT_V1",
+    "table": {"name": "inet fw4", "owner": "FW4", "ownership": "REFERENCE_ONLY"},
+    "chains": [
+      {
+        "logical_id": "CURRENT_LOCAL_CHAIN",
+        "physical_name": "openkill_local",
+        "name": "openkill_local",
+        "owner": "OPENKILL",
+        "ownership": "OWNED",
+        "component": "LOCAL",
+        "family": "IPv4",
+        "role": "LOCAL"
+      },
+      {
+        "logical_id": "LEGACY_WAN_INPUT_V4",
+        "physical_name": "openkill_wan_input",
+        "name": "openkill_wan_input",
+        "owner": "OPENKILL",
+        "component": "WAN_INPUT",
+        "role": "WAN_INPUT",
+        "semantic_ownership": "LEGACY_ONLY_SAFETY",
+        "family": "IPv4"
+      },
+      {
+        "logical_id": "LEGACY_WAN_INPUT_V6",
+        "physical_name": "openkill_wan6_input",
+        "name": "openkill_wan6_input",
+        "owner": "OPENKILL",
+        "component": "WAN_INPUT",
+        "role": "WAN_INPUT",
+        "semantic_ownership": "LEGACY_ONLY_SAFETY",
+        "family": "IPv6"
+      }
+    ],
+    "sets": [],
+    "attachments": [
+      {
+        "logical_id": "LEGACY_WAN_ATTACHMENT_V4",
+        "physical_name": "fw4_input_to_openkill_wan_input",
+        "owner": "OPENKILL",
+        "component": "WAN_INPUT",
+        "role": "WAN_INPUT",
+        "semantic_ownership": "LEGACY_ONLY_SAFETY",
+        "family": "IPv4",
+        "from_chain": "input",
+        "to_chain": "openkill_wan_input",
+        "action": "JUMP"
+      },
+      {
+        "logical_id": "LEGACY_WAN_ATTACHMENT_V6",
+        "physical_name": "fw4_input6_to_openkill_wan6_input",
+        "owner": "OPENKILL",
+        "component": "WAN_INPUT",
+        "role": "WAN_INPUT",
+        "semantic_ownership": "LEGACY_ONLY_SAFETY",
+        "family": "IPv6",
+        "from_chain": "input6",
+        "to_chain": "openkill_wan6_input",
+        "action": "JUMP"
+      }
+    ],
+    "rules": [
+      {
+        "logical_id": "CURRENT_LOCAL_RULE",
+        "physical_name": "legacy_local_rule",
+        "owner": "OPENKILL",
+        "ownership": "OWNED",
+        "component": "LOCAL",
+        "family": "IPv4",
+        "chain": "openkill_local",
+        "match_expression": "meta nfproto ipv4",
+        "action_type": "RETURN",
+        "action_expression": "return",
+        "semantic_reason": "LOCAL",
+        "action": "RETURN"
+      }
+    ]
+  },
+  "desired_intent": {
+    "schema": "OPENKILL_CURRENT_RENDERED_INTENT_V1",
+    "table": {"name": "inet fw4", "owner": "FW4", "ownership": "REFERENCE_ONLY"},
+    "chains": [
+      {
+        "logical_id": "CURRENT_LOCAL_CHAIN",
+        "physical_name": "openkill_local",
+        "name": "openkill_local",
+        "owner": "OPENKILL",
+        "ownership": "OWNED",
+        "component": "LOCAL",
+        "family": "IPv4",
+        "role": "LOCAL"
+      }
+    ],
+    "sets": [],
+    "attachments": [],
+    "rules": [
+      {
+        "logical_id": "CURRENT_LOCAL_RULE",
+        "physical_name": "current_local_rule",
+        "owner": "OPENKILL",
+        "ownership": "OWNED",
+        "component": "LOCAL",
+        "family": "IPv4",
+        "chain": "openkill_local",
+        "match_expression": "meta nfproto ipv4",
+        "action_type": "RETURN",
+        "action_expression": "return",
+        "semantic_reason": "LOCAL",
+        "action": "RETURN"
+      }
+    ]
+  },
+  "dns_actual": {
+    "dns_semantics": {
+      "DNS_FIREWALL_LAN_TARGET": 53,
+      "DNS_FIREWALL_ROUTER_TARGET": 53,
+      "DNSMASQ_LISTEN_TARGET": 53,
+      "DNSMASQ_UPSTREAM_TARGET": "127.0.0.1#7874",
+      "MIHOMO_DNS_LISTENER": "127.0.0.1:7874",
+      "DNS_LOOP_PREVENTION": {"skgid_exempt": 65534},
+      "DNS_SCOPE_IPV4": {"lan": true, "router": true},
+      "DNS_SCOPE_IPV6": {"lan": true, "router": true}
+    },
+    "field_ownership": {
+      "DNS_FIREWALL_LAN_TARGET": "CURRENT_OWNED",
+      "DNS_FIREWALL_ROUTER_TARGET": "CURRENT_OWNED",
+      "DNSMASQ_LISTEN_TARGET": "CURRENT_OWNED",
+      "DNSMASQ_UPSTREAM_TARGET": "CURRENT_OWNED",
+      "MIHOMO_DNS_LISTENER": "CURRENT_OWNED",
+      "DNS_LOOP_PREVENTION": "CURRENT_OWNED",
+      "DNS_SCOPE_IPV4": "CURRENT_OWNED",
+      "DNS_SCOPE_IPV6": "CURRENT_OWNED"
+    },
+    "sources": {
+      "DNS_FIREWALL_LAN_TARGET": "bounded legacy capture",
+      "DNS_FIREWALL_ROUTER_TARGET": "bounded legacy capture",
+      "DNSMASQ_LISTEN_TARGET": "committed dnsmasq state",
+      "DNSMASQ_UPSTREAM_TARGET": "committed dnsmasq state",
+      "MIHOMO_DNS_LISTENER": "committed Mihomo state",
+      "DNS_LOOP_PREVENTION": "committed DNS scope contract",
+      "DNS_SCOPE_IPV4": "committed DNS scope contract",
+      "DNS_SCOPE_IPV6": "committed DNS scope contract"
+    }
+  },
+  "dns_desired": {
+    "dns_semantics": {
+      "DNS_FIREWALL_LAN_TARGET": 7874,
+      "DNS_FIREWALL_ROUTER_TARGET": 7874,
+      "DNSMASQ_LISTEN_TARGET": 53,
+      "DNSMASQ_UPSTREAM_TARGET": "127.0.0.1#7874",
+      "MIHOMO_DNS_LISTENER": "127.0.0.1:7874",
+      "DNS_LOOP_PREVENTION": {"skgid_exempt": 65534},
+      "DNS_SCOPE_IPV4": {"lan": true, "router": true},
+      "DNS_SCOPE_IPV6": {"lan": true, "router": true}
+    },
+    "field_ownership": {
+      "DNS_FIREWALL_LAN_TARGET": "CURRENT_OWNED",
+      "DNS_FIREWALL_ROUTER_TARGET": "CURRENT_OWNED",
+      "DNSMASQ_LISTEN_TARGET": "CURRENT_OWNED",
+      "DNSMASQ_UPSTREAM_TARGET": "CURRENT_OWNED",
+      "MIHOMO_DNS_LISTENER": "CURRENT_OWNED",
+      "DNS_LOOP_PREVENTION": "CURRENT_OWNED",
+      "DNS_SCOPE_IPV4": "CURRENT_OWNED",
+      "DNS_SCOPE_IPV6": "CURRENT_OWNED"
+    },
+    "sources": {
+      "DNS_FIREWALL_LAN_TARGET": "CURRENT renderer DNS_REDIRECT execution (dns_port=7874)",
+      "DNS_FIREWALL_ROUTER_TARGET": "CURRENT renderer DNS_REDIRECT execution (dns_port=7874)",
+      "DNSMASQ_LISTEN_TARGET": "committed dnsmasq desired state",
+      "DNSMASQ_UPSTREAM_TARGET": "committed dnsmasq desired state",
+      "MIHOMO_DNS_LISTENER": "committed Mihomo desired state",
+      "DNS_LOOP_PREVENTION": "CURRENT DNS scope contract",
+      "DNS_SCOPE_IPV4": "CURRENT DNS scope contract",
+      "DNS_SCOPE_IPV6": "CURRENT DNS scope contract"
+    }
+  }
+}
