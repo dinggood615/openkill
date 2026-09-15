@@ -1,19 +1,9 @@
-name: Validate OpenKill source
+name: OpenKill Development CI
 
 on:
   push:
-    branches: [master, package]
-    paths:
-      - 'luci-app-openkill/**'
-      - 'scripts/**'
-      - '.github/workflows/**'
-      - 'README.md'
+    branches: [master]
   pull_request:
-    paths:
-      - 'luci-app-openkill/**'
-      - 'scripts/**'
-      - '.github/workflows/**'
-      - 'README.md'
   workflow_dispatch:
 
 permissions:
@@ -28,3 +18,7 @@ jobs:
       - name: Validate shell, YAML and version metadata
         shell: bash
         run: sh scripts/validate-openkill.sh
+
+  runtime:
+    name: Runtime and compatibility matrix
+    uses: ./.github/workflows/runtime-tests.yml

@@ -1,4 +1,4 @@
-name: Build OpenKill (OpenWrt SDK Audit)
+name: OpenKill RC Build (OpenWrt SDK Audit)
 
 on:
   # This is an opt-in SDK audit build. The release workflow owns master pushes
