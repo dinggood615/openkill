@@ -5,7 +5,11 @@
 
 OPENKILL_FWMARK="0x162"
 OPENKILL_FWMASK="0xffffffff"
-OPENKILL_ROUTE_TABLE="0x162"
+# Mark and route table are separate ABI fields.  Their numeric values happen
+# to coincide (0x162 == 354), but the committed-state and renderer contracts
+# serialize the route table as the decimal value 354.  Keep this source
+# independent from OPENKILL_FWMARK so an alias collision cannot recur.
+OPENKILL_ROUTE_TABLE="354"
 OPENKILL_RULE_PREF="1888"
 # The fingerprint payload is deliberately versioned outside the semantic
 # fields.  A schema change must be distinguishable from a real network change

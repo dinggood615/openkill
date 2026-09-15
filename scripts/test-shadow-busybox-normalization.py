@@ -19,6 +19,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 SELF_TEST = ROOT / "scripts/test-shadow-self-sufficiency.py"
 CONTINUITY_TEST = ROOT / "scripts/test-shadow-continuity.py"
+NETWORK_HELPER = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_network.sh"
 
 
 def _load(path: Path, name: str):
@@ -177,6 +178,7 @@ class BusyBoxNormalizationTests(unittest.TestCase):
             f"exec sh {self_test._quote(self_test._wsl_path(continuity_test.RENDERER))} \"$1\" \"$2\"\n",
         )
         body = (
+            f". {self_test._quote(self_test._wsl_path(NETWORK_HELPER))}; "
             "openkill_shadow_compare_nft; printf 'RC=%s\\n' \"$?\""
         )
         process = self._busybox_run(
@@ -201,7 +203,6 @@ class BusyBoxNormalizationTests(unittest.TestCase):
                 "OPENKILL_ROUTER_SELF_PROXY": "0",
                 "OPENKILL_FWMARK": "0x162",
                 "OPENKILL_FWMASK": "0xffffffff",
-                "OPENKILL_ROUTE_TABLE": "354",
                 "OPENKILL_RULE_PREF": "1888",
             },
         )
@@ -211,8 +212,34 @@ class BusyBoxNormalizationTests(unittest.TestCase):
         emitted_text = emitted.read_text(encoding="utf-8")
         self.assertTrue(emitted_text.startswith("SHELL_RENDERER_INPUT_V1\t1\n"))
         self.assertIn("META\towner\tOPENKILL", emitted_text)
+        self.assertIn("META\tmark\t0x162", emitted_text)
+        self.assertIn("META\tmask\t0xffffffff", emitted_text)
+        self.assertIn("META\troute_table\t354", emitted_text)
+        self.assertIn("META\trule_pref\t1888", emitted_text)
         self.assertFalse((self.harness.root / "generation").exists())
         self.assertTrue((telemetry / "status").exists())
+
+    def test_network_source_maps_mark_and_route_table_independently(self) -> None:
+        snapshot = self.harness.root / "network-snapshot"
+        desired = self.harness.root / "network-desired"
+        self_test._write_lf(snapshot, "SNAPSHOT_VERSION=1\nLOCAL_IPV6_READY=1\n")
+        body = (
+            f". {self_test._quote(self_test._wsl_path(NETWORK_HELPER))}; "
+            'OPENKILL_FWMARK="0x123"; OPENKILL_FWMASK="0xffffffff"; '
+            'OPENKILL_ROUTE_TABLE="456"; OPENKILL_RULE_PREF="789"; '
+            f"openkill_build_desired_state {self_test._quote(self_test._wsl_path(snapshot))} "
+            f"{self_test._quote(self_test._wsl_path(desired))}; printf 'RC=%s\\n' \"$?\""
+        )
+        process = self._busybox_run(body, {})
+        self.assertIn("RC=0", process.stdout, process.stderr)
+        state = dict(
+            line.split("=", 1)
+            for line in desired.read_text(encoding="utf-8").splitlines()
+            if "=" in line
+        )
+        self.assertEqual(state["OPENKILL_FWMARK"], "0x123")
+        self.assertEqual(state["OPENKILL_ROUTE_TABLE"], "456")
+        self.assertNotEqual(state["OPENKILL_FWMARK"], state["OPENKILL_ROUTE_TABLE"])
 
     def test_same_raw_state_keeps_continuity_token_without_generation_file(self) -> None:
         state_text = continuity_test.AUTO_SOURCE.read_text(encoding="utf-8").replace("OWNER=OPENKILL", "OWNER=openkill", 1)

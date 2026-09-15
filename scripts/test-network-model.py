@@ -985,8 +985,37 @@ LOCAL_IPV6_READY=1
 INTERNAL_IPV6_PREFIXES=2001:db8:a::/60 2001:db8:b::/64 2001:db8:c::/64
 """)
         self.assertEqual(state["LOCALNETWORK6_PREFIXES"].split(), ["2001:db8:a::/60", "2001:db8:b::/64", "2001:db8:c::/64"])
-        self.assertEqual(state["OPENKILL_ROUTE_TABLE"], "0x162")
+        self.assertEqual(state["OPENKILL_FWMARK"], "0x162")
+        self.assertEqual(state["OPENKILL_FWMASK"], "0xffffffff")
+        self.assertEqual(state["OPENKILL_ROUTE_TABLE"], "354")
         self.assertEqual(state["OPENKILL_RULE_PREF"], "1888")
+
+    def test_mark_and_route_table_are_distinct_abi_sources(self):
+        with tempfile.TemporaryDirectory() as td:
+            td = pathlib.Path(td)
+            snapshot = td / "snapshot"
+            desired = td / "desired"
+            snapshot.write_text("SNAPSHOT_VERSION=1\nLOCAL_IPV6_READY=1\n", encoding="utf-8")
+            script = (
+                f'. "{HELPER}"; '
+                'OPENKILL_FWMARK="0x123"; OPENKILL_FWMASK="0xffffffff"; '
+                'OPENKILL_ROUTE_TABLE="456"; OPENKILL_RULE_PREF="789"; '
+                'openkill_build_desired_state "$1" "$2"'
+            )
+            subprocess.run(
+                ["sh", "-c", script, "model", str(snapshot), str(desired)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            state = dict(
+                line.split("=", 1)
+                for line in desired.read_text(encoding="utf-8").splitlines()
+                if "=" in line
+            )
+            self.assertEqual(state["OPENKILL_FWMARK"], "0x123")
+            self.assertEqual(state["OPENKILL_ROUTE_TABLE"], "456")
+            self.assertNotEqual(state["OPENKILL_FWMARK"], state["OPENKILL_ROUTE_TABLE"])
 
     def test_public_probe_does_not_disable_local_ipv6(self):
         state = build("SNAPSHOT_VERSION=1\nLOCAL_IPV6_READY=1\nPUBLIC_IPV6_HEALTH=failed\n")

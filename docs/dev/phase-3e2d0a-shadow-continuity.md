@@ -32,6 +32,13 @@ The helper does not call UCI, ubus, `ip`, DNS resolution, China source
 parsing, or node discovery.  Aliases are checked for conflicting values and
 missing required values fail closed.
 
+The four mark-ABI fields remain distinct at the source boundary: `fwmark` is
+`0x162`, `fwmask` is `0xffffffff`, `route_table` is the decimal value `354`,
+and `rule_pref` is `1888`.  Although `0x162` is numerically equal to `354`,
+the producer must read `OPENKILL_ROUTE_TABLE` rather than derive the table
+from `OPENKILL_FWMARK`; the serialized `SHELL_RENDERER_INPUT_V1` value is
+therefore `route_table\t354`.
+
 The production `/tmp/openkill-network.fingerprint` remains a useful native
 network fingerprint, but it covers only network roles, addresses, native
 routes, DNS servers, readiness and TUN owner.  It does not cover all shadow
