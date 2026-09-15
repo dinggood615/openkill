@@ -1,5 +1,26 @@
 # Current execution plan: authorized local delivery and GitHub release
 
+## Final delivery checkpoint (observed before this documentation commit)
+
+- Release candidate source: `c1e6cb1c55e7166040cc231f3a2c152e7cb14a1d`.
+- Source version: `2026-1128`; reviewed notes: `docs/release/notes/2026-1128.md`.
+- Exact-commit Development CI: run `34981702407` passed.
+- Formal Release workflow: run `34981791062` passed with
+  `release_gate=true`, `publish=true`, and `build_apk=false`.
+- Published tag: `v2026-1128-ipk`, targeting the release-candidate commit.
+- Published asset: `luci-app-openkill_2026-1128_all.ipk`, SHA-256
+  `0581360bf8d88cbf2d49b8dae1c59b3cec5be44108f1fa6fca79c4e32e1ebedd`.
+- Package channel `package:master/version` reports `v2026-1128`, and
+  `master/latest-ipk.json` points to the same commit, asset and digest.
+- Historical `v2026-1127-ipk` and its asset remain present and unchanged.
+- Release transport requires version-specific reviewed notes and preserves
+  existing tags/releases; development pushes do not publish.
+- Device validation remains pending and was not accessed; CENTRAL_ACTIVE,
+  central apply and packet-path testing remain forbidden/pending.
+
+The resulting documentation checkpoint must be verified from Git after commit;
+the commit hash is intentionally not predicted here.
+
 ## Current authorization and acceptance
 
 The user authorized continuing unfinished local development through an explicit
