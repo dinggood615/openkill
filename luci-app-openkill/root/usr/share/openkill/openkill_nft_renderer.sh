@@ -232,22 +232,64 @@ okr_validate_action()
 
 okr_input_has_nul_byte()
 {
-	# Do not put input bytes in a shell variable.  `od` emits only printable
-	# hex tokens, and the small awk filter below therefore remains safe on
-	# BusyBox ash as well as host awk.  The marker makes an od failure
-	# distinguishable from a clean file without relying on pipefail.
+	# Keep raw input bytes out of shell variables.  OpenWrt's BusyBox base
+	# includes `hexdump` on the target device while it does not include `od`.
+	# Prefer the verified one-byte-per-line hexdump format and retain the old
+	# od format as a compatibility fallback for environments that provide od
+	# instead.  Scanner status is captured before the awk inspection so a
+	# partial dump or a missing utility can never look like a clean file.
 	okr_nul_input=$1
+	okr_nul_scanner=
+	for okr_nul_tool in mktemp chmod rm awk; do
+		command -v "$okr_nul_tool" >/dev/null 2>&1 || return 2
+	done
+	if command -v hexdump >/dev/null 2>&1; then
+		okr_nul_scanner=hexdump
+	elif command -v od >/dev/null 2>&1; then
+		okr_nul_scanner=od
+	else
+		return 2
+	fi
+	okr_nul_dir=$(mktemp -d /tmp/openkill-renderer-nul.XXXXXX 2>/dev/null) || return 2
+	okr_nul_cleanup()
 	{
-		od -An -v -tx1 "$okr_nul_input" 2>/dev/null || printf '%s\n' OPENKILL_OD_ERROR
-	} | awk '
-		$0 == "OPENKILL_OD_ERROR" { failed=1; next }
-		{ for (i=1; i<=NF; i++) if ($i == "00") found=1 }
+		[ -n "$okr_nul_dir" ] || return 0
+		rm -rf "$okr_nul_dir"
+		okr_nul_dir=
+	}
+	trap 'okr_nul_cleanup; exit 130' HUP INT TERM
+	chmod 700 "$okr_nul_dir" 2>/dev/null || { okr_nul_cleanup; trap - HUP INT TERM; return 2; }
+	okr_nul_hex=$okr_nul_dir/bytes
+	( umask 077; : > "$okr_nul_hex" ) 2>/dev/null || { okr_nul_cleanup; trap - HUP INT TERM; return 2; }
+	chmod 600 "$okr_nul_hex" 2>/dev/null || { okr_nul_cleanup; trap - HUP INT TERM; return 2; }
+	case "$okr_nul_scanner" in
+		hexdump) hexdump -v -e '1/1 "%02x\n"' "$okr_nul_input" > "$okr_nul_hex" 2>/dev/null ;;
+		od) od -An -v -tx1 "$okr_nul_input" > "$okr_nul_hex" 2>/dev/null ;;
+		*) okr_nul_cleanup; trap - HUP INT TERM; return 2 ;;
+	esac
+	okr_nul_scan_rc=$?
+	if [ "$okr_nul_scan_rc" -ne 0 ]; then
+		okr_nul_cleanup
+		trap - HUP INT TERM
+		return 2
+	fi
+	awk '
+		{
+			for (i=1; i<=NF; i++) {
+				if ($i !~ /^[0-9A-Fa-f][0-9A-Fa-f]$/) bad=1
+				else if ($i == "00") found=1
+			}
+		}
 		END {
-			if (failed) exit 2
+			if (bad) exit 2
 			if (found) exit 0
 			exit 1
 		}
-	'
+	' "$okr_nul_hex"
+	okr_nul_inspect_rc=$?
+	okr_nul_cleanup
+	trap - HUP INT TERM
+	return "$okr_nul_inspect_rc"
 }
 
 okr_validate_input()

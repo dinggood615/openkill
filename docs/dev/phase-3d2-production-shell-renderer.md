@@ -24,8 +24,16 @@ modern ACCESS_DENY, and other unsupported CURRENT states fail closed before
 any output is emitted.  No development fallback port is applied.
 
 Before parsing the already bounded line-oriented input, the renderer performs
-a byte preflight with `od -An -v -tx1` and rejects an actual `00` byte.  The
-`-v` keeps `od` from folding repeated blocks, so every input byte is checked.
+a byte preflight and rejects an actual `00` byte.  The target OpenWrt base
+provides BusyBox `hexdump`, so the primary scanner is
+`hexdump -v -e '1/1 "%02x\n"'`; `-v` prevents repeated zero bytes from being
+folded.  `od -An -v -tx1` is retained only as an optional fallback for bases
+that provide `od`.  Scanner status is captured separately from inspection:
+missing tools, non-zero scans, partial output, and malformed hex all fail
+closed rather than being treated as a clean input.  The scan output is held in
+a private temporary directory (mode `0700`, file mode `0600`) and is removed on
+every return path and on termination signals.
+
 The text grammar is then checked with portable awk; it does not use awk `\xNN`
 character escapes, whose meaning is not portable across BusyBox releases.
 This keeps literal text such as the four characters `\x00` distinct from a
@@ -57,12 +65,15 @@ component-local diffs, and runs every unique supported payload through local
 no Python runtime dependency is added to OpenWrt.
 
 `scripts/test-busybox-renderer-compatibility.py` is the focused portability
-regression.  It forces BusyBox `awk`, `od`, `sed`, and `sort`, preserves a
-pre-fix host-output golden comparison, rejects real NUL bytes at each input
-boundary, treats literal `\x00` text according to the existing grammar, and
-checks that malformed ABI values reach the original ABI guard.
+regression.  It exercises the host renderer, a target-shaped BusyBox PATH with
+`hexdump` and no `od`, and an `od`-only fallback PATH.  It also checks that both
+scanners missing, scanner errors or partial output, and inspector errors fail
+closed.  The suite preserves a pre-fix host-output golden comparison, rejects
+real NUL bytes at each input boundary (including repeated and all-zero files),
+treats literal `\x00` text according to the existing grammar, and checks that
+malformed ABI values reach the original ABI guard.
 
-This phase adds a production-capable package file while keeping
-`PRODUCTION_RENDERER_CALLSITES=0`, `PRODUCTION_RUNTIME_BEHAVIOR_CHANGED=NO`,
-and `DEVICE_CONNECTION=NO`.  Runtime shadow wiring requires a later approved
-phase.
+This compatibility fix changes only the renderer's byte-scanner capability;
+the renderer remains unwired with `PRODUCTION_RENDERER_CALLSITES=0`, unchanged
+NFT semantics, no new package dependency, and `DEVICE_CONNECTION=NO`.  Runtime
+shadow wiring requires a later approved phase.
