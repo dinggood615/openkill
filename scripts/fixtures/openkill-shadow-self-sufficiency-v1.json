@@ -124,6 +124,26 @@
       "list set inet fw4 <known-set>"
     ],
     "broad_ruleset_read": false,
+    "inventory_schema_version": 1,
+    "inventory_source": "CURRENT renderer input_tun/input_tproxy/input_redirect templates",
+    "inventory_missing_classes": {
+      "REQUIRED_CURRENT": "base attachment rows and stable core template rows; absence blocks capture",
+      "CONDITIONAL_CURRENT": "CURRENT-owned feature rows whose legacy object is created only when populated",
+      "INACTIVE_MODE": "a row present only in another renderer mode",
+      "OPTIONAL_OBSERVATION": "feature observation such as UPNP that is not required for every run",
+      "OUT_OF_SCOPE": "legacy-only safety rows outside CURRENT ownership",
+      "UNKNOWN": "not present in the formal inventory; fail closed"
+    },
+    "required_base_chains": [
+      "dstnat", "mangle_prerouting", "mangle_output", "output",
+      "srcnat", "input", "forward"
+    ],
+    "required_set_ids": [
+      "LOCAL_V4", "LOCAL_V6", "NODE_ENDPOINT_V4", "NODE_ENDPOINT_V6",
+      "CHINA_PASS_V4", "CHINA_PASS_V6", "CHINA_V4", "CHINA_V6",
+      "SERVICE_PORTS"
+    ],
+    "out_of_scope_set_ids": ["WAN_HOST_V4", "WAN_HOST_V6"],
     "known_base_chains": [
       "dstnat",
       "mangle_prerouting",

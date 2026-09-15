@@ -24,6 +24,13 @@ OPENKILL_NFT_SHADOW_TIMEOUT_DEFAULT=10
 OPENKILL_NFT_SHADOW_AUTO_STATE_VERSION=1
 OPENKILL_NFT_SHADOW_LEGACY_INTENT_VERSION=1
 OPENKILL_NFT_SHADOW_CAPTURE_VERSION=1
+# The bounded capture inventory is a schema, not a list of exceptions.  Its
+# rows are sourced from the CURRENT renderer templates below; these two
+# existing fw4 base-chain groups are the parser's explicit capture contract.
+OPENKILL_NFT_SHADOW_INVENTORY_SCHEMA_VERSION=1
+OPENKILL_NFT_SHADOW_REQUIRED_BASE_CHAINS="dstnat mangle_prerouting mangle_output output srcnat input forward"
+OPENKILL_NFT_SHADOW_REQUIRED_SET_IDS="LOCAL_V4 LOCAL_V6 NODE_ENDPOINT_V4 NODE_ENDPOINT_V6 CHINA_PASS_V4 CHINA_PASS_V6 CHINA_V4 CHINA_V6 SERVICE_PORTS"
+OPENKILL_NFT_SHADOW_OUT_OF_SCOPE_SET_IDS="WAN_HOST_V4 WAN_HOST_V6"
 # The file under /tmp/openkill-network-reconcile is a development helper
 # token, not a production lifecycle ABI.  Runtime shadow continuity is based
 # on this content-derived token instead.
@@ -1034,6 +1041,21 @@ openkill_shadow_capture_name_ok()
    return 0
 }
 
+# `nft list <object>` uses a non-zero result for both an absent object and a
+# failed command.  Treat only the well-known object-absence diagnostics as
+# MISSING.  Any other diagnostic, including a quiet rc=1, is a capture failure
+# and therefore remains fail-closed.  This keeps permission, syntax, and
+# executable failures from being reclassified as optional state.
+openkill_shadow_capture_absence_error()
+{
+   openkill_shadow_capture_error_file=$1
+   [ -r "$openkill_shadow_capture_error_file" ] || return 1
+   [ -s "$openkill_shadow_capture_error_file" ] || return 1
+   grep -Eqi 'no such file or directory|does not exist|object[[:space:]]+[^[:space:]]+[[:space:]]+not found|could not process rule.*no such' "$openkill_shadow_capture_error_file" || return 1
+   grep -Eqi 'syntax|parse[[:space:]]+error|permission|not permitted|operation not permitted|invalid|unexpected|unknown command' "$openkill_shadow_capture_error_file" && return 1
+   return 0
+}
+
 openkill_shadow_capture_legacy_nft()
 {
    openkill_shadow_capture_output=$1
@@ -1074,31 +1096,47 @@ openkill_shadow_capture_legacy_nft()
       openkill_shadow_capture_name_ok "$openkill_shadow_capture_chain" || { rm -f "$openkill_shadow_capture_tmp"; return "$OPENKILL_NFT_SHADOW_RC_CAPTURE_ERROR"; }
       openkill_shadow_capture_any=1
       openkill_shadow_capture_one=${openkill_shadow_capture_output}.one.$$
-      if command "$openkill_shadow_capture_nft" list chain inet fw4 "$openkill_shadow_capture_chain" > "$openkill_shadow_capture_one" 2>/dev/null; then
+      openkill_shadow_capture_error=${openkill_shadow_capture_output}.error.$$
+      if command "$openkill_shadow_capture_nft" list chain inet fw4 "$openkill_shadow_capture_chain" > "$openkill_shadow_capture_one" 2> "$openkill_shadow_capture_error"; then
          printf 'OBJECT\tchain\t%s\n' "$openkill_shadow_capture_chain" >> "$openkill_shadow_capture_tmp"
          cat "$openkill_shadow_capture_one" >> "$openkill_shadow_capture_tmp"
          printf 'OBJECT_END\n' >> "$openkill_shadow_capture_tmp"
          [ -z "$openkill_shadow_capture_trace" ] || printf 'chain %s rc=0\n' "$openkill_shadow_capture_chain" >> "$openkill_shadow_capture_trace"
       else
-         printf 'MISSING\tchain\t%s\n' "$openkill_shadow_capture_chain" >> "$openkill_shadow_capture_tmp"
-         [ -z "$openkill_shadow_capture_trace" ] || printf 'chain %s rc=1\n' "$openkill_shadow_capture_chain" >> "$openkill_shadow_capture_trace"
+         openkill_shadow_capture_rc=$?
+         if [ "$openkill_shadow_capture_rc" -eq 1 ] && openkill_shadow_capture_absence_error "$openkill_shadow_capture_error"; then
+            printf 'MISSING\tchain\t%s\n' "$openkill_shadow_capture_chain" >> "$openkill_shadow_capture_tmp"
+            [ -z "$openkill_shadow_capture_trace" ] || printf 'chain %s rc=1 missing\n' "$openkill_shadow_capture_chain" >> "$openkill_shadow_capture_trace"
+         else
+            [ -z "$openkill_shadow_capture_trace" ] || printf 'chain %s rc=%s command-error\n' "$openkill_shadow_capture_chain" "$openkill_shadow_capture_rc" >> "$openkill_shadow_capture_trace"
+            rm -f "$openkill_shadow_capture_tmp" "$openkill_shadow_capture_one" "$openkill_shadow_capture_error"
+            return "$OPENKILL_NFT_SHADOW_RC_CAPTURE_ERROR"
+         fi
       fi
-      rm -f "$openkill_shadow_capture_one"
+      rm -f "$openkill_shadow_capture_one" "$openkill_shadow_capture_error"
    done
    for openkill_shadow_capture_set in $openkill_shadow_capture_set_list; do
       openkill_shadow_capture_name_ok "$openkill_shadow_capture_set" || { rm -f "$openkill_shadow_capture_tmp"; return "$OPENKILL_NFT_SHADOW_RC_CAPTURE_ERROR"; }
       openkill_shadow_capture_any=1
       openkill_shadow_capture_one=${openkill_shadow_capture_output}.one.$$
-      if command "$openkill_shadow_capture_nft" list set inet fw4 "$openkill_shadow_capture_set" > "$openkill_shadow_capture_one" 2>/dev/null; then
+      openkill_shadow_capture_error=${openkill_shadow_capture_output}.error.$$
+      if command "$openkill_shadow_capture_nft" list set inet fw4 "$openkill_shadow_capture_set" > "$openkill_shadow_capture_one" 2> "$openkill_shadow_capture_error"; then
          printf 'OBJECT\tset\t%s\n' "$openkill_shadow_capture_set" >> "$openkill_shadow_capture_tmp"
          cat "$openkill_shadow_capture_one" >> "$openkill_shadow_capture_tmp"
          printf 'OBJECT_END\n' >> "$openkill_shadow_capture_tmp"
          [ -z "$openkill_shadow_capture_trace" ] || printf 'set %s rc=0\n' "$openkill_shadow_capture_set" >> "$openkill_shadow_capture_trace"
       else
-         printf 'MISSING\tset\t%s\n' "$openkill_shadow_capture_set" >> "$openkill_shadow_capture_tmp"
-         [ -z "$openkill_shadow_capture_trace" ] || printf 'set %s rc=1\n' "$openkill_shadow_capture_set" >> "$openkill_shadow_capture_trace"
+         openkill_shadow_capture_rc=$?
+         if [ "$openkill_shadow_capture_rc" -eq 1 ] && openkill_shadow_capture_absence_error "$openkill_shadow_capture_error"; then
+            printf 'MISSING\tset\t%s\n' "$openkill_shadow_capture_set" >> "$openkill_shadow_capture_tmp"
+            [ -z "$openkill_shadow_capture_trace" ] || printf 'set %s rc=1 missing\n' "$openkill_shadow_capture_set" >> "$openkill_shadow_capture_trace"
+         else
+            [ -z "$openkill_shadow_capture_trace" ] || printf 'set %s rc=%s command-error\n' "$openkill_shadow_capture_set" "$openkill_shadow_capture_rc" >> "$openkill_shadow_capture_trace"
+            rm -f "$openkill_shadow_capture_tmp" "$openkill_shadow_capture_one" "$openkill_shadow_capture_error"
+            return "$OPENKILL_NFT_SHADOW_RC_CAPTURE_ERROR"
+         fi
       fi
-      rm -f "$openkill_shadow_capture_one"
+      rm -f "$openkill_shadow_capture_one" "$openkill_shadow_capture_error"
    done
    [ "$openkill_shadow_capture_any" -eq 1 ] || { rm -f "$openkill_shadow_capture_tmp"; return "$OPENKILL_NFT_SHADOW_RC_CAPTURE_ERROR"; }
    mv -f "$openkill_shadow_capture_tmp" "$openkill_shadow_capture_output" || { rm -f "$openkill_shadow_capture_tmp"; return "$OPENKILL_NFT_SHADOW_RC_CAPTURE_ERROR"; }
@@ -1326,6 +1364,182 @@ openkill_shadow_parse_nft_capture()
    return 0
 }
 
+# The renderer templates are the authoritative CURRENT inventory schema.  A
+# capture can therefore report a missing object without making the coordinator
+# guess from a device-specific name list.  The chain required bit is the
+# seventh template field; the required set IDs below are the stable core rows
+# in that same schema.  Rows present only in another mode are INACTIVE_MODE.
+openkill_shadow_inventory_template()
+{
+   openkill_shadow_inventory_template_mode=$1
+   openkill_shadow_inventory_template_dir=${OPENKILL_NFT_SHADOW_TEMPLATE_DIR:-/usr/share/openkill/shadow}
+   openkill_shadow_safe_path "$openkill_shadow_inventory_template_dir" || return 1
+   case "$openkill_shadow_inventory_template_mode" in
+      TUN) openkill_shadow_inventory_template_name=input_tun_v1.tsv ;;
+      TPROXY) openkill_shadow_inventory_template_name=input_tproxy_v1.tsv ;;
+      REDIRECT) openkill_shadow_inventory_template_name=input_redirect_v1.tsv ;;
+      *) return 1 ;;
+   esac
+   openkill_shadow_inventory_template_path_value=$openkill_shadow_inventory_template_dir/$openkill_shadow_inventory_template_name
+   openkill_shadow_safe_path "$openkill_shadow_inventory_template_path_value" || return 1
+   [ -r "$openkill_shadow_inventory_template_path_value" ] || return 1
+   printf '%s\n' "$openkill_shadow_inventory_template_path_value"
+}
+
+openkill_shadow_inventory_class()
+{
+   openkill_shadow_inventory_kind=$1
+   openkill_shadow_inventory_name=$2
+   openkill_shadow_inventory_mode=$3
+   case "$openkill_shadow_inventory_kind" in
+      chain) openkill_shadow_inventory_template_kind=CHAIN ;;
+      set) openkill_shadow_inventory_template_kind=SET ;;
+      *) printf '%s\n' UNKNOWN; return 0 ;;
+   esac
+   openkill_shadow_capture_name_ok "$openkill_shadow_inventory_name" || { printf '%s\n' UNKNOWN; return 0; }
+
+   # These are the existing fw4 base-chain rows described by the capture
+   # contract.  They are outside the renderer templates but remain required
+   # attachment points for a complete bounded read.
+   if [ "$openkill_shadow_inventory_kind" = chain ]; then
+      for openkill_shadow_inventory_base in $OPENKILL_NFT_SHADOW_REQUIRED_BASE_CHAINS; do
+         [ "$openkill_shadow_inventory_name" = "$openkill_shadow_inventory_base" ] || continue
+         printf '%s\n' REQUIRED_CURRENT
+         return 0
+      done
+   fi
+
+   openkill_shadow_inventory_active_template=$(openkill_shadow_inventory_template "$openkill_shadow_inventory_mode" 2>/dev/null) || {
+      printf '%s\n' UNKNOWN
+      return 0
+   }
+   openkill_shadow_inventory_row=$(awk -F '\t' -v kind="$openkill_shadow_inventory_template_kind" -v name="$openkill_shadow_inventory_name" '$1 == kind && $3 == name { print; exit }' "$openkill_shadow_inventory_active_template")
+   if [ -n "$openkill_shadow_inventory_row" ]; then
+      openkill_shadow_inventory_id=$(printf '%s\n' "$openkill_shadow_inventory_row" | awk -F '\t' '{ print $2 }')
+      openkill_shadow_inventory_category=$(printf '%s\n' "$openkill_shadow_inventory_row" | awk -F '\t' '{ print $5 }')
+      openkill_shadow_inventory_required=$(printf '%s\n' "$openkill_shadow_inventory_row" | awk -F '\t' '{ print $7 }')
+      openkill_shadow_inventory_mode_specific=1
+      for openkill_shadow_inventory_other_mode in TUN TPROXY REDIRECT; do
+         [ "$openkill_shadow_inventory_other_mode" = "$openkill_shadow_inventory_mode" ] && continue
+         openkill_shadow_inventory_other_template=$(openkill_shadow_inventory_template "$openkill_shadow_inventory_other_mode" 2>/dev/null) || continue
+         openkill_shadow_inventory_other_row=$(awk -F '\t' -v kind="$openkill_shadow_inventory_template_kind" -v name="$openkill_shadow_inventory_name" '$1 == kind && $3 == name { print; exit }' "$openkill_shadow_inventory_other_template")
+         [ -n "$openkill_shadow_inventory_other_row" ] || continue
+         openkill_shadow_inventory_mode_specific=0
+         break
+      done
+      if [ "$openkill_shadow_inventory_kind" = chain ]; then
+         if [ "$openkill_shadow_inventory_category" = UPNP ]; then
+            printf '%s\n' OPTIONAL_OBSERVATION
+         elif [ "$openkill_shadow_inventory_required" = 1 ] || [ "$openkill_shadow_inventory_mode_specific" -eq 1 ]; then
+            printf '%s\n' REQUIRED_CURRENT
+         else
+            printf '%s\n' CONDITIONAL_CURRENT
+         fi
+         return 0
+      fi
+      for openkill_shadow_inventory_required_id in $OPENKILL_NFT_SHADOW_REQUIRED_SET_IDS; do
+         [ "$openkill_shadow_inventory_id" = "$openkill_shadow_inventory_required_id" ] || continue
+         printf '%s\n' REQUIRED_CURRENT
+         return 0
+      done
+      for openkill_shadow_inventory_out_of_scope_id in $OPENKILL_NFT_SHADOW_OUT_OF_SCOPE_SET_IDS; do
+         [ "$openkill_shadow_inventory_id" = "$openkill_shadow_inventory_out_of_scope_id" ] || continue
+         printf '%s\n' OUT_OF_SCOPE
+         return 0
+      done
+      printf '%s\n' CONDITIONAL_CURRENT
+      return 0
+   fi
+
+   # A valid row in another mode is a known inactive-mode object, not an
+   # unknown object and not a required absence for the current mode.
+   for openkill_shadow_inventory_other_mode in TUN TPROXY REDIRECT; do
+      [ "$openkill_shadow_inventory_other_mode" = "$openkill_shadow_inventory_mode" ] && continue
+      openkill_shadow_inventory_other_template=$(openkill_shadow_inventory_template "$openkill_shadow_inventory_other_mode" 2>/dev/null) || continue
+      openkill_shadow_inventory_other_row=$(awk -F '\t' -v kind="$openkill_shadow_inventory_template_kind" -v name="$openkill_shadow_inventory_name" '$1 == kind && $3 == name { print; exit }' "$openkill_shadow_inventory_other_template")
+      [ -n "$openkill_shadow_inventory_other_row" ] || continue
+      printf '%s\n' INACTIVE_MODE
+      return 0
+   done
+   printf '%s\n' UNKNOWN
+   return 0
+}
+
+openkill_shadow_classify_inventory_missing()
+{
+   openkill_shadow_inventory_intent_file=$1
+   openkill_shadow_inventory_input_file=$2
+   openkill_shadow_required_missing_count=0
+   openkill_shadow_conditional_missing_count=0
+   openkill_shadow_inactive_missing_count=0
+   openkill_shadow_optional_missing_count=0
+   openkill_shadow_out_of_scope_missing_count=0
+   openkill_shadow_unknown_count=0
+   openkill_shadow_inventory_missing_count=0
+   openkill_shadow_inventory_missing_summary=
+   openkill_shadow_inventory_error_reason=
+   [ -r "$openkill_shadow_inventory_intent_file" ] && [ -r "$openkill_shadow_inventory_input_file" ] || {
+      openkill_shadow_inventory_error_reason=inventory-input-unavailable
+      return "$OPENKILL_NFT_SHADOW_RC_CAPTURE_ERROR"
+   }
+   openkill_shadow_safe_path "$openkill_shadow_inventory_intent_file" || return "$OPENKILL_NFT_SHADOW_RC_CAPTURE_ERROR"
+   openkill_shadow_safe_path "$openkill_shadow_inventory_input_file" || return "$OPENKILL_NFT_SHADOW_RC_CAPTURE_ERROR"
+   openkill_shadow_inventory_mode_raw=$(awk -F '\t' '$1 == "META" && $2 == "run_mode" { print $3; exit }' "$openkill_shadow_inventory_input_file") || openkill_shadow_inventory_mode_raw=
+   openkill_shadow_inventory_mode=$(openkill_shadow_normalize_run_mode "$openkill_shadow_inventory_mode_raw" 2>/dev/null) || {
+      openkill_shadow_inventory_error_reason=inventory-mode-unknown
+      return "$OPENKILL_NFT_SHADOW_RC_CAPTURE_ERROR"
+   }
+   openkill_shadow_inventory_seen=${openkill_shadow_inventory_intent_file}.seen.$$
+   openkill_shadow_safe_path "$openkill_shadow_inventory_seen" || return "$OPENKILL_NFT_SHADOW_RC_CAPTURE_ERROR"
+   : > "$openkill_shadow_inventory_seen" || return "$OPENKILL_NFT_SHADOW_RC_CAPTURE_ERROR"
+   while IFS='	' read -r openkill_shadow_inventory_marker openkill_shadow_inventory_kind openkill_shadow_inventory_name openkill_shadow_inventory_extra; do
+      [ "$openkill_shadow_inventory_marker" = MISSING ] || continue
+      openkill_shadow_inventory_missing_count=$((openkill_shadow_inventory_missing_count + 1))
+      if [ -n "$openkill_shadow_inventory_extra" ] || [ -z "$openkill_shadow_inventory_kind" ] || [ -z "$openkill_shadow_inventory_name" ] ||
+         ! openkill_shadow_capture_name_ok "$openkill_shadow_inventory_name"; then
+         openkill_shadow_unknown_count=$((openkill_shadow_unknown_count + 1))
+         openkill_shadow_inventory_error_reason=inventory-record-invalid
+         continue
+      fi
+      case "$openkill_shadow_inventory_kind" in chain|set) ;; *)
+         openkill_shadow_unknown_count=$((openkill_shadow_unknown_count + 1))
+         openkill_shadow_inventory_error_reason=inventory-kind-unknown
+         continue
+      esac
+      openkill_shadow_inventory_key=$openkill_shadow_inventory_kind:$openkill_shadow_inventory_name
+      if grep -Fqx "$openkill_shadow_inventory_key" "$openkill_shadow_inventory_seen"; then
+         openkill_shadow_unknown_count=$((openkill_shadow_unknown_count + 1))
+         openkill_shadow_inventory_error_reason=inventory-duplicate-entry
+         continue
+      fi
+      printf '%s\n' "$openkill_shadow_inventory_key" >> "$openkill_shadow_inventory_seen" || {
+         rm -f "$openkill_shadow_inventory_seen"
+         openkill_shadow_inventory_error_reason=inventory-seen-write-failed
+         return "$OPENKILL_NFT_SHADOW_RC_CAPTURE_ERROR"
+      }
+      openkill_shadow_inventory_class_value=$(openkill_shadow_inventory_class "$openkill_shadow_inventory_kind" "$openkill_shadow_inventory_name" "$openkill_shadow_inventory_mode") || openkill_shadow_inventory_class_value=UNKNOWN
+      case "$openkill_shadow_inventory_class_value" in
+         REQUIRED_CURRENT) openkill_shadow_required_missing_count=$((openkill_shadow_required_missing_count + 1)) ;;
+         CONDITIONAL_CURRENT) openkill_shadow_conditional_missing_count=$((openkill_shadow_conditional_missing_count + 1)) ;;
+         INACTIVE_MODE) openkill_shadow_inactive_missing_count=$((openkill_shadow_inactive_missing_count + 1)) ;;
+         OPTIONAL_OBSERVATION) openkill_shadow_optional_missing_count=$((openkill_shadow_optional_missing_count + 1)) ;;
+         OUT_OF_SCOPE) openkill_shadow_out_of_scope_missing_count=$((openkill_shadow_out_of_scope_missing_count + 1)) ;;
+         *) openkill_shadow_unknown_count=$((openkill_shadow_unknown_count + 1)); openkill_shadow_inventory_error_reason=inventory-object-unknown ;;
+      esac
+   done < "$openkill_shadow_inventory_intent_file"
+   rm -f "$openkill_shadow_inventory_seen"
+   openkill_shadow_inventory_missing_summary="required=$openkill_shadow_required_missing_count conditional=$openkill_shadow_conditional_missing_count inactive=$openkill_shadow_inactive_missing_count optional=$openkill_shadow_optional_missing_count out_of_scope=$openkill_shadow_out_of_scope_missing_count unknown=$openkill_shadow_unknown_count"
+   if [ "$openkill_shadow_required_missing_count" -gt 0 ]; then
+      openkill_shadow_inventory_error_reason=required-current-missing
+      return "$OPENKILL_NFT_SHADOW_RC_CAPTURE_ERROR"
+   fi
+   if [ "$openkill_shadow_unknown_count" -gt 0 ]; then
+      [ -n "$openkill_shadow_inventory_error_reason" ] || openkill_shadow_inventory_error_reason=inventory-object-unknown
+      return "$OPENKILL_NFT_SHADOW_RC_CAPTURE_ERROR"
+   fi
+   return 0
+}
+
 openkill_shadow_capture_legacy_intent()
 {
    openkill_shadow_capture_legacy_nft "$1"
@@ -1506,6 +1720,17 @@ openkill_shadow_publish()
       fi
       printf 'reason=%s\n' "$openkill_shadow_reason_value"
       printf 'mismatch_count=%s\n' "$openkill_shadow_mismatch_value"
+      # Additive inventory diagnostics.  These are counts only; no object
+      # names or captured payload enter telemetry.
+      printf 'inventory_schema_version=%s\n' "$OPENKILL_NFT_SHADOW_INVENTORY_SCHEMA_VERSION"
+      printf 'inventory_missing_count=%s\n' "${openkill_shadow_inventory_missing_count:-0}"
+      printf 'inventory_missing_summary=%s\n' "${openkill_shadow_inventory_missing_summary:-required=0 conditional=0 inactive=0 optional=0 out_of_scope=0 unknown=0}"
+      printf 'required_missing_count=%s\n' "${openkill_shadow_required_missing_count:-0}"
+      printf 'conditional_missing_count=%s\n' "${openkill_shadow_conditional_missing_count:-0}"
+      printf 'inactive_missing_count=%s\n' "${openkill_shadow_inactive_missing_count:-0}"
+      printf 'optional_missing_count=%s\n' "${openkill_shadow_optional_missing_count:-0}"
+      printf 'out_of_scope_missing_count=%s\n' "${openkill_shadow_out_of_scope_missing_count:-0}"
+      printf 'unknown_missing_count=%s\n' "${openkill_shadow_unknown_count:-0}"
    ) > "$openkill_shadow_tmp" && mv -f "$openkill_shadow_tmp" "$openkill_shadow_dir/status" || {
       rm -f "$openkill_shadow_tmp"
       return 1
@@ -1675,6 +1900,13 @@ openkill_shadow_compare_nft()
    openkill_shadow_generation_for_log=-
    openkill_shadow_continuity_token_value=
    openkill_shadow_auto_continuity_mode=0
+   openkill_shadow_inventory_missing_count=0
+   openkill_shadow_required_missing_count=0
+   openkill_shadow_conditional_missing_count=0
+   openkill_shadow_inactive_missing_count=0
+   openkill_shadow_optional_missing_count=0
+   openkill_shadow_out_of_scope_missing_count=0
+   openkill_shadow_unknown_count=0
    openkill_shadow_tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/openkill-shadow.XXXXXX" 2>/dev/null) || {
       openkill_shadow_publish INPUT_ERROR - - - temp-directory-failed || true
       exit "$OPENKILL_NFT_SHADOW_RC_INPUT"
@@ -1787,10 +2019,14 @@ openkill_shadow_compare_nft()
          openkill_shadow_publish "$openkill_shadow_capture_status" - - "$openkill_shadow_generation_for_log" legacy-parse || true
          exit "$openkill_shadow_parse_rc"
       fi
-      # A required object that disappeared during a bounded read is not an
-      # empty object.  Partial capture can never produce a false MATCH.
-      if grep -Eq '^MISSING[[:space:]]' "$openkill_shadow_capture_intent"; then
-         openkill_shadow_publish CAPTURE_ERROR - - "$openkill_shadow_generation_for_log" required-object-missing || true
+      # Missing records are classified from the formal CURRENT inventory
+      # schema.  Only REQUIRED_CURRENT (or an unknown/duplicate record) is a
+      # capture failure; conditional, inactive, optional, and out-of-scope
+      # absences remain bounded diagnostic evidence and may reach compare.
+      openkill_shadow_classify_inventory_missing "$openkill_shadow_capture_intent" "$openkill_shadow_input_tmp"
+      openkill_shadow_inventory_classify_rc=$?
+      if [ "$openkill_shadow_inventory_classify_rc" -ne 0 ]; then
+         openkill_shadow_publish CAPTURE_ERROR - - "$openkill_shadow_generation_for_log" "${openkill_shadow_inventory_error_reason:-inventory-classification}" || true
          exit "$OPENKILL_NFT_SHADOW_RC_CAPTURE_ERROR"
       fi
       openkill_shadow_old_intent_file=$openkill_shadow_capture_payload

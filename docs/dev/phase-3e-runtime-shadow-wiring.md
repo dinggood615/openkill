@@ -73,6 +73,16 @@ version, status, short hashes, generation, reason, and a mismatch count.
 subscriptions, and credentials are never logged or persisted.  Telemetry is
 evidence only and is not an applied-state checkpoint.
 
+Bounded legacy capture also carries an inventory classification derived from
+the CURRENT input templates.  `REQUIRED_CURRENT` absences fail the capture;
+`CONDITIONAL_CURRENT`, `INACTIVE_MODE`, `OPTIONAL_OBSERVATION`, and
+`OUT_OF_SCOPE` absences remain diagnostic counts and may proceed to the
+comparator.  An object outside the schema, duplicate inventory record, or a
+capture command failure remains fail-closed.  The status file records only the
+bounded counts (`required_missing_count`, `conditional_missing_count`,
+`inactive_missing_count`, `optional_missing_count`,
+`out_of_scope_missing_count`, and `unknown_missing_count`).
+
 The observer has no runtime firewall, route, DNS, service, or network side
 effects.  In particular it does not execute an nft transaction or a route
 command.  Development and CI continue to use the existing real parser gate;

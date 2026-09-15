@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -27,6 +28,26 @@ CAPTURE = SCRIPTS / "fixtures/openkill-legacy-runtime-capture-v1.txt"
 TPROXY_CAPTURE = SCRIPTS / "fixtures/openkill-legacy-runtime-capture-tproxy-v1.txt"
 PRODUCTION_CAPTURE = SCRIPTS / "fixtures/openkill-legacy-runtime-capture-production-v1.txt"
 MODEL = SCRIPTS / "fixtures/openkill-shadow-self-sufficiency-v1.json"
+DEVICE_CAPTURE = SCRIPTS / "fixtures/openkill-legacy-runtime-capture-device-3e2c-v1.txt"
+
+CAPTURE_CHAINS = (
+    "dstnat", "mangle_prerouting", "mangle_output", "output", "srcnat",
+    "input", "forward", "nat_output", "openkill", "openkill_v6",
+    "openkill_mangle", "openkill_mangle_v6", "openkill_output",
+    "openkill_output_v6", "openkill_mangle_output", "openkill_mangle_output_v6",
+    "openkill_post", "openkill_post_v6", "openkill_dns_hijack",
+    "openkill_dns_hijack_v6", "openkill_dns_redirect", "openkill_dns_redirect_v6",
+    "openkill_upnp", "openkill_wan_input", "openkill_wan6_input",
+)
+CAPTURE_SETS = (
+    "localnetwork", "localnetwork6", "openkill_node4", "openkill_node6",
+    "china_ip_route", "china_ip6_route", "china_ip_route_pass",
+    "china_ip6_route_pass", "openkill_access4_allow", "openkill_access4_bypass",
+    "openkill_access4_deny", "openkill_access6_allow", "openkill_access6_bypass",
+    "openkill_access6_deny", "openkill_service_ports", "common_ports",
+    "openkill_fakeip4", "openkill_fakeip6", "openkill_lan4", "openkill_lan6",
+    "openkill_delegated6", "openkill_wan_host4", "openkill_wan_host6",
+)
 
 
 def _wsl_path(path: Path) -> str:
@@ -46,6 +67,16 @@ def _quote(value: str | Path) -> str:
 def _write_lf(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(text.replace("\r\n", "\n").replace("\r", "\n").encode())
+
+
+def _object_blocks(path: Path) -> dict[tuple[str, str], str]:
+    """Return bounded OBJECT blocks keyed by their capture kind and name."""
+    text = path.read_text(encoding="utf-8")
+    result: dict[tuple[str, str], str] = {}
+    for match in re.finditer(r"(?ms)^OBJECT\t([^\t]+)\t([^\n]+)\n.*?^OBJECT_END\n", text):
+        kind, name = match.group(1), match.group(2).rstrip("\r")
+        result[(kind, name)] = match.group(0)
+    return result
 
 
 def _status_file(path: Path) -> dict[str, str]:
@@ -205,6 +236,10 @@ class ShadowSelfSufficiencyTests(unittest.TestCase):
         self.assertEqual(model["auto_state_version"], 1)
         self.assertEqual(model["legacy_runtime_intent_version"], 1)
         self.assertFalse(model["production_bundle_required"])
+        self.assertEqual(model["capture"]["inventory_schema_version"], 1)
+        self.assertEqual(model["capture"]["inventory_missing_classes"]["UNKNOWN"], "not present in the formal inventory; fail closed")
+        self.assertIn("dstnat", model["capture"]["required_base_chains"])
+        self.assertIn("WAN_HOST_V4", model["capture"]["out_of_scope_set_ids"])
         self.assertEqual(len(model["scenarios"]), 25)
         for template in ("input_tun_v1.tsv", "input_tproxy_v1.tsv", "input_redirect_v1.tsv"):
             text = (TEMPLATE_DIR / template).read_text(encoding="utf-8")
@@ -449,15 +484,207 @@ OBJECT_END
         self.assertIn("RC=10", process.stdout)
         self.assertIn("UNKNOWN_OWNED_RULE", intent.read_text(encoding="utf-8"))
 
-    def test_missing_capture_object_fails_closed(self) -> None:
+    def _conditional_inventory_capture(self, *, mutate_dns: bool = True) -> Path:
+        """Build the sanitized 3E.2D2A shape: 15 chains, 9 sets, 24 misses."""
+        blocks = _object_blocks(DEVICE_CAPTURE)
+        blocks.update(_object_blocks(CAPTURE))
+        present_chains = (
+            "nat_output", "dstnat", "openkill_output", "openkill_output_v6",
+            "openkill_dns_redirect", "openkill_wan_input", "openkill_wan6_input",
+            "mangle_prerouting", "mangle_output", "output", "srcnat", "input",
+            "forward", "openkill_upnp", "openkill_mangle",
+        )
+        present_sets = (
+            "openkill_service_ports", "localnetwork", "localnetwork6",
+            "openkill_node4", "openkill_node6", "china_ip_route", "china_ip6_route",
+            "china_ip_route_pass", "china_ip6_route_pass",
+        )
+        lines = [
+            "LEGACY_RUNTIME_CAPTURE_V1=1\n",
+            "# DEVICE_CAPTURE_FIXTURE_SOURCE=192.168.1.102_PHASE_3E2D2A\n",
+            "# Sanitized: no private addresses, MACs, node endpoints, or credentials.\n",
+        ]
+        for name in present_chains:
+            block = blocks.get(("chain", name))
+            if block is None:
+                self.assertIn(name, {"mangle_prerouting", "mangle_output", "output", "srcnat", "input", "forward"})
+                block = (
+                    f"OBJECT\tchain\t{name}\n"
+                    "table inet fw4 {\n"
+                    f" chain {name} {{\n"
+                    " }\n"
+                    "}\n"
+                    "OBJECT_END\n"
+                )
+            if mutate_dns and name == "openkill_dns_redirect":
+                block = block.replace(":7874", ":53")
+            lines.append(block)
+        for name in present_sets:
+            block = blocks.get(("set", name))
+            self.assertIsNotNone(block, name)
+            lines.append(block)
+        for name in CAPTURE_CHAINS:
+            if name not in present_chains:
+                lines.append(f"MISSING\tchain\t{name}\n")
+        for name in CAPTURE_SETS:
+            if name not in present_sets:
+                lines.append(f"MISSING\tset\t{name}\n")
+        output = self.harness.root / "device-3e2d2a.capture"
+        _write_lf(output, "".join(lines))
+        return output
+
+    def test_conditional_inventory_missing_reaches_comparator(self) -> None:
+        capture = self._conditional_inventory_capture()
+        result = self._coordinator(capture=capture)
+        self.assertEqual(result["rc"], 1, result)
+        self.assertEqual(result["status"].get("status"), "MISMATCH")
+        status = result["status"]
+        self.assertEqual(status.get("inventory_missing_count"), "24")
+        self.assertEqual(status.get("inventory_schema_version"), "1")
+        self.assertEqual(status.get("inventory_missing_summary"), "required=0 conditional=22 inactive=0 optional=0 out_of_scope=2 unknown=0")
+        self.assertEqual(status.get("required_missing_count"), "0")
+        self.assertEqual(status.get("conditional_missing_count"), "22")
+        self.assertEqual(status.get("out_of_scope_missing_count"), "2")
+
+    def test_conditional_inventory_stable_five_cycles(self) -> None:
+        capture = self._conditional_inventory_capture()
+        actual_hashes: set[str] = set()
+        central_hashes: set[str] = set()
+        continuity_hashes: set[str] = set()
+        for _ in range(5):
+            result = self._coordinator(capture=capture)
+            self.assertEqual(result["rc"], 1)
+            status = result["status"]
+            self.assertEqual(status.get("status"), "MISMATCH")
+            actual_hashes.add(status.get("old_hash", ""))
+            central_hashes.add(status.get("new_hash", ""))
+            # Fixture-backed runs intentionally use the legacy generation
+            # field; production live-source runs expose the additive
+            # continuity_token field.  Either way the continuity identity
+            # must remain stable across all five coordinator processes.
+            continuity_hashes.add(status.get("continuity_token", status.get("generation", "")))
+        self.assertEqual(len(actual_hashes), 1)
+        self.assertEqual(len(central_hashes), 1)
+        self.assertEqual(len(continuity_hashes), 1)
+        self.assertNotIn("", actual_hashes)
+        self.assertNotIn("", central_hashes)
+        self.assertNotIn("", continuity_hashes)
+
+    def test_missing_required_capture_object_fails_closed(self) -> None:
         missing = self.harness.root / "missing.capture"
         _write_lf(
             missing,
-            "MISSING\tchain\topenkill_output\n" + CAPTURE.read_text(encoding="utf-8"),
+            "MISSING\tchain\tnat_output\n" + CAPTURE.read_text(encoding="utf-8"),
         )
         result = self._coordinator(capture=missing)
         self.assertEqual(result["rc"], 9)
         self.assertEqual(result["status"].get("status"), "CAPTURE_ERROR")
+        self.assertEqual(result["status"].get("reason"), "required-current-missing")
+        self.assertEqual(result["status"].get("required_missing_count"), "1")
+        self.assertEqual(result["status"].get("conditional_missing_count"), "0")
+
+        missing_multiple = self.harness.root / "missing-multiple.capture"
+        _write_lf(
+            missing_multiple,
+            "MISSING\tchain\tnat_output\nMISSING\tchain\tdstnat\n" + CAPTURE.read_text(encoding="utf-8"),
+        )
+        result = self._coordinator(capture=missing_multiple)
+        self.assertEqual(result["rc"], 9)
+        self.assertEqual(result["status"].get("required_missing_count"), "2")
+        self.assertEqual(result["status"].get("reason"), "required-current-missing")
+
+    def test_conditional_missing_matrix_and_inventory_evidence(self) -> None:
+        cases = {
+            "single-chain": "MISSING\tchain\topenkill_output\n",
+            "multiple-chains": "MISSING\tchain\topenkill_output\nMISSING\tchain\topenkill_post\n",
+            "single-set": "MISSING\tset\topenkill_access4_allow\n",
+            "multiple-sets": "MISSING\tset\topenkill_access4_allow\nMISSING\tset\tcommon_ports\n",
+        }
+        for name, prefix in cases.items():
+            capture = self.harness.root / f"{name}.capture"
+            _write_lf(capture, prefix + CAPTURE.read_text(encoding="utf-8"))
+            result = self._coordinator(capture=capture)
+            self.assertEqual(result["rc"], 0, name)
+            self.assertEqual(result["status"].get("status"), "MATCH", name)
+            self.assertEqual(result["status"].get("required_missing_count"), "0", name)
+        all_missing = self._conditional_inventory_capture(mutate_dns=False)
+        result = self._coordinator(capture=all_missing)
+        self.assertEqual(result["rc"], 1)
+        self.assertEqual(result["status"].get("status"), "MISMATCH")
+        self.assertEqual(result["status"].get("inventory_missing_count"), "24")
+
+    def test_inactive_mode_and_optional_inventory_classification(self) -> None:
+        inactive = self.harness.root / "inactive.capture"
+        _write_lf(inactive, "MISSING\tchain\topenkill_tproxy\n" + CAPTURE.read_text(encoding="utf-8"))
+        result = self._coordinator(capture=inactive)
+        self.assertEqual(result["rc"], 0)
+        self.assertEqual(result["status"].get("inactive_missing_count"), "1")
+
+        optional = self.harness.root / "optional.capture"
+        _write_lf(optional, "MISSING\tchain\topenkill_upnp\n" + CAPTURE.read_text(encoding="utf-8"))
+        result = self._coordinator(capture=optional)
+        self.assertEqual(result["rc"], 0)
+        self.assertEqual(result["status"].get("optional_missing_count"), "1")
+
+        tproxy_source = self.harness.root / "tproxy-source.txt"
+        _write_lf(tproxy_source, AUTO_SOURCE.read_text(encoding="utf-8").replace("RUN_MODE=TUN", "RUN_MODE=TPROXY", 1))
+        active_tproxy = self.harness.root / "active-tproxy.capture"
+        _write_lf(active_tproxy, "MISSING\tchain\topenkill_tproxy\n" + CAPTURE.read_text(encoding="utf-8"))
+        result = self._coordinator(source=tproxy_source, capture=active_tproxy)
+        self.assertEqual(result["rc"], 9)
+        self.assertEqual(result["status"].get("required_missing_count"), "1")
+
+        redirect_source = self.harness.root / "redirect-source.txt"
+        _write_lf(redirect_source, AUTO_SOURCE.read_text(encoding="utf-8").replace("RUN_MODE=TUN", "RUN_MODE=REDIRECT", 1))
+        inactive_redirect = self.harness.root / "inactive-redirect.capture"
+        _write_lf(inactive_redirect, "MISSING\tchain\topenkill_tproxy\n" + CAPTURE.read_text(encoding="utf-8"))
+        result = self._coordinator(source=redirect_source, capture=inactive_redirect)
+        self.assertEqual(result["rc"], 1)
+        self.assertEqual(result["status"].get("status"), "MISMATCH")
+        self.assertEqual(result["status"].get("inactive_missing_count"), "1")
+
+    def test_unknown_duplicate_and_command_failures_fail_closed(self) -> None:
+        unknown = self.harness.root / "unknown-inventory.capture"
+        _write_lf(unknown, "MISSING\tchain\tnot_in_current_schema\n" + CAPTURE.read_text(encoding="utf-8"))
+        result = self._coordinator(capture=unknown)
+        self.assertEqual(result["rc"], 9)
+        self.assertEqual(result["status"].get("reason"), "inventory-object-unknown")
+        self.assertEqual(result["status"].get("unknown_missing_count"), "1")
+
+        duplicate = self.harness.root / "duplicate-inventory.capture"
+        _write_lf(duplicate, "MISSING\tchain\topenkill_output\nMISSING\tchain\topenkill_output\n" + CAPTURE.read_text(encoding="utf-8"))
+        result = self._coordinator(capture=duplicate)
+        self.assertEqual(result["rc"], 9)
+        self.assertEqual(result["status"].get("reason"), "inventory-duplicate-entry")
+
+        for code, label, diagnostic, expected_rc in (
+            (13, "permission", "Operation not permitted", 9),
+            (2, "syntax", "syntax error", 9),
+            (1, "absent", "No such file or directory", 0),
+        ):
+            fake = self.harness.root / f"nft-{label}.sh"
+            _write_lf(fake, f"#!/bin/sh\nprintf '%s\\n' {_quote(diagnostic)} >&2\nexit {code}\n")
+            output = self.harness.root / f"capture-{label}.txt"
+            trace = self.harness.root / f"trace-{label}.txt"
+            body = (
+                f"openkill_shadow_capture_legacy_nft {_quote(_wsl_path(output))}; "
+                "printf 'RC=%s\\n' \"$?\""
+            )
+            process, _ = self.harness.run(
+                body,
+                {
+                    "OPENKILL_NFT_SHADOW_CAPTURE_NFT_BIN": _wsl_path(fake),
+                    "OPENKILL_NFT_SHADOW_CAPTURE_CHAINS": "openkill_output",
+                    "OPENKILL_NFT_SHADOW_CAPTURE_SETS": "openkill_service_ports",
+                    "OPENKILL_NFT_SHADOW_CAPTURE_TRACE": _wsl_path(trace),
+                },
+            )
+            self.assertIn(f"RC={expected_rc}", process.stdout, label)
+            trace_text = trace.read_text(encoding="utf-8")
+            if expected_rc:
+                self.assertIn("command-error", trace_text, label)
+            else:
+                self.assertIn("missing", trace_text, label)
 
     def test_tproxy_capture_keeps_transport_family_port_and_mark(self) -> None:
         intent = self.harness.root / "tproxy.intent"
