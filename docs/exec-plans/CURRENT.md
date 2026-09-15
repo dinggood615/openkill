@@ -6,7 +6,13 @@
 - Branch: `master`; clean at activation; origin verified through GitHub API.
 - Resolve current HEAD with `git rev-parse HEAD` at every restart. The observed
   hash above is a baseline, not a claim that later checkpoint commits are stale.
-- Migration: PASS. Current phase: post-D2C local regression and CI coverage.
+- Migration: PASS. AUTONOMOUS_ACTIVATION=PASS.
+- Current phase: post-D2C local/CI closure; executor STOPPED_AT_REAL_DEVICE_GATE.
+- Latest verified implementation HEAD: `6f98a0966a339796b58b9e047d577f931a0db74d`.
+- Development CI: PASS, run 34977442249 for that exact implementation HEAD.
+- This documentation checkpoint is a descendant commit. Resolve its actual
+  HEAD from Git and check its own CI on restart; do not recursively rewrite
+  this file just to embed its own commit hash.
 - Baseline Development CI: PASS, run 34974224074 for the observed hash.
 - Branch protection: absent (GitHub API); this executor must enforce gates
   before pushing. Repository-side enforcement remains a known limitation.
@@ -15,13 +21,21 @@
 
 ## Next autonomous action
 
-1. Finish local regression, review, commit and push the activation change;
-   verify Development CI for the exact resulting commit, repairing failures.
-2. Record that verified commit and CI run in the completion checkpoint.
-3. Next product dependency: post-D2C real-device semantic revalidation.
-   After local/CI completion stop at REAL_DEVICE_GATE. Local fixtures do not
-   prove current device parity. Resume only after explicit device authorization
-   or a new concrete local work item. Release remains separately gated.
+REAL_DEVICE_GATE: post-D2C real-device semantic revalidation is required
+before advancing the product toward Phase 4. No device access is authorized
+in this execution. Local fixtures do not prove current device parity.
+
+On restart, read AGENTS.md and this file, inspect HEAD/worktree and verify
+Development CI for that exact HEAD. Repair any ordinary CI regression locally.
+If CI is green and no new local work item exists, retain this gate and stop;
+do not invent feature scope or repeatedly commit unchanged status.
+
+Resume product development only when the user explicitly authorizes the
+post-D2C device phase with a target and scope, or supplies a concrete local
+work item. Central apply/packet-path work and RELEASE_GATE remain separate.
+No unattended executor or recurring wakeup is claimed to be running while
+this gate is active. Repository restart instructions are persisted and the
+first autonomous local iteration and its CI repair have been completed.
 
 ## Activation implementation
 
@@ -125,7 +139,7 @@ or republish it.
   not perform real parsing there. The shell-renderer suite passed its WSL
   check-only nft matrix. Neither result is live-device validation.
 - Workflow/source gate and diff whitespace review passed. Source version
-  remains 2026-1127. Commit/push and exact-commit CI verification are next.
+  remains 2026-1127. Implementation commits are pushed and exact-commit CI passed as recorded above.
 
 ## CI repair iteration
 
@@ -134,4 +148,13 @@ run 34977232002. Its new network suite exposed a fixture dependency on the
 runner's DNS servers. The repair supplies a documentation-range resolver and
 stubs nslookup/resolveip so the existing getent fallback and timeout-preserves-
 old-state assertions run deterministically without live DNS. This changes
-only the test environment. Exact-commit CI must pass before gate closure.
+only the test environment. The repaired commit passed CI run 34977442249; the gate can close.
+
+## Closure evidence
+
+- Implementation commits: `ee282e3` (activation and Stage D isolation),
+  `6f98a09` (DNS fixture isolation); both pushed to origin/master.
+- Passing run: https://github.com/dinggood615/openkill/actions/runs/34977442249
+- Working tree was clean before this documentation-only checkpoint.
+- REAL_DEVICE_VALIDATION=PENDING; RELEASE_GATE=NOT_REQUESTED.
+- No version bump, package publication, tag change or real-device access.
