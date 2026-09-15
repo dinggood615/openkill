@@ -1154,6 +1154,10 @@ def _lower_context_attachments(
     if kind == "DNS":
         protocol_match = "meta l4proto {tcp,udp} th dport 53"
         family_match = "meta nfproto {}".format("ipv4" if family == "IPv4" else "ipv6")
+        # Mode 1 enters dnsmasq on its LAN-facing listener.  ``dns_port`` is
+        # Mihomo's listener/upstream port and is intentionally retained for
+        # mode-2 direct DNS only; never alias the two fields here.
+        firewall_dns_port = int(execution.get("firewall_dns_port", execution["dns_port"]))
         if execution.get("dns_scope") == "DNS_LAN":
             source = _physical_chain("FW4_DSTNAT", chains, external)
             if str(execution.get("dns_mode")) == "1":
@@ -1164,7 +1168,7 @@ def _lower_context_attachments(
                         "FW4_DSTNAT",
                         family_match + " " + protocol_match,
                         "DNS_REDIRECT",
-                        "redirect to :{}".format(int(execution["dns_port"])),
+                        "redirect to :{}".format(firewall_dns_port),
                         component="DNS",
                     )
                 )
@@ -1191,7 +1195,7 @@ def _lower_context_attachments(
                     "OPENKILL_NAT_OUTPUT_CURRENT",
                     "meta skgid != 65534 " + family_match + " " + protocol_match + " " + family_tail,
                     "DNS_REDIRECT",
-                    "redirect to :{}".format(int(execution["dns_port"])),
+                    "redirect to :{}".format(firewall_dns_port),
                     component="DNS",
                 )
             )

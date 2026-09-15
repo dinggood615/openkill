@@ -63,14 +63,18 @@ direct or transitive equivalence.  A field without a formal owner/source is a
 `COMPARATOR_MODEL_GAP`; missing evidence is `INSUFFICIENT_EVIDENCE`.  An
 explicitly owned differing field is a `MISMATCH`.
 
-The DNS fixture records the frozen `.102` actual path (`53` at the firewall and
+The fixture records the frozen `.102` actual path (`53` at the firewall and
 dnsmasq listener, `127.0.0.1#7874` upstream, and `127.0.0.1:7874` Mihomo
-listener).  The desired firewall targets come from the CURRENT renderer's
-formal `DNS_REDIRECT` execution contract (`dns_port=7874`), while the desired
-dnsmasq and Mihomo fields come from their committed state contracts.  The
-result is therefore an attributable DNS mismatch on the two firewall target
-fields; it is not a `53` to `7874` equivalence.  The comparison is reproducible
-without a device or a live configuration read.
+listener).  The original D2B desired projection used the renderer's shared
+`dns_port=7874` value for both firewall targets and therefore exposed a
+two-field mismatch.  D2C source-of-truth auditing superseded that projection:
+the stable mode-1 `DNS_REDIRECT` entry point is the dnsmasq listener (`:53`),
+while mode-2 direct DNS retains `dns_port` for its Mihomo listener.  The
+reconciled desired fixture now records the mode-1 `:53` targets and matches the
+frozen actual path without introducing a `53` to `7874` equivalence.  The
+previous desired values remain in the fixture's frozen-evidence metadata for
+traceability.  The comparison is reproducible without a device or a live
+configuration read.
 
 ## Regression coverage
 
@@ -78,10 +82,11 @@ without a device or a live configuration read.
 and absent out-of-scope objects, active/inactive modes (including metadata-only
 inventory entries), unknown and duplicate identity fail-closed behavior,
 typed DNS mismatches and missing evidence, IPv6 endpoint canonicalization, hash
-isolation, and ten deterministic runs of the frozen stable-mismatch fixture.
-Existing D2A
-coordinator, parser, renderer, continuity, and writer tests remain unchanged.
+isolation, and ten deterministic runs of the frozen `.102` fixture after the
+DNS intent reconciliation.
+Existing D2A coordinator, parser, continuity, and writer tests remain
+unchanged.  The later D2C reconciliation adds a focused renderer DNS intent
+regression; the D2B model itself remains a comparison-only projection.
 
-No renderer NFT payload, parser grammar, auto-state ABI, continuity algorithm,
-coordinator capture classification, legacy writer, DNS writer, or device state
-is changed by this phase.
+No parser grammar, auto-state ABI, continuity algorithm, coordinator capture
+classification, legacy writer, DNS writer, or device state is changed by D2B.

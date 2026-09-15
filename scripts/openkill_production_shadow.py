@@ -307,6 +307,12 @@ def _state_values(state: Mapping[str, Any], packet: Optional[Mapping[str, Any]] 
     proxy_port_value = int(proxy_ports.get("redirect", 7892))
     tproxy_port_value = int(proxy_ports.get("tproxy", 7895))
     dns_port_value = int(proxy_ports.get("dns", 7874))
+    # ``dns_port`` is Mihomo's listener/upstream.  In the stable mode-1
+    # production path set_firewall discovers dnsmasq's LAN-facing listener;
+    # the checked-in OpenWrt configuration leaves that listener at its
+    # default :53.  Model that independent source in the record-only harness
+    # instead of accidentally feeding the Mihomo port into DNSPORT.
+    dnsmasq_listen_port = 53
     fake4 = normalized.get("fake_ip4") or ["198.18.0.0/15"]
     fake6 = normalized.get("fake_ip6") or ["fd00:ffff::/96"]
     # Values are all fixture data and are quoted again by the harness before
@@ -332,7 +338,7 @@ def _state_values(state: Mapping[str, Any], packet: Optional[Mapping[str, Any]] 
         "proxy_port": proxy_port_value,
         "tproxy_port": tproxy_port_value,
         "dns_port": dns_port_value,
-        "DNSPORT": dns_port_value,
+        "DNSPORT": dnsmasq_listen_port,
         "bypass_gateway_compatible": 0,
         "intranet_allowed": 0,
         "enable_udp_proxy": 1 if mode == "TPROXY" else 0,

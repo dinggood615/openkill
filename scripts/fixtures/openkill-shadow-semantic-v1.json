@@ -8,6 +8,11 @@
     "continuity_short_hash": "e7f4fc26650a",
     "stable_mismatch_cycles": 5,
     "dns_previous_status": "COMPARATOR_MODEL_GAP",
+    "dns_previous_desired_firewall": {
+      "lan": 7874,
+      "router": 7874
+    },
+    "dns_reconciled_architecture": "LEGACY_53_PATH_IS_CURRENT_CONTRACT",
     "wan_safety": ["legacy input attachments", "openkill_wan_input", "openkill_wan6_input"],
     "bounded_capture": {
       "chain_probes": 25,
@@ -211,8 +216,8 @@
   },
   "dns_desired": {
     "dns_semantics": {
-      "DNS_FIREWALL_LAN_TARGET": 7874,
-      "DNS_FIREWALL_ROUTER_TARGET": 7874,
+      "DNS_FIREWALL_LAN_TARGET": 53,
+      "DNS_FIREWALL_ROUTER_TARGET": 53,
       "DNSMASQ_LISTEN_TARGET": 53,
       "DNSMASQ_UPSTREAM_TARGET": "127.0.0.1#7874",
       "MIHOMO_DNS_LISTENER": "127.0.0.1:7874",
@@ -231,8 +236,8 @@
       "DNS_SCOPE_IPV6": "CURRENT_OWNED"
     },
     "sources": {
-      "DNS_FIREWALL_LAN_TARGET": "CURRENT renderer DNS_REDIRECT execution (dns_port=7874)",
-      "DNS_FIREWALL_ROUTER_TARGET": "CURRENT renderer DNS_REDIRECT execution (dns_port=7874)",
+      "DNS_FIREWALL_LAN_TARGET": "CURRENT mode-1 DNS firewall target (dnsmasq listener :53)",
+      "DNS_FIREWALL_ROUTER_TARGET": "CURRENT mode-1 DNS firewall target (dnsmasq listener :53)",
       "DNSMASQ_LISTEN_TARGET": "committed dnsmasq desired state",
       "DNSMASQ_UPSTREAM_TARGET": "committed dnsmasq desired state",
       "MIHOMO_DNS_LISTENER": "committed Mihomo desired state",

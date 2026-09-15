@@ -409,6 +409,14 @@ class SemanticModelTests(unittest.TestCase):
         self.assertEqual(f["frozen_device_evidence"]["bounded_capture"]["set_probes"], 23)
         self.assertEqual(f["frozen_device_evidence"]["bounded_capture"]["required_current_missing"], 0)
         self.assertEqual(f["frozen_device_evidence"]["bounded_capture"]["conditional_or_inventory_missing"], 24)
+        self.assertEqual(
+            f["frozen_device_evidence"]["dns_previous_desired_firewall"],
+            {"lan": 7874, "router": 7874},
+        )
+        self.assertEqual(
+            f["frozen_device_evidence"]["dns_reconciled_architecture"],
+            "LEGACY_53_PATH_IS_CURRENT_CONTRACT",
+        )
         first = compare_semantic_intents(
             f["actual_intent"],
             f["desired_intent"],
@@ -418,13 +426,10 @@ class SemanticModelTests(unittest.TestCase):
             dns_desired=f["dns_desired"],
         )
         self.assertEqual(first["framework"], "PASS")
-        self.assertEqual(first["parity"], "MISMATCH")
+        self.assertEqual(first["parity"], "MATCH")
         self.assertTrue(any(item["component"] == "WAN_SAFETY" for item in first["out_of_scope_observations"]))
-        self.assertEqual(first["dns"]["parity"], "MISMATCH")
-        self.assertEqual(
-            {item["field"] for item in first["dns"]["mismatches"]},
-            {"DNS_FIREWALL_LAN_TARGET", "DNS_FIREWALL_ROUTER_TARGET"},
-        )
+        self.assertEqual(first["dns"]["parity"], "MATCH")
+        self.assertEqual(first["dns"]["mismatches"], [])
         second = compare_semantic_intents(
             f["actual_intent"],
             f["desired_intent"],
@@ -436,7 +441,7 @@ class SemanticModelTests(unittest.TestCase):
         self.assertEqual(first["actual_owned_hash"], second["actual_owned_hash"])
         self.assertEqual(first["desired_owned_hash"], second["desired_owned_hash"])
 
-    def test_frozen_fixture_ten_stable_cycles_when_mismatch(self):
+    def test_frozen_fixture_ten_stable_cycles_after_dns_reconciliation(self):
         f = self.fixture
         reports = [
             compare_semantic_intents(
@@ -449,12 +454,12 @@ class SemanticModelTests(unittest.TestCase):
             )
             for _ in range(10)
         ]
-        self.assertEqual({item["parity"] for item in reports}, {"MISMATCH"})
+        self.assertEqual({item["parity"] for item in reports}, {"MATCH"})
         self.assertEqual({item["actual_owned_hash"] for item in reports}, {reports[0]["actual_owned_hash"]})
         self.assertEqual({item["desired_owned_hash"] for item in reports}, {reports[0]["desired_owned_hash"]})
         self.assertEqual({item["actual_current_owned_hash"] for item in reports}, {reports[0]["actual_current_owned_hash"]})
         self.assertEqual({item["desired_current_owned_hash"] for item in reports}, {reports[0]["desired_current_owned_hash"]})
-        self.assertNotEqual(reports[0]["actual_current_owned_hash"], reports[0]["desired_current_owned_hash"])
+        self.assertEqual(reports[0]["actual_current_owned_hash"], reports[0]["desired_current_owned_hash"])
 
     def test_production_shadow_adapter_exposes_same_model(self):
         f = self.fixture

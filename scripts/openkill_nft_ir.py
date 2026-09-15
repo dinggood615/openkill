@@ -125,6 +125,14 @@ MARK_ABI = {
     "rule_preference": 1888,
 }
 
+# DNS has two deliberately separate ports in the CURRENT contract.  The
+# configured ``dns`` proxy port is Mihomo's loopback listener (and the
+# dnsmasq upstream), while the stable mode-1 firewall entry point is the
+# dnsmasq listener.  OpenWrt's dnsmasq listener defaults to port 53 and the
+# production configuration does not override that default.
+DEFAULT_MIHOMO_DNS_PORT = 7874
+DEFAULT_DNSMASQ_LISTEN_PORT = 53
+
 
 class NFTIRValidationError(ValueError):
     """Raised when an abstract IR is malformed or unsafe to consume."""
@@ -935,10 +943,19 @@ def _current_backend_execution(
     # and therefore use the configured fixture ports.
     default_redirect = 7892 if state is not None else 12345
     default_tproxy = 7893 if state is not None else 12345
-    default_dns = 7874
+    default_dns = DEFAULT_MIHOMO_DNS_PORT
     redirect_port = int(ports.get("redirect", default_redirect))
     tproxy_port = int(ports.get("tproxy", default_tproxy))
     dns_port = int(ports.get("dns", default_dns))
+    # A context-only DNS render retains the historical mode-2 chain form.
+    # State-backed mode-1 renders model the production path: firewall ->
+    # dnsmasq :53 -> Mihomo :7874.  Keeping this as a distinct execution
+    # field prevents the listener/upstream value from being reused as the
+    # firewall redirect target.
+    dns_mode = str((state or {}).get("dns_mode", "2" if state is None else "0"))
+    firewall_dns_port = (
+        DEFAULT_DNSMASQ_LISTEN_PORT if dns_mode == "1" else dns_port
+    )
 
     base: Dict[str, Any] = {
         "status": "NO_ACTION",
@@ -972,6 +989,7 @@ def _current_backend_execution(
                     "kind": "DNS",
                     "dns_scope": "DNS_LAN",
                     "dns_mode": "2",
+                    "firewall_dns_port": firewall_dns_port,
                     "parent_chain_ref": "FW4_DSTNAT",
                     "body_chain_ref": "OPENKILL_DNS_LAN_" + suffix,
                     "action_type": "DNS_REDIRECT",
@@ -983,15 +1001,28 @@ def _current_backend_execution(
                     "kind": "DNS",
                     "dns_scope": "DNS_ROUTER",
                     "dns_mode": "2",
+                    "firewall_dns_port": firewall_dns_port,
                     "parent_chain_ref": "OPENKILL_NAT_OUTPUT_CURRENT",
                     "action_type": "DNS_REDIRECT",
                     "router_scope_guard": "SELF_PROCESS_EXCLUDED",
                 }
-        dns_mode = str((state or {}).get("dns_mode", "0"))
         if dns_mode == "0" or (direction == "ROUTER_OUTPUT" and not self_proxy):
-            return {**base, "status": "NO_ACTION", "kind": "DNS", "dns_mode": dns_mode}
+            return {
+                **base,
+                "status": "NO_ACTION",
+                "kind": "DNS",
+                "dns_mode": dns_mode,
+                "firewall_dns_port": firewall_dns_port,
+            }
         if direction == "LAN_INGRESS":
-            result = {**base, "status": "READY", "kind": "DNS", "dns_scope": "DNS_LAN", "dns_mode": dns_mode}
+            result = {
+                **base,
+                "status": "READY",
+                "kind": "DNS",
+                "dns_scope": "DNS_LAN",
+                "dns_mode": dns_mode,
+                "firewall_dns_port": firewall_dns_port,
+            }
             if dns_mode == "1":
                 result.update({"parent_chain_ref": "FW4_DSTNAT", "action_type": "DNS_REDIRECT"})
             else:
@@ -1017,11 +1048,12 @@ def _current_backend_execution(
                 "kind": "DNS",
                 "dns_scope": "DNS_ROUTER",
                 "dns_mode": dns_mode,
+                "firewall_dns_port": firewall_dns_port,
                 "parent_chain_ref": "OPENKILL_NAT_OUTPUT_CURRENT",
                 "action_type": "DNS_REDIRECT",
                 "router_scope_guard": "SELF_PROCESS_EXCLUDED",
             }
-        return {**base, "kind": "DNS"}
+        return {**base, "kind": "DNS", "firewall_dns_port": firewall_dns_port}
 
     if decision != "PROXY":
         return base
@@ -1762,6 +1794,8 @@ __all__ = [
     "ACTION_TYPES",
     "DIFF_CATEGORIES",
     "MARK_ABI",
+    "DEFAULT_MIHOMO_DNS_PORT",
+    "DEFAULT_DNSMASQ_LISTEN_PORT",
     "NFTIRValidationError",
     "canonical_set_elements",
     "build_static_topology",
