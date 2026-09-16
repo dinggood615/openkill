@@ -63,6 +63,11 @@ class TestGateRunner(unittest.TestCase):
         self.assertEqual(status, "SKIP_ALLOWED")
         self.assertEqual(reason, "RUBY_UNAVAILABLE")
 
+    def test_ruby_dependent_wsl_cases_declare_ruby_skip(self):
+        cases = {case.name: case for case in gates.WSL_TESTS}
+        self.assertIn("RUBY_UNAVAILABLE", cases["test-installer-wsl"].skip_policy)
+        self.assertIn("RUBY_UNAVAILABLE", cases["test-runtime-wsl"].skip_policy)
+
     def test_shell_cases_use_shell_interpreter_in_wsl(self):
         case = gates.Case("policy", "scripts/local-gate.sh", environment="wsl")
         command = gates.command_for(case)

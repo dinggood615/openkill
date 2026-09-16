@@ -103,10 +103,12 @@ NATIVE_TESTS = tuple(
     for case in NATIVE_TESTS
 )
 
+WSL_RUBY_POLICY = ("WSL_UNAVAILABLE", "RUBY_UNAVAILABLE")
+
 WSL_TESTS: tuple[Case, ...] = (
-    Case("test-installer-wsl", "scripts/test-installer.py", environment="wsl", timeout=300, skip_policy=("WSL_UNAVAILABLE",)),
+    Case("test-installer-wsl", "scripts/test-installer.py", environment="wsl", timeout=300, skip_policy=WSL_RUBY_POLICY),
     Case("test-network-model-wsl", "scripts/test-network-model.py", environment="wsl", timeout=300, skip_policy=("WSL_UNAVAILABLE",)),
-    Case("test-runtime-wsl", "scripts/test-runtime.py", environment="wsl", timeout=300, skip_policy=("WSL_UNAVAILABLE",)),
+    Case("test-runtime-wsl", "scripts/test-runtime.py", environment="wsl", timeout=300, skip_policy=WSL_RUBY_POLICY),
     Case("test-snapshot-fw4-wsl", "scripts/test-snapshot-fw4.py", environment="wsl", timeout=300, skip_policy=("WSL_UNAVAILABLE",)),
     Case("test-stage-d-wsl", "scripts/test-stage-d.py", environment="wsl", timeout=300, skip_policy=("WSL_UNAVAILABLE",)),
     Case("test-core-v1_19_30-wsl", "scripts/test-core.py", ("--release", "v1.19.30"), "wsl", 600, skip_policy=("WSL_UNAVAILABLE",)),

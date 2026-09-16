@@ -11,10 +11,10 @@ NEXT_ACTION: `PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE` after expli
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
 REAL_PACKET_PATH: `NOT_TESTED`
-FAST_GATE: `PASS` (`20260916T133010Z-4400`)
-FULL_GATE: `PASS` (`20260916T133300Z-10460`; nft CLI recorded as `NOT_RUN_ENVIRONMENT`)
-DEVICE_PREFLIGHT: `PASS` (`20260916T134656Z-6164`; nft CLI recorded as `NOT_RUN_ENVIRONMENT`)
-DEVICE_CANDIDATE_ID: `8693d265bd2f6d809229708a834ad55063cd817f0f78c1d42bab3a098e8b5135`
+FAST_GATE: `PASS` (`20260916T140505Z-2412`)
+FULL_GATE: `PASS` (`20260916T140752Z-19340`; nft CLI recorded as `NOT_RUN_ENVIRONMENT`)
+DEVICE_PREFLIGHT: `PASS` (`20260916T142142Z-21440`; nft CLI recorded as `NOT_RUN_ENVIRONMENT`)
+DEVICE_CANDIDATE_ID: `caaf4a28865dce66150758e4b2dc3ca347bbc5620ae8fefe5984084aafbb7c40`
 RESULTING_HEAD: resolve with `git rev-parse HEAD` after the local hardening commit; the recorded `CURRENT_HEAD` is the pre-commit observation
 
 IMPLEMENTED: R3C internal typed sidecar producer, canonical D2D fixture, typed ownership/DNS model, isolated staged execution and unified local gates
@@ -587,23 +587,24 @@ source/test/fixture/interpreter inputs, and writes machine-readable evidence
 bundles.  The candidate manifest's minimal staging set is the observer,
 renderer, `shadow/semantic_model_v1.tsv`, and `shadow/input_tun_v1.tsv`; its
 candidate ID is
-`8693d265bd2f6d809229708a834ad55063cd817f0f78c1d42bab3a098e8b5135` and the
+`caaf4a28865dce66150758e4b2dc3ca347bbc5620ae8fefe5984084aafbb7c40` and the
 canonical config remains
 `scripts/fixtures/3e2-safe.yaml` with SHA-256
 `9cd8d91750758823776df9c982c1e15f0baa1a72baa1792fa2f82c0df4d24a6e`.
 
 Evidence is complete for the current worktree: fast run
-`20260916T133010Z-4400` passed; full run `20260916T133300Z-10460` passed with
+`20260916T140505Z-2412` passed; full run `20260916T140752Z-19340` passed with
 32 PASS and one documented `NOT_RUN_ENVIRONMENT` (`NFT_CLI_UNAVAILABLE`);
-device-preflight run `20260916T134656Z-6164` passed with 25 PASS and the same
+device-preflight run `20260916T142142Z-21440` passed with 25 PASS and the same
 single environment result.  The staged observer test is 16/16, the R2B UCI
 lifecycle test is 18/18, and the candidate manifest reports staged execution,
 internal typed sidecars, no repository fallback, `DEVICE_ACCESS=0`,
 `CENTRAL_APPLY=0`, and `PACKET_TEST=0`.  The candidate ID is
-`8693d265bd2f6d809229708a834ad55063cd817f0f78c1d42bab3a098e8b5135`; its
+`caaf4a28865dce66150758e4b2dc3ca347bbc5620ae8fefe5984084aafbb7c40`; its
 runner source hash is
-`ea8a3da63fa4b182cb7e4a268a1219a37f7d81500cc1779c186d85d87850da7b`.
-The eight frozen writer hashes are unchanged and `NEW_UNEXPLAINED_SKIP=0`.
+`b570de29a31207a3a2cefb3c8a75bfcb07334a254ff1cf4172aab11edc44974a`.
+The WSL Ruby-dependent cases declare `RUBY_UNAVAILABLE` explicitly.  The
+eight frozen writer hashes are unchanged and `NEW_UNEXPLAINED_SKIP=0`.
 
 This proves local readiness only.  `DEVICE_RETRY_READY=YES` means the exact
 candidate may be considered for an explicitly approved `.102` phase; it does
