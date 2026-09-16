@@ -1,24 +1,24 @@
 # Current status
 
-CURRENT_HEAD: `28811e56d04b77963e5e5b8b6254b4dc741b8aac` (observed before this local hardening work)
+CURRENT_HEAD: `b522172e95ebd1be3be4634e5a8adc8374a6408f` (observed before the UI/gate follow-up)
 VERSION: `2026-1128`
 CURRENT_PHASE: `LOCAL_VALIDATION_HARDENING_WORK_PACKAGE`
-CURRENT_STATUS: `PASS — local validation hardening complete`
+CURRENT_STATUS: `IN_PROGRESS — UI presentation fixes and final clean-HEAD gate verification`
 BLOCKER: `REAL_DEVICE_GATE` — the next typed-shadow retry still needs explicit device-phase approval
 DEVICE_STATE: `.102` was not accessed in this work package; prior R2C evidence records a healthy retained baseline
-DEVICE_RETRY_READY: `YES` (purely local preflight; device verification remains pending)
+DEVICE_RETRY_READY: `PENDING_FINAL_CLEAN_HEAD_PREFLIGHT` (device verification remains pending)
 NEXT_ACTION: `PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE` after explicit device-phase approval
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
 REAL_PACKET_PATH: `NOT_TESTED`
-FAST_GATE: `PASS` (`20260916T140505Z-2412`)
-FULL_GATE: `PASS` (`20260916T140752Z-19340`; nft CLI recorded as `NOT_RUN_ENVIRONMENT`)
-DEVICE_PREFLIGHT: `PASS` (`20260916T142142Z-21440`; nft CLI recorded as `NOT_RUN_ENVIRONMENT`)
-DEVICE_CANDIDATE_ID: `caaf4a28865dce66150758e4b2dc3ca347bbc5620ae8fefe5984084aafbb7c40`
+FAST_GATE: `PENDING_FINAL_CLEAN_HEAD_RUN` (previous local result: `20260916T140505Z-2412`)
+FULL_GATE: `PENDING_FINAL_CLEAN_HEAD_RUN` (previous local result: `20260916T140752Z-19340`; nft CLI recorded as `NOT_RUN_ENVIRONMENT`)
+DEVICE_PREFLIGHT: `PENDING_FINAL_CLEAN_HEAD_RUN` (previous local result: `20260916T142142Z-21440`; nft CLI recorded as `NOT_RUN_ENVIRONMENT`)
+DEVICE_CANDIDATE_ID: `PENDING_FINAL_CLEAN_HEAD_RUN`
 RESULTING_HEAD: resolve with `git rev-parse HEAD` after the local hardening commit; the recorded `CURRENT_HEAD` is the pre-commit observation
 
-IMPLEMENTED: R3C internal typed sidecar producer, canonical D2D fixture, typed ownership/DNS model, isolated staged execution and unified local gates
-LOCAL_VERIFIED: fast/full/device-preflight evidence above, R3C local replay and focused regression suites
+IMPLEMENTED: R3C internal typed sidecar producer, canonical D2D fixture, typed ownership/DNS model, isolated staged execution, unified local gates and LuCI presentation fixes
+LOCAL_VERIFIED: prior gate evidence above; final clean-HEAD fast/full/device-preflight verification pending
 DEVICE_VERIFIED: `NO` for the R3A/R3C candidate
 RELEASED: `NO` (2026-1128 package remains the verified release baseline)
 
@@ -26,6 +26,11 @@ The detailed phase records below are retained as historical evidence. The
 single local gate runner and the hardening decisions are documented in
 [`docs/dev/local-validation-hardening.md`](../dev/local-validation-hardening.md)
 and [`docs/testing/TEST_GATES.md`](../testing/TEST_GATES.md).
+
+The UI follow-up fixes stale stylesheet cache keys, the missing subscription
+detail hook, and status-page controls that did not recover after a later poll.
+`scripts/test-ui-contract.py` covers these source-level regressions; live LuCI
+browser rendering remains outside this local-only work package.
 
 ## Historical execution records
 

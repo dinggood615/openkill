@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import sys
 import unittest
+from unittest import mock
 
 RUNNER_PATH = Path(__file__).with_name("openkill-test-gates.py")
 spec = importlib.util.spec_from_file_location("openkill_test_gates", RUNNER_PATH)
@@ -23,6 +24,7 @@ class TestGateRunner(unittest.TestCase):
         self.assertTrue(gates.build_cases("fast"))
         self.assertGreater(len(gates.build_cases("full")), len(gates.build_cases("fast")))
         self.assertGreaterEqual(len(gates.build_cases("device-preflight")), len(gates.NATIVE_TESTS))
+        self.assertIn("test-ui-contract", {case.name for case in gates.build_cases("fast")})
 
     def test_dependency_key_is_content_bound(self):
         case = gates.Case("fixture", "scripts/test-3e2-safe-config.py")
@@ -31,6 +33,18 @@ class TestGateRunner(unittest.TestCase):
         names = {item["path"] for item in inputs}
         self.assertIn("scripts/test-3e2-safe-config.py", names)
         self.assertIn("scripts/fixtures/3e2-safe.yaml", names)
+
+    def test_ui_dependency_key_includes_rendered_sources(self):
+        case = gates.Case("test-ui-contract", "scripts/test-ui-contract.py")
+        _, inputs = gates.dependency_key(case)
+        names = {item["path"] for item in inputs}
+        self.assertIn("luci-app-openkill/luasrc/view/openkill/status.htm", names)
+        self.assertIn("luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css", names)
+
+    def test_candidate_identity_fails_closed_on_worktree_change(self):
+        manifest = {"head": "head", "runner_source_hash": "runner", "artifacts": [], "canonical_config": {}}
+        with mock.patch.object(gates, "working_tree_status", return_value=" M status.htm"):
+            self.assertEqual(gates.candidate_identity_error(manifest, "candidate"), "WORKING_TREE_CHANGED")
 
     def test_candidate_manifest_is_hash_bound(self):
         manifest, candidate_id = gates.candidate_manifest("unit-test")

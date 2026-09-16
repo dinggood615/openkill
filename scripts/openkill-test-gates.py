@@ -80,6 +80,7 @@ NATIVE_TESTS: tuple[Case, ...] = tuple(
         Path("test-shadow-sidecar-producer.py"),
         Path("test-shell-renderer.py"),
         Path("test-openkill-test-gates.py"),
+        Path("test-ui-contract.py"),
         Path("test-uci-lifecycle.py"),
     )
 )
@@ -158,7 +159,7 @@ def candidate_manifest(run_id: str) -> tuple[dict[str, object], str]:
     entries = []
     for path in sorted(set(files)):
         if not path.is_file():
-            continue
+            raise FileNotFoundError(f"required candidate artifact is missing: {path.relative_to(ROOT)}")
         entries.append(
             {
                 "path": path.relative_to(ROOT).as_posix(),
@@ -167,13 +168,19 @@ def candidate_manifest(run_id: str) -> tuple[dict[str, object], str]:
                 "role": role_by_path.get(path, "runtime-dependency"),
             }
         )
+    canonical_sha = sha256_file(CANONICAL_CONFIG)
+    if canonical_sha != CANONICAL_CONFIG_SHA256:
+        raise ValueError(
+            "canonical D2D fixture hash mismatch: "
+            f"expected {CANONICAL_CONFIG_SHA256}, got {canonical_sha}"
+        )
     stable = {
         "head": git_head(),
         "runner_version": RUNNER_VERSION,
         "runner_source_hash": RUNNER_SOURCE_HASH,
         "canonical_config": {
             "path": CANONICAL_CONFIG.relative_to(ROOT).as_posix(),
-            "sha256": sha256_file(CANONICAL_CONFIG) if CANONICAL_CONFIG.is_file() else "",
+            "sha256": canonical_sha,
         },
         "artifacts": entries,
         "minimal_staging_artifacts": [entry["path"] for entry in entries if entry["role"] in ("staged-observer", "semantic-manifest", "renderer", "renderer-template")],
@@ -194,6 +201,15 @@ def dependency_files(case: Case) -> list[Path]:
     paths.extend(sorted(TEMPLATES.glob("*.tsv")))
     if case.name.startswith("test-core"):
         paths.extend((ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_validate.sh",))
+    if case.name == "compileall":
+        paths.extend(sorted((ROOT / "scripts").glob("*.py")))
+    if case.name == "test-ui-contract":
+        paths.extend(sorted((ROOT / "luci-app-openkill/luasrc/view/openkill").glob("*.htm")))
+        paths.extend((
+            ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/oc.css",
+            ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css",
+            ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/js/common.js",
+        ))
     # The fixture directory is small and is a safer dependency boundary than
     # a commit id: changing any checked-in evidence invalidates its cache.
     paths.extend(sorted((ROOT / "scripts/fixtures").glob("*")))
@@ -225,6 +241,47 @@ def dependency_key(case: Case) -> tuple[str, list[dict[str, str]]]:
 
 def wsl_available() -> bool:
     return shutil.which("wsl.exe") is not None or shutil.which("wsl") is not None
+
+
+def working_tree_status() -> str:
+    result = subprocess.run(
+        ["git", "status", "--short", "--untracked-files=all"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
+def candidate_identity_error(manifest: dict[str, object], candidate_id: str) -> str:
+    """Verify that the bytes described before a gate stayed unchanged."""
+    dirty = working_tree_status()
+    if dirty:
+        return "WORKING_TREE_CHANGED"
+    if git_head() != manifest.get("head"):
+        return "HEAD_CHANGED"
+    if not RUNNER_PATH.is_file():
+        return "RUNNER_SOURCE_MISSING"
+    if sha256_file(RUNNER_PATH) != manifest.get("runner_source_hash"):
+        return "RUNNER_SOURCE_CHANGED"
+    canonical = manifest.get("canonical_config")
+    if not isinstance(canonical, dict):
+        return "CANONICAL_CONFIG_IDENTITY_MISSING"
+    if not CANONICAL_CONFIG.is_file():
+        return "CANONICAL_CONFIG_MISSING"
+    if sha256_file(CANONICAL_CONFIG) != canonical.get("sha256"):
+        return "CANONICAL_CONFIG_CHANGED"
+    for entry in manifest.get("artifacts", []):
+        path = ROOT / str(entry["path"])
+        if not path.is_file():
+            return "CANDIDATE_ARTIFACT_MISSING"
+        if path.stat().st_size != entry.get("bytes") or sha256_file(path) != entry.get("sha256"):
+            return f"CANDIDATE_ARTIFACT_CHANGED:{entry['path']}"
+    _, current_id = candidate_manifest(str(manifest.get("evidence_run_id", "identity")))
+    if current_id != candidate_id:
+        return "CANDIDATE_ID_CHANGED"
+    return ""
 
 
 def command_for(case: Case) -> list[str]:
@@ -273,6 +330,7 @@ def build_cases(mode: str) -> list[Case]:
         "test-shadow-semantic-model",
         "test-uci-lifecycle",
         "test-production-shadow",
+        "test-ui-contract",
     )
     native_by_name = {case.name: case for case in NATIVE_TESTS}
     if mode == "fast":
@@ -402,12 +460,17 @@ def write_evidence(mode: str, run_id: str, output_dir: Path, records: list[dict[
         "run_id": run_id,
         "mode": mode,
         "head": manifest.get("head"),
+        "final_head": manifest.get("final_head"),
         "overall": "PASS" if all(record["status"] in ("PASS", "SKIP_ALLOWED", "NOT_RUN_ENVIRONMENT") for record in records) else "FAIL",
         "device_access": 0,
         "central_apply": 0,
         "packet_test": 0,
         "candidate_id": candidate_id,
         "candidate_manifest": manifest,
+        "candidate_identity": next(
+            (record for record in records if record["name"] == "candidate-identity"),
+            None,
+        ),
         # A cached PASS is reusable evidence, but it is not a fresh execution
         # in this run.  Device-preflight disables the cache, so its readiness
         # statement always comes from an actual staged execution.
@@ -422,12 +485,14 @@ def write_evidence(mode: str, run_id: str, output_dir: Path, records: list[dict[
         f"OPENKILL_TEST_GATES={summary['overall']}",
         f"MODE={mode}",
         f"HEAD={manifest.get('head', '')}",
+        f"FINAL_HEAD={manifest.get('final_head', '')}",
         f"CANDIDATE_ID={candidate_id}",
         f"DEVICE_ACCESS=0",
         f"CENTRAL_APPLY=0",
         f"PACKET_TEST=0",
         f"STAGED_OBSERVER_ACTUALLY_EXECUTED={'PASS' if summary['staged_observer_actually_executed'] else 'FAIL'}",
         f"STAGED_OBSERVER_EVIDENCE_REUSED={'YES' if summary['staged_observer_evidence_reused'] else 'NO'}",
+        f"CANDIDATE_IDENTITY={'PASS' if manifest.get('identity_verified') else 'FAIL'}",
         "REPO_RUNTIME_FALLBACK=0",
         "AUTO_TYPED_SIDECARS=INTERNAL",
     ]
@@ -480,9 +545,38 @@ def main(argv: Sequence[str] | None = None) -> int:
     output_dir.mkdir(parents=True, exist_ok=False)
     CACHE_ROOT.mkdir(parents=True, exist_ok=True)
     try:
+        if working_tree_status():
+            raise RuntimeError("WORKING_TREE_DIRTY")
         manifest, candidate_id = candidate_manifest(run_id)
-        records = [run_case(case, output_dir, use_cache=(args.mode == "fast" and not args.no_cache)) for case in build_cases(args.mode)]
-    except (OSError, subprocess.CalledProcessError, ValueError) as error:
+        cases = build_cases(args.mode)
+        records = []
+        for index, case in enumerate(cases, start=1):
+            print(f"[{index}/{len(cases)}] START {case.name}", flush=True)
+            record = run_case(case, output_dir, use_cache=(args.mode == "fast" and not args.no_cache))
+            records.append(record)
+            print(
+                f"[{index}/{len(cases)}] {record['status']} {case.name} "
+                f"elapsed={record['elapsed_seconds']}s reason={record['reason']}",
+                flush=True,
+            )
+        identity_error = candidate_identity_error(manifest, candidate_id)
+        records.append({
+            "name": "candidate-identity",
+            "status": "PASS" if not identity_error else "FAIL",
+            "return_code": 0 if not identity_error else 1,
+            "environment": "windows",
+            "elapsed_seconds": 0,
+            "evidence_key": "",
+            "cached": False,
+            "reason": identity_error,
+            "script": None,
+            "args": [],
+            "skip_policy": [],
+            "inputs": [],
+        })
+        manifest["final_head"] = git_head()
+        manifest["identity_verified"] = not identity_error
+    except (OSError, subprocess.CalledProcessError, ValueError, RuntimeError) as error:
         (output_dir / "summary.txt").write_text(f"OPENKILL_TEST_GATES=FAIL\nRUNNER_ERROR={error}\n", encoding="utf-8")
         print(f"OPENKILL_TEST_GATES=FAIL run_id={run_id} error={error}")
         return 1

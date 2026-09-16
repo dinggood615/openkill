@@ -7,8 +7,8 @@
 <html>
 <head>
 <script src="/luci-static/resources/openkill/js/common.js?v=<%=plugin_version%>"></script>
-<link rel="stylesheet" href="/luci-static/resources/openkill/css/oc.css?v=2026-1123">
-<link rel="stylesheet" href="/luci-static/resources/openkill/css/flat.css?v=2026-1123">
+<link rel="stylesheet" href="/luci-static/resources/openkill/css/oc.css?v=<%=plugin_version%>">
+<link rel="stylesheet" href="/luci-static/resources/openkill/css/flat.css?v=<%=plugin_version%>">
 </head>
 <div class="oc openkill-status-page" role="region" aria-label="<%:OpenKill runtime status%>">
                 <%+openkill/page_header%>
@@ -181,7 +181,7 @@
                                                     <span id="file-modify-time" class="file-info-item" title="<%:Modified%>"><svg class="file-modify-icon" width="14" height="14"><use href="#oc-icon-clock-edit"/></svg><span id="file-modify-time-value">--</span></span>
                                                 </div>
                                             </div>
-                                            <div class="subscription-info-details">
+                                            <div id="subscription-info-details" class="subscription-info-details">
                                                 <div class="subscription-progress oc-hidden" id="subscription-progress-section">
                                                     <div class="subscription-progress-bar">
                                                         <div id="subscription-progress-fill" class="subscription-progress-fill high" style="width: 0%"></div>
@@ -2786,21 +2786,14 @@
 
             StateManager.batchUpdateDOM(updates);
 
-            if (!status.yacd) {
-                DOMCache.web.classList.add('hidden');
+            function setDashboardVisibility(element, visible) {
+                if (element) element.classList.toggle('hidden', !visible);
             }
 
-            if (!status.dashboard) {
-                DOMCache.webo.classList.add('hidden');
-            }
-
-            if (!status.metacubexd) {
-                DOMCache.webm.classList.add('hidden');
-            }
-
-            if (!status.zashboard) {
-                DOMCache.webz.classList.add('hidden');
-            }
+            setDashboardVisibility(DOMCache.web, !!status.yacd);
+            setDashboardVisibility(DOMCache.webo, !!status.dashboard);
+            setDashboardVisibility(DOMCache.webm, !!status.metacubexd);
+            setDashboardVisibility(DOMCache.webz, !!status.zashboard);
 
             StateManager.current_status = status;
 
@@ -2824,15 +2817,18 @@
                 var proxy_ip = status.daip;
                 var mix_addr = proxy_ip + ':' + (status.mixed_port || '7893');
                 DOMCache.mix_proxy.innerHTML = "<b style=color:var(--success-color)>" + mix_addr + "</b>";
+                [DOMCache.copy_secret, DOMCache.copy_address, DOMCache.copy_mix_address,
+                    DOMCache.copy_mix_secret, DOMCache.copy_pac_config].forEach(function(element) {
+                    if (element) element.style.display = '';
+                });
             } else {
                 DOMCache.daip.innerHTML = "<b style=color:var(--error-color)><%:Not Available%></b>";
                 StateManager.cached_proxy_info = null;
                 DOMCache.mix_proxy.innerHTML = "<b style=color:var(--error-color)><%:Not Available%></b>";
-                DOMCache.copy_secret.style.display = "none";
-                DOMCache.copy_address.style.display = "none";
-                DOMCache.copy_mix_address.style.display = "none";
-                DOMCache.copy_mix_secret.style.display = "none";
-                DOMCache.copy_pac_config.style.display = "none";
+                [DOMCache.copy_secret, DOMCache.copy_address, DOMCache.copy_mix_address,
+                    DOMCache.copy_mix_secret, DOMCache.copy_pac_config].forEach(function(element) {
+                    if (element) element.style.display = 'none';
+                });
             }
 
             if (status.clash) {

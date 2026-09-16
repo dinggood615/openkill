@@ -33,6 +33,14 @@ semantic model, and production-shadow writer-freeze suites. Continuity and
 the slower self-sufficiency replay remain in the full and device-preflight
 modes.
 
+The fast suite also runs `scripts/test-ui-contract.py`. This local LuCI
+template contract check verifies that every OpenKill stylesheet uses the
+installed package version for cache invalidation, that status-page JavaScript
+hooks resolve to unique DOM ids, that subscription details have their required
+container, and that dashboard actions can reappear after a runtime transition.
+It does not claim a full LuCI/browser rendering test; a target-specific LuCI
+preview remains a separate manual check.
+
 `full` runs the complete local matrix. Fixture suites run with the native
 Windows interpreter, while runtime, installer, network, snapshot/FW4, Stage D
 and Mihomo compatibility suites run in WSL. The runner selects that

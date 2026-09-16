@@ -54,3 +54,18 @@ canonical fixture hashes. `DEVICE_RETRY_READY=YES` means only that this
 candidate is ready to be considered for an explicitly approved `.102` phase;
 it does not imply device verification, package release, central apply, or
 packet-path proof.
+
+The gate runner rejects a dirty worktree or a missing candidate artifact before
+it runs a mode. After every mode it rechecks the HEAD, runner source, canonical
+fixture, and every manifest artifact byte/hash. A candidate identity record is
+written with the evidence bundle, so a source or staging change during a long
+run cannot be reported as device-ready evidence. Fast-mode cache keys include
+the UI templates and stylesheets used by the LuCI contract test, while full
+and device-preflight always execute their cases.
+
+The LuCI contract check also covers the presentation fixes in this work
+package: stylesheet cache keys are rendered from the installed package
+version, the subscription detail wrapper has the id used by its JavaScript,
+and dashboard/proxy controls restore their visible state when a later status
+poll reports recovery. It is a static template regression check; it does not
+claim that a live LuCI backend or browser session was exercised.
