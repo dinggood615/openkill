@@ -1,5 +1,48 @@
 # Current execution plan: authorized local delivery and GitHub release
 
+## R2C canonical device baseline hold (completed)
+
+- Phase: `PHASE_3E2D2D_R2C_RESUME_WITH_CANONICAL_CONFIG`.
+- Observed HEAD before and after the device run: `b8a7313a8b50afacc695d600db1a2916abddce73`; the working tree was clean and
+  `566fa82` remains an ancestor.  The local chain from `455f463` through this
+  checkpoint remains limited to tests, fixtures, documentation and CI; no
+  production runtime, DNS, renderer, network, firewall, installer or package
+  behavior changed.
+- Local preflight, canonical verification, the 10-read config test, R2B's
+  18/18 UCI lifecycle test, `local-gate.sh`, `ci-gate.sh`, and `git diff --check`
+  passed.  The canonical source is `scripts/fixtures/3e2-safe.yaml`, 818
+  bytes, SHA-256
+  `9cd8d91750758823776df9c982c1e15f0baa1a72baa1792fa2f82c0df4d24a6e`.
+- The only device contacted was the authorized `openkill-test-102` alias
+  (192.168.1.102) with BatchMode/IdentitiesOnly.  No `.1`, `.101`, or other
+  router was accessed.  The device already had package `2026-1128`; no package
+  installation or UCI path write was performed.  Key production file hashes
+  matched the verified 1128 package/source.
+- The device began in the expected clean stopped state.  The canonical file
+  was copied to `/etc/openkill/config/3e2-safe.yaml` with root ownership and
+  mode 0600; device and local hashes matched.  `config_path`, `enable`,
+  `dns_port`, TUN ownership/flags and other user fields stayed unchanged.
+- A 300-second watchdog whose only rollback action was the formal OpenKill
+  stop was armed before startup.  One controlled start reached OpenKill/procd
+  running, one Mihomo process, `utun`, mark ABI `0x162/0xffffffff`, policy
+  preference `1888`, table `354`, dnsmasq `:53` and Mihomo `127.0.0.1:7874`.
+  A fresh SSH connection passed; the watchdog was cancelled immediately with
+  rc 0, its process disappeared, no rollback marker was written, and the
+  cancellation marker was present.
+- The field-level UCI contract matched R2B exactly: lifecycle markers and
+  dnsmasq relay/cache/AAAA state were the only expected runtime deltas;
+  network UCI and `openkill-opkg` stayed unchanged, `last_start_failed` was
+  absent, and no unknown delta was observed.  IPv6 main/default and
+  source-specific route counts/hashes stayed stable with no NAT66 signal.
+  Three 15-second read-only samples passed with identical runtime values;
+  shadow remained OFF and no comparator, packet test, central apply, restart,
+  or manual nft/ip/UCI operation was run.
+- Success state is intentionally retained for the next phase: OpenKill is
+  RUNNING, Mihomo=1, `utun` and ABI/DNS state are present, SSH is reachable,
+  and the canonical config remains installed.  The next authorized action is
+  `PHASE_3E2D2D_R3_PRODUCTION_SHADOW_DNS_SEMANTIC_REVALIDATION`; do not stop
+  this baseline before that phase.
+
 ## R2D canonical D2D test-config provenance checkpoint (local-only)
 
 - Phase: `PHASE_3E2D2D_R2D_CANONICAL_D2D_TEST_CONFIG_PROVENANCE_RECOVERY`.
