@@ -1,0 +1,33 @@
+# Canonical OpenKill D2D device-shadow fixture.
+#
+# This file is a direct-only Mihomo input used only for the
+# authorized 192.168.1.102 D2D semantic validation.  OpenKill owns policy
+# routing and firewall interception around this input; those frozen fields
+# (mode-1 firewall :53, dnsmasq :53 -> 127.0.0.1#7874, fwmark 0x162,
+# table 354, preference 1888) are asserted by the companion verifier.
+mode: rule
+log-level: warning
+ipv6: true
+allow-lan: false
+bind-address: 127.0.0.1
+rules:
+  - MATCH,DIRECT
+proxies: []
+proxy-groups: []
+tun:
+  enable: true
+  device: utun
+  stack: system
+  auto-route: false
+  auto-redirect: false
+  dns-hijack:
+    - any:53
+    - tcp://any:53
+dns:
+  enable: true
+  listen: 127.0.0.1:7874
+  ipv6: true
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  nameserver:
+    - 192.0.2.53

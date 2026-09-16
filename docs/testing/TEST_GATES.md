@@ -10,6 +10,8 @@ sh scripts/preflight-openkill.sh
 sh scripts/validate-openkill.sh
 sh scripts/ci-gate.sh
 python3 -m compileall -q scripts
+python3 scripts/verify_3e2_safe_config.py
+python3 scripts/test-3e2-safe-config.py
 ```
 
 ## Full local matrix
@@ -34,8 +36,12 @@ CRLF scripts compatible with Linux. The matrix covers runtime,
 installer, core compatibility, classifier and semantic contracts, NFT IR and
 syntax, renderer, parser fixtures, continuity, self-sufficiency, shadow
 runtime, network, snapshot/FW4, stage D, and central wiring. Also run
-`test-uci-lifecycle.py`, `git diff --check` and the shell syntax checks in
-`validate-openkill.sh`.
+`test-uci-lifecycle.py`, `test-3e2-safe-config.py`, `git diff --check` and the
+shell syntax checks in `validate-openkill.sh`.  The canonical D2D fixture and
+its verifier are documented in
+`docs/dev/phase-3e2d2d-r2d-canonical-config.md`; an approved Mihomo binary can
+be supplied with `--mihomo <path> --require-mihomo` for the additional `-t`
+check.  This is a local asset check and never contacts a device.
 
 Expected skips are limited to the documented Ruby-dependent cases. A new
 skip, xfail, warning downgrade, or device access is a gate failure.

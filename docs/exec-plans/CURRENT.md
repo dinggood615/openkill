@@ -1,5 +1,58 @@
 # Current execution plan: authorized local delivery and GitHub release
 
+## R2D canonical D2D test-config provenance checkpoint (local-only)
+
+- Phase: `PHASE_3E2D2D_R2D_CANONICAL_D2D_TEST_CONFIG_PROVENANCE_RECOVERY`.
+- Observed starting HEAD: `0c2e01fd9bd298205c96d92a2f5f10f744232ed4`; the working
+  tree was clean and `566fa82` remains an ancestor.  The audited commits after
+  the D2C implementation contain only workflow, test, documentation, and
+  release metadata changes; no production runtime, DNS, renderer, network,
+  firewall, installer, parser, or ABI behavior changed.
+- Device access was zero.  The earlier `.102` evidence remains frozen input;
+  this recovery did not connect to `.102`, `.1`, `.101`, or any other router.
+- The old R2A/R2C candidate bytes and SHA-256
+  `e894c2f7918038080ca05baa1311c8d7336e2a1497ce3324b767238fe7c76b05` were
+  searched for in the repository, reachable history, dangling project Git
+  objects, and project test/build artifacts and were not found.  No hash
+  chasing was performed, so `BYTE_EQUIVALENCE_TO_R2A=UNKNOWN`.
+- A new canonical, deterministic, direct-only fixture is now persisted at
+  `scripts/fixtures/3e2-safe.yaml`.  Its SHA-256 is
+  `9cd8d91750758823776df9c982c1e15f0baa1a72baa1792fa2f82c0df4d24a6e`.
+  `scripts/verify_3e2_safe_config.py` checks duplicate keys, binary NULs,
+  sensitive/provider material, YAML structure, the frozen D2C DNS/Mark ABI
+  contract, and optional Mihomo `-t` validation.  The focused regression
+  `scripts/test-3e2-safe-config.py` passes 10/10 and proves one byte/semantic
+  identity across ten reads.
+- The fixture's semantic contract is equivalent to the frozen R2A candidate:
+  TUN `utun`/`system`, OpenKill-owned `auto-route=false` and
+  `auto-redirect=false`, IPv4/IPv6 and fake-IP DNS enabled, mode-1 firewall
+  and dnsmasq listener `:53`, dnsmasq upstream `127.0.0.1#7874`, Mihomo
+  listener `127.0.0.1:7874`, `MATCH,DIRECT`, and Mark ABI `0x162`,
+  `0xffffffff`, table `354`, preference `1888`.  `53` and `7874` remain
+  distinct semantic fields.  The fixture contains no credentials,
+  subscriptions, tokens, private endpoints, or external provider URLs.
+- The verifier passed YAML/duplicate-key/secret/semantic checks on Windows;
+  official Mihomo v1.19.30 and the current latest v1.19.31 both passed `-t`
+  through the existing WSL compatibility path.  The direct Windows
+  invocation reports `NOT_AVAILABLE` for a Linux binary, as expected.  CI now
+  installs its existing YAML test dependency and runs the verifier plus the
+  focused suite.
+- No production files, package version, release metadata, writer hashes, or
+  device state changed.  The R2D commit is limited to the fixture, verifier,
+  focused tests, CI registration, and documentation.  The prior R2C blocker
+  is now specifically `CONFIG_PROVENANCE_PERSISTENCE_GAP`, not a claim that a
+  human secret source is required.
+
+### R2D result and next action
+
+Local R2D gates and the full fixture matrix pass; the bounded change is ready
+for commit.  On success, `CONFIG_SOURCE=CANONICAL_PROJECT_FIXTURE`,
+`CONFIG_PROVENANCE=PERSISTED`, and `DEVICE_R2C_RESUME_READY=YES`; the next
+authorized action is `PHASE_3E2D2D_R2C_RESUME_WITH_CANONICAL_CONFIG`, which is
+the first phase allowed to access `.102`.  It must use this fixture and must
+not rewrite production semantics.  No device or release action is taken in
+R2D.
+
 ## R2C device baseline checkpoint (blocked before writes)
 
 - Phase: `PHASE_3E2D2D_R2C_DEVICE_BASELINE_HOLD_WITH_SEMANTIC_UCI_GATE`.
