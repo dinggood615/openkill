@@ -1,0 +1,17 @@
+OPENKILL_SHADOW_TYPED_INTENT_V1=1
+# Formal D2B projection of the sanitized legacy observation.  The WAN rows
+# remain in the full observation but are explicitly legacy-only safety.
+OBJECT	chain	CURRENT_LOCAL_CHAIN	openkill_local	LOCAL	CURRENT_OWNED	ACTIVE	action=RETURN;family=IPv4
+OBJECT	rule	CURRENT_LOCAL_RULE	legacy_local_rule	LOCAL	CURRENT_OWNED	ACTIVE	action=RETURN;family=IPv4
+OBJECT	chain	LEGACY_WAN_INPUT_V4	openkill_wan_input	WAN_SAFETY	LEGACY_ONLY_SAFETY	ACTIVE	action=REJECT;family=IPv4
+OBJECT	chain	LEGACY_WAN_INPUT_V6	openkill_wan6_input	WAN_SAFETY	LEGACY_ONLY_SAFETY	ACTIVE	action=REJECT_ICMPV6;family=IPv6
+OBJECT	attachment	LEGACY_WAN_ATTACHMENT_V4	fw4_input_to_openkill_wan_input	WAN_SAFETY	LEGACY_ONLY_SAFETY	ACTIVE	action=JUMP;family=IPv4
+OBJECT	attachment	LEGACY_WAN_ATTACHMENT_V6	fw4_input6_to_openkill_wan6_input	WAN_SAFETY	LEGACY_ONLY_SAFETY	ACTIVE	action=JUMP;family=IPv6
+DNS	DNS_FIREWALL_LAN_TARGET	53	CURRENT_OWNED	bounded legacy capture	ACTIVE
+DNS	DNS_FIREWALL_ROUTER_TARGET	53	CURRENT_OWNED	bounded legacy capture	ACTIVE
+DNS	DNSMASQ_LISTEN_TARGET	53	CURRENT_OWNED	committed dnsmasq state	ACTIVE
+DNS	DNSMASQ_UPSTREAM_TARGET	127.0.0.1#7874	CURRENT_OWNED	committed dnsmasq state	ACTIVE
+DNS	MIHOMO_DNS_LISTENER	127.0.0.1:7874	CURRENT_OWNED	committed Mihomo state	ACTIVE
+DNS	DNS_LOOP_PREVENTION	skgid_exempt=65534	CURRENT_OWNED	committed DNS scope contract	ACTIVE
+DNS	DNS_SCOPE_IPV4	lan=true,router=true	CURRENT_OWNED	committed DNS scope contract	ACTIVE
+DNS	DNS_SCOPE_IPV6	lan=true,router=true	CURRENT_OWNED	committed DNS scope contract	ACTIVE

@@ -1,0 +1,13 @@
+OPENKILL_SHADOW_TYPED_INTENT_V1=1
+# Formal D2B/D2C projection of the CURRENT renderer and committed services.
+# Physical names may differ; logical IDs and typed semantics are compared.
+OBJECT	chain	CURRENT_LOCAL_CHAIN	current_local	LOCAL	CURRENT_OWNED	ACTIVE	action=RETURN;family=IPv4
+OBJECT	rule	CURRENT_LOCAL_RULE	current_local_rule	LOCAL	CURRENT_OWNED	ACTIVE	action=RETURN;family=IPv4
+DNS	DNS_FIREWALL_LAN_TARGET	53	CURRENT_OWNED	CURRENT renderer mode-1	ACTIVE
+DNS	DNS_FIREWALL_ROUTER_TARGET	53	CURRENT_OWNED	CURRENT renderer mode-1	ACTIVE
+DNS	DNSMASQ_LISTEN_TARGET	53	CURRENT_OWNED	committed dnsmasq desired state	ACTIVE
+DNS	DNSMASQ_UPSTREAM_TARGET	127.0.0.1#7874	CURRENT_OWNED	committed dnsmasq desired state	ACTIVE
+DNS	MIHOMO_DNS_LISTENER	127.0.0.1:7874	CURRENT_OWNED	committed Mihomo desired state	ACTIVE
+DNS	DNS_LOOP_PREVENTION	skgid_exempt=65534	CURRENT_OWNED	CURRENT DNS scope contract	ACTIVE
+DNS	DNS_SCOPE_IPV4	lan=true,router=true	CURRENT_OWNED	CURRENT DNS scope contract	ACTIVE
+DNS	DNS_SCOPE_IPV6	lan=true,router=true	CURRENT_OWNED	CURRENT DNS scope contract	ACTIVE

@@ -52,6 +52,14 @@ OPENKILL_NFT_SHADOW_RC_CAPTURE_UNAVAILABLE=8
 OPENKILL_NFT_SHADOW_RC_CAPTURE_ERROR=9
 OPENKILL_NFT_SHADOW_RC_CAPTURE_UNSUPPORTED=10
 OPENKILL_NFT_SHADOW_RC_SOURCE_GAP=11
+# Additive semantic-model result.  The legacy numeric meanings above are
+# frozen; MODEL_GAP is deliberately a new value so an incomplete ownership or
+# typed-DNS source can never be mistaken for either MATCH or MISMATCH.
+OPENKILL_NFT_SHADOW_RC_MODEL_GAP=12
+OPENKILL_NFT_SHADOW_SEMANTIC_MODEL_VERSION=1
+OPENKILL_NFT_SHADOW_OWNERSHIP_MODEL_VERSION=1
+OPENKILL_NFT_SHADOW_DNS_MODEL_VERSION=1
+OPENKILL_NFT_SHADOW_SEMANTIC_MANIFEST_DEFAULT=/usr/share/openkill/shadow/semantic_model_v1.tsv
 
 openkill_shadow_enabled()
 {
@@ -1163,7 +1171,10 @@ openkill_shadow_parse_nft_capture()
    # reject, and its IPv6 icmpv6 port-unreachable counterpart.
    awk -v OFS='\t' '
       function trim(s) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", s); return s }
-      function owned(n) { return n == "nat_output" || n ~ /^openkill/ }
+      # This is only the finite syntax vocabulary needed to reject malformed
+      # legacy captures.  It is deliberately not an ownership decision; the
+      # typed comparator joins rows to formal inventory metadata later.
+      function capture_syntax_scope(n) { return n == "nat_output" || n ~ /^openkill/ }
       function base(n) { return n == "dstnat" || n == "mangle_prerouting" || n == "mangle_output" || n == "output" || n == "srcnat" || n == "input" || n == "forward" }
       function valid_port_list(v, n, i, p) {
          v=trim(v)
@@ -1294,7 +1305,7 @@ openkill_shadow_parse_nft_capture()
          if (line ~ /^chain[[:space:]]/) {
             # Preserve the one currently-owned hooked chain declaration.  FW4
             # base-chain declarations are never captured as owned objects.
-            if (owned(chain)) {
+            if (capture_syntax_scope(chain)) {
                openkill_declaration=line
                sub(/^.*\{[[:space:]]*/, "", openkill_declaration)
                sub(/[[:space:]]*\}[[:space:]]*$/, "", openkill_declaration)
@@ -1309,7 +1320,7 @@ openkill_shadow_parse_nft_capture()
             }
             next
          }
-         if (owned(chain) && line ~ /^type[[:space:]]+nat[[:space:]]+hook/) {
+         if (capture_syntax_scope(chain) && line ~ /^type[[:space:]]+nat[[:space:]]+hook/) {
             if (valid_hook_declaration(line, chain)) {
                print "HOOK", chain, "nat", "output", hook_priority
             } else {
@@ -1321,7 +1332,7 @@ openkill_shadow_parse_nft_capture()
          line=clean_rule(line)
          if (line == "") next
          if (base(chain) && line !~ /(^|[[:space:]])jump[[:space:]]+openkill[_A-Za-z0-9]*/) next
-         if (owned(chain) && !known_rule(line, chain)) { print "UNKNOWN_OWNED_RULE", chain, line; unknown=1; next }
+         if (capture_syntax_scope(chain) && !known_rule(line, chain)) { print "UNKNOWN_OWNED_RULE", chain, line; unknown=1; next }
          order++
          print "RULE", chain, order, line
          if (base(chain) && line ~ /(^|[[:space:]])jump[[:space:]]+openkill[_A-Za-z0-9]*/) print "ATTACH", chain, order, line
@@ -1731,6 +1742,22 @@ openkill_shadow_publish()
       printf 'optional_missing_count=%s\n' "${openkill_shadow_optional_missing_count:-0}"
       printf 'out_of_scope_missing_count=%s\n' "${openkill_shadow_out_of_scope_missing_count:-0}"
       printf 'unknown_missing_count=%s\n' "${openkill_shadow_unknown_count:-0}"
+      # Typed semantic fields are additive telemetry.  Hashes are shortened
+      # and counts are bounded; no object names, addresses, endpoints, or
+      # captured rule text enter this file.
+      printf 'comparison_model_version=%s\n' "$OPENKILL_NFT_SHADOW_SEMANTIC_MODEL_VERSION"
+      printf 'ownership_model_version=%s\n' "$OPENKILL_NFT_SHADOW_OWNERSHIP_MODEL_VERSION"
+      printf 'dns_model_version=%s\n' "$OPENKILL_NFT_SHADOW_DNS_MODEL_VERSION"
+      printf 'actual_owned_hash=%s\n' "$(openkill_shadow_short_hash "${openkill_shadow_typed_actual_owned_hash:-}")"
+      printf 'desired_owned_hash=%s\n' "$(openkill_shadow_short_hash "${openkill_shadow_typed_desired_owned_hash:-}")"
+      printf 'actual_full_observation_hash=%s\n' "$(openkill_shadow_short_hash "${openkill_shadow_typed_actual_full_hash:-}")"
+      printf 'desired_full_observation_hash=%s\n' "$(openkill_shadow_short_hash "${openkill_shadow_typed_desired_full_hash:-}")"
+      printf 'dns_actual_hash=%s\n' "$(openkill_shadow_short_hash "${openkill_shadow_typed_dns_actual_hash:-}")"
+      printf 'dns_desired_hash=%s\n' "$(openkill_shadow_short_hash "${openkill_shadow_typed_dns_desired_hash:-}")"
+      printf 'model_gap_count=%s\n' "${openkill_shadow_typed_model_gap_count:-0}"
+      printf 'out_of_scope_observed_count=%s\n' "${openkill_shadow_typed_out_of_scope_count:-0}"
+      printf 'unknown_count=%s\n' "${openkill_shadow_typed_unknown_count:-0}"
+      printf 'dns_parity=%s\n' "${openkill_shadow_typed_dns_parity:-NOT_RUN}"
    ) > "$openkill_shadow_tmp" && mv -f "$openkill_shadow_tmp" "$openkill_shadow_dir/status" || {
       rm -f "$openkill_shadow_tmp"
       return 1
@@ -1738,7 +1765,7 @@ openkill_shadow_publish()
    # Keep a bounded dedupe key for mismatch diagnostics.  This is telemetry,
    # never applied state, and contains no addresses, domains, or credentials.
    case "$openkill_shadow_status_value" in
-      MISMATCH|COMPARE_ERROR|RENDER_ERROR|INPUT_ERROR|SOURCE_DRIFT|STALE|UNSUPPORTED_CURRENT_STATE)
+      MISMATCH|MODEL_GAP|COMPARE_ERROR|RENDER_ERROR|INPUT_ERROR|SOURCE_DRIFT|STALE|UNSUPPORTED_CURRENT_STATE)
          printf '%s\n' "$openkill_shadow_status_value:$openkill_shadow_old_value:$openkill_shadow_new_value:$(openkill_shadow_generation_telemetry_value "$openkill_shadow_generation_value")" > "$openkill_shadow_dir/last_mismatch.tmp.$$" &&
             mv -f "$openkill_shadow_dir/last_mismatch.tmp.$$" "$openkill_shadow_dir/last_mismatch" || true
       ;;
@@ -1765,6 +1792,320 @@ openkill_shadow_log_bounded()
    fi
 }
 
+# 3E.2D2D-R3A typed semantic projection --------------------------------------
+#
+# The automatic comparator historically compared physical nft declarations.
+# R3A keeps that path for older callers, but adds an explicit semantic bundle
+# path for the production coordinator.  The bundle is a bounded output of the
+# already completed capture/parser and CURRENT renderer; it is never a live
+# read and it is never interpreted as shell code.  Logical identity and the
+# ownership class are supplied by the formal inventory projection.  Physical
+# names are retained for observation only.
+
+openkill_shadow_typed_manifest_path()
+{
+   openkill_shadow_typed_manifest_value=${OPENKILL_NFT_SHADOW_SEMANTIC_MANIFEST:-}
+   if [ -z "$openkill_shadow_typed_manifest_value" ]; then
+      if [ -n "${OPENKILL_NFT_SHADOW_TEMPLATE_DIR:-}" ]; then
+         openkill_shadow_typed_manifest_value=$OPENKILL_NFT_SHADOW_TEMPLATE_DIR/semantic_model_v1.tsv
+      else
+         openkill_shadow_typed_manifest_value=$OPENKILL_NFT_SHADOW_SEMANTIC_MANIFEST_DEFAULT
+      fi
+   fi
+   openkill_shadow_safe_path "$openkill_shadow_typed_manifest_value" || return 1
+   [ -r "$openkill_shadow_typed_manifest_value" ] || return 1
+   printf '%s\n' "$openkill_shadow_typed_manifest_value"
+}
+
+openkill_shadow_typed_prepare_file()
+{
+   openkill_shadow_typed_source=$1
+   openkill_shadow_typed_destination=$2
+   [ -n "$openkill_shadow_typed_source" ] && [ -n "$openkill_shadow_typed_destination" ] || return 1
+   openkill_shadow_safe_path "$openkill_shadow_typed_source" || return 1
+   openkill_shadow_safe_path "$openkill_shadow_typed_destination" || return 1
+   [ -r "$openkill_shadow_typed_source" ] || return 1
+   openkill_shadow_typed_size=$(wc -c < "$openkill_shadow_typed_source") || return 1
+   [ "$openkill_shadow_typed_size" -le "$OPENKILL_NFT_SHADOW_MAX_PAYLOAD_BYTES" ] || return 1
+   cp "$openkill_shadow_typed_source" "$openkill_shadow_typed_destination" || return 1
+   [ "$(sed -n '1p' "$openkill_shadow_typed_destination")" = 'OPENKILL_SHADOW_TYPED_INTENT_V1=1' ] || return 1
+   return 0
+}
+
+openkill_shadow_compare_typed_intent()
+{
+   openkill_shadow_typed_actual=$1
+   openkill_shadow_typed_desired=$2
+   openkill_shadow_typed_parent=${3:-${openkill_shadow_tmp_dir:-}}
+   openkill_shadow_typed_actual_owned_hash=
+   openkill_shadow_typed_desired_owned_hash=
+   openkill_shadow_typed_actual_full_hash=
+   openkill_shadow_typed_desired_full_hash=
+   openkill_shadow_typed_dns_actual_hash=
+   openkill_shadow_typed_dns_desired_hash=
+   openkill_shadow_typed_model_gap_count=0
+   openkill_shadow_typed_mismatch_count=0
+   openkill_shadow_typed_out_of_scope_count=0
+   openkill_shadow_typed_unknown_count=0
+   openkill_shadow_typed_dns_parity=MODEL_GAP
+   openkill_shadow_typed_status=MODEL_GAP
+   openkill_shadow_typed_reason=typed-input-unavailable
+   [ -n "$openkill_shadow_typed_parent" ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_typed_parent" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   [ -d "$openkill_shadow_typed_parent" ] || mkdir -p "$openkill_shadow_typed_parent" 2>/dev/null || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_work=$openkill_shadow_typed_parent/typed-semantic
+   openkill_shadow_safe_path "$openkill_shadow_typed_work" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   mkdir "$openkill_shadow_typed_work" 2>/dev/null || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_manifest=$(openkill_shadow_typed_manifest_path 2>/dev/null) || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_typed_manifest" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_typed_actual" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_typed_desired" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   [ -r "$openkill_shadow_typed_manifest" ] && [ -r "$openkill_shadow_typed_actual" ] && [ -r "$openkill_shadow_typed_desired" ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   for openkill_shadow_typed_input in "$openkill_shadow_typed_manifest" "$openkill_shadow_typed_actual" "$openkill_shadow_typed_desired"; do
+      openkill_shadow_typed_size=$(wc -c < "$openkill_shadow_typed_input") || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+      [ "$openkill_shadow_typed_size" -le "$OPENKILL_NFT_SHADOW_MAX_PAYLOAD_BYTES" ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   done
+   openkill_shadow_typed_summary=$openkill_shadow_typed_work/summary
+   openkill_shadow_typed_actual_full=$openkill_shadow_typed_work/actual.full
+   openkill_shadow_typed_desired_full=$openkill_shadow_typed_work/desired.full
+   openkill_shadow_typed_actual_owned=$openkill_shadow_typed_work/actual.owned
+   openkill_shadow_typed_desired_owned=$openkill_shadow_typed_work/desired.owned
+   for openkill_shadow_typed_output in "$openkill_shadow_typed_summary" "$openkill_shadow_typed_actual_full" "$openkill_shadow_typed_desired_full" "$openkill_shadow_typed_actual_owned" "$openkill_shadow_typed_desired_owned"; do
+      openkill_shadow_safe_path "$openkill_shadow_typed_output" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+      : > "$openkill_shadow_typed_output" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   done
+
+   # The manifest defines the accepted ownership vocabulary and the eight
+   # typed DNS fields.  The sidecars contain the formal inventory projection
+   # and captured/renderer semantic values.  AWK is used only as a bounded,
+   # line-oriented parser so this remains POSIX/BusyBox compatible.
+   awk -F '\t' \
+      -v OFS='\t' \
+      -v manifest_file="$openkill_shadow_typed_manifest" \
+      -v actual_file="$openkill_shadow_typed_actual" \
+      -v desired_file="$openkill_shadow_typed_desired" \
+      -v summary_file="$openkill_shadow_typed_summary" \
+      -v actual_full_file="$openkill_shadow_typed_actual_full" \
+      -v desired_full_file="$openkill_shadow_typed_desired_full" \
+      -v actual_owned_file="$openkill_shadow_typed_actual_owned" \
+      -v desired_owned_file="$openkill_shadow_typed_desired_owned" '
+      function gap(reason) {
+         model_gap++
+         if (gap_reason == "") gap_reason=reason
+      }
+      function valid_token(value) {
+         return value != "" && value !~ /[\r\n\t]/
+      }
+      function valid_class(value) { return value in class_allowed }
+      function comparable(value) {
+         return value == "CURRENT_OWNED" || value == "CONDITIONAL_CURRENT"
+      }
+      function noncomparable(value) {
+         return value == "LEGACY_ONLY_SAFETY" || value == "FW4_BASE" ||
+                value == "INACTIVE_MODE" || value == "OPTIONAL_OBSERVATION" ||
+                value == "OUT_OF_SCOPE"
+      }
+      function canonical(value) {
+         gsub(/[[:space:]]+/, " ", value)
+         sub(/^ +/, "", value)
+         sub(/ +$/, "", value)
+         return value
+      }
+      function dns_value(field, value, number) {
+         value=canonical(value)
+         if (value == "" || value == "-") return ""
+         if (field == "DNS_FIREWALL_LAN_TARGET" ||
+             field == "DNS_FIREWALL_ROUTER_TARGET" ||
+             field == "DNSMASQ_LISTEN_TARGET") {
+            if (value !~ /^[0-9]+$/) return ""
+            number=value + 0
+            if (number < 1 || number > 65535) return ""
+            return sprintf("%d", number)
+         }
+         if (field == "DNSMASQ_UPSTREAM_TARGET" || field == "MIHOMO_DNS_LISTENER") {
+            gsub(/[[:space:]]+/, "", value)
+            if (value !~ /^[A-Za-z0-9.:#_\[\]-]+$/) return ""
+            return value
+         }
+         if (field == "DNS_LOOP_PREVENTION" || field == "DNS_SCOPE_IPV4" || field == "DNS_SCOPE_IPV6")
+            return value
+         return ""
+      }
+      function record_object(side, type, logical, physical, component, owner, state, semantic, key) {
+         if (type !~ /^(chain|set|attachment|rule)$/ || !valid_token(logical) ||
+             !valid_token(physical) || !valid_token(component) ||
+             !valid_class(owner) || state !~ /^(ACTIVE|INACTIVE)$/ ||
+             !valid_token(semantic)) {
+            gap("object-record-invalid")
+            return
+         }
+         key=type SUBSEP physical
+         if (key in inventory_expected_owner) {
+            if (owner != inventory_expected_owner[key] || component != inventory_expected_component[key]) {
+               gap("inventory-ownership-conflict")
+            }
+         }
+         if (owner == "UNKNOWN") {
+            unknown++
+            gap("unknown-ownership")
+         }
+         key=type SUBSEP logical
+         if (side == 1) {
+            if (key in actual_object) { gap("duplicate-object"); return }
+            actual_object[key]=1
+            actual_type[key]=type; actual_logical[key]=logical; actual_physical[key]=physical
+            actual_component[key]=component; actual_owner[key]=owner; actual_state[key]=state; actual_semantic[key]=canonical(semantic)
+            print "OBJECT", type, logical, physical, component, owner, state, canonical(semantic) >> actual_full_file
+            if (comparable(owner) && state == "ACTIVE") print "OBJECT", type, logical, component, owner, canonical(semantic) >> actual_owned_file
+         } else {
+            if (key in desired_object) { gap("duplicate-object"); return }
+            desired_object[key]=1
+            desired_type[key]=type; desired_logical[key]=logical; desired_physical[key]=physical
+            desired_component[key]=component; desired_owner[key]=owner; desired_state[key]=state; desired_semantic[key]=canonical(semantic)
+            print "OBJECT", type, logical, physical, component, owner, state, canonical(semantic) >> desired_full_file
+            if (comparable(owner) && state == "ACTIVE") print "OBJECT", type, logical, component, owner, canonical(semantic) >> desired_owned_file
+         }
+      }
+      function record_dns(side, field, value, owner, source, state, canonical_value) {
+         if (!(field in dns_expected)) { dns_model_gap++; gap("unknown-dns-field"); unknown++; return }
+         if (!valid_class(owner) || owner == "UNKNOWN") { dns_model_gap++; gap("unknown-dns-ownership"); unknown++; return }
+         if (owner != dns_expected_owner[field]) { dns_model_gap++; gap("dns-ownership-conflict"); return }
+         if (state != "ACTIVE" || !valid_token(source) || source == "-") { dns_model_gap++; gap("dns-source-missing"); return }
+         canonical_value=dns_value(field, value)
+         if (canonical_value == "") { dns_model_gap++; gap("dns-value-invalid"); return }
+         if (side == 1) {
+            if (field in actual_dns) { dns_model_gap++; gap("duplicate-dns-field"); return }
+            actual_dns[field]=1; actual_dns_value[field]=canonical_value; actual_dns_owner[field]=owner; actual_dns_state[field]=state
+            print "DNS", field, canonical_value, owner, state >> actual_full_file
+            if (comparable(owner)) print "DNS", field, canonical_value, owner, state >> actual_owned_file
+         } else {
+            if (field in desired_dns) { dns_model_gap++; gap("duplicate-dns-field"); return }
+            desired_dns[field]=1; desired_dns_value[field]=canonical_value; desired_dns_owner[field]=owner; desired_dns_state[field]=state
+            print "DNS", field, canonical_value, owner, state >> desired_full_file
+            if (comparable(owner)) print "DNS", field, canonical_value, owner, state >> desired_owned_file
+         }
+      }
+      FILENAME == manifest_file {
+         if (FNR == 1) {
+            if ($0 != "OPENKILL_SHADOW_SEMANTIC_MANIFEST_V1=1") gap("manifest-header")
+            next
+         }
+         if ($0 ~ /^[[:space:]]*$/ || $0 ~ /^#/) next
+         if ($1 == "MODEL_VERSION" && NF == 2) { if ($2 != "1") gap("model-version"); next }
+         if ($1 == "OWNERSHIP_CLASS" && NF == 2) { if ($2 in class_allowed) gap("duplicate-class"); class_allowed[$2]=1; next }
+         if ($1 == "DNS_FIELD" && NF == 3) { if ($2 in dns_expected) gap("duplicate-dns-manifest"); dns_expected[$2]=1; dns_expected_owner[$2]=$3; next }
+         if ($1 == "INVENTORY" && NF == 5 && $2 ~ /^(chain|set|attachment|rule)$/ && valid_token($3) && valid_class($4) && valid_token($5)) {
+            inventory_key=$2 SUBSEP $3
+            if (inventory_key in inventory_expected_owner) gap("duplicate-inventory")
+            inventory_expected_owner[inventory_key]=$4
+            inventory_expected_component[inventory_key]=$5
+            next
+         }
+         gap("manifest-record-invalid")
+         next
+      }
+      FILENAME == actual_file || FILENAME == desired_file {
+         side=(FILENAME == actual_file ? 1 : 2)
+         if (FNR == 1) {
+            if ($0 != "OPENKILL_SHADOW_TYPED_INTENT_V1=1") gap("typed-header")
+            next
+         }
+         if ($0 ~ /^[[:space:]]*$/ || $0 ~ /^#/) next
+         if ($1 == "META") {
+            if (NF != 3 || ($2 != "mode" && $2 != "model_version") || !valid_token($3)) gap("meta-record-invalid")
+            next
+         }
+         if ($1 == "OBJECT") {
+            if (NF != 8) { gap("object-record-width"); next }
+            record_object(side, $2, $3, $4, $5, $6, $7, $8)
+            next
+         }
+         if ($1 == "DNS") {
+            if (NF != 6) { gap("dns-record-width"); next }
+            record_dns(side, $2, $3, $4, $5, $6)
+            next
+         }
+         gap("typed-record-invalid")
+         next
+      }
+      END {
+         dns_manifest_count=0
+         for (field in dns_expected) {
+            dns_manifest_count++
+            if (!(field in actual_dns)) { dns_model_gap++; gap("dns-actual-missing") }
+            if (!(field in desired_dns)) { dns_model_gap++; gap("dns-desired-missing") }
+            if ((field in actual_dns) && (field in desired_dns)) {
+               if (actual_dns_owner[field] != desired_dns_owner[field]) { dns_model_gap++; gap("dns-ownership-conflict") }
+               else if (actual_dns_value[field] != desired_dns_value[field]) { mismatch++; dns_mismatch++ }
+            }
+         }
+         if (dns_manifest_count != 8) { dns_model_gap++; gap("dns-manifest-incomplete") }
+         for (key in actual_object) {
+            if (!(key in desired_object)) {
+               if (comparable(actual_owner[key]) && actual_state[key] == "ACTIVE") mismatch++
+               else if (noncomparable(actual_owner[key])) out_of_scope++
+               else gap("actual-object-ownership-unknown")
+               continue
+            }
+            if (actual_owner[key] != desired_owner[key]) { gap("object-ownership-conflict"); continue }
+            if (!valid_class(actual_owner[key])) { gap("object-class-invalid"); continue }
+            if (actual_owner[key] == "UNKNOWN") { gap("unknown-ownership"); unknown++; continue }
+            if (comparable(actual_owner[key])) {
+               if (actual_state[key] != desired_state[key] || actual_component[key] != desired_component[key] || actual_semantic[key] != desired_semantic[key]) mismatch++
+            } else out_of_scope++
+         }
+         for (key in desired_object) if (!(key in actual_object)) {
+            if (comparable(desired_owner[key]) && desired_state[key] == "ACTIVE") mismatch++
+         }
+         if (model_gap > 0) result="MODEL_GAP"
+         else if (mismatch > 0) result="MISMATCH"
+         else result="MATCH"
+         if (dns_model_gap > 0) dns_result="MODEL_GAP"
+         else if (dns_mismatch > 0) dns_result="MISMATCH"
+         else dns_result="MATCH"
+         print "RESULT", result > summary_file
+         print "DNS_RESULT", dns_result >> summary_file
+         print "MISMATCH_COUNT", mismatch >> summary_file
+         print "DNS_MISMATCH_COUNT", dns_mismatch >> summary_file
+         print "MODEL_GAP_COUNT", model_gap >> summary_file
+         print "OUT_OF_SCOPE_COUNT", out_of_scope >> summary_file
+         print "UNKNOWN_COUNT", unknown >> summary_file
+         print "REASON", (gap_reason == "" ? (mismatch > 0 ? "typed-semantic-diff" : "semantic-equivalent") : gap_reason) >> summary_file
+      }
+   ' "$openkill_shadow_typed_manifest" "$openkill_shadow_typed_actual" "$openkill_shadow_typed_desired" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+
+   openkill_shadow_typed_result=$(awk -F '\t' '$1 == "RESULT" { print $2; exit }' "$openkill_shadow_typed_summary" 2>/dev/null || true)
+   openkill_shadow_typed_dns_parity=$(awk -F '\t' '$1 == "DNS_RESULT" { print $2; exit }' "$openkill_shadow_typed_summary" 2>/dev/null || true)
+   openkill_shadow_typed_mismatch_count=$(awk -F '\t' '$1 == "MISMATCH_COUNT" { print $2; exit }' "$openkill_shadow_typed_summary" 2>/dev/null || true)
+   openkill_shadow_typed_model_gap_count=$(awk -F '\t' '$1 == "MODEL_GAP_COUNT" { print $2; exit }' "$openkill_shadow_typed_summary" 2>/dev/null || true)
+   openkill_shadow_typed_out_of_scope_count=$(awk -F '\t' '$1 == "OUT_OF_SCOPE_COUNT" { print $2; exit }' "$openkill_shadow_typed_summary" 2>/dev/null || true)
+   openkill_shadow_typed_unknown_count=$(awk -F '\t' '$1 == "UNKNOWN_COUNT" { print $2; exit }' "$openkill_shadow_typed_summary" 2>/dev/null || true)
+   openkill_shadow_typed_reason=$(awk -F '\t' '$1 == "REASON" { print $2; exit }' "$openkill_shadow_typed_summary" 2>/dev/null || true)
+   [ -n "$openkill_shadow_typed_result" ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   for openkill_shadow_typed_sort_pair in \
+      "$openkill_shadow_typed_actual_full:$openkill_shadow_typed_work/actual.full.sorted" \
+      "$openkill_shadow_typed_desired_full:$openkill_shadow_typed_work/desired.full.sorted" \
+      "$openkill_shadow_typed_actual_owned:$openkill_shadow_typed_work/actual.owned.sorted" \
+      "$openkill_shadow_typed_desired_owned:$openkill_shadow_typed_work/desired.owned.sorted"; do
+      openkill_shadow_typed_sort_input=${openkill_shadow_typed_sort_pair%%:*}
+      openkill_shadow_typed_sort_output=${openkill_shadow_typed_sort_pair#*:}
+      openkill_shadow_safe_path "$openkill_shadow_typed_sort_output" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+      LC_ALL=C sort "$openkill_shadow_typed_sort_input" > "$openkill_shadow_typed_sort_output" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   done
+   openkill_shadow_typed_actual_owned_hash=$(openkill_shadow_hash_file "$openkill_shadow_typed_work/actual.owned.sorted" 2>/dev/null || true)
+   openkill_shadow_typed_desired_owned_hash=$(openkill_shadow_hash_file "$openkill_shadow_typed_work/desired.owned.sorted" 2>/dev/null || true)
+   openkill_shadow_typed_actual_full_hash=$(openkill_shadow_hash_file "$openkill_shadow_typed_work/actual.full.sorted" 2>/dev/null || true)
+   openkill_shadow_typed_desired_full_hash=$(openkill_shadow_hash_file "$openkill_shadow_typed_work/desired.full.sorted" 2>/dev/null || true)
+   openkill_shadow_typed_dns_actual_hash=$(awk -F '\t' '$1 == "DNS" { print; }' "$openkill_shadow_typed_actual_full" | LC_ALL=C sort | sha256sum 2>/dev/null | awk 'NR == 1 { print $1; exit }')
+   openkill_shadow_typed_dns_desired_hash=$(awk -F '\t' '$1 == "DNS" { print; }' "$openkill_shadow_typed_desired_full" | LC_ALL=C sort | sha256sum 2>/dev/null | awk 'NR == 1 { print $1; exit }')
+   case "$openkill_shadow_typed_result" in
+      MATCH) openkill_shadow_typed_status=MATCH; return "$OPENKILL_NFT_SHADOW_RC_MATCH" ;;
+      MISMATCH) openkill_shadow_typed_status=MISMATCH; return "$OPENKILL_NFT_SHADOW_RC_MISMATCH" ;;
+      MODEL_GAP) openkill_shadow_typed_status=MODEL_GAP; return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP" ;;
+      *) openkill_shadow_typed_status=MODEL_GAP; openkill_shadow_typed_reason=typed-result-invalid; return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP" ;;
+   esac
+}
+
 openkill_shadow_compare_auto_intent()
 {
    # Compare the legacy runtime projection against the central desired batch.
@@ -1789,7 +2130,10 @@ openkill_shadow_compare_auto_intent()
          gsub(/^ +| +$/, "", s)
          return s
       }
-      function owned_chain(name) { return name == "nat_output" || name ~ /^openkill/ }
+      # Backward-compatible raw fallback for pre-R3A callers.  Production
+      # typed calls use formal ownership rows; this helper is never the typed
+      # policy and physical names are not projected into CURRENT parity.
+      function capture_raw_scope(name) { return name == "nat_output" || name ~ /^openkill/ }
       function add_new_rule(chain,s) { new_count[chain]++; new_rule[chain,new_count[chain]]=canon(s) }
       function add_old_rule(chain,s) { old_count[chain]++; old_rule[chain,old_count[chain]]=canon(s) }
       function set_elements(s,  x) {
@@ -1825,8 +2169,8 @@ openkill_shadow_compare_auto_intent()
          if (line ~ /^add set /) { name=$5; old_set[name]=set_elements(line); old_set_seen[name]=1; next }
          if (line ~ /^add chain /) {
             name=$5
-            if (owned_chain(name)) old_chain[name]=1
-            if (owned_chain(name) && match(line, /type[[:space:]]+nat[[:space:]]+hook[[:space:]]+output[[:space:]]+priority[[:space:]]+-?[0-9]+/)) {
+            if (capture_raw_scope(name)) old_chain[name]=1
+            if (capture_raw_scope(name) && match(line, /type[[:space:]]+nat[[:space:]]+hook[[:space:]]+output[[:space:]]+priority[[:space:]]+-?[0-9]+/)) {
                old_hook[name]=line
                old_hook_priority[name]=substr(line, RSTART, RLENGTH)
                sub(/^.*priority[[:space:]]+/, "", old_hook_priority[name])
@@ -1907,6 +2251,19 @@ openkill_shadow_compare_nft()
    openkill_shadow_optional_missing_count=0
    openkill_shadow_out_of_scope_missing_count=0
    openkill_shadow_unknown_count=0
+   openkill_shadow_typed_actual_owned_hash=
+   openkill_shadow_typed_desired_owned_hash=
+   openkill_shadow_typed_dns_actual_hash=
+   openkill_shadow_typed_dns_desired_hash=
+   openkill_shadow_typed_model_gap_count=0
+   openkill_shadow_typed_mismatch_count=0
+   openkill_shadow_typed_out_of_scope_count=0
+   openkill_shadow_typed_unknown_count=0
+   openkill_shadow_typed_dns_parity=NOT_RUN
+   openkill_shadow_typed_status=NOT_RUN
+   openkill_shadow_typed_requested=0
+   [ -n "${OPENKILL_NFT_SHADOW_TYPED_ACTUAL_FILE:-}" ] && openkill_shadow_typed_requested=1
+   [ -n "${OPENKILL_NFT_SHADOW_TYPED_DESIRED_FILE:-}" ] && openkill_shadow_typed_requested=1
    openkill_shadow_tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/openkill-shadow.XXXXXX" 2>/dev/null) || {
       openkill_shadow_publish INPUT_ERROR - - - temp-directory-failed || true
       exit "$OPENKILL_NFT_SHADOW_RC_INPUT"
@@ -2033,6 +2390,29 @@ openkill_shadow_compare_nft()
       openkill_shadow_old_intent_hash=
    fi
 
+   # A typed semantic bundle is opt-in and additive.  Its two files are
+   # copied into the private cycle directory before rendering/comparison so a
+   # caller cannot change the source underneath the coherent snapshot.  The
+   # automatic coordinator still performs the bounded legacy capture and D2A
+   # inventory classification above; typed comparison is the policy decision.
+   if [ "$openkill_shadow_typed_requested" -eq 1 ]; then
+      [ -n "${OPENKILL_NFT_SHADOW_TYPED_ACTUAL_FILE:-}" ] &&
+         [ -n "${OPENKILL_NFT_SHADOW_TYPED_DESIRED_FILE:-}" ] || {
+         openkill_shadow_publish MODEL_GAP - - "$openkill_shadow_generation_for_log" typed-input-pair-missing || true
+         exit "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+      }
+      openkill_shadow_typed_actual_file=$openkill_shadow_tmp_dir/typed-actual.tsv
+      openkill_shadow_typed_desired_file=$openkill_shadow_tmp_dir/typed-desired.tsv
+      openkill_shadow_typed_prepare_file "$OPENKILL_NFT_SHADOW_TYPED_ACTUAL_FILE" "$openkill_shadow_typed_actual_file" || {
+         openkill_shadow_publish MODEL_GAP - - "$openkill_shadow_generation_for_log" typed-actual-unavailable || true
+         exit "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+      }
+      openkill_shadow_typed_prepare_file "$OPENKILL_NFT_SHADOW_TYPED_DESIRED_FILE" "$openkill_shadow_typed_desired_file" || {
+         openkill_shadow_publish MODEL_GAP - - "$openkill_shadow_generation_for_log" typed-desired-unavailable || true
+         exit "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+      }
+   fi
+
    openkill_shadow_new_payload="$openkill_shadow_tmp_dir/new.nft"
    openkill_shadow_run_renderer "$openkill_shadow_input_tmp" "$openkill_shadow_new_payload"
    openkill_shadow_render_rc=$?
@@ -2100,7 +2480,10 @@ openkill_shadow_compare_nft()
       exit "$OPENKILL_NFT_SHADOW_RC_INPUT"
    fi
 
-   if [ "${openkill_shadow_auto_mode:-0}" -eq 1 ]; then
+   if [ "$openkill_shadow_typed_requested" -eq 1 ]; then
+      openkill_shadow_compare_typed_intent "$openkill_shadow_typed_actual_file" "$openkill_shadow_typed_desired_file" "$openkill_shadow_tmp_dir"
+      openkill_shadow_compare_rc=$?
+   elif [ "${openkill_shadow_auto_mode:-0}" -eq 1 ]; then
       if openkill_shadow_compare_auto_intent "$openkill_shadow_old_intent_file" "$openkill_shadow_new_payload"; then
          openkill_shadow_compare_rc=$OPENKILL_NFT_SHADOW_RC_MATCH
       else
@@ -2172,11 +2555,18 @@ openkill_shadow_compare_nft()
          fi
       fi
    fi
+   if [ "$openkill_shadow_compare_rc" -eq "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP" ]; then
+      openkill_shadow_log_bounded MODEL_GAP "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" "${openkill_shadow_typed_reason:-semantic-model-incomplete}"
+      # Keep mismatch_count about semantic differences; model gaps have their
+      # own bounded model_gap_count telemetry field.
+      openkill_shadow_publish MODEL_GAP "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" "$openkill_shadow_generation_for_log" "${openkill_shadow_typed_reason:-semantic-model-incomplete}" "${openkill_shadow_typed_mismatch_count:-0}" || true
+      exit "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   fi
    if [ "$openkill_shadow_compare_rc" -eq "$OPENKILL_NFT_SHADOW_RC_MATCH" ]; then
       openkill_shadow_publish MATCH "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" "$openkill_shadow_generation_for_log" semantic-equivalent 0 || true
       exit 0
    fi
    openkill_shadow_log_bounded MISMATCH "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" semantic-intent-diff
-   openkill_shadow_publish MISMATCH "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" "$openkill_shadow_generation_for_log" semantic-intent-diff 1 || true
+   openkill_shadow_publish MISMATCH "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" "$openkill_shadow_generation_for_log" semantic-intent-diff "${openkill_shadow_typed_mismatch_count:-1}" || true
    exit "$OPENKILL_NFT_SHADOW_RC_MISMATCH"
 )

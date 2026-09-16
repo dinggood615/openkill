@@ -35,6 +35,7 @@ for file in \
   luci-app-openkill/root/usr/share/openkill/shadow/input_tun_v1.tsv \
   luci-app-openkill/root/usr/share/openkill/shadow/input_tproxy_v1.tsv \
   luci-app-openkill/root/usr/share/openkill/shadow/input_redirect_v1.tsv \
+  luci-app-openkill/root/usr/share/openkill/shadow/semantic_model_v1.tsv \
   luci-app-openkill/root/usr/share/openkill/openkill_config_normalize.sh \
   luci-app-openkill/root/usr/share/openkill/openkill-benchmark.sh \
   luci-app-openkill/root/usr/share/openkill/dependencies.conf \
@@ -78,6 +79,18 @@ for file in \
   "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/yml_proxys_set.sh" \
   "$ROOT_DIR/luci-app-openkill/root/etc/uci-defaults/luci-openkill"; do
   sh -n "$file" || fail "shell syntax error: ${file#$ROOT_DIR/}"
+done
+
+grep -Fqx 'OPENKILL_SHADOW_SEMANTIC_MANIFEST_V1=1' \
+  "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/shadow/semantic_model_v1.tsv" \
+  || fail 'typed shadow semantic manifest header is missing'
+for field in \
+  DNS_FIREWALL_LAN_TARGET DNS_FIREWALL_ROUTER_TARGET DNSMASQ_LISTEN_TARGET \
+  DNSMASQ_UPSTREAM_TARGET MIHOMO_DNS_LISTENER DNS_LOOP_PREVENTION \
+  DNS_SCOPE_IPV4 DNS_SCOPE_IPV6; do
+  grep -Fq "DNS_FIELD	$field	CURRENT_OWNED" \
+    "$ROOT_DIR/luci-app-openkill/root/usr/share/openkill/shadow/semantic_model_v1.tsv" \
+    || fail "typed shadow DNS field is missing: $field"
 done
 
 sh "$ROOT_DIR/scripts/check-openkill-i18n.sh" >/dev/null || fail 'Chinese UI catalog validation failed'

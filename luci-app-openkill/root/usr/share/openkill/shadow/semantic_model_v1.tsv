@@ -1,0 +1,29 @@
+OPENKILL_SHADOW_SEMANTIC_MANIFEST_V1=1
+MODEL_VERSION	1
+# Ownership classes are the D2B vocabulary.  Object rows are supplied by
+# the bounded inventory projection; this file is the shared parser contract.
+OWNERSHIP_CLASS	CURRENT_OWNED
+OWNERSHIP_CLASS	LEGACY_ONLY_SAFETY
+OWNERSHIP_CLASS	FW4_BASE
+OWNERSHIP_CLASS	CONDITIONAL_CURRENT
+OWNERSHIP_CLASS	INACTIVE_MODE
+OWNERSHIP_CLASS	OPTIONAL_OBSERVATION
+OWNERSHIP_CLASS	OUT_OF_SCOPE
+OWNERSHIP_CLASS	UNKNOWN
+# D2C fields are independent semantic values.  No field aliases another
+# layer, and no port equivalence is implied by this manifest.
+DNS_FIELD	DNS_FIREWALL_LAN_TARGET	CURRENT_OWNED
+DNS_FIELD	DNS_FIREWALL_ROUTER_TARGET	CURRENT_OWNED
+DNS_FIELD	DNSMASQ_LISTEN_TARGET	CURRENT_OWNED
+DNS_FIELD	DNSMASQ_UPSTREAM_TARGET	CURRENT_OWNED
+DNS_FIELD	MIHOMO_DNS_LISTENER	CURRENT_OWNED
+DNS_FIELD	DNS_LOOP_PREVENTION	CURRENT_OWNED
+DNS_FIELD	DNS_SCOPE_IPV4	CURRENT_OWNED
+DNS_FIELD	DNS_SCOPE_IPV6	CURRENT_OWNED
+# Formal D2B inventory joins for the legacy WAN safety objects.  These rows
+# are metadata, not a name-based ignore list; an ownership disagreement is a
+# MODEL_GAP and the rows remain in the full observation.
+INVENTORY	chain	openkill_wan_input	LEGACY_ONLY_SAFETY	WAN_SAFETY
+INVENTORY	chain	openkill_wan6_input	LEGACY_ONLY_SAFETY	WAN_SAFETY
+INVENTORY	attachment	fw4_input_to_openkill_wan_input	LEGACY_ONLY_SAFETY	WAN_SAFETY
+INVENTORY	attachment	fw4_input6_to_openkill_wan6_input	LEGACY_ONLY_SAFETY	WAN_SAFETY
