@@ -9,6 +9,7 @@ the automatic coordinator.
 from __future__ import annotations
 
 from pathlib import Path
+import hashlib
 import shutil
 import subprocess
 import tempfile
@@ -71,23 +72,34 @@ class AutoHarness:
         "OPENKILL_NFT_SHADOW_TIMEOUT", "OPENKILL_NETWORK_DESIRED",
         "OPENKILL_NETWORK_APPLIED_FILE", "OPENKILL_NETWORK_SNAPSHOT",
         "OPENKILL_NFT_SHADOW_NODE4_FILE", "OPENKILL_NFT_SHADOW_NODE6_FILE",
-        "OPENKILL_DNS_ENDPOINT", "FAKE_UCI_COUNT",
+        "OPENKILL_DNS_ENDPOINT", "OPENKILL_MIHOMO_DNS_LISTENER", "MIHOMO_DNS_LISTENER",
+        "mihomo_dns_listener", "OPENKILL_DNSMASQ_LISTEN_TARGET", "DNSMASQ_LISTEN_TARGET",
+        "dnsmasq_listen_target", "OPENKILL_DNSMASQ_UPSTREAM_TARGET", "DNSMASQ_UPSTREAM_TARGET",
+        "dnsmasq_upstream_target", "DNSPORT", "FAKE_UCI_COUNT",
     )
 
     def __init__(self) -> None:
         self.temp = tempfile.TemporaryDirectory(prefix="openkill-shadow-sidecar-")
         self.root = Path(self.temp.name)
         self.counter = 0
+        self.last_runner: Path | None = None
 
     def close(self) -> None:
         self.temp.cleanup()
 
-    def run(self, env: dict[str, str | Path | None], timeout: int = 60, body: str | None = None) -> tuple[subprocess.CompletedProcess[str], Path]:
+    def run(
+        self,
+        env: dict[str, str | Path | None],
+        timeout: int = 60,
+        body: str | None = None,
+        helper: Path = HELPER,
+    ) -> tuple[subprocess.CompletedProcess[str], Path]:
         self.counter += 1
         case = self.root / f"case-{self.counter}"
         case.mkdir(parents=True, exist_ok=True)
         telemetry = case / "telemetry"
         runner = case / "runner.sh"
+        self.last_runner = runner
         lines = ["#!/bin/sh", "set +e"]
         lines.extend(f"unset {key}" for key in self._UNSET)
         for key, value in env.items():
@@ -95,7 +107,10 @@ class AutoHarness:
                 lines.append(f"unset {key}")
             else:
                 lines.append(f"export {key}={quote(value)}")
-        lines.append(f". {quote(wsl_path(HELPER))}")
+        # The helper path is an explicit execution input.  Staging tests pass
+        # a temporary copy here so a repository helper cannot be loaded by a
+        # hidden fallback while the candidate is being exercised.
+        lines.append(f". {quote(wsl_path(helper))}")
         lines.extend((body or "openkill_shadow_compare_nft; rc=$?; printf 'RC=%s\\n' \"$rc\"").splitlines())
         write_lf(runner, "\n".join(lines) + "\n")
         command = (
@@ -138,8 +153,16 @@ class SidecarProducerTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.harness.close()
 
-    def run_auto(self, capture: Path = CAPTURE, **extra: str | Path | None):
-        process, telemetry = self.harness.run(self.harness.env(capture, **extra))
+    def run_auto(
+        self,
+        capture: Path = CAPTURE,
+        helper: Path = HELPER,
+        body: str | None = None,
+        **extra: str | Path | None,
+    ):
+        process, telemetry = self.harness.run(
+            self.harness.env(capture, **extra), helper=helper, body=body
+        )
         return process, self.harness.rc(process), status_file(telemetry / "status")
 
     def test_automatic_path_generates_typed_sidecars_and_matches(self) -> None:
@@ -227,6 +250,14 @@ esac
 """,
         )
         (fake_bin / "uci").chmod(0o700)
+        write_lf(
+            fake_bin / "netstat",
+            """#!/bin/sh
+printf 'Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name\\n'
+printf 'tcp        0      0 127.0.0.1:7874          0.0.0.0:*               LISTEN      123/mihomo\\n'
+""",
+        )
+        (fake_bin / "netstat").chmod(0o700)
         values = self.harness.env(
             OPENKILL_NFT_SHADOW_SOURCE_FILE=None,
             OPENKILL_NETWORK_DESIRED=wsl_path(desired),
@@ -245,6 +276,87 @@ esac
         self.assertEqual(rc, 0, process.stderr)
         self.assertEqual(status_file(telemetry / "status").get("status"), "MATCH", process.stderr)
         self.assertEqual(count_file.read_text(encoding="utf-8").strip(), "2", process.stderr)
+
+    def test_mihomo_listener_uses_live_process_evidence_not_endpoint_intent(self) -> None:
+        fake_bin = self.harness.root / "runtime-dns-bin"
+        fake_bin.mkdir()
+        write_lf(
+            fake_bin / "uci",
+            """#!/bin/sh
+case "$*" in
+    *port) printf '53\\n' ;;
+    *server) printf '127.0.0.1#7874\\n' ;;
+    *) exit 1 ;;
+esac
+""",
+        )
+        write_lf(
+            fake_bin / "netstat",
+            """#!/bin/sh
+printf 'Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name\\n'
+printf 'tcp        0      0 127.0.0.1:7874          0.0.0.0:*               LISTEN      123/mihomo\\n'
+""",
+        )
+        (fake_bin / "uci").chmod(0o700)
+        (fake_bin / "netstat").chmod(0o700)
+        state_dir = self.harness.root / "runtime-dns-state"
+        process, _ = self.harness.run(
+            {
+                "PATH": f"{wsl_path(fake_bin)}:/usr/bin:/bin",
+                # This is readiness/configuration intent and must not win over
+                # the process-owned socket evidence.
+                "OPENKILL_DNS_ENDPOINT": "127.0.0.1:9999",
+                "OPENKILL_MIHOMO_DNS_LISTENER": "127.0.0.1:9999",
+            },
+            body=(
+                f"mkdir -p {quote(wsl_path(state_dir))}; "
+                f"openkill_shadow_capture_runtime_dns {quote(wsl_path(state_dir))}; rc=$?; "
+                "printf 'RC=%s\\n' \"$rc\"; "
+                "printf 'LISTENER=%s\\n' \"${OPENKILL_NFT_SHADOW_FROZEN_MIHOMO_DNS_LISTENER:-}\"; "
+                "printf 'SOURCE=%s\\n' \"${OPENKILL_NFT_SHADOW_FROZEN_MIHOMO_DNS_SOURCE:-}\""
+            ),
+        )
+        self.assertIn("RC=0", process.stdout, process.stderr)
+        self.assertIn("LISTENER=127.0.0.1:7874", process.stdout, process.stderr)
+        self.assertIn("SOURCE=netstat-mihomo", process.stdout, process.stderr)
+
+    def test_missing_live_mihomo_evidence_does_not_fallback_to_endpoint(self) -> None:
+        fake_bin = self.harness.root / "missing-runtime-dns-bin"
+        fake_bin.mkdir()
+        write_lf(
+            fake_bin / "uci",
+            """#!/bin/sh
+case "$*" in
+    *port) printf '53\\n' ;;
+    *server) printf '127.0.0.1#7874\\n' ;;
+    *) exit 1 ;;
+esac
+""",
+        )
+        # A successful but empty process table is still a source gap.  The
+        # endpoint intent below must never be accepted as live evidence.
+        write_lf(fake_bin / "netstat", "#!/bin/sh\nexit 0\n")
+        (fake_bin / "uci").chmod(0o700)
+        (fake_bin / "netstat").chmod(0o700)
+        state_dir = self.harness.root / "missing-runtime-dns-state"
+        process, _ = self.harness.run(
+            {
+                "PATH": f"{wsl_path(fake_bin)}:/usr/bin:/bin",
+                "OPENKILL_DNS_ENDPOINT": "127.0.0.1:7874",
+            },
+            body=(
+                f"mkdir -p {quote(wsl_path(state_dir))}; "
+                f"openkill_shadow_capture_runtime_dns {quote(wsl_path(state_dir))}; rc=$?; "
+                "printf 'RC=%s\\n' \"$rc\""
+            ),
+        )
+        self.assertIn("RC=11", process.stdout, process.stderr)
+
+    def test_dns_endpoint_is_intent_only_in_runtime_capture(self) -> None:
+        source = HELPER.read_text(encoding="utf-8")
+        capture = source.split("openkill_shadow_capture_runtime_dns()", 1)[1].split("\nopenkill_shadow_auto_continuity_snapshot()", 1)[0]
+        self.assertNotIn("runtime_dns_mihomo=${OPENKILL_DNS_ENDPOINT", capture)
+        self.assertIn("netstat-mihomo", capture)
 
     def test_actual_mark_difference_is_mismatch(self) -> None:
         capture = self.harness.root / "mark-wrong.capture"
@@ -340,12 +452,66 @@ esac
         shutil.copy2(RENDERER, staged / "openkill_nft_renderer.sh")
         for name in ("semantic_model_v1.tsv", "input_tun_v1.tsv"):
             shutil.copy2(TEMPLATE_DIR / name, staged_shadow / name)
-        process, rc, status = self.run_auto(
-            OPENKILL_NFT_SHADOW_RENDERER=wsl_path(staged / "openkill_nft_renderer.sh"),
-            OPENKILL_NFT_SHADOW_TEMPLATE_DIR=wsl_path(staged_shadow),
-        )
-        self.assertEqual(rc, 0, process.stderr)
-        self.assertEqual(status.get("status"), "MATCH")
+        staged_helper = staged / "openkill_nft_shadow.sh"
+        staged_renderer = staged / "openkill_nft_renderer.sh"
+        staged_manifest = staged_shadow / "semantic_model_v1.tsv"
+        staged_template = staged_shadow / "input_tun_v1.tsv"
+        # The marker is appended only to this temporary candidate.  It makes
+        # the executed shell provenance observable and turns a hidden source
+        # fallback into a deterministic test failure.
+        with staged_helper.open("ab") as stream:
+            stream.write(b"\nOPENKILL_SHADOW_STAGED_EXECUTION=1\n")
+        identity_inputs = (staged_helper, staged_manifest, staged_renderer, staged_template)
+        identity = hashlib.sha256(
+            "\n".join(
+                f"{path.name}:{hashlib.sha256(path.read_bytes()).hexdigest()}"
+                for path in identity_inputs
+            ).encode()
+        ).hexdigest()
+        # Deliberately make the repository helper unavailable to the staged
+        # runner.  The explicit helper argument above is the only source of
+        # production shell code for these cycles; a fallback would fail.
+        staged_processes = []
+        statuses = []
+        for _ in range(5):
+            process, rc, status = self.run_auto(
+                helper=staged_helper,
+                body=(
+                    "openkill_shadow_compare_nft; rc=$?; "
+                    "printf 'RC=%s\\n' \"$rc\"; "
+                    "printf 'STAGED_MARKER=%s\\n' \"${OPENKILL_SHADOW_STAGED_EXECUTION:-0}\"; "
+                    f"printf 'OBSERVER_PATH=%s\\n' {quote(wsl_path(staged_helper))}; "
+                    f"printf 'MANIFEST_PATH=%s\\n' {quote(wsl_path(staged_manifest))}; "
+                    f"printf 'RENDERER_PATH=%s\\n' {quote(wsl_path(staged_renderer))}; "
+                    f"printf 'TEMPLATE_PATH=%s\\n' {quote(wsl_path(staged_template))}; "
+                    f"printf 'EXECUTION_IDENTITY_HASH=%s\\n' {quote(identity)}"
+                ),
+                OPENKILL_NFT_SHADOW_RENDERER=wsl_path(staged_renderer),
+                OPENKILL_NFT_SHADOW_TEMPLATE_DIR=wsl_path(staged_shadow),
+            )
+            staged_processes.append((process, rc))
+            statuses.append(status)
+        for process, rc in staged_processes:
+            self.assertEqual(rc, 0, process.stderr)
+            self.assertIn("STAGED_MARKER=1", process.stdout)
+            self.assertIn(f"OBSERVER_PATH={wsl_path(staged_helper)}", process.stdout)
+            self.assertIn(f"MANIFEST_PATH={wsl_path(staged_manifest)}", process.stdout)
+            self.assertIn(f"RENDERER_PATH={wsl_path(staged_renderer)}", process.stdout)
+            self.assertIn(f"TEMPLATE_PATH={wsl_path(staged_template)}", process.stdout)
+            self.assertIn(f"EXECUTION_IDENTITY_HASH={identity}", process.stdout)
+        self.assertIsNotNone(self.harness.last_runner)
+        runner_text = self.harness.last_runner.read_text(encoding="utf-8")
+        self.assertIn(wsl_path(staged_helper), runner_text)
+        self.assertNotIn(wsl_path(HELPER), runner_text)
+        self.assertNotIn(wsl_path(RENDERER), runner_text)
+        self.assertNotIn(wsl_path(TEMPLATE_DIR), runner_text)
+        self.assertTrue(all(status.get("status") == "MATCH" for status in statuses))
+        self.assertEqual({status.get("actual_owned_hash") for status in statuses}, {statuses[0].get("actual_owned_hash")})
+        self.assertEqual({status.get("desired_owned_hash") for status in statuses}, {statuses[0].get("desired_owned_hash")})
+        self.assertEqual({status.get("dns_actual_hash") for status in statuses}, {statuses[0].get("dns_actual_hash")})
+        self.assertEqual({status.get("dns_desired_hash") for status in statuses}, {statuses[0].get("dns_desired_hash")})
+        self.assertTrue(identity)
+        self.assertNotEqual(staged_helper.resolve(), HELPER.resolve())
 
 
 if __name__ == "__main__":

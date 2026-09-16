@@ -67,6 +67,14 @@ only for an explicit fixture/development invocation.  Automatic mode rejects
 them even if a caller exports a legacy override flag, so externally prepared
 sidecars can never become device parity evidence.
 
+Runtime DNS provenance is also explicit.  In the automatic production path,
+`OPENKILL_DNS_ENDPOINT` is an init readiness/configuration value; it is not
+accepted as proof of a live Mihomo socket.  The actual listener is obtained
+from one unambiguous process-owned entry in the bounded `netstat` capture and
+its source kind is frozen with the DNS values before T0.  Fixture-only runs
+use their labelled committed runtime snapshot.  Missing or ambiguous live
+evidence is `MODEL_GAP`, never a guessed default.
+
 The sidecars and their hashes are temporary cycle data.  They are bounded by
 `OPENKILL_NFT_SHADOW_MAX_PAYLOAD_BYTES`, cleaned by the existing coordinator
 trap, and never written to `/etc`, `/usr/share`, UCI, or package-managed

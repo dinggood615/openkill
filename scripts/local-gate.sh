@@ -13,4 +13,5 @@ if command -v python3 >/dev/null 2>&1; then
     python3 -m compileall -q scripts
 fi
 
+printf 'LOCAL_POLICY_GATE=PASS\n'
 printf 'OpenKill local gate passed.\n'

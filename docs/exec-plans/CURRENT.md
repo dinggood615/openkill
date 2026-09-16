@@ -1,4 +1,33 @@
-# Current execution plan: authorized local delivery and GitHub release
+# Current status
+
+CURRENT_HEAD: `28811e56d04b77963e5e5b8b6254b4dc741b8aac` (observed before this local hardening work)
+VERSION: `2026-1128`
+CURRENT_PHASE: `LOCAL_VALIDATION_HARDENING_WORK_PACKAGE`
+CURRENT_STATUS: `PASS — local validation hardening complete`
+BLOCKER: `REAL_DEVICE_GATE` — the next typed-shadow retry still needs explicit device-phase approval
+DEVICE_STATE: `.102` was not accessed in this work package; prior R2C evidence records a healthy retained baseline
+DEVICE_RETRY_READY: `YES` (purely local preflight; device verification remains pending)
+NEXT_ACTION: `PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE` after explicit device-phase approval
+CENTRAL_ACTIVE: `NOT_APPROVED`
+CENTRAL_NFT_APPLY: `NOT_APPROVED`
+REAL_PACKET_PATH: `NOT_TESTED`
+FAST_GATE: `PASS` (`20260916T133010Z-4400`)
+FULL_GATE: `PASS` (`20260916T133300Z-10460`; nft CLI recorded as `NOT_RUN_ENVIRONMENT`)
+DEVICE_PREFLIGHT: `PASS` (`20260916T134656Z-6164`; nft CLI recorded as `NOT_RUN_ENVIRONMENT`)
+DEVICE_CANDIDATE_ID: `8693d265bd2f6d809229708a834ad55063cd817f0f78c1d42bab3a098e8b5135`
+RESULTING_HEAD: resolve with `git rev-parse HEAD` after the local hardening commit; the recorded `CURRENT_HEAD` is the pre-commit observation
+
+IMPLEMENTED: R3C internal typed sidecar producer, canonical D2D fixture, typed ownership/DNS model, isolated staged execution and unified local gates
+LOCAL_VERIFIED: fast/full/device-preflight evidence above, R3C local replay and focused regression suites
+DEVICE_VERIFIED: `NO` for the R3A/R3C candidate
+RELEASED: `NO` (2026-1128 package remains the verified release baseline)
+
+The detailed phase records below are retained as historical evidence. The
+single local gate runner and the hardening decisions are documented in
+[`docs/dev/local-validation-hardening.md`](../dev/local-validation-hardening.md)
+and [`docs/testing/TEST_GATES.md`](../testing/TEST_GATES.md).
+
+## Historical execution records
 
 ## R2C canonical device baseline hold (completed)
 
@@ -527,3 +556,56 @@ has not been tested with this candidate.  `R3C=PASS`:
 `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
 `CENTRAL_ACTIVE=NOT_APPROVED`, `CENTRAL_NFT_APPLY=NOT_APPROVED`, and
 `REAL_PACKET_PATH=NOT_TESTED` remain unchanged.
+
+## Local validation hardening work package (completed)
+
+Observed on 2026-09-16 from `28811e56d04b77963e5e5b8b6254b4dc741b8aac`,
+version `2026-1128`, with no device or router access.  The D2C commit
+`566fa82f0b814710b290c4bbd7e2385b689bd616` remains an ancestor.  The local
+changes are limited to the shadow observer's read-only DNS provenance capture,
+staged observer tests, the unified test runner, gate naming, evidence
+documentation, and CURRENT status; legacy writers, dataplane behavior, init,
+renderer, parser, network, firewall, installer, package, version, release and
+central-apply behavior were not changed.
+
+The observer now treats `OPENKILL_DNS_ENDPOINT` as readiness/configuration
+intent only.  Automatic actual `MIHOMO_DNS_LISTENER` evidence comes from one
+unambiguous Mihomo-owned `netstat` listener row; dnsmasq values and all source
+kinds are frozen before the continuity token and consumed without a
+comparator-stage live reread.  Missing or ambiguous sources remain a typed
+`MODEL_GAP`.  The staged regression copies the observer, renderer, semantic
+manifest and TUN template into a private directory, appends a temporary marker
+to the staged observer, records all candidate paths/hashes and runs five
+automatic cycles without external typed sidecars.  The marker proves the
+temporary observer executed; the runner source contains no repository helper,
+renderer or template fallback.
+
+The single `scripts/openkill-test-gates.py` executor provides `fast`, `full`,
+and `device-preflight` modes.  It selects Windows/WSL per case, captures every
+return code, records explicit environment-limited results, binds cache keys to
+source/test/fixture/interpreter inputs, and writes machine-readable evidence
+bundles.  The candidate manifest's minimal staging set is the observer,
+renderer, `shadow/semantic_model_v1.tsv`, and `shadow/input_tun_v1.tsv`; its
+candidate ID is
+`8693d265bd2f6d809229708a834ad55063cd817f0f78c1d42bab3a098e8b5135` and the
+canonical config remains
+`scripts/fixtures/3e2-safe.yaml` with SHA-256
+`9cd8d91750758823776df9c982c1e15f0baa1a72baa1792fa2f82c0df4d24a6e`.
+
+Evidence is complete for the current worktree: fast run
+`20260916T133010Z-4400` passed; full run `20260916T133300Z-10460` passed with
+32 PASS and one documented `NOT_RUN_ENVIRONMENT` (`NFT_CLI_UNAVAILABLE`);
+device-preflight run `20260916T134656Z-6164` passed with 25 PASS and the same
+single environment result.  The staged observer test is 16/16, the R2B UCI
+lifecycle test is 18/18, and the candidate manifest reports staged execution,
+internal typed sidecars, no repository fallback, `DEVICE_ACCESS=0`,
+`CENTRAL_APPLY=0`, and `PACKET_TEST=0`.  The candidate ID is
+`8693d265bd2f6d809229708a834ad55063cd817f0f78c1d42bab3a098e8b5135`; its
+runner source hash is
+`ea8a3da63fa4b182cb7e4a268a1219a37f7d81500cc1779c186d85d87850da7b`.
+The eight frozen writer hashes are unchanged and `NEW_UNEXPLAINED_SKIP=0`.
+
+This proves local readiness only.  `DEVICE_RETRY_READY=YES` means the exact
+candidate may be considered for an explicitly approved `.102` phase; it does
+not claim device verification, package release, central apply, or packet-path
+validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.

@@ -1,69 +1,71 @@
 # Test gates
 
-Tests are layered so a documentation or workflow change does not require a
-device.
+OpenKill uses one local executor for the validation matrix:
 
-## Fast local gate
-
-```sh
-sh scripts/preflight-openkill.sh
-sh scripts/validate-openkill.sh
-sh scripts/ci-gate.sh
-python3 -m compileall -q scripts
-python3 scripts/verify_3e2_safe_config.py
-python3 scripts/test-3e2-safe-config.py
+```text
+python scripts/openkill-test-gates.py fast
+python scripts/openkill-test-gates.py full --no-cache
+python scripts/openkill-test-gates.py device-preflight --no-cache
 ```
 
-## Full local matrix
+The executor runs every case independently, records its return code, and
+fails the mode when any required case fails. A later successful case cannot
+hide an earlier failure. Each run writes a bounded, local-only evidence bundle
+under `artifacts/test-evidence/<run-id>/`:
 
-Use Windows Python for the fixture suites that launch WSL/BusyBox.
-Run `test-installer.py`, `test-runtime.py`, `test-network-model.py`,
-`test-snapshot-fw4.py`, `test-stage-d.py` and `test-core.py` inside WSL
-instead: these need Linux paths, shell executables or the Linux core binary.
-For example, from PowerShell in the repository:
-
-```powershell
-python scripts/test-shadow-continuity.py
-wsl --cd /mnt/d/openkill --exec python3 scripts/test-stage-d.py
-wsl --cd /mnt/d/openkill --exec python3 scripts/test-core.py --release v1.19.30
-wsl --cd /mnt/d/openkill --exec python3 scripts/test-core.py --release latest
+```text
+summary.json  summary.txt  environment.txt  hashes.txt
+tests.tsv     skips.tsv    candidate-manifest.json
 ```
 
-Run every `scripts/test-*.py` suite with the corresponding entry point;
-any nonzero exit fails the gate. Do not run the entire matrix with Windows
-Python: a discovered bash executable alone does not make Windows paths and
-CRLF scripts compatible with Linux. The matrix covers runtime,
-installer, core compatibility, classifier and semantic contracts, NFT IR and
-syntax, renderer, parser fixtures, continuity, self-sufficiency, shadow
-runtime, network, snapshot/FW4, stage D, and central wiring. Also run
-`test-uci-lifecycle.py`, `test-3e2-safe-config.py`, `git diff --check` and the
-shell syntax checks in `validate-openkill.sh`.  The canonical D2D fixture and
-its verifier are documented in
-`docs/dev/phase-3e2d2d-r2d-canonical-config.md`; an approved Mihomo binary can
-be supplied with `--mihomo <path> --require-mihomo` for the additional `-t`
-check.  This is a local asset check and never contacts a device.
+The directory is ignored by Git. The evidence key for each case includes the
+case source, the OpenKill production observer/renderer and fixtures it can
+consume, the runner version and source hash, interpreter/platform versions,
+command, environment and the case's allowed skip policy. Fast mode may reuse a matching
+allowed result from the cache; `full` and `device-preflight` always execute
+their cases again. A changed input
+therefore invalidates only the affected evidence rather than relying on a
+commit id alone.
 
-Expected skips are limited to the documented Ruby-dependent cases. A new
-skip, xfail, warning downgrade, or device access is a gate failure.
+`fast` is the short feedback loop. It runs the policy checks, compile and diff
+checks, canonical configuration, UCI lifecycle, typed producer/shadow,
+semantic model, and production-shadow writer-freeze suites. Continuity and
+the slower self-sufficiency replay remain in the full and device-preflight
+modes.
 
-## CI gate
+`full` runs the complete local matrix. Fixture suites run with the native
+Windows interpreter, while runtime, installer, network, snapshot/FW4, Stage D
+and Mihomo compatibility suites run in WSL. The runner selects that
+environment itself; it does not depend on a developer guessing which shell to
+use. The `nft` CLI case is reported as `NOT_RUN_ENVIRONMENT` with reason
+`NFT_CLI_UNAVAILABLE` when the host does not provide the binary. Ruby-dependent
+tests retain their documented `RUBY_UNAVAILABLE` skip. WSL absence is reported
+as `SKIP_ALLOWED` with reason `WSL_UNAVAILABLE`. These are the only accepted
+environment limitations; there are no silent or generic skips.
 
-Development CI must pass before merge. RC builds are reviewed as artifacts.
-Formal release CI must pass its version gate, runtime matrix, package audit,
-and publication steps. A failed gate is analyzed and repaired in source before
-retrying; no package or device hotfix is used to bypass it.
+`device-preflight` is still completely local. It repeats the source,
+canonical-config, staged-observer, internal-sidecar, provenance, continuity,
+writer-freeze and semantic replay checks needed before a future `.102` phase.
+Its `DEVICE_PREFLIGHT=PASS` and `DEVICE_RETRY_READY=YES` output never contacts
+or probes a router. The staged observer test copies the candidate observer,
+renderer and semantic templates into a private directory, records their
+identity, and executes that copy for five independent automatic cycles. No
+typed sidecar, Python oracle, or repository fallback is permitted.
 
-## Activated development coverage
+The canonical D2D fixture and verifier are
+[`scripts/fixtures/3e2-safe.yaml`](../../scripts/fixtures/3e2-safe.yaml) and
+[`scripts/verify_3e2_safe_config.py`](../../scripts/verify_3e2_safe_config.py).
+They validate the frozen D2C DNS contract, the independent 53/7874 fields, the
+Mark ABI, determinism and secret absence without contacting a device.
 
-Development CI runs `local-gate.sh` and the autonomous-workflow,
-classifier-contract, dataplane-semantic-spec, nft-ir, shadow-context-adapter,
-shadow-semantic-model, dns-current-intent, network-model, snapshot-fw4 and
-stage-d, and uci-lifecycle Python suites. Its existing
-runtime/installer and two-core compatibility matrix remains required.
-The full Windows/WSL fixture matrix is still a local gate; several harnesses
-invoke `wsl.exe` directly and must not be silently skipped on Linux CI.
+The shell scripts retain narrower names for compatibility:
 
-Stage D uses a record-only nft CLI fixture to assert check-only arguments,
-error propagation, and rejection of destructive batches before CLI invocation.
-It does not require or inspect a host fw4 table. Actual nft parsing remains
-covered separately by the renderer/syntax suites and device validation.
+- `local-gate.sh` reports `LOCAL_POLICY_GATE=PASS`; it is a policy/preflight
+  gate and does not claim to be the complete matrix.
+- `ci-gate.sh` reports `CI_WORKFLOW_SEPARATION_GATE=PASS`; this is the local
+  workflow separation check and does not claim that GitHub CI ran.
+
+Development CI remains push/PR driven and never publishes. RC and formal
+release workflows remain manual and separately gated. This local work package
+does not enable central apply, install a package, access a router, or run a
+packet-path test.

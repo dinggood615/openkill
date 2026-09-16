@@ -40,4 +40,5 @@ grep -Fq 'check-version-bump.sh' .github/workflows/compile_new_ipk.yml || fail '
 grep -Fq 'inputs.release_gate == true && inputs.publish == true' .github/workflows/compile_new_ipk.yml || fail 'publish is not release-gated'
 
 git diff --check
+printf 'CI_WORKFLOW_SEPARATION_GATE=PASS\n'
 printf 'OpenKill CI workflow separation passed.\n'

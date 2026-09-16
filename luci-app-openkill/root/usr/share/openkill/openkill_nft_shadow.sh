@@ -533,6 +533,9 @@ openkill_shadow_continuity_shell_scalars()
       "${OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_LISTEN_TARGET:-}" \
       "${OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_UPSTREAM_TARGET:-}" \
       "${OPENKILL_NFT_SHADOW_FROZEN_MIHOMO_DNS_LISTENER:-}" \
+      "${OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_LISTEN_SOURCE:-}" \
+      "${OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_UPSTREAM_SOURCE:-}" \
+      "${OPENKILL_NFT_SHADOW_FROZEN_MIHOMO_DNS_SOURCE:-}" \
       "${OPENKILL_FWMARK:-${PROXY_FWMARK:-}}" "${OPENKILL_FWMARK:-}" "${OPENKILL_FWMASK:-}" \
       "${OPENKILL_ROUTE_TABLE:-${PROXY_ROUTE_TABLE:-}}" "${OPENKILL_ROUTE_TABLE:-}" \
       "${OPENKILL_RULE_PREF:-}" "${OPENKILL_IPV6_READY:-}" \
@@ -562,6 +565,9 @@ openkill_shadow_continuity_shell_scalars()
       printf 'FROZEN_DNSMASQ_LISTEN_TARGET=%s\n' "${OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_LISTEN_TARGET:-}"
       printf 'FROZEN_DNSMASQ_UPSTREAM_TARGET=%s\n' "${OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_UPSTREAM_TARGET:-}"
       printf 'FROZEN_MIHOMO_DNS_LISTENER=%s\n' "${OPENKILL_NFT_SHADOW_FROZEN_MIHOMO_DNS_LISTENER:-}"
+      printf 'FROZEN_DNSMASQ_LISTEN_SOURCE=%s\n' "${OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_LISTEN_SOURCE:-}"
+      printf 'FROZEN_DNSMASQ_UPSTREAM_SOURCE=%s\n' "${OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_UPSTREAM_SOURCE:-}"
+      printf 'FROZEN_MIHOMO_DNS_SOURCE=%s\n' "${OPENKILL_NFT_SHADOW_FROZEN_MIHOMO_DNS_SOURCE:-}"
       printf 'MARK=%s\n' "${OPENKILL_FWMARK:-${PROXY_FWMARK:-}}"
       printf 'OPENKILL_FWMARK=%s\n' "${OPENKILL_FWMARK:-}"
       printf 'MASK=%s\n' "${OPENKILL_FWMASK:-}"
@@ -719,11 +725,10 @@ openkill_shadow_continuity_copy_matches()
 
 # Freeze runtime DNS evidence before T0.  The automatic producer must never
 # discover a missing typed value after the coherent snapshot has been sealed.
-# Existing init/reconcile callers already have the authoritative values in
-# shell variables (DNSPORT and OPENKILL_DNS_ENDPOINT); a standalone automatic
-# observer can obtain the same read-only values from UCI and the dnsmasq
-# listener table.  No value is defaulted here: an unavailable source is a
-# source gap and is reported as MODEL_GAP by the typed producer.
+# The automatic observer must use live, snapshot-bound evidence.  DNSPORT and
+# OPENKILL_DNS_ENDPOINT are configuration/readiness intent supplied by init;
+# they are never accepted as evidence of a Mihomo listener.  A missing live
+# source is a source gap and is reported as MODEL_GAP by the typed producer.
 openkill_shadow_capture_runtime_dns()
 {
    openkill_shadow_runtime_dns_state_dir=$1
@@ -733,6 +738,9 @@ openkill_shadow_capture_runtime_dns()
    openkill_shadow_runtime_dns_listener=
    openkill_shadow_runtime_dns_upstream=
    openkill_shadow_runtime_dns_mihomo=
+   openkill_shadow_runtime_dns_listener_source=
+   openkill_shadow_runtime_dns_upstream_source=
+   openkill_shadow_runtime_dns_mihomo_source=
 
    # The dnsmasq UCI port is authoritative when present.  DNSPORT is the
    # already-captured listener selected by the legacy writer; netstat is a
@@ -744,6 +752,8 @@ openkill_shadow_capture_runtime_dns()
          openkill_shadow_runtime_dns_listener=$(uci -q get dhcp.@dnsmasq[0].port 2>/dev/null || true)
       [ -n "$openkill_shadow_runtime_dns_upstream" ] ||
          openkill_shadow_runtime_dns_upstream=$(uci -q get dhcp.@dnsmasq[0].server 2>/dev/null || true)
+      [ -z "$openkill_shadow_runtime_dns_listener" ] || openkill_shadow_runtime_dns_listener_source=uci-dnsmasq-port
+      [ -z "$openkill_shadow_runtime_dns_upstream" ] || openkill_shadow_runtime_dns_upstream_source=uci-dnsmasq-server
    fi
 
    # A committed state file is useful in a local harness that deliberately
@@ -770,14 +780,17 @@ openkill_shadow_capture_runtime_dns()
                DNSMASQ_LISTEN_TARGET)
                   [ -z "$openkill_shadow_runtime_dns_listener" ] || [ "$openkill_shadow_runtime_dns_listener" = "$openkill_shadow_runtime_dns_state_value" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
                   openkill_shadow_runtime_dns_listener=$openkill_shadow_runtime_dns_state_value
+                  openkill_shadow_runtime_dns_listener_source=fixture-committed-dnsmasq
                   ;;
                DNSMASQ_UPSTREAM_TARGET)
                   [ -z "$openkill_shadow_runtime_dns_upstream" ] || [ "$openkill_shadow_runtime_dns_upstream" = "$openkill_shadow_runtime_dns_state_value" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
                   openkill_shadow_runtime_dns_upstream=$openkill_shadow_runtime_dns_state_value
+                  openkill_shadow_runtime_dns_upstream_source=fixture-committed-dnsmasq
                   ;;
                MIHOMO_DNS_LISTENER)
                   [ -z "$openkill_shadow_runtime_dns_mihomo" ] || [ "$openkill_shadow_runtime_dns_mihomo" = "$openkill_shadow_runtime_dns_state_value" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
                   openkill_shadow_runtime_dns_mihomo=$openkill_shadow_runtime_dns_state_value
+                  openkill_shadow_runtime_dns_mihomo_source=fixture-committed-runtime
                   ;;
             esac
          done
@@ -785,15 +798,18 @@ openkill_shadow_capture_runtime_dns()
    fi
    if [ -z "$openkill_shadow_runtime_dns_listener" ]; then
       openkill_shadow_runtime_dns_listener=${DNSPORT:-}
+      [ -z "$openkill_shadow_runtime_dns_listener" ] || openkill_shadow_runtime_dns_listener_source=committed-dnsmasq-port
    fi
    if [ -z "$openkill_shadow_runtime_dns_listener" ]; then
       openkill_shadow_runtime_dns_listener=${OPENKILL_DNSMASQ_LISTEN_TARGET:-${DNSMASQ_LISTEN_TARGET:-${dnsmasq_listen_target:-}}}
+      [ -z "$openkill_shadow_runtime_dns_listener" ] || openkill_shadow_runtime_dns_listener_source=committed-dnsmasq-port
    fi
    if [ -z "$openkill_shadow_runtime_dns_listener" ] && command -v netstat >/dev/null 2>&1; then
       openkill_shadow_runtime_dns_listener=$(netstat -nlp 2>/dev/null |
          awk '/dnsmasq([[:space:]]|$)/ && $4 ~ /:[0-9]+$/ { value=$4; sub(/^.*:/, "", value); if (value ~ /^[0-9]+$/ && !(value in seen)) { seen[value]=1; count++ } } END { if (count == 1) for (value in seen) print value; else if (count > 1) exit 2 }')
       openkill_shadow_runtime_dns_listener_rc=$?
       [ "$openkill_shadow_runtime_dns_listener_rc" -eq 0 ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+      [ -z "$openkill_shadow_runtime_dns_listener" ] || openkill_shadow_runtime_dns_listener_source=netstat-dnsmasq
    fi
 
    # A list of upstream servers is not silently collapsed.  The current
@@ -802,22 +818,41 @@ openkill_shadow_capture_runtime_dns()
    openkill_shadow_runtime_dns_upstream=$(printf '%s\n' "$openkill_shadow_runtime_dns_upstream" |
       awk '{ gsub(/[[:space:]]+/, " "); sub(/^ +/, ""); sub(/ +$/, ""); print }')
    if [ -z "$openkill_shadow_runtime_dns_upstream" ]; then
-      openkill_shadow_runtime_dns_upstream=${OPENKILL_DNSMASQ_UPSTREAM_TARGET:-${DNSMASQ_UPSTREAM_TARGET:-${dnsmasq_upstream_target:-}}}
+      if [ "$openkill_shadow_runtime_dns_has_uci" -eq 0 ]; then
+         openkill_shadow_runtime_dns_upstream=${OPENKILL_DNSMASQ_UPSTREAM_TARGET:-${DNSMASQ_UPSTREAM_TARGET:-${dnsmasq_upstream_target:-}}}
+         [ -z "$openkill_shadow_runtime_dns_upstream" ] || openkill_shadow_runtime_dns_upstream_source=committed-dnsmasq
+      fi
    fi
    case "$openkill_shadow_runtime_dns_upstream" in
       *\ *|*','*|*';'*) return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP" ;;
    esac
 
-   [ -n "$openkill_shadow_runtime_dns_mihomo" ] ||
-      openkill_shadow_runtime_dns_mihomo=${OPENKILL_DNS_ENDPOINT:-}
-   [ -n "$openkill_shadow_runtime_dns_mihomo" ] ||
-      openkill_shadow_runtime_dns_mihomo=${OPENKILL_MIHOMO_DNS_LISTENER:-${MIHOMO_DNS_LISTENER:-${mihomo_dns_listener:-}}}
+   # OPENKILL_DNS_ENDPOINT and its aliases describe desired/readiness intent,
+   # not a live socket.  In the production path obtain one unambiguous
+   # Mihomo-owned listener from the bounded process table.  Multiple listeners
+   # or no process evidence are deliberately a source gap.
+   if [ -z "$openkill_shadow_runtime_dns_mihomo" ] && command -v netstat >/dev/null 2>&1; then
+      openkill_shadow_runtime_dns_mihomo=$(netstat -nlp 2>/dev/null |
+         awk '$0 ~ /mihomo/ && $4 ~ /:[0-9]+$/ { value=$4; if (!(value in seen)) { seen[value]=1; count++ } } END { if (count == 1) for (value in seen) print value; else if (count > 1) exit 2 }')
+      openkill_shadow_runtime_dns_mihomo_rc=$?
+      [ "$openkill_shadow_runtime_dns_mihomo_rc" -eq 0 ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+      [ -z "$openkill_shadow_runtime_dns_mihomo" ] || openkill_shadow_runtime_dns_mihomo_source=netstat-mihomo
+   fi
 
    for openkill_shadow_runtime_dns_value in \
       "$openkill_shadow_runtime_dns_listener" \
       "$openkill_shadow_runtime_dns_upstream" \
       "$openkill_shadow_runtime_dns_mihomo"; do
       openkill_shadow_safe_value "$openkill_shadow_runtime_dns_value" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   done
+   [ -n "$openkill_shadow_runtime_dns_listener_source" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   [ -n "$openkill_shadow_runtime_dns_upstream_source" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   [ -n "$openkill_shadow_runtime_dns_mihomo_source" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   for openkill_shadow_runtime_dns_source in \
+      "$openkill_shadow_runtime_dns_listener_source" \
+      "$openkill_shadow_runtime_dns_upstream_source" \
+      "$openkill_shadow_runtime_dns_mihomo_source"; do
+      openkill_shadow_safe_value "$openkill_shadow_runtime_dns_source" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
    done
    case "$openkill_shadow_runtime_dns_listener" in ''|*[!0-9]*) return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP" ;; esac
    [ "$openkill_shadow_runtime_dns_listener" -ge 1 ] 2>/dev/null &&
@@ -841,12 +876,18 @@ openkill_shadow_capture_runtime_dns()
       printf 'DNSMASQ_LISTEN_TARGET=%s\n' "$openkill_shadow_runtime_dns_listener"
       printf 'DNSMASQ_UPSTREAM_TARGET=%s\n' "$openkill_shadow_runtime_dns_upstream"
       printf 'MIHOMO_DNS_LISTENER=%s\n' "$openkill_shadow_runtime_dns_mihomo"
+      printf 'DNSMASQ_LISTEN_SOURCE=%s\n' "$openkill_shadow_runtime_dns_listener_source"
+      printf 'DNSMASQ_UPSTREAM_SOURCE=%s\n' "$openkill_shadow_runtime_dns_upstream_source"
+      printf 'MIHOMO_DNS_LISTENER_SOURCE=%s\n' "$openkill_shadow_runtime_dns_mihomo_source"
    } > "$openkill_shadow_runtime_dns_file" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
    chmod 600 "$openkill_shadow_runtime_dns_file" 2>/dev/null || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
 
    OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_LISTEN_TARGET=$openkill_shadow_runtime_dns_listener
    OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_UPSTREAM_TARGET=$openkill_shadow_runtime_dns_upstream
    OPENKILL_NFT_SHADOW_FROZEN_MIHOMO_DNS_LISTENER=$openkill_shadow_runtime_dns_mihomo
+   OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_LISTEN_SOURCE=$openkill_shadow_runtime_dns_listener_source
+   OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_UPSTREAM_SOURCE=$openkill_shadow_runtime_dns_upstream_source
+   OPENKILL_NFT_SHADOW_FROZEN_MIHOMO_DNS_SOURCE=$openkill_shadow_runtime_dns_mihomo_source
    return 0
 }
 
@@ -2423,15 +2464,21 @@ openkill_shadow_typed_auto_produce()
       openkill_shadow_typed_actual_dnsmasq_listen=${OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_LISTEN_TARGET:-}
       openkill_shadow_typed_actual_dnsmasq_upstream=${OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_UPSTREAM_TARGET:-}
       openkill_shadow_typed_actual_mihomo_listener=${OPENKILL_NFT_SHADOW_FROZEN_MIHOMO_DNS_LISTENER:-}
+      openkill_shadow_typed_actual_dnsmasq_listen_source=${OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_LISTEN_SOURCE:-snapshot-dnsmasq}
+      openkill_shadow_typed_actual_dnsmasq_upstream_source=${OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_UPSTREAM_SOURCE:-snapshot-dnsmasq}
+      openkill_shadow_typed_actual_mihomo_source=${OPENKILL_NFT_SHADOW_FROZEN_MIHOMO_DNS_SOURCE:-snapshot-mihomo}
    else
       # Explicit source fixtures retain the established local test contract;
       # they are never the automatic device source.
       openkill_shadow_auto_field DNSMASQ_LISTEN_TARGET DNSMASQ_LISTEN || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
       openkill_shadow_typed_actual_dnsmasq_listen=$openkill_shadow_auto_field_value
+      openkill_shadow_typed_actual_dnsmasq_listen_source=fixture-runtime-dnsmasq
       openkill_shadow_auto_field DNSMASQ_UPSTREAM_TARGET DNSMASQ_UPSTREAM || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
       openkill_shadow_typed_actual_dnsmasq_upstream=$openkill_shadow_auto_field_value
+      openkill_shadow_typed_actual_dnsmasq_upstream_source=fixture-runtime-dnsmasq
       openkill_shadow_auto_field MIHOMO_DNS_LISTENER MIHOMO_LISTENER || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
       openkill_shadow_typed_actual_mihomo_listener=$openkill_shadow_auto_field_value
+      openkill_shadow_typed_actual_mihomo_source=fixture-runtime-mihomo
    fi
    openkill_shadow_typed_actual_loop=$(awk -F '	' '$1 == "DNS_LOOP_PREVENTION" { print $2; exit }' "$openkill_shadow_typed_actual_loop_file") || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
    openkill_shadow_typed_actual_scope4=$(awk -F '	' '$1 == "DNS_SCOPE_IPV4" { print $2; exit }' "$openkill_shadow_typed_actual_ports") || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
@@ -2456,9 +2503,9 @@ openkill_shadow_typed_auto_produce()
    {
       printf 'DNS\tDNS_FIREWALL_LAN_TARGET\t%s\tCURRENT_OWNED\tlegacy-capture\tACTIVE\n' "$openkill_shadow_typed_actual_firewall_lan"
       printf 'DNS\tDNS_FIREWALL_ROUTER_TARGET\t%s\tCURRENT_OWNED\tlegacy-capture\tACTIVE\n' "$openkill_shadow_typed_actual_firewall_router"
-      printf 'DNS\tDNSMASQ_LISTEN_TARGET\t%s\tCURRENT_OWNED\tcommitted-dnsmasq\tACTIVE\n' "$openkill_shadow_typed_actual_dnsmasq_listen"
-      printf 'DNS\tDNSMASQ_UPSTREAM_TARGET\t%s\tCURRENT_OWNED\tcommitted-dnsmasq\tACTIVE\n' "$openkill_shadow_typed_actual_dnsmasq_upstream"
-      printf 'DNS\tMIHOMO_DNS_LISTENER\t%s\tCURRENT_OWNED\tcommitted-mihomo\tACTIVE\n' "$openkill_shadow_typed_actual_mihomo_listener"
+      printf 'DNS\tDNSMASQ_LISTEN_TARGET\t%s\tCURRENT_OWNED\t%s\tACTIVE\n' "$openkill_shadow_typed_actual_dnsmasq_listen" "$openkill_shadow_typed_actual_dnsmasq_listen_source"
+      printf 'DNS\tDNSMASQ_UPSTREAM_TARGET\t%s\tCURRENT_OWNED\t%s\tACTIVE\n' "$openkill_shadow_typed_actual_dnsmasq_upstream" "$openkill_shadow_typed_actual_dnsmasq_upstream_source"
+      printf 'DNS\tMIHOMO_DNS_LISTENER\t%s\tCURRENT_OWNED\t%s\tACTIVE\n' "$openkill_shadow_typed_actual_mihomo_listener" "$openkill_shadow_typed_actual_mihomo_source"
       printf 'DNS\tDNS_LOOP_PREVENTION\t%s\tCURRENT_OWNED\tcommitted-dns-scope\tACTIVE\n' "$openkill_shadow_typed_actual_loop"
       printf 'DNS\tDNS_SCOPE_IPV4\t%s\tCURRENT_OWNED\tcommitted-dns-scope\tACTIVE\n' "$openkill_shadow_typed_actual_scope4"
       printf 'DNS\tDNS_SCOPE_IPV6\t%s\tCURRENT_OWNED\tcommitted-dns-scope\tACTIVE\n' "$openkill_shadow_typed_actual_scope6"

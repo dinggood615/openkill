@@ -57,6 +57,7 @@ build/
 *.cache
 /tmp/
 *.tmp
+artifacts/test-evidence/
 
 # Patch files (unless intentional)
 *.orig
