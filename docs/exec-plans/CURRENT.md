@@ -418,3 +418,48 @@ Local evidence: the production coordinator replay with the sanitized R3/D2C fixt
 Production impact is limited to the shadow observer/comparator and its additive manifest/telemetry: `PRODUCTION_SHADOW_OBSERVER_CHANGED=YES`, `PRODUCTION_LEGACY_WRITER_CHANGED=NO`, `DNS_WRITER_CHANGED=NO`, `ROUTING_WRITER_CHANGED=NO`, `FIREWALL_WRITER_CHANGED=NO`, `DATAPLANE_WRITE_BEHAVIOR_CHANGED=NO`, and `CENTRAL_WRITE_CALLSITE=0`. The eight frozen writer hashes remain unchanged. No version, package, release, tag, or workflow publication changed.
 
 `PHASE_3E2D2D-R3A=PASS`; `LOCAL_R3_REPLAY=MATCH`; `PRODUCTION_TYPED_OWNERSHIP=READY`; `PRODUCTION_TYPED_DNS=READY`; `DEVICE_REVALIDATION_READY=YES`. The device phases remain partial until a separately approved device run consumes typed sidecars. `NEXT=PHASE_3E2D2D-R3B_DEVICE_PRODUCTION_SHADOW_TYPED_REVALIDATION`. `CENTRAL_ACTIVE=NOT_APPROVED`, `CENTRAL_NFT_APPLY=NOT_APPROVED`, and `REAL_PACKET_PATH=NOT_TESTED` remain unchanged.
+
+## Phase 3E.2D2D-R3B — device typed-shadow revalidation gate
+
+On 2026-09-16 the R3B preflight used source baseline
+`0708ba5480c6c4507b1eba7acdfc00e8fd67891a`, version `2026-1128`, with a
+clean worktree and the D2C ancestor check passing. The R3A range contains only
+the shadow observer, its semantic manifest, fixtures/tests, workflow wiring,
+and documentation; legacy writers, DNS/network/firewall dataplane, init,
+parser, renderer, installer, package, and version behavior are unchanged.
+All local R3A gates passed (typed shadow 14/14, D2B 21/21, R2B 18/18,
+canonical config 10/10, runtime shadow 11/11, self-sufficiency 23/23,
+`local-gate.sh`, `ci-gate.sh`, validation, POSIX syntax, compileall, and
+diff-check). The frozen writer hashes remain unchanged.
+
+The only R3A runtime candidate files are
+`luci-app-openkill/root/usr/share/openkill/openkill_nft_shadow.sh` (160557
+bytes, SHA-256 `4de3738e953552c7acfa60d39f12c2341341dfd459bf76b46d1491ecd50367ff`)
+and `luci-app-openkill/root/usr/share/openkill/shadow/semantic_model_v1.tsv`
+(1453 bytes, SHA-256
+`7bd6909cfcb08aee02cc6900fee6de358228d7d5b9fef15c634f19c69a4fdb50`). The
+shell accepts a temporary manifest through
+`OPENKILL_NFT_SHADOW_SEMANTIC_MANIFEST` or `OPENKILL_NFT_SHADOW_TEMPLATE_DIR`
+and safely copies caller-provided typed files through
+`OPENKILL_NFT_SHADOW_TYPED_ACTUAL_FILE` and
+`OPENKILL_NFT_SHADOW_TYPED_DESIRED_FILE`.
+
+The complete device staging path is nevertheless blocked. The production
+tree has no sidecar producer: `openkill_shadow_capture_legacy_nft` and
+`openkill_shadow_parse_nft_capture` emit legacy capture/intent, and
+`openkill_shadow_run_renderer` emits CURRENT nft payload, but no production
+caller emits `OPENKILL_SHADOW_TYPED_INTENT_V1=1` actual/desired files from
+that same coherent cycle. `openkill_shadow_compare_nft` requires both typed
+files and returns `MODEL_GAP` when either is absent. The checked-in typed TSVs
+are sanitized local fixtures only; staging them would not be live `.102`
+evidence. R3B therefore stopped before SSH or any device write:
+`CANDIDATE_STAGING_ENTRYPOINT_BLOCKER`, `R3A_CANDIDATE_REAL_DEVICE=NOT_RUN`,
+and `DEVICE_TYPED_*_PARITY=INSUFFICIENT_EVIDENCE`. No device or router was
+accessed and no package, service, UCI, dataplane, config, or central write
+occurred.
+
+`NEXT=R3B_LOCAL_TYPED_SIDECAR_PRODUCER_INTEGRATION` (local only: add and
+validate a formal sidecar producer or an equivalent existing production
+caller before another device run). `CENTRAL_ACTIVE=NOT_APPROVED`,
+`CENTRAL_NFT_APPLY=NOT_APPROVED`, and `REAL_PACKET_PATH=NOT_TESTED` remain
+unchanged.
