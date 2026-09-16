@@ -1,5 +1,35 @@
 # Current execution plan: authorized local delivery and GitHub release
 
+## R2C device baseline checkpoint (blocked before writes)
+
+- Phase: `PHASE_3E2D2D_R2C_DEVICE_BASELINE_HOLD_WITH_SEMANTIC_UCI_GATE`.
+- Observed local HEAD: `2592088787a8f2fce87e20e80a355d0dfec4d69c`; the working
+  tree was clean and `566fa82` remains an ancestor.  The delta from
+  `455f463` is limited to the R2B lifecycle test, its documentation, the
+  execution-plan/test-gate records, and CI registration; no runtime, package,
+  DNS, renderer, init, network, firewall, or installer source changed.
+- `preflight-openkill.sh`, `local-gate.sh`, `ci-gate.sh`, and
+  `test-uci-lifecycle.py` passed (18/18).  No product semantic drift was
+  found after D2C.
+- The only device contact was the authorized `openkill-test-102` alias using
+  BatchMode/IdentitiesOnly.  Read-only evidence matched the required clean
+  stopped baseline: package `2026-1128`, OpenKill inactive, Mihomo 0, no TUN,
+  no OpenKill pref-1888/table-354 state, no 7874 listener, the configured
+  target `/etc/openkill/config/3e2-safe.yaml` absent, shadow unset, and the
+  existing UCI path/hash intact.  Key production file hashes matched the
+  current 2026-1128 source.
+- The R2C hard configuration gate cannot be satisfied from the project
+  source: no approved `3e2-safe.yaml`, generator output, tracked-history file,
+  or project-generated copy matching
+  `e894c2f7918038080ca05baa1311c8d7336e2a1497ce3324b767238fe7c76b05` exists.
+  The device's leftover generated `/etc/openkill/3e2-safe.yaml` is a different
+  hash and is not an approved, secret-free candidate; it was not reused.
+- Result: `CONFIG_RECONSTRUCTION_DRIFT`.  The run stopped before transfer,
+  package installation, configuration materialization, service start, UCI,
+  nft, route, rule, DNS, network, or reboot writes.  The next resume requires
+  an exact approved candidate (or a committed deterministic generator) and a
+  re-run of the local hash/validation gates before any device write.
+
 ## R2B local UCI lifecycle checkpoint (observed before this change)
 
 - Phase: `PHASE_3E2D2D_R2B_LOCAL_STARTUP_UCI_MUTATION_CONTRACT_RECONCILIATION`.
