@@ -34,7 +34,8 @@ CRLF scripts compatible with Linux. The matrix covers runtime,
 installer, core compatibility, classifier and semantic contracts, NFT IR and
 syntax, renderer, parser fixtures, continuity, self-sufficiency, shadow
 runtime, network, snapshot/FW4, stage D, and central wiring. Also run
-`git diff --check` and the shell syntax checks in `validate-openkill.sh`.
+`test-uci-lifecycle.py`, `git diff --check` and the shell syntax checks in
+`validate-openkill.sh`.
 
 Expected skips are limited to the documented Ruby-dependent cases. A new
 skip, xfail, warning downgrade, or device access is a gate failure.
@@ -51,7 +52,7 @@ retrying; no package or device hotfix is used to bypass it.
 Development CI runs `local-gate.sh` and the autonomous-workflow,
 classifier-contract, dataplane-semantic-spec, nft-ir, shadow-context-adapter,
 shadow-semantic-model, dns-current-intent, network-model, snapshot-fw4 and
-stage-d Python suites. Its existing
+stage-d, and uci-lifecycle Python suites. Its existing
 runtime/installer and two-core compatibility matrix remains required.
 The full Windows/WSL fixture matrix is still a local gate; several harnesses
 invoke `wsl.exe` directly and must not be silently skipped on Linux CI.

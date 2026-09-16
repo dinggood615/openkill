@@ -1,5 +1,38 @@
 # Current execution plan: authorized local delivery and GitHub release
 
+## R2B local UCI lifecycle checkpoint (observed before this change)
+
+- Phase: `PHASE_3E2D2D_R2B_LOCAL_STARTUP_UCI_MUTATION_CONTRACT_RECONCILIATION`.
+- Observed starting HEAD: `455f46309e30b7931cc2598bb16bfef5fc7ae688`;
+  working tree clean; `566fa82` remains an ancestor. Devices were not accessed.
+- The R2A whole-file running hash gate was too strong.  The checked-in start
+  path intentionally records reversible dnsmasq backups, runtime/fallback
+  metadata, a transient failure marker, one-shot overwrite state and the
+  firewall include; the DHCP package receives the corresponding dnsmasq
+  redirect.  Formal stop restores the reversible fields, converges lifecycle
+  markers to their inactive value and intentionally retains resolver backup
+  metadata, which is the convergence boundary.
+- A field-level contract is now covered by `scripts/test-uci-lifecycle.py` and
+  `docs/dev/phase-3e2d2d-r2b-uci-lifecycle.md`.  The full local matrix and
+  Development CI include that focused suite.  The contract keeps user fields and a
+  target-present `config_path` unchanged, requires exact OpenKill/DHCP runtime
+  deltas, rejects unclassified writes, and requires stop convergence.
+- Local verification for this checkpoint: `scripts/test-uci-lifecycle.py`
+  passes 18/18; `test-autonomous-workflow.py`, the Development CI static suite,
+  WSL runtime/installer/network/snapshot/Stage-D/core suites, `local-gate.sh`,
+  and `git diff --check` also pass.  Shell-dependent suites report their
+  expected Windows entry-point failures when invoked directly and pass through
+  their WSL entry points.  No production behavior, version, release, or device
+  state is changed.
+
+### R2B next action
+
+After the local gates pass, commit only this lifecycle contract/test/documentation
+change.  `R2A_CAUSE=VALIDATION_GATE_MODEL_DEFECT`; no production UCI lifecycle
+defect is currently evidenced.  The next authorized phase is
+`R2C_DEVICE_BASELINE_HOLD_WITH_SEMANTIC_UCI_GATE`, which requires a separately
+approved device run; this phase does not perform it.
+
 ## Final delivery checkpoint (observed before this documentation commit)
 
 - Release candidate source: `c1e6cb1c55e7166040cc231f3a2c152e7cb14a1d`.

@@ -22,7 +22,7 @@ jobs:
         shell: bash
         run: |
           set -eu
-          for suite in autonomous-workflow classifier-contract dataplane-semantic-spec nft-ir shadow-context-adapter shadow-semantic-model dns-current-intent network-model snapshot-fw4 stage-d; do
+          for suite in autonomous-workflow classifier-contract dataplane-semantic-spec nft-ir shadow-context-adapter shadow-semantic-model dns-current-intent network-model snapshot-fw4 stage-d uci-lifecycle; do
             python3 "scripts/test-${suite}.py"
           done
 
