@@ -105,6 +105,7 @@ NATIVE_TESTS = tuple(
 )
 
 WSL_RUBY_POLICY = ("WSL_UNAVAILABLE", "RUBY_UNAVAILABLE")
+WSL_CORE_POLICY = ("WSL_UNAVAILABLE", "CORE_RELEASE_UNAVAILABLE")
 
 WSL_TESTS: tuple[Case, ...] = (
     Case("test-installer-wsl", "scripts/test-installer.py", environment="wsl", timeout=300, skip_policy=WSL_RUBY_POLICY),
@@ -112,8 +113,8 @@ WSL_TESTS: tuple[Case, ...] = (
     Case("test-runtime-wsl", "scripts/test-runtime.py", environment="wsl", timeout=300, skip_policy=WSL_RUBY_POLICY),
     Case("test-snapshot-fw4-wsl", "scripts/test-snapshot-fw4.py", environment="wsl", timeout=300, skip_policy=("WSL_UNAVAILABLE",)),
     Case("test-stage-d-wsl", "scripts/test-stage-d.py", environment="wsl", timeout=300, skip_policy=("WSL_UNAVAILABLE",)),
-    Case("test-core-v1_19_30-wsl", "scripts/test-core.py", ("--release", "v1.19.30"), "wsl", 600, skip_policy=("WSL_UNAVAILABLE",)),
-    Case("test-core-latest-wsl", "scripts/test-core.py", ("--release", "latest"), "wsl", 600, skip_policy=("WSL_UNAVAILABLE",)),
+    Case("test-core-v1_19_30-wsl", "scripts/test-core.py", ("--release", "v1.19.30"), "wsl", 600, skip_policy=WSL_CORE_POLICY),
+    Case("test-core-latest-wsl", "scripts/test-core.py", ("--release", "latest"), "wsl", 600, skip_policy=WSL_CORE_POLICY),
 )
 
 
@@ -355,6 +356,18 @@ def classify_output(case: Case, process: subprocess.CompletedProcess[str]) -> tu
             reason = "RUBY_UNAVAILABLE"
             return ("SKIP_ALLOWED", reason) if reason in case.skip_policy else ("FAIL", "UNDECLARED_ENVIRONMENT_SKIP")
         return "PASS", ""
+    if any(
+        marker in output
+        for marker in (
+            "CERTIFICATE_VERIFY_FAILED",
+            "urlopen error",
+            "Temporary failure in name resolution",
+            "Name or service not known",
+            "Network is unreachable",
+        )
+    ):
+        reason = "CORE_RELEASE_UNAVAILABLE"
+        return ("NOT_RUN_ENVIRONMENT", reason) if reason in case.skip_policy else ("FAIL", "UNDECLARED_ENVIRONMENT_SKIP")
     return "FAIL", f"RETURN_CODE_{process.returncode}"
 
 
@@ -530,7 +543,7 @@ def write_evidence(mode: str, run_id: str, output_dir: Path, records: list[dict[
     with (output_dir / "skips.tsv").open("w", encoding="utf-8", newline="") as stream:
         stream.write("name\tstatus\treason\n")
         for record in records:
-            if record["status"] in ("SKIP_ALLOWED", "NOT_RUN_ENVIRONMENT") or record.get("reason") in ("NFT_CLI_UNAVAILABLE", "RUBY_UNAVAILABLE"):
+            if record["status"] in ("SKIP_ALLOWED", "NOT_RUN_ENVIRONMENT") or record.get("reason") in ("NFT_CLI_UNAVAILABLE", "RUBY_UNAVAILABLE", "CORE_RELEASE_UNAVAILABLE"):
                 stream.write(f"{record['name']}\t{record['status']}\t{record.get('reason', '')}\n")
     (output_dir / "candidate-manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 

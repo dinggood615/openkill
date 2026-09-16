@@ -77,10 +77,29 @@ class TestGateRunner(unittest.TestCase):
         self.assertEqual(status, "SKIP_ALLOWED")
         self.assertEqual(reason, "RUBY_UNAVAILABLE")
 
+    def test_core_network_failure_is_explicit_environment_skip(self):
+        process = subprocess.CompletedProcess(
+            [sys.executable],
+            1,
+            "",
+            "ssl.SSLCertVerificationError: CERTIFICATE_VERIFY_FAILED",
+        )
+        status, reason = gates.classify_output(
+            gates.Case("core", None, skip_policy=("CORE_RELEASE_UNAVAILABLE",)),
+            process,
+        )
+        self.assertEqual(status, "NOT_RUN_ENVIRONMENT")
+        self.assertEqual(reason, "CORE_RELEASE_UNAVAILABLE")
+
     def test_ruby_dependent_wsl_cases_declare_ruby_skip(self):
         cases = {case.name: case for case in gates.WSL_TESTS}
         self.assertIn("RUBY_UNAVAILABLE", cases["test-installer-wsl"].skip_policy)
         self.assertIn("RUBY_UNAVAILABLE", cases["test-runtime-wsl"].skip_policy)
+
+    def test_core_cases_declare_network_skip(self):
+        cases = {case.name: case for case in gates.WSL_TESTS}
+        self.assertIn("CORE_RELEASE_UNAVAILABLE", cases["test-core-v1_19_30-wsl"].skip_policy)
+        self.assertIn("CORE_RELEASE_UNAVAILABLE", cases["test-core-latest-wsl"].skip_policy)
 
     def test_shell_cases_use_shell_interpreter_in_wsl(self):
         case = gates.Case("policy", "scripts/local-gate.sh", environment="wsl")

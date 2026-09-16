@@ -48,8 +48,10 @@ environment itself; it does not depend on a developer guessing which shell to
 use. The `nft` CLI case is reported as `NOT_RUN_ENVIRONMENT` with reason
 `NFT_CLI_UNAVAILABLE` when the host does not provide the binary. Ruby-dependent
 tests retain their documented `RUBY_UNAVAILABLE` skip. WSL absence is reported
-as `SKIP_ALLOWED` with reason `WSL_UNAVAILABLE`. These are the only accepted
-environment limitations; there are no silent or generic skips.
+as `SKIP_ALLOWED` with reason `WSL_UNAVAILABLE`. The Mihomo release-download
+cases additionally use `CORE_RELEASE_UNAVAILABLE` when the host's TLS, DNS or
+network path prevents the official API or asset download. The runner records
+each reason explicitly; there are no silent or generic skips.
 
 `device-preflight` is still completely local. It repeats the source,
 canonical-config, staged-observer, internal-sidecar, provenance, continuity,

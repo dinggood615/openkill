@@ -69,3 +69,9 @@ version, the subscription detail wrapper has the id used by its JavaScript,
 and dashboard/proxy controls restore their visible state when a later status
 poll reports recovery. It is a static template regression check; it does not
 claim that a live LuCI backend or browser session was exercised.
+
+Official Mihomo compatibility downloads remain fail-closed: if the local
+WSL TLS/DNS/network path cannot reach the release API or asset, the unified
+runner records `CORE_RELEASE_UNAVAILABLE` as an explicit environment-limited
+case. A download or checksum that reaches the test but fails validation is
+still a required failure.
