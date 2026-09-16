@@ -20,6 +20,14 @@ DNS_FIELD	MIHOMO_DNS_LISTENER	CURRENT_OWNED
 DNS_FIELD	DNS_LOOP_PREVENTION	CURRENT_OWNED
 DNS_FIELD	DNS_SCOPE_IPV4	CURRENT_OWNED
 DNS_FIELD	DNS_SCOPE_IPV6	CURRENT_OWNED
+# Desired values are explicit contract records.  They are independent from
+# the actual capture fields and are consumed only by the automatic producer.
+DNS_EXPECTED	DNSMASQ_LISTEN_TARGET	53	current-contract:dnsmasq
+DNS_EXPECTED	DNSMASQ_UPSTREAM_TARGET	127.0.0.1#7874	current-contract:dnsmasq
+DNS_EXPECTED	MIHOMO_DNS_LISTENER	127.0.0.1:7874	current-contract:mihomo
+DNS_EXPECTED	DNS_LOOP_PREVENTION	skgid_exempt=65534	current-contract:nft
+DNS_EXPECTED	DNS_SCOPE_IPV4	lan=true,router=true	current-contract:scope
+DNS_EXPECTED	DNS_SCOPE_IPV6	lan=true,router=true	current-contract:scope
 # Formal D2B inventory joins for the legacy WAN safety objects.  These rows
 # are metadata, not a name-based ignore list; an ownership disagreement is a
 # MODEL_GAP and the rows remain in the full observation.

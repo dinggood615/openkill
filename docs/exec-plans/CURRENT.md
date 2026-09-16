@@ -463,3 +463,67 @@ validate a formal sidecar producer or an equivalent existing production
 caller before another device run). `CENTRAL_ACTIVE=NOT_APPROVED`,
 `CENTRAL_NFT_APPLY=NOT_APPROVED`, and `REAL_PACKET_PATH=NOT_TESTED` remain
 unchanged.
+
+## Phase 3E.2D2D-R3C — self-contained typed sidecar producer integration
+
+Observed locally on 2026-09-16 from baseline
+`f710e572c1e9524feae8f4919b9a93ad64422a38`, version `2026-1128`, with no
+device or router access.  The D2C commit remains an ancestor.  The R3C scope
+is limited to the production shadow observer, its semantic manifest, sanitized
+automatic-state fixture, local producer tests, CI suite wiring, and this
+documentation; legacy writers, DNS/network/firewall dataplane behavior,
+renderer, parser, init, installer, package, and version behavior are unchanged.
+
+R3B's blocker was reproduced locally: the typed comparator accepted prepared
+sidecars, but the automatic coordinator had no producer and returned
+`MODEL_GAP` when those files were absent.  R3C adds a self-contained producer
+inside the same private coordinator cycle.  After coherent T0/T1 capture and
+parser output, the formal inventory and CURRENT renderer run; the coordinator
+then emits independent `OPENKILL_SHADOW_TYPED_SIDECAR_V1` actual and desired
+files and feeds them directly to the existing typed comparator.  The actual
+side uses parsed legacy intent and snapshot-frozen scalar fields.  The desired
+side uses CURRENT renderer output for firewall DNS targets plus renderer input,
+templates, and explicit manifest contract records for desired objects and the
+remaining DNS layers.  No producer step performs a live UCI, ubus, nft, ip,
+DNS, or Mihomo reread after the snapshot.  D2A inventory classification runs
+before typed projection, so required absence remains fail-closed while
+conditional, inactive, optional, and out-of-scope absences remain explicit
+diagnostic evidence.
+
+The sidecars carry schema, model, side, cycle, and continuity metadata and are
+bounded mode-0600 files in the private temporary directory.  Missing or
+ambiguous sources, duplicate rows, or unknown ownership return the additive
+`MODEL_GAP` result (exit 12); present semantic differences remain the existing
+`MISMATCH` result.  WAN safety rows remain in full observation and are excluded
+from CURRENT-owned equality by formal `LEGACY_ONLY_SAFETY` metadata.  The
+independent firewall/listener/upstream/Mihomo/loop/scope fields preserve the
+D2C `53` versus `7874` distinction.  External sidecars remain available only
+for explicit fixture/development calls; automatic production mode rejects
+them even when a legacy override variable is supplied.  The device runtime
+remains POSIX shell/BusyBox-only.
+
+Local evidence: automatic no-sidecar replay is `MATCH` with
+`DNS_PARITY=MATCH`, one stable actual/desired/DNS hash pair, and retained WAN
+observation; renderer mutation and actual-state mutation are independently
+detected as `MISMATCH`; missing actual or desired DNS sources are `MODEL_GAP`;
+the minimal staged observer/manifest simulation is `MATCH`.  The dedicated
+producer suite passes 13/13, including automatic rejection of externally
+supplied sidecars with and without a legacy override; the explicit typed suite
+passes 14/14, self-sufficiency 23/23, continuity 11/11, BusyBox normalization
+7/7, runtime shadow 11/11, and context adapter 15/15.  The broader local
+matrix passes: NFT IR 16/16, NFT syntax 18/18 (`nft` CLI unavailable, so the
+syntax matrix is explicitly not run), device parser 7/7, network 65/65,
+snapshot/FW4 6/6, Stage D 7/7, runtime 28/28 with two existing skips,
+installer 11/11 with one existing skip, core validation, BusyBox renderer
+13/13, and autonomous workflow 8/8.  `local-gate`, `ci-gate`, POSIX syntax,
+compileall, and diff-check pass.  `NEW_UNEXPLAINED_SKIP=0`.  No version,
+package, release, tag, device, central apply, or packet-path operation is part
+of R3C.
+
+`R3B=PARTIAL` remains a historical device gate because the installed release
+has not been tested with this candidate.  `R3C=PASS`:
+`AUTO_TYPED_PRODUCTION_PATH=READY`, `SELF_CONTAINED_STAGING=READY`,
+`LOCAL_R3_REPLAY=MATCH`, and `DEVICE_RETRY_READY=YES`.
+`NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
+`CENTRAL_ACTIVE=NOT_APPROVED`, `CENTRAL_NFT_APPLY=NOT_APPROVED`, and
+`REAL_PACKET_PATH=NOT_TESTED` remain unchanged.

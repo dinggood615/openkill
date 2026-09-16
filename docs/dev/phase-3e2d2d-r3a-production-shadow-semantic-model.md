@@ -66,9 +66,11 @@ new runtime dependency.  `openkill_shadow_semantic_model.py` remains the
 development oracle; `scripts/test-shadow-production-typed.py` compares the
 same sanitized positive and negative cases through the production shell path.
 The old raw automatic fallback and explicit bundle protocol remain available
-to older callers, but a production caller that wants typed R3A semantics must
-provide both formal sidecars.  This preserves backward compatibility while
-making ownership and DNS policy explicit for the next device revalidation.
+to older callers.  R3C adds an internal producer to the automatic path, so a
+production caller no longer needs to provide sidecars; explicit sidecars are
+retained only for fixture/development invocations.  This preserves backward
+compatibility while making ownership and DNS policy explicit for the next
+device revalidation.
 
 Telemetry is additive and bounded: model versions, status, short hashes for
 the full observation, CURRENT-owned projection, and DNS projection, counts,

@@ -113,6 +113,8 @@ class ShellFixtureHarness:
         "OPENKILL_NFT_SHADOW_RENDERER",
         "OPENKILL_NFT_SHADOW_TEMPLATE_DIR",
         "OPENKILL_NFT_SHADOW_TELEMETRY_DIR",
+        "OPENKILL_NFT_SHADOW_AUTO_TYPED",
+        "OPENKILL_NFT_SHADOW_TYPED_OVERRIDE",
         "OPENKILL_NFT_SHADOW_FORCE",
         "OPENKILL_NFT_SHADOW_TIMEOUT",
         "OPENKILL_NETWORK_DESIRED",
@@ -213,6 +215,11 @@ class ShadowSelfSufficiencyTests(unittest.TestCase):
             "OPENKILL_NFT_SHADOW_CAPTURE_FIXTURE": _wsl_path(capture),
             "OPENKILL_NFT_SHADOW_RENDERER": _wsl_path(renderer),
             "OPENKILL_NFT_SHADOW_TELEMETRY_DIR": _wsl_path(telemetry),
+            # These tests exercise the pre-R3C raw automatic ABI.  R3C's
+            # self-contained typed path is covered by the dedicated producer
+            # suite; keeping the mode explicit makes the compatibility scope
+            # clear instead of relying on the production default.
+            "OPENKILL_NFT_SHADOW_AUTO_TYPED": "0",
         }
         env.update(extra_env or {})
         body = (

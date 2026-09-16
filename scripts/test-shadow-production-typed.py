@@ -84,6 +84,7 @@ class ShellHarness:
         "OPENKILL_NFT_SHADOW_SEMANTIC_MANIFEST",
         "OPENKILL_NFT_SHADOW_TYPED_ACTUAL_FILE",
         "OPENKILL_NFT_SHADOW_TYPED_DESIRED_FILE",
+        "OPENKILL_NFT_SHADOW_TYPED_OVERRIDE",
         "OPENKILL_NFT_SHADOW_TELEMETRY_DIR",
         "OPENKILL_NFT_SHADOW_FORCE",
         "OPENKILL_NFT_SHADOW_TIMEOUT",
@@ -131,6 +132,7 @@ class TypedProductionShadowTests(unittest.TestCase):
             "OPENKILL_NFT_SHADOW_TEMPLATE_DIR": wsl_path(TEMPLATE_DIR),
             "OPENKILL_NFT_SHADOW_TYPED_ACTUAL_FILE": wsl_path(actual),
             "OPENKILL_NFT_SHADOW_TYPED_DESIRED_FILE": wsl_path(desired),
+            "OPENKILL_NFT_SHADOW_TYPED_OVERRIDE": "1",
         }
 
     def direct(self, actual: pathlib.Path = ACTUAL, desired: pathlib.Path = DESIRED) -> tuple[subprocess.CompletedProcess[str], pathlib.Path]:
@@ -157,7 +159,7 @@ class TypedProductionShadowTests(unittest.TestCase):
                 values[key] = value
         return values
 
-    def coordinator(self, actual: pathlib.Path = ACTUAL, desired: pathlib.Path = DESIRED) -> tuple[subprocess.CompletedProcess[str], dict[str, str], pathlib.Path]:
+    def coordinator(self, manifest: pathlib.Path | None = None) -> tuple[subprocess.CompletedProcess[str], dict[str, str], pathlib.Path]:
         case = self.harness.root / f"coordinator-{self.harness.count + 1}"
         telemetry = case / "telemetry"
         case.mkdir(parents=True, exist_ok=True)
@@ -167,9 +169,11 @@ class TypedProductionShadowTests(unittest.TestCase):
             "OPENKILL_NFT_SHADOW_SOURCE_FILE": wsl_path(AUTO_SOURCE),
             "OPENKILL_NFT_SHADOW_CAPTURE_FIXTURE": wsl_path(CAPTURE),
             "OPENKILL_NFT_SHADOW_RENDERER": wsl_path(RENDERER),
+            "OPENKILL_NFT_SHADOW_TEMPLATE_DIR": wsl_path(TEMPLATE_DIR),
             "OPENKILL_NFT_SHADOW_TELEMETRY_DIR": wsl_path(telemetry),
-            **self.typed_env(actual, desired),
         }
+        if manifest is not None:
+            env["OPENKILL_NFT_SHADOW_SEMANTIC_MANIFEST"] = wsl_path(manifest)
         body = f"openkill_shadow_compare_nft; printf 'RC=%s\\n' \"$?\""
         process = self.harness.run(body, env)
         return process, status_file(telemetry / "status"), telemetry
@@ -210,9 +214,16 @@ class TypedProductionShadowTests(unittest.TestCase):
         self.assertEqual(values.get("DNS"), "MATCH")
 
     def test_coordinator_keeps_model_gap_count_separate_from_mismatch_count(self) -> None:
-        actual = self.harness.root / "coordinator-unknown.tsv"
-        write_lf(actual, ACTUAL.read_text(encoding="utf-8").replace("WAN_SAFETY\tLEGACY_ONLY_SAFETY", "WAN_SAFETY\tUNKNOWN", 1))
-        process, status, _ = self.coordinator(actual=actual)
+        manifest = self.harness.root / "coordinator-unknown.tsv"
+        write_lf(
+            manifest,
+            (TEMPLATE_DIR / "semantic_model_v1.tsv").read_text(encoding="utf-8").replace(
+                "INVENTORY\tchain\topenkill_wan_input\tLEGACY_ONLY_SAFETY\tWAN_SAFETY",
+                "INVENTORY\tchain\topenkill_wan_input\tUNKNOWN\tWAN_SAFETY",
+                1,
+            ),
+        )
+        process, status, _ = self.coordinator(manifest=manifest)
         self.assertIn("RC=12", process.stdout)
         self.assertEqual(status.get("status"), "MODEL_GAP")
         self.assertEqual(status.get("mismatch_count"), "0")

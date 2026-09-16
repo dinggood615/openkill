@@ -60,6 +60,12 @@ OPENKILL_NFT_SHADOW_SEMANTIC_MODEL_VERSION=1
 OPENKILL_NFT_SHADOW_OWNERSHIP_MODEL_VERSION=1
 OPENKILL_NFT_SHADOW_DNS_MODEL_VERSION=1
 OPENKILL_NFT_SHADOW_SEMANTIC_MANIFEST_DEFAULT=/usr/share/openkill/shadow/semantic_model_v1.tsv
+# Automatic production cycles produce typed sidecars from their private
+# snapshot by default.  The explicit zero value is retained only for the
+# pre-R3C raw-fixture compatibility path; real callers never need to set it.
+OPENKILL_NFT_SHADOW_AUTO_TYPED_DEFAULT=1
+# External typed sidecars are a fixture/development interface.  Automatic
+# production cycles are always internal-only.
 
 openkill_shadow_enabled()
 {
@@ -358,6 +364,12 @@ openkill_shadow_auto_lookup()
       ROUTE_TABLE|OPENKILL_ROUTE_TABLE) openkill_shadow_auto_value=${OPENKILL_ROUTE_TABLE:-${PROXY_ROUTE_TABLE:-}} ;;
       RULE_PREF|OPENKILL_RULE_PREF) openkill_shadow_auto_value=${OPENKILL_RULE_PREF:-} ;;
       IPV6_READY) openkill_shadow_auto_value=${OPENKILL_IPV6_READY:-} ;;
+      DNSMASQ_LISTEN_TARGET|DNSMASQ_LISTEN) openkill_shadow_auto_value=${OPENKILL_DNSMASQ_LISTEN_TARGET:-${DNSMASQ_LISTEN_TARGET:-${dnsmasq_listen_target:-}}} ;;
+      DNSMASQ_UPSTREAM_TARGET|DNSMASQ_UPSTREAM) openkill_shadow_auto_value=${OPENKILL_DNSMASQ_UPSTREAM_TARGET:-${DNSMASQ_UPSTREAM_TARGET:-${dnsmasq_upstream_target:-}}} ;;
+      MIHOMO_DNS_LISTENER|MIHOMO_LISTENER) openkill_shadow_auto_value=${OPENKILL_MIHOMO_DNS_LISTENER:-${MIHOMO_DNS_LISTENER:-${mihomo_dns_listener:-}}} ;;
+      DNS_LOOP_PREVENTION) openkill_shadow_auto_value=${OPENKILL_DNS_LOOP_PREVENTION:-${DNS_LOOP_PREVENTION:-${dns_loop_prevention:-}}} ;;
+      DNS_SCOPE_IPV4) openkill_shadow_auto_value=${OPENKILL_DNS_SCOPE_IPV4:-${DNS_SCOPE_IPV4:-${dns_scope_ipv4:-}}} ;;
+      DNS_SCOPE_IPV6) openkill_shadow_auto_value=${OPENKILL_DNS_SCOPE_IPV6:-${DNS_SCOPE_IPV6:-${dns_scope_ipv6:-}}} ;;
       *) openkill_shadow_auto_value= ;;
    esac
    [ -n "$openkill_shadow_auto_value" ] || return 1
@@ -422,7 +434,7 @@ openkill_shadow_auto_list()
 openkill_shadow_continuity_state_key()
 {
    case "$1" in
-      OWNER|TUN_OWNER|RUN_MODE|ROUTER_SELF_PROXY|REDIRECT_PORT|PROXY_PORT|TPROXY_PORT|DNS_PORT|MARK|OPENKILL_FWMARK|MASK|OPENKILL_FWMASK|ROUTE_TABLE|OPENKILL_ROUTE_TABLE|RULE_PREF|OPENKILL_RULE_PREF|IPV6_READY|BC01_UNSUPPORTED|BC_01_UNSUPPORTED|CURRENT_UNDEFINED|EXPLICIT_POLICY_CURRENT_UNDEFINED|CURRENT_ACCESS_DENY|BC07_UNSUPPORTED|BC_07_UNSUPPORTED|ACCESS_DENY_REQUIRED|ACCESS4_ALLOW|LAN_AC_WHITE_V4|USER_DIRECT_V4|ACCESS4_BYPASS|ACCESS4_DENY|LAN_AC_BLACK_V4|ACCESS6_ALLOW|LAN_AC_WHITE_V6|USER_DIRECT_V6|ACCESS6_BYPASS|ACCESS6_DENY|LAN_AC_BLACK_V6|CHINA_PASS4|CHINA_PASS6|CHINA4|CHINA6|COMMON_PORTS|SERVICE_PORTS|DELEGATED6|PD6|DELEGATED_IPV6_PREFIXES|FAKE_IP4|FAKEIP4|FAKE_IP6|FAKEIP6|LAN4|LAN_IPV4_PREFIXES|LAN6|LAN_IPV6_PREFIXES|LOCAL4|LOCAL_V4|LOCALNETWORK4|LOCALNETWORK4_PREFIXES|INTERNAL_IPV4_PREFIXES|LOCAL6|LOCAL_V6|LOCALNETWORK6|LOCALNETWORK6_PREFIXES|INTERNAL_IPV6_PREFIXES|NODE4|NODE4_ENDPOINTS|NODE6|NODE6_ENDPOINTS|SERVICE_PORTS|USER_DIRECT4|USER_DIRECT_V6|USER_DIRECT6|USER_PROXY4|USER_PROXY6|WAN4|WAN_HOST4|WAN4_HOST|WAN4_HOST_ADDRESSES|WAN4_ADDRESSES|WAN6|WAN_HOST6|WAN6_HOST|WAN6_HOST_ADDRESSES|WAN6_ADDRESSES|WAN_AC_BLACK_PORTS|WAN_AC_BLACK_V4|WAN_AC_BLACK_V6|OPENKILL_NFT_SHADOW_AUTO_STATE_V1|OPENKILL_SHADOW_SOURCE_V1|SHELL_RENDERER_STATE_V1)
+      OWNER|TUN_OWNER|RUN_MODE|ROUTER_SELF_PROXY|REDIRECT_PORT|PROXY_PORT|TPROXY_PORT|DNS_PORT|DNSMASQ_LISTEN_TARGET|DNSMASQ_LISTEN|DNSMASQ_UPSTREAM_TARGET|DNSMASQ_UPSTREAM|MIHOMO_DNS_LISTENER|MIHOMO_LISTENER|DNS_LOOP_PREVENTION|DNS_SCOPE_IPV4|DNS_SCOPE_IPV6|MARK|OPENKILL_FWMARK|MASK|OPENKILL_FWMASK|ROUTE_TABLE|OPENKILL_ROUTE_TABLE|RULE_PREF|OPENKILL_RULE_PREF|IPV6_READY|BC01_UNSUPPORTED|BC_01_UNSUPPORTED|CURRENT_UNDEFINED|EXPLICIT_POLICY_CURRENT_UNDEFINED|CURRENT_ACCESS_DENY|BC07_UNSUPPORTED|BC_07_UNSUPPORTED|ACCESS_DENY_REQUIRED|ACCESS4_ALLOW|LAN_AC_WHITE_V4|USER_DIRECT_V4|ACCESS4_BYPASS|ACCESS4_DENY|LAN_AC_BLACK_V4|ACCESS6_ALLOW|LAN_AC_WHITE_V6|USER_DIRECT_V6|ACCESS6_BYPASS|ACCESS6_DENY|LAN_AC_BLACK_V6|CHINA_PASS4|CHINA_PASS6|CHINA4|CHINA6|COMMON_PORTS|SERVICE_PORTS|DELEGATED6|PD6|DELEGATED_IPV6_PREFIXES|FAKE_IP4|FAKEIP4|FAKE_IP6|FAKEIP6|LAN4|LAN_IPV4_PREFIXES|LAN6|LAN_IPV6_PREFIXES|LOCAL4|LOCAL_V4|LOCALNETWORK4|LOCALNETWORK4_PREFIXES|INTERNAL_IPV4_PREFIXES|LOCAL6|LOCAL_V6|LOCALNETWORK6|LOCALNETWORK6_PREFIXES|INTERNAL_IPV6_PREFIXES|NODE4|NODE4_ENDPOINTS|NODE6|NODE6_ENDPOINTS|SERVICE_PORTS|USER_DIRECT4|USER_DIRECT_V4|USER_DIRECT6|USER_PROXY4|USER_PROXY6|WAN4|WAN_HOST4|WAN4_HOST|WAN4_HOST_ADDRESSES|WAN4_ADDRESSES|WAN6|WAN_HOST6|WAN6_HOST|WAN6_HOST_ADDRESSES|WAN6_ADDRESSES|WAN_AC_BLACK_PORTS|WAN_AC_BLACK_V4|WAN_AC_BLACK_V6|OPENKILL_NFT_SHADOW_AUTO_STATE_V1|OPENKILL_SHADOW_SOURCE_V1|SHELL_RENDERER_STATE_V1)
          return 0
       ;;
    esac
@@ -512,6 +524,15 @@ openkill_shadow_continuity_shell_scalars()
       "${router_self_proxy:-}" "${OPENKILL_ROUTER_SELF_PROXY:-}" \
       "${proxy_port:-}" "${OPENKILL_PROXY_PORT:-}" "${tproxy_port:-}" "${OPENKILL_TPROXY_PORT:-}" \
       "${dns_port:-${DNSPORT:-}}" "${OPENKILL_DNS_PORT:-}" \
+      "${OPENKILL_DNSMASQ_LISTEN_TARGET:-${DNSMASQ_LISTEN_TARGET:-${dnsmasq_listen_target:-}}}" \
+      "${OPENKILL_DNSMASQ_UPSTREAM_TARGET:-${DNSMASQ_UPSTREAM_TARGET:-${dnsmasq_upstream_target:-}}}" \
+      "${OPENKILL_MIHOMO_DNS_LISTENER:-${MIHOMO_DNS_LISTENER:-${mihomo_dns_listener:-}}}" \
+      "${OPENKILL_DNS_LOOP_PREVENTION:-${DNS_LOOP_PREVENTION:-${dns_loop_prevention:-}}}" \
+      "${OPENKILL_DNS_SCOPE_IPV4:-${DNS_SCOPE_IPV4:-${dns_scope_ipv4:-}}}" \
+      "${OPENKILL_DNS_SCOPE_IPV6:-${DNS_SCOPE_IPV6:-${dns_scope_ipv6:-}}}" \
+      "${OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_LISTEN_TARGET:-}" \
+      "${OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_UPSTREAM_TARGET:-}" \
+      "${OPENKILL_NFT_SHADOW_FROZEN_MIHOMO_DNS_LISTENER:-}" \
       "${OPENKILL_FWMARK:-${PROXY_FWMARK:-}}" "${OPENKILL_FWMARK:-}" "${OPENKILL_FWMASK:-}" \
       "${OPENKILL_ROUTE_TABLE:-${PROXY_ROUTE_TABLE:-}}" "${OPENKILL_ROUTE_TABLE:-}" \
       "${OPENKILL_RULE_PREF:-}" "${OPENKILL_IPV6_READY:-}" \
@@ -532,6 +553,15 @@ openkill_shadow_continuity_shell_scalars()
       printf 'OPENKILL_TPROXY_PORT=%s\n' "${OPENKILL_TPROXY_PORT:-}"
       printf 'DNS_PORT=%s\n' "${dns_port:-${DNSPORT:-}}"
       printf 'OPENKILL_DNS_PORT=%s\n' "${OPENKILL_DNS_PORT:-}"
+      printf 'DNSMASQ_LISTEN_TARGET=%s\n' "${OPENKILL_DNSMASQ_LISTEN_TARGET:-${DNSMASQ_LISTEN_TARGET:-${dnsmasq_listen_target:-}}}"
+      printf 'DNSMASQ_UPSTREAM_TARGET=%s\n' "${OPENKILL_DNSMASQ_UPSTREAM_TARGET:-${DNSMASQ_UPSTREAM_TARGET:-${dnsmasq_upstream_target:-}}}"
+      printf 'MIHOMO_DNS_LISTENER=%s\n' "${OPENKILL_MIHOMO_DNS_LISTENER:-${MIHOMO_DNS_LISTENER:-${mihomo_dns_listener:-}}}"
+      printf 'DNS_LOOP_PREVENTION=%s\n' "${OPENKILL_DNS_LOOP_PREVENTION:-${DNS_LOOP_PREVENTION:-${dns_loop_prevention:-}}}"
+      printf 'DNS_SCOPE_IPV4=%s\n' "${OPENKILL_DNS_SCOPE_IPV4:-${DNS_SCOPE_IPV4:-${dns_scope_ipv4:-}}}"
+      printf 'DNS_SCOPE_IPV6=%s\n' "${OPENKILL_DNS_SCOPE_IPV6:-${DNS_SCOPE_IPV6:-${dns_scope_ipv6:-}}}"
+      printf 'FROZEN_DNSMASQ_LISTEN_TARGET=%s\n' "${OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_LISTEN_TARGET:-}"
+      printf 'FROZEN_DNSMASQ_UPSTREAM_TARGET=%s\n' "${OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_UPSTREAM_TARGET:-}"
+      printf 'FROZEN_MIHOMO_DNS_LISTENER=%s\n' "${OPENKILL_NFT_SHADOW_FROZEN_MIHOMO_DNS_LISTENER:-}"
       printf 'MARK=%s\n' "${OPENKILL_FWMARK:-${PROXY_FWMARK:-}}"
       printf 'OPENKILL_FWMARK=%s\n' "${OPENKILL_FWMARK:-}"
       printf 'MASK=%s\n' "${OPENKILL_FWMASK:-}"
@@ -687,6 +717,139 @@ openkill_shadow_continuity_copy_matches()
    [ "$openkill_shadow_continuity_match_actual" = "$openkill_shadow_continuity_match_expected" ]
 }
 
+# Freeze runtime DNS evidence before T0.  The automatic producer must never
+# discover a missing typed value after the coherent snapshot has been sealed.
+# Existing init/reconcile callers already have the authoritative values in
+# shell variables (DNSPORT and OPENKILL_DNS_ENDPOINT); a standalone automatic
+# observer can obtain the same read-only values from UCI and the dnsmasq
+# listener table.  No value is defaulted here: an unavailable source is a
+# source gap and is reported as MODEL_GAP by the typed producer.
+openkill_shadow_capture_runtime_dns()
+{
+   openkill_shadow_runtime_dns_state_dir=$1
+   [ -n "$openkill_shadow_runtime_dns_state_dir" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_runtime_dns_state_dir" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+
+   openkill_shadow_runtime_dns_listener=
+   openkill_shadow_runtime_dns_upstream=
+   openkill_shadow_runtime_dns_mihomo=
+
+   # The dnsmasq UCI port is authoritative when present.  DNSPORT is the
+   # already-captured listener selected by the legacy writer; netstat is a
+   # bounded read-only fallback for a default (unset) UCI port.
+   openkill_shadow_runtime_dns_has_uci=0
+   if command -v uci >/dev/null 2>&1; then
+      openkill_shadow_runtime_dns_has_uci=1
+      [ -n "$openkill_shadow_runtime_dns_listener" ] ||
+         openkill_shadow_runtime_dns_listener=$(uci -q get dhcp.@dnsmasq[0].port 2>/dev/null || true)
+      [ -n "$openkill_shadow_runtime_dns_upstream" ] ||
+         openkill_shadow_runtime_dns_upstream=$(uci -q get dhcp.@dnsmasq[0].server 2>/dev/null || true)
+   fi
+
+   # A committed state file is useful in a local harness that deliberately
+   # omits UCI, but it is never allowed to mask an actual device UCI source.
+   # Production therefore observes dnsmasq from UCI/netstat, while fixture-only
+   # continuity runs can still freeze their checked-in state values.
+   if [ "$openkill_shadow_runtime_dns_has_uci" -eq 0 ]; then
+      for openkill_shadow_runtime_dns_state_file in \
+         "${OPENKILL_NETWORK_DESIRED:-}" \
+         "${OPENKILL_NETWORK_APPLIED_FILE:-}" \
+         "${OPENKILL_NETWORK_SNAPSHOT:-}"; do
+         [ -r "$openkill_shadow_runtime_dns_state_file" ] || continue
+         for openkill_shadow_runtime_dns_state_pair in \
+            'DNSMASQ_LISTEN_TARGET DNSMASQ_LISTEN' \
+            'DNSMASQ_UPSTREAM_TARGET DNSMASQ_UPSTREAM' \
+            'MIHOMO_DNS_LISTENER MIHOMO_LISTENER'; do
+            set -- $openkill_shadow_runtime_dns_state_pair
+            openkill_shadow_runtime_dns_state_value=
+            openkill_shadow_auto_lookup_file "$1" "$openkill_shadow_runtime_dns_state_file" >/dev/null 2>&1
+            openkill_shadow_runtime_dns_state_rc=$?
+            [ "$openkill_shadow_runtime_dns_state_rc" -eq 0 ] || continue
+            openkill_shadow_runtime_dns_state_value=$openkill_shadow_auto_lookup_result
+            case "$1" in
+               DNSMASQ_LISTEN_TARGET)
+                  [ -z "$openkill_shadow_runtime_dns_listener" ] || [ "$openkill_shadow_runtime_dns_listener" = "$openkill_shadow_runtime_dns_state_value" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+                  openkill_shadow_runtime_dns_listener=$openkill_shadow_runtime_dns_state_value
+                  ;;
+               DNSMASQ_UPSTREAM_TARGET)
+                  [ -z "$openkill_shadow_runtime_dns_upstream" ] || [ "$openkill_shadow_runtime_dns_upstream" = "$openkill_shadow_runtime_dns_state_value" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+                  openkill_shadow_runtime_dns_upstream=$openkill_shadow_runtime_dns_state_value
+                  ;;
+               MIHOMO_DNS_LISTENER)
+                  [ -z "$openkill_shadow_runtime_dns_mihomo" ] || [ "$openkill_shadow_runtime_dns_mihomo" = "$openkill_shadow_runtime_dns_state_value" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+                  openkill_shadow_runtime_dns_mihomo=$openkill_shadow_runtime_dns_state_value
+                  ;;
+            esac
+         done
+      done
+   fi
+   if [ -z "$openkill_shadow_runtime_dns_listener" ]; then
+      openkill_shadow_runtime_dns_listener=${DNSPORT:-}
+   fi
+   if [ -z "$openkill_shadow_runtime_dns_listener" ]; then
+      openkill_shadow_runtime_dns_listener=${OPENKILL_DNSMASQ_LISTEN_TARGET:-${DNSMASQ_LISTEN_TARGET:-${dnsmasq_listen_target:-}}}
+   fi
+   if [ -z "$openkill_shadow_runtime_dns_listener" ] && command -v netstat >/dev/null 2>&1; then
+      openkill_shadow_runtime_dns_listener=$(netstat -nlp 2>/dev/null |
+         awk '/dnsmasq([[:space:]]|$)/ && $4 ~ /:[0-9]+$/ { value=$4; sub(/^.*:/, "", value); if (value ~ /^[0-9]+$/ && !(value in seen)) { seen[value]=1; count++ } } END { if (count == 1) for (value in seen) print value; else if (count > 1) exit 2 }')
+      openkill_shadow_runtime_dns_listener_rc=$?
+      [ "$openkill_shadow_runtime_dns_listener_rc" -eq 0 ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   fi
+
+   # A list of upstream servers is not silently collapsed.  The current
+   # contract has one local endpoint; multiple/ambiguous values remain a
+   # source gap until a typed list representation is formally added.
+   openkill_shadow_runtime_dns_upstream=$(printf '%s\n' "$openkill_shadow_runtime_dns_upstream" |
+      awk '{ gsub(/[[:space:]]+/, " "); sub(/^ +/, ""); sub(/ +$/, ""); print }')
+   if [ -z "$openkill_shadow_runtime_dns_upstream" ]; then
+      openkill_shadow_runtime_dns_upstream=${OPENKILL_DNSMASQ_UPSTREAM_TARGET:-${DNSMASQ_UPSTREAM_TARGET:-${dnsmasq_upstream_target:-}}}
+   fi
+   case "$openkill_shadow_runtime_dns_upstream" in
+      *\ *|*','*|*';'*) return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP" ;;
+   esac
+
+   [ -n "$openkill_shadow_runtime_dns_mihomo" ] ||
+      openkill_shadow_runtime_dns_mihomo=${OPENKILL_DNS_ENDPOINT:-}
+   [ -n "$openkill_shadow_runtime_dns_mihomo" ] ||
+      openkill_shadow_runtime_dns_mihomo=${OPENKILL_MIHOMO_DNS_LISTENER:-${MIHOMO_DNS_LISTENER:-${mihomo_dns_listener:-}}}
+
+   for openkill_shadow_runtime_dns_value in \
+      "$openkill_shadow_runtime_dns_listener" \
+      "$openkill_shadow_runtime_dns_upstream" \
+      "$openkill_shadow_runtime_dns_mihomo"; do
+      openkill_shadow_safe_value "$openkill_shadow_runtime_dns_value" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   done
+   case "$openkill_shadow_runtime_dns_listener" in ''|*[!0-9]*) return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP" ;; esac
+   [ "$openkill_shadow_runtime_dns_listener" -ge 1 ] 2>/dev/null &&
+      [ "$openkill_shadow_runtime_dns_listener" -le 65535 ] 2>/dev/null ||
+      return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   case "$openkill_shadow_runtime_dns_upstream" in
+      ''|*[!A-Za-z0-9.:#_\[\]-]*) return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP" ;;
+   esac
+   case "$openkill_shadow_runtime_dns_mihomo" in
+      ''|*[!A-Za-z0-9.:#_\[\]-]*) return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP" ;;
+   esac
+
+   # Keep the frozen values in a private, bounded artifact for diagnostics and
+   # make the shell variables explicit inputs to the continuity token.  The
+   # producer reads these values only after T0 from this private snapshot.
+   openkill_shadow_runtime_dns_file=$openkill_shadow_runtime_dns_state_dir/runtime-dns
+   openkill_shadow_safe_path "$openkill_shadow_runtime_dns_file" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   umask 077
+   {
+      printf 'OPENKILL_SHADOW_RUNTIME_DNS_V1=1\n'
+      printf 'DNSMASQ_LISTEN_TARGET=%s\n' "$openkill_shadow_runtime_dns_listener"
+      printf 'DNSMASQ_UPSTREAM_TARGET=%s\n' "$openkill_shadow_runtime_dns_upstream"
+      printf 'MIHOMO_DNS_LISTENER=%s\n' "$openkill_shadow_runtime_dns_mihomo"
+   } > "$openkill_shadow_runtime_dns_file" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   chmod 600 "$openkill_shadow_runtime_dns_file" 2>/dev/null || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+
+   OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_LISTEN_TARGET=$openkill_shadow_runtime_dns_listener
+   OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_UPSTREAM_TARGET=$openkill_shadow_runtime_dns_upstream
+   OPENKILL_NFT_SHADOW_FROZEN_MIHOMO_DNS_LISTENER=$openkill_shadow_runtime_dns_mihomo
+   return 0
+}
+
 openkill_shadow_auto_continuity_snapshot()
 {
    openkill_shadow_continuity_root=$1
@@ -710,6 +873,11 @@ openkill_shadow_auto_continuity_snapshot()
    if [ -n "$openkill_shadow_continuity_live_desired" ]; then
       openkill_shadow_safe_path "$openkill_shadow_continuity_live_desired" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
    fi
+
+   # Freeze all runtime DNS values before calculating T0.  This keeps the
+   # actual typed sidecar coupled to the same coherent cycle as the committed
+   # network sources and prevents any comparator-stage live reread.
+   openkill_shadow_capture_runtime_dns "$openkill_shadow_continuity_state_dir" || return $?
 
    openkill_shadow_continuity_t0_work=$openkill_shadow_continuity_state_dir/t0
    openkill_shadow_continuity_t1_work=$openkill_shadow_continuity_state_dir/t1
@@ -1796,11 +1964,12 @@ openkill_shadow_log_bounded()
 #
 # The automatic comparator historically compared physical nft declarations.
 # R3A keeps that path for older callers, but adds an explicit semantic bundle
-# path for the production coordinator.  The bundle is a bounded output of the
-# already completed capture/parser and CURRENT renderer; it is never a live
-# read and it is never interpreted as shell code.  Logical identity and the
-# ownership class are supplied by the formal inventory projection.  Physical
-# names are retained for observation only.
+# path for the production coordinator.  R3C produces that bundle internally
+# from the completed capture/parser and CURRENT renderer; the explicit files
+# remain a fixture/development compatibility path.  The bundle is bounded,
+# never a live read, and never interpreted as shell code.  Logical identity and
+# ownership class come from the formal inventory projection.  Physical names
+# are retained for observation only.
 
 openkill_shadow_typed_manifest_path()
 {
@@ -1829,6 +1998,486 @@ openkill_shadow_typed_prepare_file()
    [ "$openkill_shadow_typed_size" -le "$OPENKILL_NFT_SHADOW_MAX_PAYLOAD_BYTES" ] || return 1
    cp "$openkill_shadow_typed_source" "$openkill_shadow_typed_destination" || return 1
    [ "$(sed -n '1p' "$openkill_shadow_typed_destination")" = 'OPENKILL_SHADOW_TYPED_INTENT_V1=1' ] || return 1
+   return 0
+}
+
+# R3C automatic typed-sidecar producer ---------------------------------------
+#
+# Automatic production cycles must not depend on a caller-created semantic
+# bundle.  These helpers consume only the already frozen renderer input and
+# parsed legacy intent.  They deliberately use small, line-oriented AWK
+# programs so the device path remains POSIX/BusyBox compatible and never
+# invokes a second discovery read.
+
+openkill_shadow_typed_manifest_expected()
+{
+   openkill_shadow_typed_manifest_input=$1
+   openkill_shadow_typed_manifest_output=$2
+   [ -r "$openkill_shadow_typed_manifest_input" ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_typed_manifest_input" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_typed_manifest_output" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   awk -F '	' -v OFS='	' -v output="$openkill_shadow_typed_manifest_output" '
+      function valid_token(v) { return v != "" && v !~ /[\r\n\t]/ }
+      function valid_value(field, value) {
+         if (!valid_token(value)) return 0
+         if (field == "DNSMASQ_LISTEN_TARGET") return value ~ /^[0-9]+$/ && value >= 1 && value <= 65535
+         if (field == "DNSMASQ_UPSTREAM_TARGET") return value ~ /^[A-Za-z0-9.:#_\[\]-]+$/
+         if (field == "MIHOMO_DNS_LISTENER") return value ~ /^[A-Za-z0-9.:#_\[\]-]+$/
+         if (field == "DNS_LOOP_PREVENTION") return value == "skgid_exempt=65534"
+         if (field == "DNS_SCOPE_IPV4" || field == "DNS_SCOPE_IPV6") return value == "lan=true,router=true"
+         return 0
+      }
+      BEGIN { fields="DNSMASQ_LISTEN_TARGET DNSMASQ_UPSTREAM_TARGET MIHOMO_DNS_LISTENER DNS_LOOP_PREVENTION DNS_SCOPE_IPV4 DNS_SCOPE_IPV6" }
+      FNR == 1 { if ($0 != "OPENKILL_SHADOW_SEMANTIC_MANIFEST_V1=1") bad=1; next }
+      $0 ~ /^[[:space:]]*$/ || $0 ~ /^#/ { next }
+      $1 == "DNS_EXPECTED" && NF == 4 {
+         if ($2 !~ /^(DNSMASQ_LISTEN_TARGET|DNSMASQ_UPSTREAM_TARGET|MIHOMO_DNS_LISTENER|DNS_LOOP_PREVENTION|DNS_SCOPE_IPV4|DNS_SCOPE_IPV6)$/ || !valid_value($2, $3) || !valid_token($4)) { bad=1; next }
+         if ($2 in value) { bad=1; next }
+         value[$2]=$3; source[$2]=$4; next
+      }
+      END {
+         count=split(fields, wanted, " ")
+         for (i=1; i<=count; i++) if (!(wanted[i] in value)) bad=1
+         if (bad) exit 2
+         for (i=1; i<=count; i++) print wanted[i], value[wanted[i]], source[wanted[i]] > output
+      }
+   ' "$openkill_shadow_typed_manifest_input"
+   openkill_shadow_typed_manifest_rc=$?
+   [ "$openkill_shadow_typed_manifest_rc" -eq 0 ] || {
+      rm -f "$openkill_shadow_typed_manifest_output"
+      return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   }
+   [ -s "$openkill_shadow_typed_manifest_output" ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   return 0
+}
+
+openkill_shadow_typed_dns_firewall_ports()
+{
+   openkill_shadow_typed_dns_input=$1
+   openkill_shadow_typed_dns_output=$2
+   openkill_shadow_typed_dns_metadata=${3:-}
+   [ -r "$openkill_shadow_typed_dns_input" ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_typed_dns_input" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_typed_dns_output" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   if [ -n "$openkill_shadow_typed_dns_metadata" ]; then
+      openkill_shadow_safe_path "$openkill_shadow_typed_dns_metadata" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+      [ -r "$openkill_shadow_typed_dns_metadata" ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   fi
+   awk -F '	' -v OFS='	' -v output="$openkill_shadow_typed_dns_output" -v metadata="$openkill_shadow_typed_dns_metadata" '
+      function canon(v) { gsub(/[[:space:]]+/, " ", v); sub(/^ +/, "", v); sub(/ +$/, "", v); return v }
+      function add(role, value) {
+         if (value !~ /^[0-9]+$/ || value < 1 || value > 65535) { bad=1; return }
+         if (role in seen && ports[role] != value) bad=1
+         seen[role]=1; ports[role]=sprintf("%d", value)
+      }
+      function role_for(chain, family, role) {
+         if (!(chain in meta_role)) return ""
+         family=meta_family[chain]; role=meta_role[chain]
+         if (role == "PREROUTING_MANGLE" && family == "IPv4") return "LAN4"
+         if (role == "PREROUTING_MANGLE" && family == "IPv6") return "LAN6"
+         if (role == "OUTPUT_MANGLE" && family == "IPv4") return "ROUTER4"
+         if (role == "OUTPUT_MANGLE" && family == "IPv6") return "ROUTER6"
+         return ""
+      }
+      function inspect(chain, expression, match_text, port_text, value, role) {
+         role=role_for(chain)
+         if (role == "") return
+          # The legacy/current writers use both `openkill_dns_hijack*` for
+          # LAN interception and `openkill_dns_redirect*` for router-origin
+          # interception.  Match the typed DNS action family, rather than a
+          # single physical spelling, while keeping the formal chain metadata
+          # authoritative for the LAN/router/family role.
+          if (expression !~ /jump[[:space:]]+openkill_dns(_|[[:space:]])/) return
+          if (role == "LAN4") chain_seen["LAN4"]=1
+          if (role == "LAN6") chain_seen["LAN6"]=1
+          if (role == "ROUTER4") chain_seen["ROUTER4"]=1
+          if (role == "ROUTER6") chain_seen["ROUTER6"]=1
+         match_text=expression
+         if (!match(match_text, /dport[[:space:]]+[0-9]+/)) { bad=1; return }
+         port_text=substr(match_text, RSTART, RLENGTH)
+         sub(/^.*[[:space:]]/, "", port_text)
+         value=port_text + 0
+         add(role, value)
+      }
+      BEGIN {
+         if (metadata != "") {
+            while ((getline metadata_line < metadata) > 0) {
+               metadata_count=split(metadata_line, metadata_fields, "\t")
+               if (metadata_fields[1] == "CHAIN" && metadata_count == 10) {
+                  meta_family[metadata_fields[3]]=metadata_fields[4]
+                  meta_role[metadata_fields[3]]=metadata_fields[6]
+               }
+            }
+            close(metadata)
+         }
+      }
+      {
+          if ($1 == "CHAIN" && NF >= 2) {
+             # Chain declarations alone do not prove DNS interception.  Scope
+             # is marked only after a typed DNS jump rule is observed.
+         }
+         else if ($1 == "RULE" && NF >= 12) inspect($5, canon($7 " " $9))
+         else if ($1 == "RULE" && NF >= 4) inspect($2, canon($4))
+         # The desired side is rendered before the typed sidecar is built.
+         # Consume only the renderer bounded `add rule inet fw4 ...` form;
+         # this keeps desired DNS provenance tied to CURRENT renderer output
+         # without rereading live state or accepting a caller-provided sidecar.
+         else if ($0 ~ /^add[[:space:]]+rule[[:space:]]+inet[[:space:]]+fw4[[:space:]]+/) {
+            raw=substr($0, 1)
+            sub(/^add[[:space:]]+rule[[:space:]]+inet[[:space:]]+fw4[[:space:]]+/, "", raw)
+             split(raw, raw_fields, /[[:space:]]+/)
+             raw_chain=raw_fields[1]
+             role=role_for(raw_chain)
+             sub(/^[^[:space:]]+[[:space:]]+/, "", raw)
+            inspect(raw_chain, canon(raw))
+         }
+      }
+       END {
+          # The target is a typed LAN/router value while family coverage is a
+          # separate scope field.  If one family is absent but the other
+          # family supplies the same LAN/router target, preserve the target and
+          # let the scope comparison report a real semantic mismatch.  A
+          # completely absent LAN or router source remains a model gap.
+          if (!("LAN4" in seen) && !("LAN6" in seen)) bad=1
+          if (!("ROUTER4" in seen) && !("ROUTER6" in seen)) bad=1
+          if ("LAN4" in ports && "LAN6" in ports && ports["LAN4"] != ports["LAN6"]) bad=1
+          if ("ROUTER4" in ports && "ROUTER6" in ports && ports["ROUTER4"] != ports["ROUTER6"]) bad=1
+          if (!("LAN4" in chain_seen) && !("LAN6" in chain_seen) && !("ROUTER4" in chain_seen) && !("ROUTER6" in chain_seen)) bad=1
+          if (bad) exit 2
+          print "DNS_FIREWALL_LAN_TARGET", ("LAN4" in ports ? ports["LAN4"] : ports["LAN6"]) > output
+          print "DNS_FIREWALL_ROUTER_TARGET", ("ROUTER4" in ports ? ports["ROUTER4"] : ports["ROUTER6"]) > output
+         print "DNS_SCOPE_IPV4", ("LAN4" in chain_seen ? "lan=true" : "lan=false") "," ("ROUTER4" in chain_seen ? "router=true" : "router=false") > output
+         print "DNS_SCOPE_IPV6", ("LAN6" in chain_seen ? "lan=true" : "lan=false") "," ("ROUTER6" in chain_seen ? "router=true" : "router=false") > output
+      }
+   ' "$openkill_shadow_typed_dns_input"
+   openkill_shadow_typed_dns_rc=$?
+   [ "$openkill_shadow_typed_dns_rc" -eq 0 ] || {
+      rm -f "$openkill_shadow_typed_dns_output"
+      return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   }
+   return 0
+}
+
+openkill_shadow_typed_dns_loop_prevention()
+{
+   openkill_shadow_typed_loop_input=$1
+   openkill_shadow_typed_loop_output=$2
+   openkill_shadow_typed_loop_metadata=${3:-}
+   [ -r "$openkill_shadow_typed_loop_input" ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_typed_loop_input" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_typed_loop_output" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   if [ -n "$openkill_shadow_typed_loop_metadata" ]; then
+      openkill_shadow_safe_path "$openkill_shadow_typed_loop_metadata" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+      [ -r "$openkill_shadow_typed_loop_metadata" ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   fi
+   awk -F '	' -v OFS='	' -v output="$openkill_shadow_typed_loop_output" -v metadata="$openkill_shadow_typed_loop_metadata" '
+      function canon(v) { gsub(/[[:space:]]+/, " ", v); sub(/^ +/, "", v); sub(/ +$/, "", v); return v }
+      function relevant(chain) {
+         return chain in meta_role && (meta_role[chain] == "PREROUTING_MANGLE" || meta_role[chain] == "OUTPUT_MANGLE")
+      }
+      function inspect(chain, expression, value, match_text) {
+         if (!relevant(chain)) return
+         if (!(chain in chain_seen)) chain_seen_count++
+         chain_seen[chain]=1
+         match_text=canon(expression)
+         if (match_text !~ /(^|[[:space:]])(meta[[:space:]]+)?skgid([[:space:]]+|[[:space:]]+!=[[:space:]]+|[[:space:]]+==[[:space:]]+)[0-9]+/) return
+         if (!match(match_text, /skgid([[:space:]]+|[[:space:]]+!=[[:space:]]+|[[:space:]]+==[[:space:]]+)[0-9]+/)) { bad=1; return }
+         value=substr(match_text, RSTART, RLENGTH)
+         sub(/^.*skgid[[:space:]]+/, "", value)
+         sub(/^!=[[:space:]]+/, "", value)
+         sub(/^==[[:space:]]+/, "", value)
+         if (value !~ /^[0-9]+$/) { bad=1; return }
+         if (seen_value && loop_value != value) bad=1
+         loop_value=value; seen_value=1
+      }
+      BEGIN {
+         if (metadata != "") {
+            while ((getline metadata_line < metadata) > 0) {
+               metadata_count=split(metadata_line, metadata_fields, "\t")
+               if (metadata_fields[1] == "CHAIN" && metadata_count == 10) {
+                  meta_role[metadata_fields[3]]=metadata_fields[6]
+               }
+            }
+            close(metadata)
+         }
+      }
+      {
+         if ($1 == "RULE" && NF >= 12) inspect($5, canon($7 " " $9))
+         else if ($1 == "RULE" && NF >= 4) inspect($2, canon($4))
+         else if ($0 ~ /^add[[:space:]]+rule[[:space:]]+inet[[:space:]]+fw4[[:space:]]+/) {
+            raw=substr($0, 1)
+            sub(/^add[[:space:]]+rule[[:space:]]+inet[[:space:]]+fw4[[:space:]]+/, "", raw)
+            split(raw, raw_fields, /[[:space:]]+/)
+            raw_chain=raw_fields[1]
+            sub(/^[^[:space:]]+[[:space:]]+/, "", raw)
+            inspect(raw_chain, canon(raw))
+         }
+      }
+      END {
+         if (!seen_value) {
+            if (chain_seen_count == 0) bad=1
+            else loop_value="missing"
+         }
+         if (bad) exit 2
+         print "DNS_LOOP_PREVENTION", "skgid_exempt=" loop_value > output
+      }
+   ' "$openkill_shadow_typed_loop_input"
+   openkill_shadow_typed_loop_rc=$?
+   [ "$openkill_shadow_typed_loop_rc" -eq 0 ] || {
+      rm -f "$openkill_shadow_typed_loop_output"
+      return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   }
+   return 0
+}
+
+openkill_shadow_typed_emit_objects()
+{
+   openkill_shadow_typed_emit_side=$1
+   openkill_shadow_typed_emit_template=$2
+   openkill_shadow_typed_emit_intent=$3
+   openkill_shadow_typed_emit_manifest=$4
+   openkill_shadow_typed_emit_output=$5
+   [ -r "$openkill_shadow_typed_emit_template" ] && [ -r "$openkill_shadow_typed_emit_manifest" ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   [ -r "$openkill_shadow_typed_emit_intent" ] || [ "$openkill_shadow_typed_emit_side" = DESIRED ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   for openkill_shadow_typed_emit_path in "$openkill_shadow_typed_emit_template" "$openkill_shadow_typed_emit_manifest" "$openkill_shadow_typed_emit_intent" "$openkill_shadow_typed_emit_output"; do
+      [ -n "$openkill_shadow_typed_emit_path" ] || continue
+      openkill_shadow_safe_path "$openkill_shadow_typed_emit_path" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   done
+   awk -F '	' -v OFS='	' \
+      -v side="$openkill_shadow_typed_emit_side" \
+      -v manifest_file="$openkill_shadow_typed_emit_manifest" \
+      -v template_file="$openkill_shadow_typed_emit_template" \
+      -v intent_file="$openkill_shadow_typed_emit_intent" \
+      -v output="$openkill_shadow_typed_emit_output" '
+      function canon(v) { gsub(/[[:space:]]+/, " ", v); sub(/^ +/, "", v); sub(/ +$/, "", v); return v }
+      function listcanon(v, a, n, i, j, t, out, last) {
+         v=canon(v); gsub(/,/, " ", v); if (v == "" || v == "-") return "-"
+         n=split(v, a, /[[:space:]]+/)
+         for (i=1; i<=n; i++) { t=a[i]; j=i; while (j > 1 && a[j-1] > t) { a[j]=a[j-1]; j-- } a[j]=t }
+         out=""; last=""
+         for (i=1; i<=n; i++) if (a[i] != "" && a[i] != last) { if (out != "") out=out ","; out=out a[i]; last=a[i] }
+         return out == "" ? "-" : out
+      }
+      function inventory_class(type, physical, component, key) {
+         key=type SUBSEP physical
+         if (key in inv_owner) { current_component=inv_component[key]; return inv_owner[key] }
+         current_component=component
+         if (component == "UPNP") return "OPTIONAL_OBSERVATION"
+         if (component == "WAN_INPUT") return "LEGACY_ONLY_SAFETY"
+         if (component !~ /^(ACCESS|CHINA|DNS|LOCAL|NODE|PROXY_ACTION|SERVICE|TOPOLOGY)$/) return "UNKNOWN"
+         return "CURRENT_OWNED"
+      }
+      function emit(type, logical, physical, component, owner, state, semantic) {
+         if (owner == "") { bad=1; return }
+         print "OBJECT", type, logical, physical, component, owner, state, canon(semantic) >> output
+      }
+      function template_chain(logical, physical, family, component, role, base, ctype, hook, priority) {
+         chain_n++; chain_logical[chain_n]=logical; chain_physical[chain_n]=physical; chain_family[chain_n]=family; chain_component[chain_n]=component; chain_role[chain_n]=role; chain_base[chain_n]=base; chain_type[chain_n]=ctype; chain_hook[chain_n]=hook; chain_priority[chain_n]=priority
+         chain_by_physical[physical]=chain_n
+      }
+      function template_set(logical, physical, family, etype, flags, elements, component) {
+         set_n++; set_logical[set_n]=logical; set_physical[set_n]=physical; set_family[set_n]=family; set_etype[set_n]=etype; set_flags[set_n]=flags; set_elements[set_n]=elements; set_component[set_n]=component
+         set_by_physical[physical]=set_n
+      }
+      function template_rule(logical, component, family, chain, order, match_text, action_type, action_expr, reason, decision, gap) {
+         rule_n++; rule_logical[rule_n]=logical; rule_component[rule_n]=component; rule_family[rule_n]=family; rule_chain[rule_n]=chain; rule_order[rule_n]=order; rule_match[rule_n]=canon(match_text); rule_action_type[rule_n]=action_type; rule_action[rule_n]=canon(action_expr); rule_reason[rule_n]=reason; rule_decision[rule_n]=decision; rule_gap[rule_n]=gap
+         rule_expression[rule_n]=canon(rule_match[rule_n] " " rule_action[rule_n])
+      }
+      function is_base(chain) { return chain == "dstnat" || chain == "mangle_prerouting" || chain == "mangle_output" || chain == "output" || chain == "srcnat" || chain == "input" || chain == "forward" }
+      function actual_rule_add(chain, order, expression) { actual_rule_n++; actual_chain[actual_rule_n]=chain; actual_order[actual_rule_n]=order; actual_expression[actual_rule_n]=canon(expression) }
+      function actual_find(chain, expression, i) {
+         for (i=1; i<=actual_rule_n; i++) if (!actual_used[i] && actual_chain[i] == chain && actual_expression[i] == expression) { actual_used[i]=1; return i }
+         return 0
+      }
+       function canonical_hook(value) {
+          value=canon(value)
+          if (value == "prerouting") return "PREROUTING"
+          if (value == "input") return "INPUT"
+          if (value == "forward") return "FORWARD"
+          if (value == "output") return "OUTPUT"
+          if (value == "postrouting") return "POSTROUTING"
+          return value
+       }
+       function object_semantic_chain(i, hook_value, priority_value) {
+          hook_value=canonical_hook(chain_hook[i]); priority_value=chain_priority[i]
+          if (chain_physical[i] in actual_hook) hook_value=actual_hook[chain_physical[i]]
+          if (chain_physical[i] in actual_priority) priority_value=actual_priority[chain_physical[i]]
+          hook_value=canonical_hook(hook_value)
+          return "family=" chain_family[i] ";component=" chain_component[i] ";role=" chain_role[i] ";base=" chain_base[i] ";type=" chain_type[i] ";hook=" (hook_value == "" ? "-" : hook_value) ";priority=" (priority_value == "" ? "-" : priority_value)
+      }
+      function object_semantic_set(i, elements) {
+         elements=set_elements[i]; if (set_physical[i] in actual_set_elements) elements=actual_set_elements[set_physical[i]]
+         return "family=" set_family[i] ";element_type=" set_etype[i] ";flags=" (set_flags[i] == "" ? "-" : set_flags[i]) ";elements=" listcanon(elements)
+      }
+      FILENAME == manifest_file {
+         if ($1 == "INVENTORY" && NF == 5) { key=$2 SUBSEP $3; if (key in inv_owner) bad=1; inv_owner[key]=$4; inv_component[key]=$5 }
+         next
+      }
+      FILENAME == template_file {
+         if ($1 == "CHAIN" && NF == 10) template_chain($2,$3,$4,$5,$6,$7,$8,$9,$10)
+         else if ($1 == "SET" && NF == 8) template_set($2,$3,$4,$5,$6,$7,$8)
+         else if ($1 == "RULE" && NF == 12) template_rule($2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         next
+      }
+      FILENAME == intent_file {
+         if ($1 == "CHAIN" && NF >= 2) actual_chain_present[$2]=1
+          else if ($1 == "HOOK" && NF >= 5) { actual_hook[$2]=$4; actual_priority[$2]=$5 }
+         else if ($1 == "SET" && NF >= 5) { actual_set_present[$2]=1; actual_set_elements[$2]=listcanon($5) }
+         else if ($1 == "RULE" && NF >= 4) { if (!is_base($2) && $2 != "nat_output") actual_rule_add($2,$3,$4) }
+         next
+      }
+      END {
+         if (bad) exit 2
+         if (side == "DESIRED") {
+            for (i=1; i<=chain_n; i++) { owner=inventory_class("chain",chain_physical[i],chain_component[i]); emit("chain",chain_logical[i],chain_physical[i],current_component,owner,"ACTIVE",object_semantic_chain(i)) }
+            for (i=1; i<=set_n; i++) { owner=inventory_class("set",set_physical[i],set_component[i]); emit("set",set_logical[i],set_physical[i],current_component,owner,"ACTIVE",object_semantic_set(i)) }
+            for (i=1; i<=rule_n; i++) emit("rule",rule_logical[i],"current_" rule_logical[i],rule_component[i],"CURRENT_OWNED","ACTIVE","family=" rule_family[i] ";chain=" rule_chain[i] ";match=" rule_match[i] ";action=" rule_action[i] ";reason=" rule_reason[i] ";decision=" rule_decision[i] ";gap=" rule_gap[i])
+         } else {
+            for (i=1; i<=chain_n; i++) if (chain_physical[i] in actual_chain_present) { owner=inventory_class("chain",chain_physical[i],chain_component[i]); emit("chain",chain_logical[i],chain_physical[i],current_component,owner,"ACTIVE",object_semantic_chain(i)) }
+            for (i=1; i<=set_n; i++) if (set_physical[i] in actual_set_present) { owner=inventory_class("set",set_physical[i],set_component[i]); emit("set",set_logical[i],set_physical[i],current_component,owner,"ACTIVE",object_semantic_set(i)) }
+            for (i=1; i<=rule_n; i++) {
+               j=actual_find(rule_chain[i],rule_expression[i])
+               if (j > 0) emit("rule",rule_logical[i],rule_chain[i] "_rule_" actual_order[j],rule_component[i],"CURRENT_OWNED","ACTIVE","family=" rule_family[i] ";chain=" rule_chain[i] ";match=" rule_match[i] ";action=" rule_action[i] ";reason=" rule_reason[i] ";decision=" rule_decision[i] ";gap=" rule_gap[i])
+            }
+            for (j=1; j<=actual_rule_n; j++) if (!actual_used[j]) {
+               if (actual_expression[j] ~ /(^|[[:space:]])jump[[:space:]]+openkill_upnp([[:space:]]|$)/) continue
+               if (!(actual_chain[j] in chain_by_physical)) { bad=1; continue }
+               emit("rule","UNMATCHED_RULE_" actual_chain[j] "_" actual_order[j],actual_chain[j] "_rule_" actual_order[j],"TOPOLOGY","CURRENT_OWNED","ACTIVE","chain=" actual_chain[j] ";expression=" actual_expression[j])
+            }
+         }
+         if (bad) exit 2
+      }
+   ' "$openkill_shadow_typed_emit_manifest" "$openkill_shadow_typed_emit_template" "$openkill_shadow_typed_emit_intent" >> "$openkill_shadow_typed_emit_output"
+   openkill_shadow_typed_emit_rc=$?
+   [ "$openkill_shadow_typed_emit_rc" -eq 0 ] || {
+      rm -f "$openkill_shadow_typed_emit_output"
+      return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   }
+   return 0
+}
+
+openkill_shadow_typed_sidecar_init()
+{
+   openkill_shadow_typed_sidecar_side=$1
+   openkill_shadow_typed_sidecar_identity=$2
+   openkill_shadow_typed_sidecar_output=$3
+   [ "$openkill_shadow_typed_sidecar_side" = ACTUAL ] || [ "$openkill_shadow_typed_sidecar_side" = DESIRED ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_safe_value "$openkill_shadow_typed_sidecar_identity" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_typed_sidecar_output" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   umask 077
+   {
+      printf 'OPENKILL_SHADOW_TYPED_INTENT_V1=1\n'
+      printf 'META\tschema_version\tOPENKILL_SHADOW_TYPED_SIDECAR_V1\n'
+      printf 'META\tside\t%s\n' "$openkill_shadow_typed_sidecar_side"
+      printf 'META\tcycle_identity\t%s\n' "$openkill_shadow_typed_sidecar_identity"
+      printf 'META\tcontinuity_identity\t%s\n' "$openkill_shadow_typed_sidecar_identity"
+      printf 'META\tmodel_version\t%s\n' "$OPENKILL_NFT_SHADOW_SEMANTIC_MODEL_VERSION"
+      printf 'META\townership_model_version\t%s\n' "$OPENKILL_NFT_SHADOW_OWNERSHIP_MODEL_VERSION"
+      printf 'META\tdns_model_version\t%s\n' "$OPENKILL_NFT_SHADOW_DNS_MODEL_VERSION"
+   } > "$openkill_shadow_typed_sidecar_output" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   chmod 600 "$openkill_shadow_typed_sidecar_output" 2>/dev/null || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   return 0
+}
+
+openkill_shadow_typed_auto_produce()
+{
+   openkill_shadow_typed_actual_intent=$1
+   openkill_shadow_typed_desired_input=$2
+   openkill_shadow_typed_rendered_payload=$3
+   openkill_shadow_typed_actual_output=$4
+   openkill_shadow_typed_desired_output=$5
+   [ -r "$openkill_shadow_typed_actual_intent" ] && [ -r "$openkill_shadow_typed_desired_input" ] && [ -r "$openkill_shadow_typed_rendered_payload" ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   for openkill_shadow_typed_producer_path in "$openkill_shadow_typed_actual_intent" "$openkill_shadow_typed_desired_input" "$openkill_shadow_typed_rendered_payload" "$openkill_shadow_typed_actual_output" "$openkill_shadow_typed_desired_output"; do
+      openkill_shadow_safe_path "$openkill_shadow_typed_producer_path" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   done
+   openkill_shadow_typed_manifest=$(openkill_shadow_typed_manifest_path 2>/dev/null) || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_work=${openkill_shadow_tmp_dir:-${openkill_shadow_typed_actual_output%/*}}
+   openkill_shadow_safe_path "$openkill_shadow_typed_work" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_defaults=$openkill_shadow_typed_work/typed-dns-defaults
+   openkill_shadow_typed_actual_ports=$openkill_shadow_typed_work/typed-dns-actual
+   openkill_shadow_typed_desired_ports=$openkill_shadow_typed_work/typed-dns-desired
+   openkill_shadow_typed_actual_loop_file=$openkill_shadow_typed_work/typed-loop-actual
+   openkill_shadow_typed_desired_loop_file=$openkill_shadow_typed_work/typed-loop-desired
+   openkill_shadow_typed_empty_intent=$openkill_shadow_typed_work/typed-empty-intent
+   for openkill_shadow_typed_tmp in "$openkill_shadow_typed_defaults" "$openkill_shadow_typed_actual_ports" "$openkill_shadow_typed_desired_ports" "$openkill_shadow_typed_actual_loop_file" "$openkill_shadow_typed_desired_loop_file" "$openkill_shadow_typed_empty_intent"; do
+      openkill_shadow_safe_path "$openkill_shadow_typed_tmp" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+      rm -f "$openkill_shadow_typed_tmp"
+   done
+   openkill_shadow_typed_manifest_expected "$openkill_shadow_typed_manifest" "$openkill_shadow_typed_defaults" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_dns_firewall_ports "$openkill_shadow_typed_actual_intent" "$openkill_shadow_typed_actual_ports" "$openkill_shadow_typed_desired_input" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_dns_firewall_ports "$openkill_shadow_typed_rendered_payload" "$openkill_shadow_typed_desired_ports" "$openkill_shadow_typed_desired_input" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_dns_loop_prevention "$openkill_shadow_typed_actual_intent" "$openkill_shadow_typed_actual_loop_file" "$openkill_shadow_typed_desired_input" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_dns_loop_prevention "$openkill_shadow_typed_rendered_payload" "$openkill_shadow_typed_desired_loop_file" "$openkill_shadow_typed_desired_input" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_actual_firewall_lan=$(awk -F '	' '$1 == "DNS_FIREWALL_LAN_TARGET" { print $2; exit }' "$openkill_shadow_typed_actual_ports") || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_actual_firewall_router=$(awk -F '	' '$1 == "DNS_FIREWALL_ROUTER_TARGET" { print $2; exit }' "$openkill_shadow_typed_actual_ports") || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_desired_firewall_lan=$(awk -F '	' '$1 == "DNS_FIREWALL_LAN_TARGET" { print $2; exit }' "$openkill_shadow_typed_desired_ports") || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_desired_firewall_router=$(awk -F '	' '$1 == "DNS_FIREWALL_ROUTER_TARGET" { print $2; exit }' "$openkill_shadow_typed_desired_ports") || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_actual_dnsmasq_listen=
+   openkill_shadow_typed_actual_dnsmasq_upstream=
+   openkill_shadow_typed_actual_mihomo_listener=
+   if [ "${openkill_shadow_auto_continuity_mode:-0}" -eq 1 ]; then
+      # In the production automatic path these values were frozen before T0
+      # by openkill_shadow_capture_runtime_dns.  Reading the shell scalars is
+      # therefore a read from the coherent snapshot, not a comparator-stage
+      # UCI/netstat/Mihomo reread.
+      openkill_shadow_typed_actual_dnsmasq_listen=${OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_LISTEN_TARGET:-}
+      openkill_shadow_typed_actual_dnsmasq_upstream=${OPENKILL_NFT_SHADOW_FROZEN_DNSMASQ_UPSTREAM_TARGET:-}
+      openkill_shadow_typed_actual_mihomo_listener=${OPENKILL_NFT_SHADOW_FROZEN_MIHOMO_DNS_LISTENER:-}
+   else
+      # Explicit source fixtures retain the established local test contract;
+      # they are never the automatic device source.
+      openkill_shadow_auto_field DNSMASQ_LISTEN_TARGET DNSMASQ_LISTEN || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+      openkill_shadow_typed_actual_dnsmasq_listen=$openkill_shadow_auto_field_value
+      openkill_shadow_auto_field DNSMASQ_UPSTREAM_TARGET DNSMASQ_UPSTREAM || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+      openkill_shadow_typed_actual_dnsmasq_upstream=$openkill_shadow_auto_field_value
+      openkill_shadow_auto_field MIHOMO_DNS_LISTENER MIHOMO_LISTENER || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+      openkill_shadow_typed_actual_mihomo_listener=$openkill_shadow_auto_field_value
+   fi
+   openkill_shadow_typed_actual_loop=$(awk -F '	' '$1 == "DNS_LOOP_PREVENTION" { print $2; exit }' "$openkill_shadow_typed_actual_loop_file") || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_actual_scope4=$(awk -F '	' '$1 == "DNS_SCOPE_IPV4" { print $2; exit }' "$openkill_shadow_typed_actual_ports") || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_actual_scope6=$(awk -F '	' '$1 == "DNS_SCOPE_IPV6" { print $2; exit }' "$openkill_shadow_typed_actual_ports") || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_desired_dnsmasq_listen=$(awk -F '	' '$1 == "DNSMASQ_LISTEN_TARGET" { print $2; exit }' "$openkill_shadow_typed_defaults") || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_desired_dnsmasq_upstream=$(awk -F '	' '$1 == "DNSMASQ_UPSTREAM_TARGET" { print $2; exit }' "$openkill_shadow_typed_defaults") || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_desired_mihomo_listener=$(awk -F '	' '$1 == "MIHOMO_DNS_LISTENER" { print $2; exit }' "$openkill_shadow_typed_defaults") || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_desired_loop=$(awk -F '	' '$1 == "DNS_LOOP_PREVENTION" { print $2; exit }' "$openkill_shadow_typed_desired_loop_file") || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_desired_scope4=$(awk -F '	' '$1 == "DNS_SCOPE_IPV4" { print $2; exit }' "$openkill_shadow_typed_desired_ports") || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_desired_scope6=$(awk -F '	' '$1 == "DNS_SCOPE_IPV6" { print $2; exit }' "$openkill_shadow_typed_desired_ports") || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   [ -n "$openkill_shadow_typed_actual_dnsmasq_listen" ] && [ -n "$openkill_shadow_typed_actual_dnsmasq_upstream" ] && [ -n "$openkill_shadow_typed_actual_mihomo_listener" ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   [ -n "$openkill_shadow_typed_actual_loop" ] && [ -n "$openkill_shadow_typed_actual_scope4" ] && [ -n "$openkill_shadow_typed_actual_scope6" ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   [ -n "$openkill_shadow_typed_desired_loop" ] && [ -n "$openkill_shadow_typed_desired_scope4" ] && [ -n "$openkill_shadow_typed_desired_scope6" ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_identity=${openkill_shadow_continuity_token_value:-${openkill_shadow_generation_for_log:-}}
+   [ -n "$openkill_shadow_typed_identity" ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_sidecar_init ACTUAL "$openkill_shadow_typed_identity" "$openkill_shadow_typed_actual_output" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_sidecar_init DESIRED "$openkill_shadow_typed_identity" "$openkill_shadow_typed_desired_output" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_emit_objects ACTUAL "$openkill_shadow_typed_desired_input" "$openkill_shadow_typed_actual_intent" "$openkill_shadow_typed_manifest" "$openkill_shadow_typed_actual_output" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   : > "$openkill_shadow_typed_empty_intent" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   chmod 600 "$openkill_shadow_typed_empty_intent" 2>/dev/null || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   openkill_shadow_typed_emit_objects DESIRED "$openkill_shadow_typed_desired_input" "$openkill_shadow_typed_empty_intent" "$openkill_shadow_typed_manifest" "$openkill_shadow_typed_desired_output" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   {
+      printf 'DNS\tDNS_FIREWALL_LAN_TARGET\t%s\tCURRENT_OWNED\tlegacy-capture\tACTIVE\n' "$openkill_shadow_typed_actual_firewall_lan"
+      printf 'DNS\tDNS_FIREWALL_ROUTER_TARGET\t%s\tCURRENT_OWNED\tlegacy-capture\tACTIVE\n' "$openkill_shadow_typed_actual_firewall_router"
+      printf 'DNS\tDNSMASQ_LISTEN_TARGET\t%s\tCURRENT_OWNED\tcommitted-dnsmasq\tACTIVE\n' "$openkill_shadow_typed_actual_dnsmasq_listen"
+      printf 'DNS\tDNSMASQ_UPSTREAM_TARGET\t%s\tCURRENT_OWNED\tcommitted-dnsmasq\tACTIVE\n' "$openkill_shadow_typed_actual_dnsmasq_upstream"
+      printf 'DNS\tMIHOMO_DNS_LISTENER\t%s\tCURRENT_OWNED\tcommitted-mihomo\tACTIVE\n' "$openkill_shadow_typed_actual_mihomo_listener"
+      printf 'DNS\tDNS_LOOP_PREVENTION\t%s\tCURRENT_OWNED\tcommitted-dns-scope\tACTIVE\n' "$openkill_shadow_typed_actual_loop"
+      printf 'DNS\tDNS_SCOPE_IPV4\t%s\tCURRENT_OWNED\tcommitted-dns-scope\tACTIVE\n' "$openkill_shadow_typed_actual_scope4"
+      printf 'DNS\tDNS_SCOPE_IPV6\t%s\tCURRENT_OWNED\tcommitted-dns-scope\tACTIVE\n' "$openkill_shadow_typed_actual_scope6"
+   } >> "$openkill_shadow_typed_actual_output" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   {
+      printf 'DNS\tDNS_FIREWALL_LAN_TARGET\t%s\tCURRENT_OWNED\tcurrent-renderer\tACTIVE\n' "$openkill_shadow_typed_desired_firewall_lan"
+      printf 'DNS\tDNS_FIREWALL_ROUTER_TARGET\t%s\tCURRENT_OWNED\tcurrent-renderer\tACTIVE\n' "$openkill_shadow_typed_desired_firewall_router"
+      printf 'DNS\tDNSMASQ_LISTEN_TARGET\t%s\tCURRENT_OWNED\tcurrent-contract-dnsmasq\tACTIVE\n' "$openkill_shadow_typed_desired_dnsmasq_listen"
+      printf 'DNS\tDNSMASQ_UPSTREAM_TARGET\t%s\tCURRENT_OWNED\tcurrent-contract-dnsmasq\tACTIVE\n' "$openkill_shadow_typed_desired_dnsmasq_upstream"
+      printf 'DNS\tMIHOMO_DNS_LISTENER\t%s\tCURRENT_OWNED\tcurrent-contract-mihomo\tACTIVE\n' "$openkill_shadow_typed_desired_mihomo_listener"
+      printf 'DNS\tDNS_LOOP_PREVENTION\t%s\tCURRENT_OWNED\tcurrent-contract-nft\tACTIVE\n' "$openkill_shadow_typed_desired_loop"
+      printf 'DNS\tDNS_SCOPE_IPV4\t%s\tCURRENT_OWNED\tcurrent-contract-scope\tACTIVE\n' "$openkill_shadow_typed_desired_scope4"
+      printf 'DNS\tDNS_SCOPE_IPV6\t%s\tCURRENT_OWNED\tcurrent-contract-scope\tACTIVE\n' "$openkill_shadow_typed_desired_scope6"
+   } >> "$openkill_shadow_typed_desired_output" || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   for openkill_shadow_typed_final in "$openkill_shadow_typed_actual_output" "$openkill_shadow_typed_desired_output"; do
+      openkill_shadow_typed_size=$(wc -c < "$openkill_shadow_typed_final") || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+      [ "$openkill_shadow_typed_size" -le "$OPENKILL_NFT_SHADOW_MAX_PAYLOAD_BYTES" ] || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+      chmod 600 "$openkill_shadow_typed_final" 2>/dev/null || return "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   done
    return 0
 }
 
@@ -1993,7 +2642,12 @@ openkill_shadow_compare_typed_intent()
          if ($0 ~ /^[[:space:]]*$/ || $0 ~ /^#/) next
          if ($1 == "MODEL_VERSION" && NF == 2) { if ($2 != "1") gap("model-version"); next }
          if ($1 == "OWNERSHIP_CLASS" && NF == 2) { if ($2 in class_allowed) gap("duplicate-class"); class_allowed[$2]=1; next }
-         if ($1 == "DNS_FIELD" && NF == 3) { if ($2 in dns_expected) gap("duplicate-dns-manifest"); dns_expected[$2]=1; dns_expected_owner[$2]=$3; next }
+          if ($1 == "DNS_FIELD" && NF == 3) { if ($2 in dns_expected) gap("duplicate-dns-manifest"); dns_expected[$2]=1; dns_expected_owner[$2]=$3; next }
+          if ($1 == "DNS_EXPECTED" && NF == 4 && ($2 in dns_expected) && valid_token($3) && valid_token($4)) {
+             if ($2 in dns_expected_value) gap("duplicate-dns-expected")
+             else { dns_expected_value[$2]=dns_value($2, $3); dns_expected_source[$2]=$4; if (dns_expected_value[$2] == "") gap("dns-expected-invalid") }
+             next
+          }
          if ($1 == "INVENTORY" && NF == 5 && $2 ~ /^(chain|set|attachment|rule)$/ && valid_token($3) && valid_class($4) && valid_token($5)) {
             inventory_key=$2 SUBSEP $3
             if (inventory_key in inventory_expected_owner) gap("duplicate-inventory")
@@ -2011,10 +2665,16 @@ openkill_shadow_compare_typed_intent()
             next
          }
          if ($0 ~ /^[[:space:]]*$/ || $0 ~ /^#/) next
-         if ($1 == "META") {
-            if (NF != 3 || ($2 != "mode" && $2 != "model_version") || !valid_token($3)) gap("meta-record-invalid")
-            next
-         }
+          if ($1 == "META") {
+             if (NF != 3 || ($2 != "mode" && $2 != "model_version" && $2 != "schema_version" && $2 != "side" && $2 != "cycle_identity" && $2 != "continuity_identity" && $2 != "ownership_model_version" && $2 != "dns_model_version") || !valid_token($3)) gap("meta-record-invalid")
+             else {
+                meta_key=side SUBSEP $2
+                if (meta_key in meta_value) gap("duplicate-meta-record")
+                meta_value[meta_key]=$3
+                if ($2 == "schema_version" || $2 == "side" || $2 == "cycle_identity" || $2 == "continuity_identity" || $2 == "ownership_model_version" || $2 == "dns_model_version") metadata_seen=1
+             }
+             next
+          }
          if ($1 == "OBJECT") {
             if (NF != 8) { gap("object-record-width"); next }
             record_object(side, $2, $3, $4, $5, $6, $7, $8)
@@ -2029,7 +2689,20 @@ openkill_shadow_compare_typed_intent()
          next
       }
       END {
-         dns_manifest_count=0
+          if (metadata_seen) {
+             # ``side`` is intentionally different between the two files;
+             # compare the cycle/model identity fields across both sidecars
+             # and validate the side labels separately below.
+             required_meta="schema_version cycle_identity continuity_identity model_version ownership_model_version dns_model_version"
+             meta_count=split(required_meta, meta_keys, " ")
+             for (m=1; m<=meta_count; m++) {
+                key=meta_keys[m]
+                if (!(1 SUBSEP key in meta_value) || !(2 SUBSEP key in meta_value)) gap("metadata-missing")
+                else if (meta_value[1 SUBSEP key] != meta_value[2 SUBSEP key]) gap("metadata-mismatch")
+             }
+             if ((1 SUBSEP "side" in meta_value && meta_value[1 SUBSEP "side"] != "ACTUAL") || (2 SUBSEP "side" in meta_value && meta_value[2 SUBSEP "side"] != "DESIRED") || !(1 SUBSEP "side" in meta_value) || !(2 SUBSEP "side" in meta_value)) gap("metadata-side-invalid")
+          }
+          dns_manifest_count=0
          for (field in dns_expected) {
             dns_manifest_count++
             if (!(field in actual_dns)) { dns_model_gap++; gap("dns-actual-missing") }
@@ -2262,6 +2935,7 @@ openkill_shadow_compare_nft()
    openkill_shadow_typed_dns_parity=NOT_RUN
    openkill_shadow_typed_status=NOT_RUN
    openkill_shadow_typed_requested=0
+   openkill_shadow_typed_auto=0
    [ -n "${OPENKILL_NFT_SHADOW_TYPED_ACTUAL_FILE:-}" ] && openkill_shadow_typed_requested=1
    [ -n "${OPENKILL_NFT_SHADOW_TYPED_DESIRED_FILE:-}" ] && openkill_shadow_typed_requested=1
    openkill_shadow_tmp_dir=$(mktemp -d "${TMPDIR:-/tmp}/openkill-shadow.XXXXXX" 2>/dev/null) || {
@@ -2289,6 +2963,21 @@ openkill_shadow_compare_nft()
          openkill_shadow_publish "$openkill_shadow_auto_status" - - - automatic-state-source || true
          exit "$openkill_shadow_auto_prepare_rc"
       fi
+   fi
+   # Automatic production mode is self-contained.  Explicit sidecars are an
+   # additive fixture/development interface for explicit-bundle invocations;
+   # an automatic cycle must never accept caller-provided evidence.
+   if [ "${openkill_shadow_auto_mode:-0}" -eq 1 ] &&
+      { [ -n "${OPENKILL_NFT_SHADOW_TYPED_ACTUAL_FILE:-}" ] || [ -n "${OPENKILL_NFT_SHADOW_TYPED_DESIRED_FILE:-}" ]; }; then
+      openkill_shadow_publish MODEL_GAP - - "$openkill_shadow_generation_for_log" external-typed-sidecar-disallowed || true
+      exit "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+   fi
+   if [ "${openkill_shadow_auto_mode:-0}" -eq 1 ] &&
+      [ -z "${OPENKILL_NFT_SHADOW_TYPED_ACTUAL_FILE:-}" ] &&
+      [ -z "${OPENKILL_NFT_SHADOW_TYPED_DESIRED_FILE:-}" ] &&
+      [ "${OPENKILL_NFT_SHADOW_AUTO_TYPED:-$OPENKILL_NFT_SHADOW_AUTO_TYPED_DEFAULT}" = 1 ]; then
+      openkill_shadow_typed_requested=1
+      openkill_shadow_typed_auto=1
    fi
    if [ "${openkill_shadow_auto_mode:-0}" -eq 1 ] && [ "${openkill_shadow_auto_continuity_mode:-0}" -eq 1 ]; then
       openkill_shadow_generation_for_log=${openkill_shadow_continuity_token_value:-}
@@ -2390,12 +3079,11 @@ openkill_shadow_compare_nft()
       openkill_shadow_old_intent_hash=
    fi
 
-   # A typed semantic bundle is opt-in and additive.  Its two files are
-   # copied into the private cycle directory before rendering/comparison so a
-   # caller cannot change the source underneath the coherent snapshot.  The
-   # automatic coordinator still performs the bounded legacy capture and D2A
-   # inventory classification above; typed comparison is the policy decision.
-   if [ "$openkill_shadow_typed_requested" -eq 1 ]; then
+    # Explicit typed bundles are copied into the private cycle directory before
+    # rendering/comparison.  Automatic mode instead creates both sidecars from
+    # the frozen capture/input after the renderer succeeds; no caller-provided
+    # sidecar is accepted as the production automatic source.
+    if [ "$openkill_shadow_typed_requested" -eq 1 ] && [ "$openkill_shadow_typed_auto" -eq 0 ]; then
       [ -n "${OPENKILL_NFT_SHADOW_TYPED_ACTUAL_FILE:-}" ] &&
          [ -n "${OPENKILL_NFT_SHADOW_TYPED_DESIRED_FILE:-}" ] || {
          openkill_shadow_publish MODEL_GAP - - "$openkill_shadow_generation_for_log" typed-input-pair-missing || true
@@ -2436,10 +3124,20 @@ openkill_shadow_compare_nft()
       exit "$OPENKILL_NFT_SHADOW_RC_RENDER"
    }
    openkill_shadow_new_size=$(wc -c < "$openkill_shadow_new_payload") || openkill_shadow_new_size=0
-   [ "$openkill_shadow_new_size" -le "$OPENKILL_NFT_SHADOW_MAX_PAYLOAD_BYTES" ] || {
+    [ "$openkill_shadow_new_size" -le "$OPENKILL_NFT_SHADOW_MAX_PAYLOAD_BYTES" ] || {
       openkill_shadow_publish RENDER_ERROR - - "$openkill_shadow_generation_for_log" payload-too-large || true
       exit "$OPENKILL_NFT_SHADOW_RC_RENDER"
    }
+   if [ "$openkill_shadow_typed_auto" -eq 1 ]; then
+      openkill_shadow_typed_actual_file=$openkill_shadow_tmp_dir/typed-actual.tsv
+      openkill_shadow_typed_desired_file=$openkill_shadow_tmp_dir/typed-desired.tsv
+      openkill_shadow_typed_auto_produce "$openkill_shadow_capture_intent" "$openkill_shadow_input_tmp" "$openkill_shadow_new_payload" "$openkill_shadow_typed_actual_file" "$openkill_shadow_typed_desired_file" || {
+         openkill_shadow_typed_reason=typed-sidecar-producer-gap
+         openkill_shadow_log_bounded MODEL_GAP - - "$openkill_shadow_typed_reason"
+         openkill_shadow_publish MODEL_GAP - - "$openkill_shadow_generation_for_log" "$openkill_shadow_typed_reason" || true
+         exit "$OPENKILL_NFT_SHADOW_RC_MODEL_GAP"
+      }
+   fi
    openkill_shadow_new_normalized="$openkill_shadow_tmp_dir/new.normalized"
    openkill_shadow_normalize_payload "$openkill_shadow_new_payload" "$openkill_shadow_new_normalized" || {
       openkill_shadow_publish COMPARE_ERROR - - "$openkill_shadow_generation_for_log" new-normalization-failed || true
