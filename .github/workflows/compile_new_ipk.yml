@@ -321,10 +321,21 @@ jobs:
             # compile LLVM and the rest of the toolchain.  Reset package
             # symbols before selecting OpenKill so the release build remains
             # bounded to the package under audit.
+            # Some SDK archives do not ship a top-level .config.  Create an
+            # empty one in that case so defconfig cannot fall back to a broad
+            # SDK selection.
+            [ -f .config ] || : > .config
             sed -i \
               -e '/^CONFIG_PACKAGE_[^=]*=/d' \
               -e '/^# CONFIG_PACKAGE_[^ ]* is not set$/d' \
               .config
+            for symbol in CONFIG_ALL CONFIG_ALL_KMODS; do
+              if grep -q "^${symbol}=" .config; then
+                sed -i "s/^${symbol}=.*/# ${symbol} is not set/" .config
+              elif ! grep -q "^# ${symbol} is not set$" .config; then
+                printf '# %s is not set\n' "$symbol" >> .config
+              fi
+            done
             printf 'CONFIG_PACKAGE_luci-app-openkill=m\n' >> .config
             make defconfig
             selected_package_count=$(grep -c '^CONFIG_PACKAGE_.*=[ym]$' .config || true)

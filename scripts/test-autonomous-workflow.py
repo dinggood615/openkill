@@ -50,6 +50,7 @@ class AutonomousWorkflowTests(unittest.TestCase):
     def test_rc_build_resets_sdk_package_selection(self):
         source = self.read(".github/workflows/build-openkill.yml")
         self.assertIn("timeout-minutes: 20", source)
+        self.assertIn("[ -f .config ] || : > .config", source)
         self.assertIn("/^CONFIG_PACKAGE_[^=]*=/d", source)
         self.assertIn("selected_package_count", source)
         self.assertIn('Refusing an unexpectedly broad package selection', source)
@@ -69,7 +70,9 @@ class AutonomousWorkflowTests(unittest.TestCase):
 
     def test_formal_ipk_build_resets_sdk_package_selection(self):
         source = self.read(".github/workflows/compile_new_ipk.yml")
+        self.assertIn("[ -f .config ] || : > .config", source)
         self.assertIn("/^CONFIG_PACKAGE_[^=]*=/d", source)
+        self.assertIn("for symbol in CONFIG_ALL CONFIG_ALL_KMODS", source)
         self.assertIn("selected_package_count", source)
         self.assertIn('Refusing an unexpectedly broad package selection', source)
         self.assertIn('make -j"$(nproc)" package/luci-app-openkill/compile', source)

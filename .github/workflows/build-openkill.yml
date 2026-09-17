@@ -124,6 +124,10 @@ jobs:
           # CONFIG_PACKAGE_* entries in place, so `make package/.../compile`
           # starts compiling unrelated packages (notably LLVM).  Reset all
           # package selections before selecting the one package under audit.
+          # Some SDK archives do not ship a top-level .config.  Create an
+          # empty one in that case so defconfig cannot fall back to a broad
+          # SDK selection.
+          [ -f .config ] || : > .config
           sed -i \
             -e '/^CONFIG_PACKAGE_[^=]*=/d' \
             -e '/^# CONFIG_PACKAGE_[^ ]* is not set$/d' \
