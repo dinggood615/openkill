@@ -55,3 +55,12 @@ modification times, `/tmp/openkill-start.token` and `/tmp/openkill-ready.token`,
 the current `LOCAL_IPV6_READY` snapshot, and the service log lines around the
 last readiness commit. Until those values share one generation, the
 continuity gate remains authoritative and `DEVICE_RETRY_READY=NO`.
+
+## Environment scope update (2026-09-17)
+
+`openkill-test-102` is a VMware test machine whose IPv6 implementation is
+known to be limited. The historical IPv6 split remains useful as a record of
+that test environment, but it is not evidence of a production OpenKill defect
+and does not block local release-readiness work. Full IPv6 device parity is
+deferred to an IPv6-capable target; the saved R3B result is not rewritten as a
+successful IPv6 verification.

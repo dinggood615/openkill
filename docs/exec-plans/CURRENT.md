@@ -2,12 +2,12 @@
 
 CURRENT_HEAD: `5b7cbed714cddf2e9c2fb9671e189db82e289b93` (clean HEAD used for the latest gates; resolve the final docs HEAD with Git after this status update)
 VERSION: `2026-1128`
-CURRENT_PHASE: `LOCAL_UI_DYNAMIC_INTERACTION_AND_VALIDATION_HARDENING`
-CURRENT_STATUS: `local conditional-control state is synchronized across the status, upload/editor, update, log, table and subscription views; production-template browser preview and focused interaction checks pass; fast, full and device-preflight gates pass on the clean candidate, while the historical .102 IPv6 source-convergence blocker remains unresolved`
-BLOCKER: `DEVICE_CONTINUITY_SOURCE_NONCONVERGENCE` — `/tmp/openkill-network.desired` and `/tmp/openkill-network.applied` stably differ in the IPv6 rule/prefix fields; resolve that source contract before another device run
-DEVICE_STATE: `.102` remains healthy and RUNNING from frozen R3B evidence; this work package made no device contact or service/package/UCI/dataplane/config change
-DEVICE_RETRY_READY: `NO`
-NEXT_ACTION: `obtain an explicitly approved read-only .102 capture for IPv6 desired/applied generation convergence; do not rerun typed parity before the source converges`
+CURRENT_PHASE: `LOCAL_RELEASE_READINESS_AND_UI_HARDENING`
+CURRENT_STATUS: `local conditional-control state is synchronized across the status, upload/editor, update, log, table and subscription views; production-template browser preview and focused interaction checks pass; fast, full and device-preflight gates pass on the clean candidate`
+BLOCKER: `NONE_FOR_LOCAL_PROGRESS` — `.102` is a VMware test machine with limited IPv6 compatibility; its historical IPv6 continuity split is retained as an environment limitation and is not treated as a product defect
+DEVICE_STATE: `.102` remains healthy and RUNNING from frozen R3B evidence; typed IPv6 parity is not claimed, and this work package made no device contact or service/package/UCI/dataplane/config change
+DEVICE_RETRY_READY: `NO` (full IPv6 device evidence is deferred to an IPv6-capable environment)
+NEXT_ACTION: `continue local release-readiness work: candidate/package integration, exact-commit CI and release-gate review; defer IPv6-capable device parity`
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
 REAL_PACKET_PATH: `NOT_TESTED`
@@ -20,7 +20,7 @@ UI_STATIC_CONTRACT: `PASS`
 UI_BROWSER_VALIDATION: `PASS` (local Chrome/Playwright preview at 1920/1366/768/390 CSS px, including upload mode, age-option placement, overwrite selection and editor race checks; evidence under `artifacts/test-evidence/ui-preview`)
 UI_DEVICE_VALIDATION: `NOT_RUN`
 UI_REFERENCE_ALIGNMENT: `PASS` (flowing two-column dashboard, full-width connectivity panel, two-column mobile metrics, truthful states and synchronized conditional panels)
-IPV6_SOURCE_ROOT_CAUSE: `UNRESOLVED`
+IPV6_SOURCE_ROOT_CAUSE: `KNOWN_VMWARE_TEST_ENVIRONMENT_LIMITATION` (not a production defect conclusion)
 CONTINUITY_CONTRACT_PRESERVED: `PASS`
 WRITER_HASHES_UNCHANGED: `PASS`
 FAST_GATE: `PASS` — `20260917T110207Z-2372` (18/18, no cache)
@@ -31,7 +31,7 @@ DEVICE_EVIDENCE: `artifacts/test-evidence/20260917T112344Z-4584`; latest full ev
 RESULTING_HEAD: resolve with `git rev-parse HEAD` after this status commit; the recorded `CURRENT_HEAD` is the pre-commit observation
 
 IMPLEMENTED: R3C internal typed sidecar producer, canonical D2D fixture, typed ownership/DNS model, isolated staged execution, unified local gates, LuCI presentation and conditional-control fixes, T0/T1/T2 runtime-DNS continuity checks, multi-listener core-owned DNS socket selection, owned-process cleanup, and read-only host-network guarding
-LOCAL_VERIFIED: focused UI/interaction suites, clean fast/full gates and clean device-preflight pass; the browser run executes production status/upload/editor coordinators at 1920/1366/768/390 CSS px with local mocks; WSL-only lifecycle changes and the explicit NFT CLI limitation are classified; the 1000-call continuity stress runs in private WSL `/tmp`; historical device cycles still stopped fail-closed at IPv6 source continuity before typed parity
+LOCAL_VERIFIED: focused UI/interaction suites, clean fast/full gates and clean device-preflight pass; the browser run executes production status/upload/editor coordinators at 1920/1366/768/390 CSS px with local mocks; WSL-only lifecycle changes and the explicit NFT CLI limitation are classified; the 1000-call continuity stress runs in private WSL `/tmp`; historical device cycles stopped fail-closed at IPv6 source continuity, which is deferred because `.102` is a VMware IPv6-limited test environment
 DEVICE_VERIFIED: `NO` for the R3A/R3C candidate (`.102` runtime stayed healthy, but typed parity was NOT_RUN)
 RELEASED: `NO` (2026-1128 package remains the verified release baseline)
 
