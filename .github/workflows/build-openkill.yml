@@ -145,6 +145,24 @@ jobs:
             grep -q '^CONFIG_PACKAGE_luci-app-openkill=m' .config || echo 'CONFIG_PACKAGE_luci-app-openkill=m' >> .config
           fi
           make defconfig
+          # defconfig may repopulate an SDK's default package modules.  Do a
+          # final package-only reset after defconfig and before counting/building.
+          sed -i \
+            -e '/^CONFIG_PACKAGE_[^=]*=/d' \
+            -e '/^# CONFIG_PACKAGE_[^ ]* is not set$/d' \
+            .config
+          for symbol in CONFIG_ALL CONFIG_ALL_KMODS; do
+            if grep -q "^${symbol}=" .config; then
+              sed -i "s/^${symbol}=.*/# ${symbol} is not set/" .config
+            elif ! grep -q "^# ${symbol} is not set$" .config; then
+              printf '# %s is not set\n' "$symbol" >> .config
+            fi
+          done
+          if [ -f ./scripts/config ] && [ -x ./scripts/config ]; then
+            ./scripts/config --module CONFIG_PACKAGE_luci-app-openkill
+          else
+            printf 'CONFIG_PACKAGE_luci-app-openkill=m\n' >> .config
+          fi
           echo 'Selected package summary:'
           grep -E '^CONFIG_PACKAGE_(luci-app-openkill|firewall4|iptables|openssl|ruby|rust|llvm|gmp)' .config || true
           selected_package_count=$(grep -c '^CONFIG_PACKAGE_.*=[ym]$' .config || true)
