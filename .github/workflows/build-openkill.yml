@@ -22,6 +22,10 @@ jobs:
   build:
     name: Build luci-app-openkill with the OpenWrt SDK
     runs-on: ubuntu-latest
+    # The RC audit is intentionally a single all-arch package build.  A
+    # malformed SDK config can otherwise expand into a full toolchain build
+    # and consume the runner for hours before producing our package.
+    timeout-minutes: 20
 
     steps:
       - name: Checkout source
@@ -115,6 +119,15 @@ jobs:
           rm -rf package/luci-app-openkill
           cp -a "$GITHUB_WORKSPACE/luci-app-openkill" package/luci-app-openkill
 
+          # SDK archives commonly ship with every package selected as a
+          # module.  Disabling CONFIG_ALL alone leaves those stale
+          # CONFIG_PACKAGE_* entries in place, so `make package/.../compile`
+          # starts compiling unrelated packages (notably LLVM).  Reset all
+          # package selections before selecting the one package under audit.
+          sed -i \
+            -e '/^CONFIG_PACKAGE_[^=]*=/d' \
+            -e '/^# CONFIG_PACKAGE_[^ ]* is not set$/d' \
+            .config
           for symbol in CONFIG_ALL CONFIG_ALL_KMODS; do
             if grep -q "^${symbol}=" .config; then
               sed -i "s/^${symbol}=.*/# ${symbol} is not set/" .config
@@ -130,9 +143,14 @@ jobs:
           make defconfig
           echo 'Selected package summary:'
           grep -E '^CONFIG_PACKAGE_(luci-app-openkill|firewall4|iptables|openssl|ruby|rust|llvm|gmp)' .config || true
-          echo "CONFIG_PACKAGE count: $(grep -c '^CONFIG_PACKAGE_.*=[ym]' .config || true)"
+          selected_package_count=$(grep -c '^CONFIG_PACKAGE_.*=[ym]$' .config || true)
+          echo "CONFIG_PACKAGE count: $selected_package_count"
           if grep -q '^CONFIG_ALL=y' .config || grep -q '^CONFIG_ALL_KMODS=y' .config; then
             echo 'Refusing a broad CONFIG_ALL/CONFIG_ALL_KMODS build.' >&2
+            exit 1
+          fi
+          if [ "$selected_package_count" -gt 64 ]; then
+            echo "Refusing an unexpectedly broad package selection: $selected_package_count" >&2
             exit 1
           fi
 
@@ -148,8 +166,8 @@ jobs:
             echo "OpenWrt version: $OPENWRT_VERSION"
             echo "Target: $OPENWRT_TARGET/$OPENWRT_SUBTARGET"
             echo "SDK URL: $OPENWRT_SDK_URL"
-            make package/luci-app-openkill/clean V=s
-            make package/luci-app-openkill/compile V=s
+            make -j"$(nproc)" package/luci-app-openkill/clean V=s
+            make -j"$(nproc)" package/luci-app-openkill/compile V=s
           } 2>&1 | tee "$GITHUB_WORKSPACE/build-openkill.log"
 
       - name: Locate and audit the IPK
