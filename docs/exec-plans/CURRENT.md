@@ -1,25 +1,26 @@
 # Current status
 
-CURRENT_HEAD: `70599b11a38eae1c0a7c02c895d9087c74339365` (observed before this listener-provenance fix commit)
+CURRENT_HEAD: `45b94aee217c49395197a088d17f1f591c9648e6` (observed before this status update)
 VERSION: `2026-1128`
-CURRENT_PHASE: `LOCAL_VALIDATION_HARDENING_WORK_PACKAGE`
-CURRENT_STATUS: `IN_PROGRESS — multi-listener DNS provenance and T0/T1/T2 continuity hardening`
-BLOCKER: `LOCAL_VALIDATION_HARDENING` — the listener-join fix must pass a new clean fast/full/preflight sequence before the approved `.102` retry
-DEVICE_STATE: `.102` has not been accessed in this iteration; prior R2C/R3 evidence records a healthy retained baseline
-DEVICE_RETRY_READY: `PENDING_FINAL_PREFLIGHT`
-NEXT_ACTION: `fast → full --no-cache → device-preflight --no-cache`, then the already-approved `PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`
+CURRENT_PHASE: `PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`
+CURRENT_STATUS: `PARTIAL — three independent staged production cycles stopped at STALE before typed comparison`
+BLOCKER: `DEVICE_CONTINUITY_SOURCE_NONCONVERGENCE` — `/tmp/openkill-network.desired` and `/tmp/openkill-network.applied` stably differ in the IPv6 rule/prefix fields; resolve that source contract before another device run
+DEVICE_STATE: `.102` remains healthy and RUNNING; no service, package, UCI, dataplane, or canonical-config change was made
+DEVICE_RETRY_READY: `NO`
+NEXT_ACTION: `reconcile the stable IPv6 desired/applied runtime source before requesting a new device retry`
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
 REAL_PACKET_PATH: `NOT_TESTED`
-FAST_GATE: `INVALIDATED_BY_LISTENER_FIX` (previous run `20260917T013838Z-2628` was bound before this change)
-FULL_GATE: `INVALIDATED_BY_LISTENER_FIX` (previous run `20260917T014127Z-20204` was bound before this change)
-DEVICE_PREFLIGHT: `PENDING` (must regenerate candidate identity after the listener-join change)
-DEVICE_CANDIDATE_ID: `PENDING_FINAL_PREFLIGHT`
-RESULTING_HEAD: resolve with `git rev-parse HEAD` after the hardening commit; the recorded `CURRENT_HEAD` is the pre-commit observation
+FAST_GATE: `PASS` — `20260917T021444Z-24520`
+FULL_GATE: `PASS` — `20260917T021740Z-10528`
+DEVICE_PREFLIGHT: `PASS` — `20260917T023225Z-24796`
+DEVICE_CANDIDATE_ID: `f83d592f18b685fe62b9b94a4f907e5465ac13f3e1488a27b8bff5d1cd5ea763`
+DEVICE_EVIDENCE: `artifacts/test-evidence/r3b-device-f83d592f18b685fe62b9b94a4f907e5465ac13f3e1488a27b8bff5d1cd5ea763`
+RESULTING_HEAD: resolve with `git rev-parse HEAD` after this documentation commit; the recorded `CURRENT_HEAD` is the pre-commit observation
 
 IMPLEMENTED: R3C internal typed sidecar producer, canonical D2D fixture, typed ownership/DNS model, isolated staged execution, unified local gates, LuCI presentation fixes, T0/T1/T2 runtime-DNS continuity checks, and multi-listener core-owned DNS socket selection
-LOCAL_VERIFIED: focused shadow suites (20/20 producer, 11/11 continuity, 14/14 typed, 23/23 self-sufficiency, 7/7 BusyBox) and local policy gate pass; clean fast/full/device-preflight evidence is pending for this listener fix
-DEVICE_VERIFIED: `NO` for the R3A/R3C candidate
+LOCAL_VERIFIED: focused shadow suites and clean fast/full/device-preflight evidence pass; device cycles stopped fail-closed at continuity before typed parity
+DEVICE_VERIFIED: `NO` for the R3A/R3C candidate (`.102` runtime stayed healthy, but typed parity was NOT_RUN)
 RELEASED: `NO` (2026-1128 package remains the verified release baseline)
 
 The detailed phase records below are retained as historical evidence. The
@@ -33,6 +34,41 @@ detail hook, and status-page controls that did not recover after a later poll.
 browser rendering remains outside this local-only work package.
 
 ## Historical execution records
+
+## R3B self-contained typed candidate retry (blocked at device continuity)
+
+- Phase: `PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
+- The local candidate was bound to clean HEAD
+  `45b94aee217c49395197a088d17f1f591c9648e6`, candidate ID
+  `f83d592f18b685fe62b9b94a4f907e5465ac13f3e1488a27b8bff5d1cd5ea763`,
+  and preflight evidence
+  `artifacts/test-evidence/20260917T023225Z-24796`.  The staged set was
+  exactly the observer, renderer, TUN template, and semantic manifest listed
+  by that manifest; device-side hashes matched.  The installed 2026-1128
+  observer remained unchanged.
+- Only `openkill-test-102` (192.168.1.102) was contacted with
+  BatchMode/IdentitiesOnly.  No .1, .101, or other device was accessed.  The
+  existing runtime stayed healthy: OpenKill/procd running, one core, utun,
+  IPv4/IPv6 ABI and table 354, dnsmasq :53, core UDP 7874, SSH, and the
+  canonical config hash all remained valid.
+- Three independent invocations of the staged automatic coordinator returned
+  `STALE` (rc 6, reason `automatic-state-source`) before capture/parser or
+  typed comparison.  The result was stable because the committed
+  `/tmp/openkill-network.desired` and `/tmp/openkill-network.applied`
+  files differ in `IPV6_PROXY_RULE`, `IPV6_TUN_ROUTE`, and
+  `LOCALNETWORK6_PREFIXES`; the snapshot reports `LOCAL_IPV6_READY=1`.
+  This is a source-convergence blocker, not evidence of a DNS semantic
+  mismatch.  The 10-cycle gate was correctly not started.
+- Post-run UCI, canonical config, installed production files, process state,
+  routes/rules and service status remained unchanged.  Candidate telemetry,
+  wrapper, lock and temporary directory were removed after the coordinator
+  exited.  No package, UCI, nft, route, rule, reload, restart, central apply,
+  or packet-path operation occurred.
+- Evidence is retained under
+  `artifacts/test-evidence/r3b-device-f83d592f18b685fe62b9b94a4f907e5465ac13f3e1488a27b8bff5d1cd5ea763`.
+  The next action is to reconcile the stable desired/applied IPv6 source
+  contract under a separately approved device maintenance step; do not rerun
+  the typed comparator until continuity converges.
 
 ## R2C canonical device baseline hold (completed)
 
