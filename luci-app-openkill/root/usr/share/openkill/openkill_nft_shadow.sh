@@ -460,7 +460,7 @@ openkill_shadow_continuity_canonicalize_file()
    openkill_shadow_safe_path "$openkill_shadow_continuity_output" || return 1
    openkill_shadow_continuity_header=$(sed -n '1p' "$openkill_shadow_continuity_input") || return 1
    case "$openkill_shadow_continuity_header" in
-      OPENKILL_NFT_SHADOW_AUTO_STATE_V1=1|OPENKILL_SHADOW_SOURCE_V1=1|SHELL_RENDERER_STATE_V1=1|SNAPSHOT_VERSION=1) ;;
+      OPENKILL_NFT_SHADOW_AUTO_STATE_V1=1|OPENKILL_SHADOW_SOURCE_V1=1|SHELL_RENDERER_STATE_V1=1|SNAPSHOT_VERSION=1|OPENKILL_SHADOW_RUNTIME_DNS_V1=1) ;;
       OPENKILL_NFT_SHADOW_AUTO_STATE_V1=*|OPENKILL_SHADOW_SOURCE_V1=*|SHELL_RENDERER_STATE_V1=*|SNAPSHOT_VERSION=*|*_VERSION=*|*_V[0-9]*=*) return 1 ;;
    esac
    # Keep this one-pass and shell-portable: repeated per-line command
@@ -472,7 +472,7 @@ openkill_shadow_continuity_canonicalize_file()
    openkill_shadow_safe_path "$openkill_shadow_continuity_raw" || return 1
    awk -F '=' -v listkeys='|ACCESS4_ALLOW|LAN_AC_WHITE_V4|USER_DIRECT_V4|ACCESS4_BYPASS|ACCESS4_DENY|LAN_AC_BLACK_V4|ACCESS6_ALLOW|LAN_AC_WHITE_V6|USER_DIRECT_V6|USER_DIRECT6|ACCESS6_BYPASS|ACCESS6_DENY|LAN_AC_BLACK_V6|CHINA_PASS4|CHINA_PASS6|CHINA4|CHINA6|COMMON_PORTS|SERVICE_PORTS|DELEGATED6|PD6|DELEGATED_IPV6_PREFIXES|FAKE_IP4|FAKEIP4|FAKE_IP6|FAKEIP6|LAN4|LAN_IPV4_PREFIXES|LAN6|LAN_IPV6_PREFIXES|LOCAL4|LOCAL_V4|LOCALNETWORK4|LOCALNETWORK4_PREFIXES|INTERNAL_IPV4_PREFIXES|LOCAL6|LOCAL_V6|LOCALNETWORK6|LOCALNETWORK6_PREFIXES|INTERNAL_IPV6_PREFIXES|NODE4|NODE4_ENDPOINTS|NODE6|NODE6_ENDPOINTS|USER_DIRECT4|USER_DIRECT_V6|USER_DIRECT6|USER_PROXY4|USER_PROXY6|WAN4|WAN_HOST4|WAN4_HOST|WAN4_HOST_ADDRESSES|WAN4_ADDRESSES|WAN6|WAN_HOST6|WAN6_HOST|WAN6_HOST_ADDRESSES|WAN6_ADDRESSES|WAN_AC_BLACK_PORTS|WAN_AC_BLACK_V4|WAN_AC_BLACK_V6|' '
       function allowed(k) {
-         return index("|OWNER|TUN_OWNER|RUN_MODE|ROUTER_SELF_PROXY|REDIRECT_PORT|PROXY_PORT|TPROXY_PORT|DNS_PORT|MARK|OPENKILL_FWMARK|MASK|OPENKILL_FWMASK|ROUTE_TABLE|OPENKILL_ROUTE_TABLE|RULE_PREF|OPENKILL_RULE_PREF|IPV6_READY|BC01_UNSUPPORTED|BC_01_UNSUPPORTED|CURRENT_UNDEFINED|EXPLICIT_POLICY_CURRENT_UNDEFINED|CURRENT_ACCESS_DENY|BC07_UNSUPPORTED|BC_07_UNSUPPORTED|ACCESS_DENY_REQUIRED|ACCESS4_ALLOW|LAN_AC_WHITE_V4|USER_DIRECT_V4|ACCESS4_BYPASS|ACCESS4_DENY|LAN_AC_BLACK_V4|ACCESS6_ALLOW|LAN_AC_WHITE_V6|USER_DIRECT_V6|USER_DIRECT6|ACCESS6_BYPASS|ACCESS6_DENY|LAN_AC_BLACK_V6|CHINA_PASS4|CHINA_PASS6|CHINA4|CHINA6|COMMON_PORTS|SERVICE_PORTS|DELEGATED6|PD6|DELEGATED_IPV6_PREFIXES|FAKE_IP4|FAKEIP4|FAKE_IP6|FAKEIP6|LAN4|LAN_IPV4_PREFIXES|LAN6|LAN_IPV6_PREFIXES|LOCAL4|LOCAL_V4|LOCALNETWORK4|LOCALNETWORK4_PREFIXES|INTERNAL_IPV4_PREFIXES|LOCAL6|LOCAL_V6|LOCALNETWORK6|LOCALNETWORK6_PREFIXES|INTERNAL_IPV6_PREFIXES|NODE4|NODE4_ENDPOINTS|NODE6|NODE6_ENDPOINTS|USER_DIRECT4|USER_DIRECT_V6|USER_DIRECT6|USER_PROXY4|USER_PROXY6|WAN4|WAN_HOST4|WAN4_HOST|WAN4_HOST_ADDRESSES|WAN4_ADDRESSES|WAN6|WAN_HOST6|WAN6_HOST|WAN6_HOST_ADDRESSES|WAN6_ADDRESSES|WAN_AC_BLACK_PORTS|WAN_AC_BLACK_V4|WAN_AC_BLACK_V6|OPENKILL_NFT_SHADOW_AUTO_STATE_V1|OPENKILL_SHADOW_SOURCE_V1|SHELL_RENDERER_STATE_V1|", "|" k "|") > 0
+         return index("|OWNER|TUN_OWNER|RUN_MODE|ROUTER_SELF_PROXY|REDIRECT_PORT|PROXY_PORT|TPROXY_PORT|DNS_PORT|DNSMASQ_LISTEN_TARGET|DNSMASQ_UPSTREAM_TARGET|MIHOMO_DNS_LISTENER|DNSMASQ_LISTEN_SOURCE|DNSMASQ_UPSTREAM_SOURCE|MIHOMO_DNS_LISTENER_SOURCE|MARK|OPENKILL_FWMARK|MASK|OPENKILL_FWMASK|ROUTE_TABLE|OPENKILL_ROUTE_TABLE|RULE_PREF|OPENKILL_RULE_PREF|IPV6_READY|BC01_UNSUPPORTED|BC_01_UNSUPPORTED|CURRENT_UNDEFINED|EXPLICIT_POLICY_CURRENT_UNDEFINED|CURRENT_ACCESS_DENY|BC07_UNSUPPORTED|BC_07_UNSUPPORTED|ACCESS_DENY_REQUIRED|ACCESS4_ALLOW|LAN_AC_WHITE_V4|USER_DIRECT_V4|ACCESS4_BYPASS|ACCESS4_DENY|LAN_AC_BLACK_V4|ACCESS6_ALLOW|LAN_AC_WHITE_V6|USER_DIRECT_V6|USER_DIRECT6|ACCESS6_BYPASS|ACCESS6_DENY|LAN_AC_BLACK_V6|CHINA_PASS4|CHINA_PASS6|CHINA4|CHINA6|COMMON_PORTS|SERVICE_PORTS|DELEGATED6|PD6|DELEGATED_IPV6_PREFIXES|FAKE_IP4|FAKEIP4|FAKE_IP6|FAKEIP6|LAN4|LAN_IPV4_PREFIXES|LAN6|LAN_IPV6_PREFIXES|LOCAL4|LOCAL_V4|LOCALNETWORK4|LOCALNETWORK4_PREFIXES|INTERNAL_IPV4_PREFIXES|LOCAL6|LOCAL_V6|LOCALNETWORK6|LOCALNETWORK6_PREFIXES|INTERNAL_IPV6_PREFIXES|NODE4|NODE4_ENDPOINTS|NODE6|NODE6_ENDPOINTS|USER_DIRECT4|USER_DIRECT_V4|USER_DIRECT6|USER_PROXY4|USER_PROXY6|WAN4|WAN_HOST4|WAN4_HOST|WAN4_HOST_ADDRESSES|WAN4_ADDRESSES|WAN6|WAN_HOST6|WAN6_HOST|WAN6_HOST_ADDRESSES|WAN6_ADDRESSES|WAN_AC_BLACK_PORTS|WAN_AC_BLACK_V4|WAN_AC_BLACK_V6|OPENKILL_NFT_SHADOW_AUTO_STATE_V1|OPENKILL_SHADOW_SOURCE_V1|SHELL_RENDERER_STATE_V1|", "|" k "|") > 0
       }
       function islist(k) { return index(listkeys, "|" k "|") > 0 }
       function listcanon(v, a,n,i,j,t,out) {
@@ -621,8 +621,10 @@ openkill_shadow_continuity_add_file()
 openkill_shadow_auto_continuity_token()
 {
    # Arguments: output token file, work directory, desired, applied, snapshot,
-   # node4, node6.  The caller supplies the original live paths explicitly so
-   # the final T2 read cannot accidentally inspect the private snapshot.
+   # node4, node6, optional runtime DNS evidence.  The caller supplies the
+   # original live paths explicitly so the final T2 read cannot accidentally
+   # inspect the private snapshot.  Runtime DNS is optional for the legacy
+   # token API, but required by the automatic production path.
    openkill_shadow_continuity_token_output_file=$1
    openkill_shadow_continuity_work=$2
    openkill_shadow_continuity_desired=$3
@@ -630,6 +632,7 @@ openkill_shadow_auto_continuity_token()
    openkill_shadow_continuity_snapshot=$5
    openkill_shadow_continuity_node4=$6
    openkill_shadow_continuity_node6=$7
+   openkill_shadow_continuity_runtime_dns=${8:-}
    [ -n "$openkill_shadow_continuity_token_output_file" ] && [ -n "$openkill_shadow_continuity_work" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
    openkill_shadow_safe_path "$openkill_shadow_continuity_token_output_file" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
    openkill_shadow_safe_path "$openkill_shadow_continuity_work" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
@@ -649,6 +652,9 @@ openkill_shadow_auto_continuity_token()
    openkill_shadow_continuity_add_file snapshot "$openkill_shadow_continuity_snapshot" 0 state "$openkill_shadow_continuity_work" "$openkill_shadow_continuity_components" || return $?
    openkill_shadow_continuity_add_file node4 "$openkill_shadow_continuity_node4" 0 node "$openkill_shadow_continuity_work" "$openkill_shadow_continuity_components" || return $?
    openkill_shadow_continuity_add_file node6 "$openkill_shadow_continuity_node6" 0 node "$openkill_shadow_continuity_work" "$openkill_shadow_continuity_components" || return $?
+   if [ -n "$openkill_shadow_continuity_runtime_dns" ]; then
+      openkill_shadow_continuity_add_file runtime_dns "$openkill_shadow_continuity_runtime_dns" 1 state "$openkill_shadow_continuity_work" "$openkill_shadow_continuity_components" || return $?
+   fi
    openkill_shadow_continuity_scalars=$openkill_shadow_continuity_work/scalars
    openkill_shadow_continuity_shell_scalars "$openkill_shadow_continuity_scalars" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
    openkill_shadow_continuity_scalar_hash=$(openkill_shadow_hash_file "$openkill_shadow_continuity_scalars" 2>/dev/null) || return "$OPENKILL_NFT_SHADOW_RC_COMPARE"
@@ -828,15 +834,32 @@ openkill_shadow_capture_runtime_dns()
    esac
 
    # OPENKILL_DNS_ENDPOINT and its aliases describe desired/readiness intent,
-   # not a live socket.  In the production path obtain one unambiguous
-   # Mihomo-owned listener from the bounded process table.  Multiple listeners
-   # or no process evidence are deliberately a source gap.
+   # not a live socket.  Mihomo commonly exposes an API or proxy TCP port in
+   # addition to DNS.  Use the process-owned UDP listener as the DNS evidence:
+   # a DNS socket must be observable as UDP, while unrelated TCP listeners are
+   # ignored.  Core names are restricted to the binaries OpenKill supports;
+   # an unknown process name, multiple UDP ports, or no UDP evidence is a
+   # source gap.  The selected endpoint is still the socket address emitted by
+   # netstat, never a value inferred from configuration intent.
    if [ -z "$openkill_shadow_runtime_dns_mihomo" ] && command -v netstat >/dev/null 2>&1; then
       openkill_shadow_runtime_dns_mihomo=$(netstat -nlp 2>/dev/null |
-         awk '$0 ~ /mihomo/ && $4 ~ /:[0-9]+$/ { value=$4; if (!(value in seen)) { seen[value]=1; count++ } } END { if (count == 1) for (value in seen) print value; else if (count > 1) exit 2 }')
+         awk '
+            function core_process(value, name) {
+               name=value
+               sub(/^.*\//, "", name)
+               return name ~ /^(mihomo|clash|clash_meta|clash-meta)([-_.].*)?$/
+            }
+            $1 ~ /^udp/ && $4 ~ /:[0-9]+$/ && core_process($NF) {
+               value=$4
+               if (!(value in seen)) { seen[value]=1; count++ }
+            }
+            END {
+               if (count == 1) for (value in seen) print value
+               else if (count > 1) exit 2
+            }')
       openkill_shadow_runtime_dns_mihomo_rc=$?
       [ "$openkill_shadow_runtime_dns_mihomo_rc" -eq 0 ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
-      [ -z "$openkill_shadow_runtime_dns_mihomo" ] || openkill_shadow_runtime_dns_mihomo_source=netstat-mihomo
+      [ -z "$openkill_shadow_runtime_dns_mihomo" ] || openkill_shadow_runtime_dns_mihomo_source=netstat-mihomo-udp
    fi
 
    for openkill_shadow_runtime_dns_value in \
@@ -891,6 +914,44 @@ openkill_shadow_capture_runtime_dns()
    return 0
 }
 
+openkill_shadow_auto_continuity_dns_check()
+{
+   # Re-sample live DNS sources only at a continuity boundary.  The typed
+   # producer never calls this helper: it consumes the T0 runtime-dns copy.
+   # A missing source is a fail-closed source gap; a changed source makes the
+   # whole cycle stale rather than mixing observations from different times.
+   openkill_shadow_dns_check_expected=$1
+   openkill_shadow_dns_check_root=$2
+   openkill_shadow_dns_check_label=$3
+   [ -r "$openkill_shadow_dns_check_expected" ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_dns_check_expected" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   openkill_shadow_safe_path "$openkill_shadow_dns_check_root" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   openkill_shadow_safe_value "$openkill_shadow_dns_check_label" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   openkill_shadow_dns_check_dir=$openkill_shadow_dns_check_root/dns-$openkill_shadow_dns_check_label
+   openkill_shadow_safe_path "$openkill_shadow_dns_check_dir" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   rm -rf "$openkill_shadow_dns_check_dir"
+   mkdir -p "$openkill_shadow_dns_check_dir" || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   chmod 700 "$openkill_shadow_dns_check_dir" 2>/dev/null || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   (
+      openkill_shadow_capture_runtime_dns "$openkill_shadow_dns_check_dir"
+   )
+   openkill_shadow_dns_check_rc=$?
+   [ "$openkill_shadow_dns_check_rc" -eq 0 ] || {
+      rm -rf "$openkill_shadow_dns_check_dir"
+      return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   }
+   openkill_shadow_dns_check_actual=$openkill_shadow_dns_check_dir/runtime-dns
+   openkill_shadow_safe_path "$openkill_shadow_dns_check_actual" || {
+      rm -rf "$openkill_shadow_dns_check_dir"
+      return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
+   }
+   if ! cmp -s "$openkill_shadow_dns_check_expected" "$openkill_shadow_dns_check_actual"; then
+      rm -rf "$openkill_shadow_dns_check_dir"
+      return "$OPENKILL_NFT_SHADOW_RC_STALE"
+   fi
+   return 0
+}
+
 openkill_shadow_auto_continuity_snapshot()
 {
    openkill_shadow_continuity_root=$1
@@ -926,7 +987,8 @@ openkill_shadow_auto_continuity_snapshot()
    openkill_shadow_continuity_t1=$openkill_shadow_continuity_state_dir/t1.token
    openkill_shadow_auto_continuity_token "$openkill_shadow_continuity_t0" "$openkill_shadow_continuity_t0_work" \
       "$openkill_shadow_continuity_live_desired" "$openkill_shadow_continuity_live_applied" \
-      "$openkill_shadow_continuity_live_snapshot" "$openkill_shadow_continuity_live_node4" "$openkill_shadow_continuity_live_node6" > "$openkill_shadow_continuity_state_dir/t0.stdout" || return $?
+      "$openkill_shadow_continuity_live_snapshot" "$openkill_shadow_continuity_live_node4" "$openkill_shadow_continuity_live_node6" \
+      "$openkill_shadow_continuity_state_dir/runtime-dns" > "$openkill_shadow_continuity_state_dir/t0.stdout" || return $?
    chmod 600 "$openkill_shadow_continuity_state_dir/t0.stdout" 2>/dev/null || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
    openkill_shadow_continuity_t0_value=$(sed -n '1p' "$openkill_shadow_continuity_t0") || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
 
@@ -974,6 +1036,13 @@ openkill_shadow_auto_continuity_snapshot()
        openkill_shadow_continuity_copy_matches node6 "$openkill_shadow_continuity_live_node6" node "$openkill_shadow_continuity_node6_copy" "$openkill_shadow_continuity_t0_work/components" || return "$OPENKILL_NFT_SHADOW_RC_STALE"
     fi
 
+   # T1 is a continuity boundary for runtime DNS as well as committed state.
+   # The check runs in a subshell so the T0-frozen DNS scalars remain the only
+   # values available to the producer.
+   openkill_shadow_auto_continuity_dns_check \
+      "$openkill_shadow_continuity_state_dir/runtime-dns" \
+      "$openkill_shadow_continuity_state_dir" t1 || return $?
+
    # Explicitly opt-in test hooks are used only to exercise the race contract;
    # production never sets them and no arbitrary command is executed.
    if [ "${OPENKILL_NFT_SHADOW_TEST_HOOK:-0}" = 1 ] && [ -n "${OPENKILL_NFT_SHADOW_TEST_AFTER_COPY_FILE:-}" ]; then
@@ -987,7 +1056,8 @@ openkill_shadow_auto_continuity_snapshot()
 
    openkill_shadow_auto_continuity_token "$openkill_shadow_continuity_t1" "$openkill_shadow_continuity_t1_work" \
       "$openkill_shadow_continuity_live_desired" "$openkill_shadow_continuity_live_applied" \
-      "$openkill_shadow_continuity_live_snapshot" "$openkill_shadow_continuity_live_node4" "$openkill_shadow_continuity_live_node6" > "$openkill_shadow_continuity_state_dir/t1.stdout" || return $?
+      "$openkill_shadow_continuity_live_snapshot" "$openkill_shadow_continuity_live_node4" "$openkill_shadow_continuity_live_node6" \
+      "$openkill_shadow_continuity_state_dir/dns-t1/runtime-dns" > "$openkill_shadow_continuity_state_dir/t1.stdout" || return $?
    chmod 600 "$openkill_shadow_continuity_state_dir/t1.stdout" 2>/dev/null || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
    openkill_shadow_continuity_t1_value=$(sed -n '1p' "$openkill_shadow_continuity_t1") || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
    [ "$openkill_shadow_continuity_t0_value" = "$openkill_shadow_continuity_t1_value" ] || return "$OPENKILL_NFT_SHADOW_RC_STALE"
@@ -3250,12 +3320,22 @@ openkill_shadow_compare_nft()
    if [ "${openkill_shadow_auto_mode:-0}" -eq 1 ] && [ "${openkill_shadow_auto_continuity_mode:-0}" -eq 1 ]; then
       # T2 is always computed from the original live paths.  The renderer and
       # capture consumed only the private snapshot above; any committed-state
-      # change during those operations wins over a provisional MATCH.
+      # or runtime-DNS change during those operations wins over a provisional
+      # MATCH.  DNS is re-sampled only at this boundary and never by the
+      # typed producer/comparator.
+      openkill_shadow_auto_continuity_dns_check \
+         "$openkill_shadow_continuity_state_dir/runtime-dns" \
+         "$openkill_shadow_continuity_state_dir" t2 || {
+            openkill_shadow_log_bounded STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" continuity-dns-changed
+            openkill_shadow_publish STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" "$openkill_shadow_generation_for_log" continuity-dns-changed || true
+            exit "$OPENKILL_NFT_SHADOW_RC_STALE"
+         }
       openkill_shadow_continuity_t2_work=$openkill_shadow_tmp_dir/t2
       openkill_shadow_continuity_t2_file=$openkill_shadow_tmp_dir/t2.token
       openkill_shadow_auto_continuity_token "$openkill_shadow_continuity_t2_file" "$openkill_shadow_continuity_t2_work" \
          "$openkill_shadow_continuity_live_desired" "$openkill_shadow_continuity_live_applied" \
-         "$openkill_shadow_continuity_live_snapshot" "$openkill_shadow_continuity_live_node4" "$openkill_shadow_continuity_live_node6" > "$openkill_shadow_tmp_dir/t2.stdout" 2>/dev/null || {
+         "$openkill_shadow_continuity_live_snapshot" "$openkill_shadow_continuity_live_node4" "$openkill_shadow_continuity_live_node6" \
+         "$openkill_shadow_continuity_state_dir/dns-t2/runtime-dns" > "$openkill_shadow_tmp_dir/t2.stdout" 2>/dev/null || {
             openkill_shadow_log_bounded STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" continuity-token-unavailable
             openkill_shadow_publish STALE "$openkill_shadow_old_hash_for_log" "$openkill_shadow_new_hash_for_log" "$openkill_shadow_generation_for_log" continuity-token-unavailable || true
             exit "$OPENKILL_NFT_SHADOW_RC_STALE"

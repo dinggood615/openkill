@@ -242,7 +242,10 @@ if [ -r "$count" ]; then
 fi
 n=$((n + 1))
 printf '%s\\n' "$n" > "$count"
-[ "$n" -le 2 ] || exit 99
+# Runtime DNS is sampled at T0, T1 and T2; each sample reads the two
+# dnsmasq fields independently.  The producer still consumes only the T0
+# frozen copy after the boundary checks.
+[ "$n" -le 6 ] || exit 99
 case "$*" in
     *port) printf '53\\n' ;;
     *) printf '127.0.0.1#7874\\n' ;;
@@ -254,7 +257,8 @@ esac
             fake_bin / "netstat",
             """#!/bin/sh
 printf 'Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name\\n'
-printf 'tcp        0      0 127.0.0.1:7874          0.0.0.0:*               LISTEN      123/mihomo\\n'
+printf 'udp        0      0 127.0.0.1:7874          0.0.0.0:*                           123/mihomo\\n'
+printf 'tcp        0      0 127.0.0.1:7874          0.0.0.0:*               LISTEN      123/clash_meta\\n'
 """,
         )
         (fake_bin / "netstat").chmod(0o700)
@@ -275,7 +279,99 @@ printf 'tcp        0      0 127.0.0.1:7874          0.0.0.0:*               LIST
         rc = self.harness.rc(process)
         self.assertEqual(rc, 0, process.stderr)
         self.assertEqual(status_file(telemetry / "status").get("status"), "MATCH", process.stderr)
-        self.assertEqual(count_file.read_text(encoding="utf-8").strip(), "2", process.stderr)
+        self.assertEqual(count_file.read_text(encoding="utf-8").strip(), "6", process.stderr)
+
+    def test_runtime_dns_change_at_t1_invalidates_the_cycle(self) -> None:
+        fake_bin = self.harness.root / "dns-t1-bin"
+        fake_bin.mkdir()
+        uci_count = self.harness.root / "dns-t1-uci-count"
+        netstat_count = self.harness.root / "dns-t1-netstat-count"
+        write_lf(
+            fake_bin / "uci",
+            "#!/bin/sh\n"
+            f"count={quote(wsl_path(uci_count))}\n"
+            "n=0; [ -r \"$count\" ] && n=$(cat \"$count\"); n=$((n + 1)); printf '%s\\n' \"$n\" > \"$count\"\n"
+            "case \"$*\" in\n"
+            "  *port) [ \"$n\" -le 2 ] && printf '53\\n' || printf '54\\n' ;;\n"
+            "  *server) [ \"$n\" -le 2 ] && printf '127.0.0.1#7874\\n' || printf '127.0.0.1#7875\\n' ;;\n"
+            "  *) exit 1 ;;\n"
+            "esac\n",
+        )
+        write_lf(
+            fake_bin / "netstat",
+            "#!/bin/sh\n"
+            f"count={quote(wsl_path(netstat_count))}\n"
+            "n=0; [ -r \"$count\" ] && n=$(cat \"$count\"); n=$((n + 1)); printf '%s\\n' \"$n\" > \"$count\"\n"
+            "port=7874; [ \"$n\" -gt 1 ] && port=7875\n"
+            "printf 'Proto Recv-Q Send-Q Local Address Foreign Address State PID/Program name\\n'\n"
+            "printf 'udp 0 0 127.0.0.1:%s 0.0.0.0:* 123/mihomo\\n' \"$port\"\n"
+            "printf 'tcp 0 0 127.0.0.1:%s 0.0.0.0:* LISTEN 123/mihomo\\n' \"$port\"\n",
+        )
+        (fake_bin / "uci").chmod(0o700)
+        (fake_bin / "netstat").chmod(0o700)
+        desired = self.harness.root / "dns-t1-desired"
+        applied = self.harness.root / "dns-t1-applied"
+        write_lf(desired, AUTO_SOURCE.read_text(encoding="utf-8"))
+        write_lf(applied, AUTO_SOURCE.read_text(encoding="utf-8"))
+        env = self.harness.env(
+            OPENKILL_NFT_SHADOW_SOURCE_FILE=None,
+            OPENKILL_NETWORK_DESIRED=wsl_path(desired),
+            OPENKILL_NETWORK_APPLIED_FILE=wsl_path(applied),
+            OPENKILL_NETWORK_SNAPSHOT=wsl_path(self.harness.root / "dns-t1-missing-snapshot"),
+            OPENKILL_NFT_SHADOW_NODE4_FILE=wsl_path(self.harness.root / "dns-t1-missing-node4"),
+            OPENKILL_NFT_SHADOW_NODE6_FILE=wsl_path(self.harness.root / "dns-t1-missing-node6"),
+            PATH=f"{wsl_path(fake_bin)}:/usr/bin:/bin",
+        )
+        process, telemetry = self.harness.run(env)
+        self.assertEqual(self.harness.rc(process), 6, process.stderr)
+        self.assertEqual(status_file(telemetry / "status").get("status"), "STALE", process.stderr)
+
+    def test_runtime_dns_change_at_t2_invalidates_the_cycle(self) -> None:
+        fake_bin = self.harness.root / "dns-t2-bin"
+        fake_bin.mkdir()
+        uci_count = self.harness.root / "dns-t2-uci-count"
+        netstat_count = self.harness.root / "dns-t2-netstat-count"
+        write_lf(
+            fake_bin / "uci",
+            "#!/bin/sh\n"
+            f"count={quote(wsl_path(uci_count))}\n"
+            "n=0; [ -r \"$count\" ] && n=$(cat \"$count\"); n=$((n + 1)); printf '%s\\n' \"$n\" > \"$count\"\n"
+            "case \"$*\" in\n"
+            "  *port) printf '53\\n' ;;\n"
+            "  *server) printf '127.0.0.1#7874\\n' ;;\n"
+            "  *) exit 1 ;;\n"
+            "esac\n",
+        )
+        write_lf(
+            fake_bin / "netstat",
+            "#!/bin/sh\n"
+            f"count={quote(wsl_path(netstat_count))}\n"
+            "n=0; [ -r \"$count\" ] && n=$(cat \"$count\"); n=$((n + 1)); printf '%s\\n' \"$n\" > \"$count\"\n"
+            "port=7874; [ \"$n\" -gt 2 ] && port=7875\n"
+            "printf 'Proto Recv-Q Send-Q Local Address Foreign Address State PID/Program name\\n'\n"
+            "printf 'udp 0 0 127.0.0.1:%s 0.0.0.0:* 123/mihomo\\n' \"$port\"\n"
+            "printf 'tcp 0 0 127.0.0.1:%s 0.0.0.0:* LISTEN 123/mihomo\\n' \"$port\"\n",
+        )
+        (fake_bin / "uci").chmod(0o700)
+        (fake_bin / "netstat").chmod(0o700)
+        desired = self.harness.root / "dns-t2-desired"
+        applied = self.harness.root / "dns-t2-applied"
+        write_lf(desired, AUTO_SOURCE.read_text(encoding="utf-8"))
+        write_lf(applied, AUTO_SOURCE.read_text(encoding="utf-8"))
+        env = self.harness.env(
+            OPENKILL_NFT_SHADOW_SOURCE_FILE=None,
+            OPENKILL_NETWORK_DESIRED=wsl_path(desired),
+            OPENKILL_NETWORK_APPLIED_FILE=wsl_path(applied),
+            OPENKILL_NETWORK_SNAPSHOT=wsl_path(self.harness.root / "dns-t2-missing-snapshot"),
+            OPENKILL_NFT_SHADOW_NODE4_FILE=wsl_path(self.harness.root / "dns-t2-missing-node4"),
+            OPENKILL_NFT_SHADOW_NODE6_FILE=wsl_path(self.harness.root / "dns-t2-missing-node6"),
+            PATH=f"{wsl_path(fake_bin)}:/usr/bin:/bin",
+        )
+        process, telemetry = self.harness.run(env)
+        self.assertEqual(self.harness.rc(process), 6, process.stderr)
+        status = status_file(telemetry / "status")
+        self.assertEqual(status.get("status"), "STALE", process.stderr)
+        self.assertEqual(status.get("reason"), "continuity-dns-changed", process.stderr)
 
     def test_mihomo_listener_uses_live_process_evidence_not_endpoint_intent(self) -> None:
         fake_bin = self.harness.root / "runtime-dns-bin"
@@ -294,7 +390,8 @@ esac
             fake_bin / "netstat",
             """#!/bin/sh
 printf 'Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name\\n'
-printf 'tcp        0      0 127.0.0.1:7874          0.0.0.0:*               LISTEN      123/mihomo\\n'
+printf 'udp        0      0 127.0.0.1:7874          0.0.0.0:*                           123/clash_meta\\n'
+printf 'tcp        0      0 127.0.0.1:7874          0.0.0.0:*               LISTEN      123/clash_meta\\n'
 """,
         )
         (fake_bin / "uci").chmod(0o700)
@@ -318,7 +415,76 @@ printf 'tcp        0      0 127.0.0.1:7874          0.0.0.0:*               LIST
         )
         self.assertIn("RC=0", process.stdout, process.stderr)
         self.assertIn("LISTENER=127.0.0.1:7874", process.stdout, process.stderr)
-        self.assertIn("SOURCE=netstat-mihomo", process.stdout, process.stderr)
+        self.assertIn("SOURCE=netstat-mihomo-udp", process.stdout, process.stderr)
+
+    def test_mihomo_listener_selects_unique_udp_socket_with_other_core_ports(self) -> None:
+        fake_bin = self.harness.root / "multi-runtime-dns-bin"
+        fake_bin.mkdir()
+        write_lf(
+            fake_bin / "uci",
+            "#!/bin/sh\n"
+            "case \"$*\" in\n"
+            "    *port) printf '53\\n' ;;\n"
+            "    *server) printf '127.0.0.1#7874\\n' ;;\n"
+            "    *) exit 1 ;;\n"
+            "esac\n",
+        )
+        write_lf(
+            fake_bin / "netstat",
+            "#!/bin/sh\n"
+            "printf 'Proto Recv-Q Send-Q Local Address Foreign Address State PID/Program name\\n'\n"
+            "printf 'tcp 0 0 127.0.0.1:9090 0.0.0.0:* LISTEN 123/clash_meta\\n'\n"
+            "printf 'tcp 0 0 127.0.0.1:7890 0.0.0.0:* LISTEN 123/clash_meta\\n'\n"
+            "printf 'udp 0 0 127.0.0.1:7874 0.0.0.0:* 123/clash_meta\\n'\n"
+            "printf 'tcp 0 0 127.0.0.1:7874 0.0.0.0:* LISTEN 123/clash_meta\\n'\n",
+        )
+        (fake_bin / "uci").chmod(0o700)
+        (fake_bin / "netstat").chmod(0o700)
+        state_dir = self.harness.root / "multi-runtime-dns-state"
+        process, _ = self.harness.run(
+            {"PATH": f"{wsl_path(fake_bin)}:/usr/bin:/bin"},
+            body=(
+                f"mkdir -p {quote(wsl_path(state_dir))}; "
+                f"openkill_shadow_capture_runtime_dns {quote(wsl_path(state_dir))}; rc=$?; "
+                "printf 'RC=%s\\n' \"$rc\"; "
+                "printf 'LISTENER=%s\\n' \"${OPENKILL_NFT_SHADOW_FROZEN_MIHOMO_DNS_LISTENER:-}\"; "
+                "printf 'SOURCE=%s\\n' \"${OPENKILL_NFT_SHADOW_FROZEN_MIHOMO_DNS_SOURCE:-}\""
+            ),
+        )
+        self.assertIn("RC=0", process.stdout, process.stderr)
+        self.assertIn("LISTENER=127.0.0.1:7874", process.stdout, process.stderr)
+        self.assertIn("SOURCE=netstat-mihomo-udp", process.stdout, process.stderr)
+
+    def test_multiple_mihomo_udp_sockets_fail_closed_as_source_gap(self) -> None:
+        fake_bin = self.harness.root / "ambiguous-runtime-dns-bin"
+        fake_bin.mkdir()
+        write_lf(
+            fake_bin / "uci",
+            "#!/bin/sh\n"
+            "case \"$*\" in\n"
+            "    *port) printf '53\\n' ;;\n"
+            "    *server) printf '127.0.0.1#7874\\n' ;;\n"
+            "    *) exit 1 ;;\n"
+            "esac\n",
+        )
+        write_lf(
+            fake_bin / "netstat",
+            "#!/bin/sh\n"
+            "printf 'udp 0 0 127.0.0.1:7874 0.0.0.0:* 123/mihomo\\n'\n"
+            "printf 'udp 0 0 127.0.0.1:7875 0.0.0.0:* 123/mihomo\\n'\n",
+        )
+        (fake_bin / "uci").chmod(0o700)
+        (fake_bin / "netstat").chmod(0o700)
+        state_dir = self.harness.root / "ambiguous-runtime-dns-state"
+        process, _ = self.harness.run(
+            {"PATH": f"{wsl_path(fake_bin)}:/usr/bin:/bin"},
+            body=(
+                f"mkdir -p {quote(wsl_path(state_dir))}; "
+                f"openkill_shadow_capture_runtime_dns {quote(wsl_path(state_dir))}; rc=$?; "
+                "printf 'RC=%s\\n' \"$rc\""
+            ),
+        )
+        self.assertIn("RC=11", process.stdout, process.stderr)
 
     def test_missing_live_mihomo_evidence_does_not_fallback_to_endpoint(self) -> None:
         fake_bin = self.harness.root / "missing-runtime-dns-bin"
@@ -456,11 +622,22 @@ esac
         staged_renderer = staged / "openkill_nft_renderer.sh"
         staged_manifest = staged_shadow / "semantic_model_v1.tsv"
         staged_template = staged_shadow / "input_tun_v1.tsv"
-        # The marker is appended only to this temporary candidate.  It makes
-        # the executed shell provenance observable and turns a hidden source
-        # fallback into a deterministic test failure.
-        with staged_helper.open("ab") as stream:
-            stream.write(b"\nOPENKILL_SHADOW_STAGED_EXECUTION=1\n")
+        # Keep candidate bytes unchanged.  A separate wrapper records that the
+        # staged observer was sourced and verifies its bytes before execution;
+        # the marker is therefore execution metadata, never candidate content.
+        staged_wrapper = staged / "staged-entrypoint.sh"
+        observer_sha = hashlib.sha256(HELPER.read_bytes()).hexdigest()
+        write_lf(
+            staged_wrapper,
+            "#!/bin/sh\n"
+            "set -u\n"
+            f"actual=$(sha256sum {quote(wsl_path(staged_helper))} | awk '{{print $1}}')\n"
+            f"[ \"$actual\" = {quote(observer_sha)} ] || exit 97\n"
+            "export OPENKILL_SHADOW_STAGED_EXECUTION=1\n"
+            f". {quote(wsl_path(staged_helper))}\n"
+            "command -v openkill_shadow_compare_nft >/dev/null 2>&1 || exit 98\n",
+        )
+        staged_wrapper.chmod(0o700)
         identity_inputs = (staged_helper, staged_manifest, staged_renderer, staged_template)
         identity = hashlib.sha256(
             "\n".join(
@@ -469,17 +646,23 @@ esac
             ).encode()
         ).hexdigest()
         # Deliberately make the repository helper unavailable to the staged
-        # runner.  The explicit helper argument above is the only source of
-        # production shell code for these cycles; a fallback would fail.
+        # runner.  The wrapper and staged paths are the only production shell
+        # sources, and the automatic path gets its coherent state from staged
+        # fixture inputs rather than a caller-provided typed sidecar.
+        desired = self.harness.root / "staged-desired"
+        applied = self.harness.root / "staged-applied"
+        write_lf(desired, AUTO_SOURCE.read_text(encoding="utf-8"))
+        write_lf(applied, AUTO_SOURCE.read_text(encoding="utf-8"))
         staged_processes = []
         statuses = []
         for _ in range(5):
             process, rc, status = self.run_auto(
-                helper=staged_helper,
+                helper=staged_wrapper,
                 body=(
                     "openkill_shadow_compare_nft; rc=$?; "
                     "printf 'RC=%s\\n' \"$rc\"; "
                     "printf 'STAGED_MARKER=%s\\n' \"${OPENKILL_SHADOW_STAGED_EXECUTION:-0}\"; "
+                    f"printf 'OBSERVER_SHA=%s\\n' {quote(observer_sha)}; "
                     f"printf 'OBSERVER_PATH=%s\\n' {quote(wsl_path(staged_helper))}; "
                     f"printf 'MANIFEST_PATH=%s\\n' {quote(wsl_path(staged_manifest))}; "
                     f"printf 'RENDERER_PATH=%s\\n' {quote(wsl_path(staged_renderer))}; "
@@ -488,12 +671,19 @@ esac
                 ),
                 OPENKILL_NFT_SHADOW_RENDERER=wsl_path(staged_renderer),
                 OPENKILL_NFT_SHADOW_TEMPLATE_DIR=wsl_path(staged_shadow),
+                OPENKILL_NFT_SHADOW_SOURCE_FILE=None,
+                OPENKILL_NETWORK_DESIRED=wsl_path(desired),
+                OPENKILL_NETWORK_APPLIED_FILE=wsl_path(applied),
+                OPENKILL_NETWORK_SNAPSHOT=wsl_path(self.harness.root / "missing-staged-snapshot"),
+                OPENKILL_NFT_SHADOW_NODE4_FILE=wsl_path(self.harness.root / "missing-staged-node4"),
+                OPENKILL_NFT_SHADOW_NODE6_FILE=wsl_path(self.harness.root / "missing-staged-node6"),
             )
             staged_processes.append((process, rc))
             statuses.append(status)
         for process, rc in staged_processes:
             self.assertEqual(rc, 0, process.stderr)
             self.assertIn("STAGED_MARKER=1", process.stdout)
+            self.assertIn(f"OBSERVER_SHA={observer_sha}", process.stdout)
             self.assertIn(f"OBSERVER_PATH={wsl_path(staged_helper)}", process.stdout)
             self.assertIn(f"MANIFEST_PATH={wsl_path(staged_manifest)}", process.stdout)
             self.assertIn(f"RENDERER_PATH={wsl_path(staged_renderer)}", process.stdout)
@@ -501,10 +691,11 @@ esac
             self.assertIn(f"EXECUTION_IDENTITY_HASH={identity}", process.stdout)
         self.assertIsNotNone(self.harness.last_runner)
         runner_text = self.harness.last_runner.read_text(encoding="utf-8")
-        self.assertIn(wsl_path(staged_helper), runner_text)
+        self.assertIn(wsl_path(staged_wrapper), runner_text)
         self.assertNotIn(wsl_path(HELPER), runner_text)
         self.assertNotIn(wsl_path(RENDERER), runner_text)
         self.assertNotIn(wsl_path(TEMPLATE_DIR), runner_text)
+        self.assertEqual(hashlib.sha256(staged_helper.read_bytes()).hexdigest(), observer_sha)
         self.assertTrue(all(status.get("status") == "MATCH" for status in statuses))
         self.assertEqual({status.get("actual_owned_hash") for status in statuses}, {statuses[0].get("actual_owned_hash")})
         self.assertEqual({status.get("desired_owned_hash") for status in statuses}, {statuses[0].get("desired_owned_hash")})

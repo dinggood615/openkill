@@ -7,13 +7,22 @@ writers, DNS topology, routing ABI, package version, or device state.
 The automatic shadow coordinator freezes DNS evidence before its continuity
 token is created. `DNSMASQ_LISTEN_TARGET` and
 `DNSMASQ_UPSTREAM_TARGET` come from the committed dnsmasq state; the
-`MIHOMO_DNS_LISTENER` actual value comes from one unambiguous `netstat`
-process-owned Mihomo listener in the production path. `OPENKILL_DNS_ENDPOINT`
-is a readiness/configuration intent used by init and is never treated as live
-listener evidence. Fixture-only runs may use their checked-in runtime snapshot
-because that source is explicitly labelled as fixture evidence. Every source
-and source kind is frozen into the private cycle artifact before T0, and the
-typed producer consumes those values without a comparator-stage reread.
+`MIHOMO_DNS_LISTENER` actual value comes from one unambiguous, process-owned
+UDP socket in the bounded `netstat` evidence. The process name must be one of
+the supported Mihomo/Clash core names, so unrelated TCP control or proxy ports
+do not make a valid DNS listener ambiguous. Multiple core-owned UDP ports,
+unknown core names, or missing UDP evidence are a source gap.
+`OPENKILL_DNS_ENDPOINT` is a readiness/configuration intent used by init and
+is never treated as live listener evidence. Fixture-only runs may use their
+checked-in runtime snapshot because that source is explicitly labelled as
+fixture evidence.
+
+The T0 artifact is the only DNS value consumed by the typed producer and
+comparator. T1 and T2 re-sample the same live dnsmasq and core-owned listener
+sources at continuity boundaries and compare them with the T0 artifact. A
+change or missing source makes the whole cycle `STALE`/source-gap; it never
+mixes a later live value into the frozen sidecar and never performs a
+comparator-stage reread.
 
 The typed provenance contract is deliberately field-specific:
 
@@ -28,16 +37,19 @@ The typed provenance contract is deliberately field-specific:
 | `DNS_SCOPE_IPV4` | parsed v4 interception scope | CURRENT scope contract | `MODEL_GAP` |
 | `DNS_SCOPE_IPV6` | parsed v6 interception scope | CURRENT scope contract | `MODEL_GAP` |
 
-Each row is captured before the continuity identity is sealed. The comparator
-does not query live UCI, nft, ip, netstat or Mihomo state after that point;
-missing, duplicate or ambiguous provenance fails closed.
+Each row is captured before the T0 continuity identity is sealed. The only
+later reads are the explicit T1/T2 continuity boundary checks described above;
+the comparator itself does not query live UCI, nft, ip, netstat or Mihomo
+state. Missing, duplicate or ambiguous provenance fails closed.
 
 The staged observer regression copies the observer, renderer and semantic
-templates to a private directory, appends a temporary execution marker, and
-sources that copy explicitly. Five independent automatic cycles must report
-`MATCH` with stable owned and DNS hashes. The test does not provide typed
-sidecars, a Python oracle, or a repository runtime fallback. The marker and
-candidate file hashes bind the result to the bytes that were executed.
+templates to a private directory and sources that copy through a separate
+wrapper. The wrapper records execution identity and verifies the observer
+hash before sourcing it; it never changes the candidate bytes. Five
+independent automatic cycles must report `MATCH` with stable owned and DNS
+hashes. The test does not provide typed sidecars, a Python oracle, or a
+repository runtime fallback. Execution metadata and candidate hashes bind the
+result to the bytes that were executed.
 
 `scripts/openkill-test-gates.py` is the single local entry point. `fast` is the
 short feedback loop, `full` runs the Windows/WSL matrix, and
