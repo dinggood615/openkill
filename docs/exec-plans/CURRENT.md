@@ -1,13 +1,13 @@
 # Current status
 
-CURRENT_HEAD: `5b7cbed714cddf2e9c2fb9671e189db82e289b93` (clean HEAD used for the latest gates; resolve the final docs HEAD with Git after this status update)
-VERSION: `2026-1128`
-CURRENT_PHASE: `LOCAL_RELEASE_READINESS_AND_UI_HARDENING`
-CURRENT_STATUS: `local conditional-control state is synchronized across the status, upload/editor, update, log, table and subscription views; production-template browser preview and focused interaction checks pass; fast, full and device-preflight gates pass on the clean candidate`
-BLOCKER: `NONE_FOR_LOCAL_PROGRESS` — `.102` is a VMware test machine with limited IPv6 compatibility; its historical IPv6 continuity split is retained as an environment limitation and is not treated as a product defect
+CURRENT_HEAD: `36a0923220ca722c1be91fef7736fb826e113558` (observed before release-preparation changes; resolve the resulting HEAD with Git)
+VERSION: `2026-1129`
+CURRENT_PHASE: `RELEASE_CANDIDATE_AND_UI_HARDENING`
+CURRENT_STATUS: `release-preparation metadata and Development CI UI coverage are staged for exact-commit validation; local UI and shadow gates remain verified on the preceding clean candidate`
+BLOCKER: `RELEASE_GATES_PENDING` — `.102` is a VMware test machine with limited IPv6 compatibility; its historical IPv6 continuity split is retained as an environment limitation and is not treated as a product defect
 DEVICE_STATE: `.102` remains healthy and RUNNING from frozen R3B evidence; typed IPv6 parity is not claimed, and this work package made no device contact or service/package/UCI/dataplane/config change
 DEVICE_RETRY_READY: `NO` (full IPv6 device evidence is deferred to an IPv6-capable environment)
-NEXT_ACTION: `continue local release-readiness work: candidate/package integration, exact-commit CI and release-gate review; defer IPv6-capable device parity`
+NEXT_ACTION: `run exact-commit local gates, push after review, then Development CI → RC Build → Formal Release`
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
 REAL_PACKET_PATH: `NOT_TESTED`

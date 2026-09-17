@@ -25,7 +25,8 @@ jobs:
         run: |
           set -eu
           python3 scripts/verify_3e2_safe_config.py
-          for suite in autonomous-workflow classifier-contract dataplane-semantic-spec nft-ir shadow-context-adapter shadow-semantic-model shadow-production-typed shadow-sidecar-producer dns-current-intent network-model snapshot-fw4 stage-d uci-lifecycle 3e2-safe-config; do
+          command -v node
+          for suite in autonomous-workflow classifier-contract dataplane-semantic-spec nft-ir shadow-context-adapter shadow-semantic-model shadow-production-typed shadow-sidecar-producer dns-current-intent network-model snapshot-fw4 stage-d uci-lifecycle 3e2-safe-config ui-contract ui-interactions ui-preview; do
             python3 "scripts/test-${suite}.py"
           done
 
