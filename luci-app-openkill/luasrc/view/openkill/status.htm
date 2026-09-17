@@ -86,7 +86,7 @@
                             <div class="sub-card">
                                 <div class="card-title"><%:Running Mode%></div>
                                 <div class="card-content">
-                                    <div class="card-value"><span id="_mode" class="value-indicator"><%:Collecting data...%></span></div>
+                                    <div class="card-value mode-status-value" aria-live="polite"><span id="_mode" class="value-indicator"><%:Collecting data...%></span></div>
                                     <div class="card-controls">
                                         <div id="radio-ru-mode" class="cbi-button-group oc-inline-flex">
                                             <input type="radio" id="normal" name="radios-ru" value="" onclick="return switch_run_mode(this.value)"/><label for="normal" id="run_normal" class="cbi-button-option"><%:Compat%></label>
@@ -377,6 +377,8 @@
         runtime_watchdog_chip: document.getElementById('runtime-watchdog-chip')
     };
 
+    var openkillRuntimeState = 'loading';
+
     // Keep the top-level status truthful when the backend is still loading,
     // returns an incomplete payload, or becomes unreachable.  A valid status
     // response contains both booleans; anything else is deliberately unknown
@@ -402,6 +404,7 @@
 
     function setRuntimeState(status, forcedState) {
         var state = forcedState || classifyRuntimeState(status);
+        openkillRuntimeState = state;
         var page = document.querySelector('.openkill-status-page');
         if (page) {
             page.dataset.runtimeState = state;
@@ -510,6 +513,7 @@
         for (var i = 0; i < controls.length; i++) {
             if (!controls[i]) continue;
             controls[i].disabled = !available;
+            controls[i].setAttribute('aria-disabled', available ? 'false' : 'true');
             controls[i].classList.toggle('runtime-unavailable', !available);
         }
 
@@ -521,6 +525,24 @@
         );
         for (var j = 0; j < settingControls.length; j++) {
             settingControls[j].disabled = !available;
+            settingControls[j].setAttribute('aria-disabled', available ? 'false' : 'true');
+        }
+    }
+
+    function setStatusVisibility(element, visible, displayValue, hiddenClass) {
+        if (!element) return;
+        var shouldShow = !!visible;
+        if (hiddenClass) element.classList.toggle(hiddenClass, !shouldShow);
+        element.hidden = !shouldShow;
+        element.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+        if (displayValue !== undefined) {
+            element.style.display = shouldShow ? displayValue : 'none';
+        } else if (shouldShow) {
+            element.style.removeProperty('display');
+        }
+        if (!shouldShow && element.contains && element.contains(document.activeElement) &&
+            document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
         }
     }
 
@@ -554,12 +576,12 @@
         }
 
         if (DOMCache.oclog) {
-            DOMCache.oclog.classList.add('oc-hidden');
+            setStatusVisibility(DOMCache.oclog, false, undefined, 'oc-hidden');
             DOMCache.oclog.textContent = '';
         }
         [DOMCache.copy_secret, DOMCache.copy_address, DOMCache.copy_mix_address,
             DOMCache.copy_mix_secret, DOMCache.copy_pac_config].forEach(function(element) {
-            if (element) element.style.display = 'none';
+            setStatusVisibility(element, false);
         });
         setRuntimeControlsAvailable(false);
 
@@ -589,16 +611,16 @@
             var autoIcon = document.getElementById('auto-icon');
             if (sunIcon && moonIcon && autoIcon) {
                 var theme = localStorage.getItem('oc-theme') || 'auto';
-                sunIcon.classList.add('oc-hidden');
-                moonIcon.classList.add('oc-hidden');
-                autoIcon.classList.add('oc-hidden');
+                setStatusVisibility(sunIcon, false, undefined, 'oc-hidden');
+                setStatusVisibility(moonIcon, false, undefined, 'oc-hidden');
+                setStatusVisibility(autoIcon, false, undefined, 'oc-hidden');
 
                 if (theme === 'light') {
-                    sunIcon.classList.remove('oc-hidden');
+                    setStatusVisibility(sunIcon, true, undefined, 'oc-hidden');
                 } else if (theme === 'dark') {
-                    moonIcon.classList.remove('oc-hidden');
+                    setStatusVisibility(moonIcon, true, undefined, 'oc-hidden');
                 } else {
-                    autoIcon.classList.remove('oc-hidden');
+                    setStatusVisibility(autoIcon, true, undefined, 'oc-hidden');
                 }
             }
         }
@@ -1001,9 +1023,14 @@
         },
 
         setupEventListeners: function() {
-            if (this.selectElement) {
+            if (this.selectElement && !this.selectElement._openkillConfigChangeBound) {
                 this.selectElement.addEventListener('change', this.onConfigChange.bind(this));
+                this.selectElement._openkillConfigChangeBound = true;
             }
+        },
+
+        setVisibility: function(element, visible, displayValue) {
+            setStatusVisibility(element, visible, displayValue, 'oc-hidden');
         },
 
         loadConfigFileList: function(force) {
@@ -1157,23 +1184,15 @@
             var configFileContent = document.querySelector('.config-file-content');
 
             if (isEmpty) {
-                if (emptyStateElement) {
-                    emptyStateElement.classList.remove('oc-hidden');
-                }
-                if (configFileBottom) {
-                    configFileBottom.classList.add('oc-hidden');
-                }
+                this.setVisibility(emptyStateElement, true);
+                this.setVisibility(configFileBottom, false);
                 if (configFileContent) {
                     configFileContent.classList.add('empty-state');
                 }
                 this.hideSubscriptionDisplay();
             } else {
-                if (emptyStateElement) {
-                    emptyStateElement.classList.add('oc-hidden');
-                }
-                if (configFileBottom) {
-                    configFileBottom.classList.remove('oc-hidden');
-                }
+                this.setVisibility(emptyStateElement, false);
+                this.setVisibility(configFileBottom, true);
                 if (configFileContent) {
                     configFileContent.classList.remove('empty-state');
                 }
@@ -1182,9 +1201,9 @@
 
         hideSubscriptionDisplay: function() {
             var subscriptionDisplay = document.getElementById('subscription-info-display');
-            if (subscriptionDisplay) {
-                subscriptionDisplay.classList.add('oc-hidden');
-            }
+            var detailsSection = document.getElementById('subscription-info-details');
+            this.setVisibility(subscriptionDisplay, false);
+            this.setVisibility(detailsSection, false, 'flex');
         },
 
         updateConfigSelect: function(configFiles, currentConfig) {
@@ -1255,21 +1274,21 @@
             if (!container) return;
 
             if (this.configList.length === 0) {
-                container.classList.add('oc-hidden');
+                this.setVisibility(container, false);
                 return;
             }
 
             if (!configFile) {
-                container.classList.add('oc-hidden');
+                this.setVisibility(container, false);
                 return;
             }
 
             if (configFileContent && configFileContent.classList.contains('empty-state')) {
-                container.classList.add('oc-hidden');
+                this.setVisibility(container, false);
                 return;
             }
 
-            container.classList.remove('oc-hidden');
+            this.setVisibility(container, true);
 
             if (configNameElement) {
                 var displayName = this.formatDisplayName(configFile);
@@ -1294,17 +1313,17 @@
                 }
 
                 if (detailsSection) {
-                    detailsSection.style.display = 'flex';
+                    this.setVisibility(detailsSection, true, 'flex');
                 }
 
                 if (ageFileIconElement) {
                     if (fileInfo.age) {
                         ageFileIconElement.innerHTML = '<svg width="16" height="16"><use href="#oc-icon-shield-check"/></svg>';
                         ageFileIconElement.title = '<%:Age Encryption File%>';
-                        ageFileIconElement.classList.remove('oc-hidden');
+                        this.setVisibility(ageFileIconElement, true);
                     } else {
                         ageFileIconElement.innerHTML = '';
-                        ageFileIconElement.classList.add('oc-hidden');
+                        this.setVisibility(ageFileIconElement, false);
                     }
                 }
             } else {
@@ -1315,12 +1334,12 @@
                 }
 
                 if (detailsSection) {
-                    detailsSection.style.display = 'none';
+                    this.setVisibility(detailsSection, false, 'flex');
                 }
 
                 if (ageFileIconElement) {
                     ageFileIconElement.innerHTML = '';
-                    ageFileIconElement.classList.add('oc-hidden');
+                    this.setVisibility(ageFileIconElement, false);
                 }
             }
         },
@@ -1366,9 +1385,7 @@
                 if (SubscriptionManager.currentConfigFile !== selectedValue) {
                     SubscriptionManager.currentConfigFile = selectedValue;
                     var detailsSection = document.getElementById('subscription-info-details');
-                    if (detailsSection) {
-                        detailsSection.style.display = 'none';
-                    }
+                    this.setVisibility(detailsSection, false, 'flex');
                     SubscriptionManager.getSubscriptionInfo();
                 }
                 OverwriteSubscribeManager.render(OverwriteSubscribeManager.data);
@@ -1450,9 +1467,7 @@
             if (SubscriptionManager.currentConfigFile !== filePath) {
                 SubscriptionManager.currentConfigFile = filePath;
                 var detailsSection = document.getElementById('subscription-info-details');
-                if (detailsSection) {
-                    detailsSection.style.display = 'none';
-                }
+                this.setVisibility(detailsSection, false, 'flex');
                 SubscriptionManager.getSubscriptionInfo();
             }
 
@@ -1699,7 +1714,7 @@
                 return;
             }
 
-            container.classList.remove('oc-hidden');
+            ConfigFileManager.setVisibility(container, true);
 
             if (data && data.providers && data.providers.length > 0) {
                 if (data.providers.length > 1 || data.providers[0].provider_name) {
@@ -1708,19 +1723,17 @@
                     this.displaySingleProvider(data.providers[0], progressSection);
                 }
             } else {
-                progressSection.classList.add('oc-hidden');
+                ConfigFileManager.setVisibility(progressSection, false);
             }
 
-            if (detailsSection) {
-                detailsSection.style.display = 'flex';
-            }
+            ConfigFileManager.setVisibility(detailsSection, true, 'flex');
         },
 
         displaySingleProvider: function(provider, progressSection) {
             if (!progressSection) return;
 
             progressSection.innerHTML = '';
-            progressSection.classList.remove('oc-hidden');
+            ConfigFileManager.setVisibility(progressSection, true);
             progressSection.className = 'subscription-progress';
 
             var progressBar = document.createElement('div');
@@ -1766,7 +1779,7 @@
             var providerCount = displayProviders.length;
 
             progressSection.innerHTML = '';
-            progressSection.classList.remove('oc-hidden');
+            ConfigFileManager.setVisibility(progressSection, true);
             progressSection.className = 'subscription-providers-grid';
             progressSection.setAttribute('data-count', providerCount);
 
@@ -1894,11 +1907,11 @@
                 return;
             }
 
-            container.classList.remove('oc-hidden');
+            ConfigFileManager.setVisibility(container, true);
 
             if (progressSection) {
                 progressSection.innerHTML = '<div class="subscription-no-info"><%:No Sub Info Found%></div>';
-                progressSection.classList.remove('oc-hidden');
+                ConfigFileManager.setVisibility(progressSection, true);
                 progressSection.className = 'subscription-progress';
             }
 
@@ -1911,7 +1924,7 @@
                     hasFileInfo = !modifyTimeText.includes('--');
                 }
 
-                detailsSection.style.display = hasFileInfo ? 'flex' : 'none';
+                ConfigFileManager.setVisibility(detailsSection, hasFileInfo, 'flex');
             }
         },
 
@@ -1931,17 +1944,15 @@
                 return;
             }
 
-            container.classList.remove('oc-hidden');
+            ConfigFileManager.setVisibility(container, true);
 
             if (progressSection) {
                 progressSection.innerHTML = '<div class="subscription-loading"><span class="loading-spinner"></span><%:Collecting data...%></div>';
-                progressSection.classList.remove('oc-hidden');
+                ConfigFileManager.setVisibility(progressSection, true);
                 progressSection.className = 'subscription-progress';
             }
 
-            if (detailsSection) {
-                detailsSection.style.display = 'none';
-            }
+            ConfigFileManager.setVisibility(detailsSection, false, 'flex');
         },
 
         handleError: function(status) {
@@ -2219,7 +2230,7 @@
             this.container.innerHTML = '';
 
             if (enabledModules.length === 0) {
-                this.container.classList.add('oc-hidden');
+                setStatusVisibility(this.container, false, undefined, 'oc-hidden');
                 this.updateDragScrollState();
                 return;
             }
@@ -2240,7 +2251,7 @@
                 this.container.appendChild(tag);
             }
 
-            this.container.classList.remove('oc-hidden');
+            setStatusVisibility(this.container, true, undefined, 'oc-hidden');
             this.updateDragScrollState();
         }
     };
@@ -2273,7 +2284,7 @@
 
             if (DOMCache.oclog) {
                 if (initialMessage) {
-                    DOMCache.oclog.classList.remove('oc-hidden');
+                    setStatusVisibility(DOMCache.oclog, true, undefined, 'oc-hidden');
                     DOMCache.oclog.innerHTML = '<b style="color:var(--tip-color)">' + initialMessage + '</b>';
                 }
             }
@@ -2319,7 +2330,7 @@
                         setTimeout(function() {
                             if (self.streamingXHR !== capturedXhr && !self.streamingXHR) {
                                 if (DOMCache.oclog) {
-                                    DOMCache.oclog.classList.add('oc-hidden');
+                                    setStatusVisibility(DOMCache.oclog, false, undefined, 'oc-hidden');
                                     DOMCache.oclog.innerHTML = '';
                                 }
                             }
@@ -2416,7 +2427,7 @@
             if (DOMCache.oclog) {
                 setTimeout(function() {
                     if (!LogManager.streamingXHR) {
-                        DOMCache.oclog.classList.add('oc-hidden');
+                        setStatusVisibility(DOMCache.oclog, false, undefined, 'oc-hidden');
                         DOMCache.oclog.innerHTML = '';
                     }
                 }, 1000);
@@ -2472,7 +2483,7 @@
                 DOMCache.oclog.insertBefore(spacer, DOMCache.oclog.firstChild);
             }
 
-            DOMCache.oclog.classList.remove('oc-hidden');
+            setStatusVisibility(DOMCache.oclog, true, undefined, 'oc-hidden');
             DOMCache.oclog.style.willChange = 'scroll-position';
 
             ocAnimateScroll(DOMCache.oclog);
@@ -2643,116 +2654,201 @@
     var SettingsManager = {
         pendingOperations: new Set(),
         pausedPolls: new Set(),
+        pendingBySetting: Object.create(null),
+        confirmedValues: Object.create(null),
+        pauseTimers: Object.create(null),
+        operationSequence: 0,
+        responseSettleDelay: 1500,
+        confirmationTimeout: 8000,
+
+        normalizeValue: function(setting, value) {
+            var text = value === null || value === undefined ? '' : String(value);
+            if (setting !== 'run_mode') return text;
+
+            // The controls use the suffix (-tun/-mix), while the status API
+            // reports the complete Mihomo mode (fake-ip-tun, redir-host-mix,
+            // ...).  Compare their shared semantic value instead of their
+            // transport spelling so a valid poll cannot undo a selection.
+            if (text === '' || text === '-tun' || text === '-mix') return text;
+            if (text === 'fake-ip' || text === 'redir-host') return '';
+            if (text === 'fake-ip-tun' || text === 'redir-host-tun') return '-tun';
+            if (text === 'fake-ip-mix' || text === 'redir-host-mix') return '-mix';
+            return text;
+        },
+
+        pollNameFor: function(setting) {
+            if (setting === 'rule_mode' || setting === 'run_mode') return setting;
+            return 'oc_settings';
+        },
+
+        operationKeyFor: function(setting, value) {
+            return setting + '_' + this.normalizeValue(setting, value);
+        },
+
+        controlsFor: function(setting) {
+            var controls;
+            switch (setting) {
+                case 'meta_sniffer':
+                    controls = [DOMCache.meta_sniffer_on, DOMCache.meta_sniffer_off];
+                    break;
+                case 'respect_rules':
+                    controls = [DOMCache.respect_rules_on, DOMCache.respect_rules_off];
+                    break;
+                case 'oversea':
+                    controls = [DOMCache.oc_setting_oversea_0, DOMCache.oc_setting_oversea_1,
+                        DOMCache.oc_setting_oversea_2];
+                    break;
+                case 'stream_unlock':
+                    controls = [DOMCache.stream_unlock_on, DOMCache.stream_unlock_off];
+                    break;
+                case 'rule_mode':
+                    controls = [];
+                    for (var i = 0; i < DOMCache.radio.length; i++) controls.push(DOMCache.radio[i]);
+                    break;
+                case 'run_mode':
+                    controls = [];
+                    for (var j = 0; j < DOMCache.radio_ru.length; j++) controls.push(DOMCache.radio_ru[j]);
+                    break;
+                default:
+                    controls = [];
+            }
+            return controls.filter(function(element) { return !!element; });
+        },
+
+        controlsAvailable: function() {
+            // The isolated production-manager tests do not load the full
+            // status view, so an absent runtime marker means availability is
+            // controlled by the caller.  In the real page, a non-running
+            // state must keep late request callbacks from re-enabling inputs.
+            return typeof openkillRuntimeState !== 'string' || openkillRuntimeState === 'running';
+        },
+
+        isKnownValue: function(setting, value) {
+            var normalized = this.normalizeValue(setting, value);
+            var controls = this.controlsFor(setting);
+            for (var i = 0; i < controls.length; i++) {
+                if (this.normalizeValue(setting, controls[i].value) === normalized) return true;
+            }
+            return false;
+        },
+
+        setControls: function(setting, value, disabled) {
+            var normalized = this.normalizeValue(setting, value);
+            var controls = this.controlsFor(setting);
+            var shouldDisable = disabled === undefined ? false : !!disabled;
+            if (!this.controlsAvailable()) shouldDisable = true;
+            for (var i = 0; i < controls.length; i++) {
+                controls[i].checked = this.normalizeValue(setting, controls[i].value) === normalized;
+                if (disabled !== undefined || shouldDisable) controls[i].disabled = shouldDisable;
+            }
+        },
+
+        currentControlValue: function(setting) {
+            var controls = this.controlsFor(setting);
+            for (var i = 0; i < controls.length; i++) {
+                if (controls[i].checked) return this.normalizeValue(setting, controls[i].value);
+            }
+            return undefined;
+        },
+
+        isCurrentPending: function(setting, token) {
+            return !!(this.pendingBySetting[setting] && this.pendingBySetting[setting].token === token);
+        },
+
+        clearPending: function(setting, token) {
+            var pending = this.pendingBySetting[setting];
+            if (!pending || (token !== undefined && pending.token !== token)) return false;
+            if (pending.confirmationTimer) clearTimeout(pending.confirmationTimer);
+            this.pendingOperations.delete(pending.operationKey);
+            delete this.pendingBySetting[setting];
+            return true;
+        },
+
+        syncPendingControls: function() {
+            var settings = ['run_mode', 'rule_mode', 'meta_sniffer', 'respect_rules', 'oversea', 'stream_unlock'];
+            for (var i = 0; i < settings.length; i++) {
+                var setting = settings[i];
+                var pending = this.pendingBySetting[setting];
+                if (pending) this.setControls(setting, pending.requested,
+                    pending.transportPending || !this.controlsAvailable());
+            }
+        },
 
         pausePoll: function(pollName, duration) {
+            if (this.pauseTimers[pollName]) clearTimeout(this.pauseTimers[pollName]);
             this.pausedPolls.add(pollName);
-            setTimeout(() => {
-                this.pausedPolls.delete(pollName);
-            }, duration || 3000);
+            var self = this;
+            var timer = setTimeout(function() {
+                if (self.pauseTimers[pollName] !== timer) return;
+                delete self.pauseTimers[pollName];
+                self.pausedPolls.delete(pollName);
+            }, duration === undefined ? 3000 : duration);
+            this.pauseTimers[pollName] = timer;
         },
 
         isPollPaused: function(pollName) {
             return this.pausedPolls.has(pollName);
         },
 
-        updateUIState: function(setting, value) {
-            setTimeout(() => {
-                function setCheckedAndDisabled(elements, checkedIndex) {
-                    for (let i = 0; i < elements.length; i++) {
-                        elements[i].checked = (i === checkedIndex);
-                        elements[i].disabled = true;
-                    }
-                }
-                switch(setting) {
-                    case 'meta_sniffer':
-                        var metaSnifferOn = document.getElementById('meta_sniffer_on');
-                        var metaSnifferOff = document.getElementById('meta_sniffer_off');
-                        if (metaSnifferOn && metaSnifferOff) {
-                            setCheckedAndDisabled([metaSnifferOn, metaSnifferOff], value === '1' ? 0 : 1);
-                            var changeEvent = new Event('change', { bubbles: true });
-                            (value === '1' ? metaSnifferOn : metaSnifferOff).dispatchEvent(changeEvent);
-                        }
-                        break;
-                    case 'respect_rules':
-                        var respectRulesOn = document.getElementById('respect_rules_on');
-                        var respectRulesOff = document.getElementById('respect_rules_off');
-                        if (respectRulesOn && respectRulesOff) {
-                            setCheckedAndDisabled([respectRulesOn, respectRulesOff], value === '1' ? 0 : 1);
-                            var changeEvent = new Event('change', { bubbles: true });
-                            (value === '1' ? respectRulesOn : respectRulesOff).dispatchEvent(changeEvent);
-                        }
-                        break;
-                    case 'oversea':
-                        var oversea0 = document.getElementById('oc_setting_oversea_0');
-                        var oversea1 = document.getElementById('oc_setting_oversea_1');
-                        var oversea2 = document.getElementById('oc_setting_oversea_2');
-                        if (oversea0 && oversea1 && oversea2) {
-                            setCheckedAndDisabled([oversea0, oversea1, oversea2], value === '0' ? 0 : (value === '1' ? 1 : 2));
-                            var changeEvent = new Event('change', { bubbles: true });
-                            [oversea0, oversea1, oversea2][value === '0' ? 0 : (value === '1' ? 1 : 2)].dispatchEvent(changeEvent);
-                        }
-                        break;
-                    case 'stream_unlock':
-                        var streamUnlockOn = document.getElementById('stream_unlock_on');
-                        var streamUnlockOff = document.getElementById('stream_unlock_off');
-                        if (streamUnlockOn && streamUnlockOff) {
-                            setCheckedAndDisabled([streamUnlockOn, streamUnlockOff], value === '1' ? 0 : 1);
-                            var changeEvent = new Event('change', { bubbles: true });
-                            (value === '1' ? streamUnlockOn : streamUnlockOff).dispatchEvent(changeEvent);
-                        }
-                        break;
-                    case 'rule_mode':
-                        var radioElements = document.getElementsByName("radios");
-                        if (radioElements && radioElements.length > 0) {
-                            for (var i = 0; i < radioElements.length; i++) {
-                                radioElements[i].checked = radioElements[i].value === value;
-                                radioElements[i].disabled = true;
-                                if (radioElements[i].checked) {
-                                    var changeEvent = new Event('change', { bubbles: true });
-                                    radioElements[i].dispatchEvent(changeEvent);
-                                }
-                            }
-                        }
-                        break;
-                    case 'run_mode':
-                        var radioRuElements = document.getElementsByName("radios-ru");
-                        if (radioRuElements && radioRuElements.length > 0) {
-                            for (var i = 0; i < radioRuElements.length; i++) {
-                                radioRuElements[i].checked = radioRuElements[i].value === value;
-                                radioRuElements[i].disabled = true;
-                                if (radioRuElements[i].checked) {
-                                    var changeEvent = new Event('change', { bubbles: true });
-                                    radioRuElements[i].dispatchEvent(changeEvent);
-                                }
-                            }
-                        }
-                        break;
-                }
-            }, 10);
+        updateUIState: function(setting, value, disabled) {
+            this.setControls(setting, value, disabled === undefined ? true : disabled);
+        },
+
+        shouldApplyPoll: function(setting, value) {
+            var normalized = this.normalizeValue(setting, value);
+            var pending = this.pendingBySetting[setting];
+            if (!pending) {
+                this.confirmedValues[setting] = normalized;
+                return true;
+            }
+
+            if (pending.requested === normalized) {
+                this.confirmedValues[setting] = normalized;
+                this.clearPending(setting, pending.token);
+                this.setControls(setting, normalized, false);
+                return true;
+            }
+
+            // A stale response must not overwrite a newer user choice while
+            // its request is in flight or inside the post-response
+            // confirmation window.  Once that window expires, the backend is
+            // authoritative again and the next poll may apply its value.
+            if (Date.now() < pending.deadline) return false;
+            this.clearPending(setting, pending.token);
+            this.confirmedValues[setting] = normalized;
+            this.setControls(setting, normalized, false);
+            return true;
         },
 
         switchSetting: function(setting, value, endpoint, additionalParams) {
-            var operationKey = setting + '_' + value;
-
-            if (this.pendingOperations.has(operationKey)) {
+            var requested = this.normalizeValue(setting, value);
+            var operationKey = this.operationKeyFor(setting, requested);
+            var previous = this.pendingBySetting[setting];
+            if (previous && previous.requested === requested && previous.transportPending) {
                 return false;
             }
 
-            this.pendingOperations.add(operationKey);
-
-            try {
-                this.updateUIState(setting, value);
-            } catch (e) {}
-
-            let pollName;
-            if (setting === 'rule_mode') {
-                pollName = 'rule_mode';
-            } else if (setting === 'run_mode') {
-                pollName = 'run_mode';
-            } else {
-                pollName = 'oc_settings';
+            if (previous) this.clearPending(setting, previous.token);
+            if (this.confirmedValues[setting] === undefined) {
+                var current = this.currentControlValue(setting);
+                if (current !== undefined) this.confirmedValues[setting] = current;
             }
-            this.pausedPolls.add(pollName);
+
+            this.pendingOperations.add(operationKey);
+            var pollName = this.pollNameFor(setting);
+            var token = ++this.operationSequence;
+            var pending = {
+                token: token,
+                requested: requested,
+                operationKey: operationKey,
+                pollName: pollName,
+                transportPending: true,
+                deadline: Date.now() + this.confirmationTimeout,
+                confirmationTimer: null
+            };
+            this.pendingBySetting[setting] = pending;
+            this.updateUIState(setting, requested, true);
+            this.pausePoll(pollName, this.responseSettleDelay);
 
             var params = Object.assign({}, additionalParams || {});
             if (setting !== 'rule_mode' && setting !== 'run_mode') {
@@ -2768,59 +2864,33 @@
 
             XHR.get(endpoint, params, function(x, status) {
                 setTimeout(function() {
-                    self.pendingOperations.delete(operationKey);
-
-                    switch(setting) {
-                        case 'meta_sniffer':
-                            var metaSnifferOn = document.getElementById('meta_sniffer_on');
-                            var metaSnifferOff = document.getElementById('meta_sniffer_off');
-                            if (metaSnifferOn) metaSnifferOn.disabled = false;
-                            if (metaSnifferOff) metaSnifferOff.disabled = false;
-                            break;
-                        case 'respect_rules':
-                            var respectRulesOn = document.getElementById('respect_rules_on');
-                            var respectRulesOff = document.getElementById('respect_rules_off');
-                            if (respectRulesOn) respectRulesOn.disabled = false;
-                            if (respectRulesOff) respectRulesOff.disabled = false;
-                            break;
-                        case 'oversea':
-                            var oversea0 = document.getElementById('oc_setting_oversea_0');
-                            var oversea1 = document.getElementById('oc_setting_oversea_1');
-                            var oversea2 = document.getElementById('oc_setting_oversea_2');
-                            if (oversea0) oversea0.disabled = false;
-                            if (oversea1) oversea1.disabled = false;
-                            if (oversea2) oversea2.disabled = false;
-                            break;
-                        case 'stream_unlock':
-                            var streamUnlockOn = document.getElementById('stream_unlock_on');
-                            var streamUnlockOff = document.getElementById('stream_unlock_off');
-                            if (streamUnlockOn) streamUnlockOn.disabled = false;
-                            if (streamUnlockOff) streamUnlockOff.disabled = false;
-                            break;
-                        case 'rule_mode':
-                            var radioElements = document.getElementsByName("radios");
-                            if (radioElements && radioElements.length > 0) {
-                                for (var i = 0; i < radioElements.length; i++) {
-                                    radioElements[i].disabled = false;
-                                }
-                            }
-                            break;
-                        case 'run_mode':
-                            var radioRuElements = document.getElementsByName("radios-ru");
-                            if (radioRuElements && radioRuElements.length > 0) {
-                                for (var i = 0; i < radioRuElements.length; i++) {
-                                    radioRuElements[i].disabled = false;
-                                }
-                            }
-                            break;
-                    }
-
+                    if (!self.isCurrentPending(setting, token)) return;
+                    pending.transportPending = false;
                     self.pausedPolls.delete(pollName);
 
                     if (!x || x.status !== 200) {
+                        var restored = self.confirmedValues[setting];
+                        self.clearPending(setting, token);
+                        if (restored !== undefined) self.updateUIState(setting, restored, false);
+                        else self.setControls(setting, requested, false);
                         alert(self.getErrorMessage(setting));
+                        return;
                     }
-                }, 1500);
+
+                    pending.deadline = Date.now() + self.confirmationTimeout;
+                    pending.confirmationTimer = setTimeout(function() {
+                        if (!self.isCurrentPending(setting, token)) return;
+                        var fallback = self.confirmedValues[setting];
+                        self.clearPending(setting, token);
+                        // No matching confirmation arrived in time.  Return
+                        // to the last confirmed value until the next poll
+                        // supplies authoritative backend state.
+                        if (fallback !== undefined) self.setControls(setting, fallback, false);
+                        self.syncPendingControls();
+                    }, self.confirmationTimeout);
+                    self.updateUIState(setting, requested, false);
+                    self.syncPendingControls();
+                }, self.responseSettleDelay);
             });
 
             return false;
@@ -2858,6 +2928,7 @@
             if (!SettingsManager.pendingOperations || SettingsManager.pendingOperations.size === 0) {
                 setRuntimeControlsAvailable(true);
             }
+            SettingsManager.syncPendingControls();
             clearRuntimeUnavailableMarkers();
             var updates = [];
 
@@ -2871,47 +2942,39 @@
                 updatePluginToggleState(status.clash);
             }
 
-            if (status.run_mode && !SettingsManager.pendingOperations.has('run_mode_' + status.run_mode)) {
-                if (status.run_mode.indexOf("fake-ip") === 0) {
+            if (status.run_mode !== undefined && status.run_mode !== null && SettingsManager.shouldApplyPoll('run_mode', status.run_mode)) {
+                var runModeText = typeof status.run_mode === 'string' ? status.run_mode : '';
+                var knownRunMode = SettingsManager.isKnownValue('run_mode', status.run_mode);
+                if (knownRunMode && runModeText.indexOf("fake-ip") === 0) {
                     DOMCache.mode.innerHTML = "<b style=color:var(--success-color)><%:Fake-IP%></b>";
                     DOMCache.radio_run_normal.innerHTML = "<%:Enhance%>";
-                } else if (status.run_mode.indexOf("redir-host") === 0) {
+                    DOMCache.mode.classList.remove('runtime-unavailable');
+                } else if (knownRunMode && runModeText.indexOf("redir-host") === 0) {
                     DOMCache.mode.innerHTML = "<b style=color:var(--success-color)><%:Redir-Host%></b>";
                     DOMCache.radio_run_normal.innerHTML = "<%:Compat%>";
+                    DOMCache.mode.classList.remove('runtime-unavailable');
+                } else {
+                    DOMCache.mode.innerHTML = "<b style=color:var(--warning-color)><%:Unknown%></b>";
+                    DOMCache.mode.classList.add('runtime-unavailable');
                 }
-                var expectedValue = status.run_mode.split("-")[2] == undefined ? "" : ("-" + status.run_mode.split("-")[2]);
-                for (var i = 0; i < DOMCache.radio_ru.length; i++) {
-                    if (DOMCache.radio_ru[i].value == expectedValue && !DOMCache.radio_ru[i].checked) {
-                        DOMCache.radio_ru[i].checked = true;
-                    }
-                }
+                SettingsManager.setControls('run_mode', status.run_mode, false);
             }
 
-            if (status.rule_mode && !SettingsManager.pendingOperations.has('rule_mode_' + status.rule_mode)) {
-                for (var i = 0; i < DOMCache.radio.length; i++) {
-                    if (DOMCache.radio[i].value == status.rule_mode && !DOMCache.radio[i].checked) {
-                        DOMCache.radio[i].checked = true;
-                        break;
-                    }
-                }
+            if (status.rule_mode !== undefined && status.rule_mode !== null && SettingsManager.shouldApplyPoll('rule_mode', status.rule_mode)) {
+                SettingsManager.setControls('rule_mode', status.rule_mode, false);
             }
 
-            if (!SettingsManager.pendingOperations.has('meta_sniffer_' + status.meta_sniffer)) {
-                DOMCache.meta_sniffer_on.checked = status.meta_sniffer == "1";
-                DOMCache.meta_sniffer_off.checked = status.meta_sniffer != "1";
+            if (status.meta_sniffer !== undefined && SettingsManager.shouldApplyPoll('meta_sniffer', status.meta_sniffer)) {
+                SettingsManager.setControls('meta_sniffer', status.meta_sniffer, false);
             }
-            if (!SettingsManager.pendingOperations.has('respect_rules_' + status.respect_rules)) {
-                DOMCache.respect_rules_on.checked = status.respect_rules == "1";
-                DOMCache.respect_rules_off.checked = status.respect_rules != "1";
+            if (status.respect_rules !== undefined && SettingsManager.shouldApplyPoll('respect_rules', status.respect_rules)) {
+                SettingsManager.setControls('respect_rules', status.respect_rules, false);
             }
-            if (!SettingsManager.pendingOperations.has('oversea_' + status.oversea)) {
-                if (status.oversea == "0") DOMCache.oc_setting_oversea_0.checked = true;
-                else if (status.oversea == "1") DOMCache.oc_setting_oversea_1.checked = true;
-                else if (status.oversea == "2") DOMCache.oc_setting_oversea_2.checked = true;
+            if (status.oversea !== undefined && SettingsManager.shouldApplyPoll('oversea', status.oversea)) {
+                SettingsManager.setControls('oversea', status.oversea, false);
             }
-            if (!SettingsManager.pendingOperations.has('stream_unlock_' + status.stream_unlock)) {
-                DOMCache.stream_unlock_on.checked = status.stream_unlock === '1';
-                DOMCache.stream_unlock_off.checked = status.stream_unlock !== '1';
+            if (status.stream_unlock !== undefined && SettingsManager.shouldApplyPoll('stream_unlock', status.stream_unlock)) {
+                SettingsManager.setControls('stream_unlock', status.stream_unlock, false);
             }
 
             var webContent = status.clash ? '<input type="button" class="dashboard-btn" value="<%:Yacd%>" onclick="return ycad_dashboard(this)"/>' : '<input type="button" class="dashboard-btn" value="<%:Yacd%>" onclick="event.preventDefault(); event.stopPropagation(); return false;"/>';
@@ -2942,7 +3005,7 @@
             if (DOMCache.clash) DOMCache.clash.setAttribute('aria-label', runtimeStateLabels[runtimeState]);
 
             function setDashboardVisibility(element, visible) {
-                if (element) element.classList.toggle('hidden', !visible);
+                setStatusVisibility(element, visible, undefined, 'hidden');
             }
 
             setDashboardVisibility(DOMCache.web, !!status.yacd);
@@ -2974,7 +3037,7 @@
                 DOMCache.mix_proxy.innerHTML = "<b style=color:var(--success-color)>" + mix_addr + "</b>";
                 [DOMCache.copy_secret, DOMCache.copy_address, DOMCache.copy_mix_address,
                     DOMCache.copy_mix_secret, DOMCache.copy_pac_config].forEach(function(element) {
-                    if (element) element.style.display = '';
+                    setStatusVisibility(element, true);
                 });
             } else {
                 DOMCache.daip.innerHTML = "<b style=color:var(--error-color)><%:Not Available%></b>";
@@ -2982,7 +3045,7 @@
                 DOMCache.mix_proxy.innerHTML = "<b style=color:var(--error-color)><%:Not Available%></b>";
                 [DOMCache.copy_secret, DOMCache.copy_address, DOMCache.copy_mix_address,
                     DOMCache.copy_mix_secret, DOMCache.copy_pac_config].forEach(function(element) {
-                    if (element) element.style.display = 'none';
+                    setStatusVisibility(element, false);
                 });
             }
 
@@ -3101,14 +3164,9 @@
         }
 
         StateManager.cachedXHRGet('<%=luci.dispatcher.build_url("admin", "services", "openkill", "rule_mode")%>', function(x, status) {
-            if (x && x.status == 200 && status.mode != "") {
-                if (!SettingsManager.pendingOperations.has('rule_mode_' + status.mode)) {
-                    for (var i = 0; i < DOMCache.radio.length; i++) {
-                        if (DOMCache.radio[i].value == status.mode && !DOMCache.radio[i].checked) {
-                            DOMCache.radio[i].checked = true;
-                            break;
-                        }
-                    }
+            if (x && x.status == 200 && status && status.mode !== undefined && status.mode !== null && status.mode !== "") {
+                if (SettingsManager.shouldApplyPoll('rule_mode', status.mode)) {
+                    SettingsManager.setControls('rule_mode', status.mode, false);
                 }
             }
         }, true);
@@ -3128,25 +3186,22 @@
         }
 
         StateManager.cachedXHRGet('<%=luci.dispatcher.build_url("admin", "services", "openkill", "get_run_mode")%>', function(x, status) {
-            if (x && x.status == 200 && status.mode) {
-                if (status.mode == "fake-ip" || status.mode == "fake-ip-tun" || status.mode == "fake-ip-mix") {
+            if (x && x.status == 200 && status && status.mode !== undefined && status.mode !== null && status.mode !== "") {
+                if (!SettingsManager.shouldApplyPoll('run_mode', status.mode)) return;
+                var modeText = String(status.mode);
+                if (SettingsManager.isKnownValue('run_mode', modeText) && modeText.indexOf("fake-ip") === 0) {
                     DOMCache.mode.innerHTML = "<b style=color:var(--success-color)><%:Fake-IP%></b>";
                     DOMCache.radio_run_normal.innerHTML = "<%:Enhance%>";
-                } else if (status.mode == "redir-host" || status.mode == "redir-host-tun" ||  status.mode == "redir-host-mix") {
+                    DOMCache.mode.classList.remove('runtime-unavailable');
+                } else if (SettingsManager.isKnownValue('run_mode', modeText) && modeText.indexOf("redir-host") === 0) {
                     DOMCache.mode.innerHTML = "<b style=color:var(--success-color)><%:Redir-Host%></b>";
                     DOMCache.radio_run_normal.innerHTML = "<%:Compat%>";
+                    DOMCache.mode.classList.remove('runtime-unavailable');
+                } else {
+                    DOMCache.mode.innerHTML = "<b style=color:var(--warning-color)><%:Unknown%></b>";
+                    DOMCache.mode.classList.add('runtime-unavailable');
                 }
-
-                var expectedValue = status["mode"].split("-")[2] == undefined ? "" : ("-" + status["mode"].split("-")[2]);
-                var operationKey = 'run_mode_' + status.mode;
-
-                if (!SettingsManager.pendingOperations.has(operationKey)) {
-                    for (var i = 0; i < DOMCache.radio_ru.length; i++) {
-                        if (DOMCache.radio_ru[i].value == expectedValue && !DOMCache.radio_ru[i].checked) {
-                            DOMCache.radio_ru[i].checked = true;
-                        }
-                    }
-                }
+                SettingsManager.setControls('run_mode', modeText, false);
             }
         }, true);
     }
@@ -3326,7 +3381,7 @@
         }
 
         function updateCoreDot(corelv) {
-            if (DOMCache.core_version_display.classList.contains('oc-hidden')) return;
+            if (DOMCache.core_version_display.hidden || DOMCache.core_version_display.classList.contains('oc-hidden')) return;
             var coremetacv = DOMCache.core_version_text.textContent;
             var hasUpdate = corelv && corelv !== "" && corelv !== "loading..." && corelv !== coremetacv;
             var existingDot = DOMCache.core_version_display.querySelector('.update-dot');
@@ -3347,7 +3402,7 @@
         }
 
         function updatePluginDot(oplv) {
-            if (DOMCache.plugin_version_display.classList.contains('oc-hidden')) return;
+            if (DOMCache.plugin_version_display.hidden || DOMCache.plugin_version_display.classList.contains('oc-hidden')) return;
             var opcv = DOMCache.plugin_version_text.textContent;
             var hasUpdate = false;
             if (oplv && oplv !== "" && oplv !== "loading...") {
@@ -3382,9 +3437,9 @@
                     } else {
                         DOMCache.core_version_text.title = '';
                     }
-                    DOMCache.core_version_display.classList.remove('oc-hidden');
+                    setStatusVisibility(DOMCache.core_version_display, true, undefined, 'oc-hidden');
                 } else {
-                    DOMCache.core_version_display.classList.add('oc-hidden');
+                    setStatusVisibility(DOMCache.core_version_display, false, undefined, 'oc-hidden');
                     DOMCache.core_version_display.title = '';
                 }
 
@@ -3396,9 +3451,9 @@
                     } else {
                         DOMCache.plugin_version_text.title = '';
                     }
-                    DOMCache.plugin_version_display.classList.remove('oc-hidden');
+                    setStatusVisibility(DOMCache.plugin_version_display, true, undefined, 'oc-hidden');
                 } else {
-                    DOMCache.plugin_version_display.classList.add('oc-hidden');
+                    setStatusVisibility(DOMCache.plugin_version_display, false, undefined, 'oc-hidden');
                     DOMCache.plugin_version_display.title = '';
                 }
             }
@@ -3523,30 +3578,21 @@
         }
 
         StateManager.cachedXHRGet('<%=luci.dispatcher.build_url("admin", "services", "openkill", "oc_settings")%>', function(x, info) {
-            if (x && x.status == 200) {
-                if (!SettingsManager.pendingOperations.has('meta_sniffer_' + info.meta_sniffer)) {
-                    DOMCache.meta_sniffer_on.checked = info.meta_sniffer == "1";
-                    DOMCache.meta_sniffer_off.checked = info.meta_sniffer != "1";
+            if (x && x.status == 200 && info && typeof info === 'object') {
+                if (info.meta_sniffer !== undefined && info.meta_sniffer !== null && SettingsManager.shouldApplyPoll('meta_sniffer', info.meta_sniffer)) {
+                    SettingsManager.setControls('meta_sniffer', info.meta_sniffer, false);
                 }
 
-                if (!SettingsManager.pendingOperations.has('respect_rules_' + info.respect_rules)) {
-                    DOMCache.respect_rules_on.checked = info.respect_rules == "1";
-                    DOMCache.respect_rules_off.checked = info.respect_rules != "1";
+                if (info.respect_rules !== undefined && info.respect_rules !== null && SettingsManager.shouldApplyPoll('respect_rules', info.respect_rules)) {
+                    SettingsManager.setControls('respect_rules', info.respect_rules, false);
                 }
 
-                if (!SettingsManager.pendingOperations.has('oversea_' + info.oversea)) {
-                    if (info.oversea == "0") {
-                        DOMCache.oc_setting_oversea_0.checked = true;
-                    } else if (info.oversea == "1") {
-                        DOMCache.oc_setting_oversea_1.checked = true;
-                    } else if (info.oversea == "2") {
-                        DOMCache.oc_setting_oversea_2.checked = true;
-                    }
+                if (info.oversea !== undefined && info.oversea !== null && SettingsManager.shouldApplyPoll('oversea', info.oversea)) {
+                    SettingsManager.setControls('oversea', info.oversea, false);
                 }
 
-                if (!SettingsManager.pendingOperations.has('stream_unlock_' + info.stream_unlock)) {
-                    DOMCache.stream_unlock_on.checked = info.stream_unlock === '1';
-                    DOMCache.stream_unlock_off.checked = info.stream_unlock !== '1';
+                if (info.stream_unlock !== undefined && info.stream_unlock !== null && SettingsManager.shouldApplyPoll('stream_unlock', info.stream_unlock)) {
+                    SettingsManager.setControls('stream_unlock', info.stream_unlock, false);
                 }
             }
         }, true);

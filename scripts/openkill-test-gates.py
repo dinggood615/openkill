@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import lru_cache
 import hashlib
+import importlib.metadata
 import json
 import os
 from pathlib import Path
@@ -59,7 +60,8 @@ NATIVE_TESTS: tuple[Case, ...] = tuple(
             name=path.stem,
             script=f"scripts/{path.name}",
             timeout=180,
-            skip_policy=("NFT_CLI_UNAVAILABLE",) if path.stem == "test-nft-syntax" else (),
+            skip_policy=("NFT_CLI_UNAVAILABLE",) if path.stem == "test-nft-syntax" else
+            ("PLAYWRIGHT_UNAVAILABLE", "PLAYWRIGHT_BROWSER_UNAVAILABLE") if path.stem == "test-ui-browser" else (),
         )
     for path in (
         Path("test-3e2-safe-config.py"),
@@ -86,6 +88,8 @@ NATIVE_TESTS: tuple[Case, ...] = tuple(
         Path("test-core-download-contract.py"),
         Path("test-openkill-test-gates.py"),
         Path("test-ui-contract.py"),
+        Path("test-ui-interactions.py"),
+        Path("test-ui-browser.py"),
         Path("test-ui-preview.py"),
         Path("test-uci-lifecycle.py"),
     )
@@ -212,7 +216,7 @@ def dependency_files(case: Case) -> list[Path]:
         paths.append(ROOT / "scripts/test-core.py")
     if case.name == "compileall":
         paths.extend(sorted((ROOT / "scripts").glob("*.py")))
-    if case.name in ("test-ui-contract", "test-ui-preview"):
+    if case.name in ("test-ui-contract", "test-ui-interactions", "test-ui-preview"):
         paths.extend(sorted((ROOT / "luci-app-openkill/luasrc/view/openkill").glob("*.htm")))
         paths.extend((
             ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/oc.css",
@@ -220,8 +224,21 @@ def dependency_files(case: Case) -> list[Path]:
             ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/js/common.js",
             ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/js/oc-icons.js",
         ))
-        if case.name == "test-ui-preview":
+        if case.name in ("test-ui-interactions", "test-ui-preview"):
             paths.append(ROOT / "scripts/build-ui-preview.py")
+    if case.name == "test-ui-browser":
+        paths.extend((
+            ROOT / "scripts/build-ui-preview.py",
+            ROOT / "scripts/test-ui-browser.py",
+            ROOT / "luci-app-openkill/luasrc/view/openkill/status.htm",
+            ROOT / "luci-app-openkill/luasrc/view/openkill/myip.htm",
+            ROOT / "luci-app-openkill/luasrc/view/openkill/config_upload.htm",
+            ROOT / "luci-app-openkill/luasrc/view/openkill/config_edit.htm",
+            ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/oc.css",
+            ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css",
+            ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/js/common.js",
+            ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/js/oc-icons.js",
+        ))
     if case.name == "test-openkill-test-gates":
         paths.append(RUNNER_PATH)
     if case.name == "test-process-ownership":
@@ -260,6 +277,8 @@ def dependency_key(case: Case) -> tuple[str, list[dict[str, str]]]:
     for path in dependency_files(case):
         inputs.append({"path": path.relative_to(ROOT).as_posix(), "sha256": sha256_file(path)})
     versions = dict(environment_versions())
+    if case.name == "test-ui-browser":
+        versions["browser_runtime"] = browser_runtime_identity()
     versions.update({
         "environment": case.environment,
         "runner": RUNNER_VERSION,
@@ -763,6 +782,55 @@ def read_version(command: Sequence[str]) -> str:
     return (result.stdout or result.stderr).strip().splitlines()[0][:200] if (result.stdout or result.stderr) else "ok"
 
 
+def browser_runtime_identity() -> str:
+    """Return a read-only browser/Playwright identity for UI cache keys."""
+    try:
+        playwright_version = importlib.metadata.version("playwright")
+    except importlib.metadata.PackageNotFoundError:
+        playwright_version = "unavailable"
+
+    candidates: list[Path] = []
+    if os.name == "nt":
+        roots = [
+            Path(path)
+            for path in (
+                os.environ.get("PROGRAMFILES", ""),
+                os.environ.get("PROGRAMFILES(X86)", ""),
+            )
+            if path
+        ]
+        candidates = [
+            root / relative
+            for root in roots
+            for relative in (
+                Path("Google/Chrome/Application/chrome.exe"),
+                Path("Microsoft/Edge/Application/msedge.exe"),
+            )
+        ]
+    else:
+        for name in ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser"):
+            path = shutil.which(name)
+            if path:
+                candidates.append(Path(path))
+
+    for executable in candidates:
+        if executable.is_file():
+            return json.dumps(
+                {
+                    "playwright": playwright_version,
+                    "executable": str(executable),
+                    "version": read_version((str(executable), "--version")),
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+    return json.dumps(
+        {"playwright": playwright_version, "executable": "unavailable", "version": "unavailable"},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
 def build_cases(mode: str) -> list[Case]:
     policy = (
         Case("local-policy-gate", "scripts/local-gate.sh", environment="wsl", timeout=300, cacheable=False),
@@ -780,6 +848,8 @@ def build_cases(mode: str) -> list[Case]:
         "test-core-download-contract",
         "test-production-shadow",
         "test-ui-contract",
+        "test-ui-interactions",
+        "test-ui-browser",
         "test-ui-preview",
     )
     native_by_name = {case.name: case for case in NATIVE_TESTS}
@@ -812,6 +882,10 @@ def classify_output(case: Case, process: subprocess.CompletedProcess[str]) -> tu
         if "Ruby is not installed" in output or "Ruby required" in output:
             reason = "RUBY_UNAVAILABLE"
             return ("SKIP_ALLOWED", reason) if reason in case.skip_policy else ("FAIL", "UNDECLARED_ENVIRONMENT_SKIP")
+        if case.name == "test-ui-browser":
+            for reason in ("PLAYWRIGHT_UNAVAILABLE", "PLAYWRIGHT_BROWSER_UNAVAILABLE"):
+                if f"OPENKILL_ENVIRONMENT_LIMIT={reason}" in output:
+                    return ("NOT_RUN_ENVIRONMENT", reason) if reason in case.skip_policy else ("FAIL", "UNDECLARED_ENVIRONMENT_SKIP")
         return "PASS", ""
     # A release-download limitation is an explicit, structured result from
     # test-core.py.  Generic traceback text (including ``urlopen error``) is
@@ -1007,6 +1081,8 @@ def write_evidence(
         f"runner_version={RUNNER_VERSION}",
         f"runner_source_hash={RUNNER_SOURCE_HASH}",
     ]
+    if any(record.get("name") == "test-ui-browser" for record in records):
+        environment_lines.append(f"browser_runtime={browser_runtime_identity()}")
     (output_dir / "environment.txt").write_text("\n".join(environment_lines) + "\n", encoding="utf-8")
     hash_lines = [f"candidate_id={candidate_id}"]
     for record in records:

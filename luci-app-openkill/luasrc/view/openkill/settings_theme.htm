@@ -127,6 +127,46 @@
         el.classList.toggle(name, !!enabled);
     }
 
+    function setSearchVisibility(element, visible) {
+        if (!element) return;
+        var shouldShow = !!visible;
+        if (!shouldShow) {
+            if (!element._ocSearchVisibility) {
+                element._ocSearchVisibility = {
+                    hidden: !!element.hidden,
+                    ariaHidden: element.getAttribute('aria-hidden')
+                };
+            }
+            addClass(element, 'openkill-search-hidden', true);
+            element.hidden = true;
+            element.setAttribute('aria-hidden', 'true');
+            if (element.contains && document.activeElement &&
+                element.contains(document.activeElement) && document.activeElement.blur) {
+                document.activeElement.blur();
+            }
+            return;
+        }
+        addClass(element, 'openkill-search-hidden', false);
+        var previous = element._ocSearchVisibility;
+        if (previous) {
+            element.hidden = previous.hidden;
+            if (previous.ariaHidden === null) element.removeAttribute('aria-hidden');
+            else element.setAttribute('aria-hidden', previous.ariaHidden);
+            delete element._ocSearchVisibility;
+        }
+    }
+
+    function setAdvancedTabVisibility(item, visible) {
+        if (!item) return;
+        var shouldShow = !!visible;
+        item.hidden = !shouldShow;
+        item.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+        if (!shouldShow && item.contains && document.activeElement &&
+            item.contains(document.activeElement) && document.activeElement.blur) {
+            document.activeElement.blur();
+        }
+    }
+
     function tabLabel(item) {
         var link = item && item.querySelector('a');
         return ((link && link.textContent) || (item && item.textContent) || '').trim();
@@ -239,9 +279,15 @@
         var body = card.querySelector('.openkill-settings-card-body');
         var toggle = card.querySelector('.openkill-settings-card-toggle');
         if (!body || !toggle) return;
-        card.classList.toggle('is-collapsed', !expanded);
-        body.hidden = !expanded;
-        toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        var isExpanded = !!expanded;
+        card.classList.toggle('is-collapsed', !isExpanded);
+        body.hidden = !isExpanded;
+        body.setAttribute('aria-hidden', isExpanded ? 'false' : 'true');
+        toggle.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+        if (!isExpanded && body.contains && document.activeElement &&
+            body.contains(document.activeElement) && document.activeElement.blur) {
+            document.activeElement.blur();
+        }
     }
 
     function createCard(content, definition, fields, index, host) {
@@ -515,6 +561,9 @@
             visible = !!visible;
             addClass(map, 'openkill-advanced-visible', visible);
             addClass(map, 'openkill-advanced-collapsed', !visible);
+            advancedItems.forEach(function(item) {
+                setAdvancedTabVisibility(item, visible);
+            });
             advancedToggle.textContent = visible ? HIDE_ADVANCED : SHOW_ADVANCED;
             advancedToggle.setAttribute('aria-expanded', visible ? 'true' : 'false');
             try {
@@ -540,7 +589,7 @@
                 var matched = 0;
                 for (var j = 0; j < fields.length; j++) {
                     var found = !query || fieldSearchText(fields[j]).indexOf(query) !== -1;
-                    addClass(fields[j], 'openkill-search-hidden', !found);
+                    setSearchVisibility(fields[j], found);
                     if (found && query) {
                         matched++;
                         if (!firstMatch) firstMatch = {item: item, field: fields[j]};
@@ -558,7 +607,7 @@
                             break;
                         }
                     }
-                    addClass(cards[k], 'openkill-search-hidden', !!query && !cardMatch);
+                    setSearchVisibility(cards[k], !query || cardMatch);
                 }
                 addClass(item, 'openkill-search-match', !!query && matched > 0);
                 var anchor = item.querySelector('a');

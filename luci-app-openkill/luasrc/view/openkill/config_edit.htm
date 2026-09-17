@@ -34,12 +34,12 @@
             </div>
 
             <div id="config-mode-tabs" class="oc-hidden">
-                <div class="mode-tabs">
-                    <button type="button" class="mode-tab active" id="tab-original-config" data-mode="original">
+                <div class="mode-tabs" role="tablist" aria-label="<%:Config view%>">
+                    <button type="button" class="mode-tab active" id="tab-original-config" data-mode="original" role="tab" aria-selected="true" tabindex="0">
                         <svg width="16" height="16"><use href="#oc-icon-list"/></svg>
                         <span><%:Original Config%></span>
                     </button>
-                    <button type="button" class="mode-tab" id="tab-runtime-config" data-mode="runtime">
+                    <button type="button" class="mode-tab" id="tab-runtime-config" data-mode="runtime" role="tab" aria-selected="false" tabindex="-1">
                         <svg width="16" height="16"><use href="#oc-icon-zap"/></svg>
                         <span><%:Runtime Config%></span>
                     </button>
@@ -98,6 +98,8 @@ var ConfigEditor = {
     mergeViewActive: false,
     isFullscreen: false,
     mergeShowDifferences: true,
+    loadSequence: 0,
+    overwriteLoadSequence: 0,
 
     overwriteFiles: [],
     overwriteSubInfo: {},
@@ -123,6 +125,42 @@ var ConfigEditor = {
         }
 
         this.bindEvents();
+    },
+
+    setVisibility: function(element, visible, displayValue) {
+        if (typeof ocSetVisibility === 'function') {
+            ocSetVisibility(element, visible, displayValue);
+            return;
+        }
+        if (!element) return;
+        var shouldShow = !!visible;
+        element.classList.toggle('oc-hidden', !shouldShow);
+        element.hidden = !shouldShow;
+        element.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+        if (displayValue !== undefined) {
+            element.style.display = shouldShow ? displayValue : 'none';
+        } else if (shouldShow) {
+            element.style.removeProperty('display');
+        }
+        if (!shouldShow && element.contains && document.activeElement &&
+            element.contains(document.activeElement) && document.activeElement.blur) {
+            document.activeElement.blur();
+        }
+    },
+
+    setModeTab: function(tab, selected) {
+        if (!tab) return;
+        tab.classList.toggle('active', !!selected);
+        tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+        tab.tabIndex = selected ? 0 : -1;
+    },
+
+    setOverwriteMode: function(tabFile, tabSubscribe, contentFile, contentSubscribe, mode) {
+        var fileSelected = mode === 'file';
+        this.setModeTab(tabFile, fileSelected);
+        this.setModeTab(tabSubscribe, !fileSelected);
+        this.setVisibility(contentFile, fileSelected, 'block');
+        this.setVisibility(contentSubscribe, !fileSelected, 'block');
     },
 
     bindEvents: function() {
@@ -186,12 +224,12 @@ var ConfigEditor = {
         if (layoutBtn) {
             layoutBtn.addEventListener('click', function() {
                 if (!self.mergeViewActive) {
-                    self.showMergeView();
                     self.currentViewMode = 'original';
+                    self.showMergeView();
                     layoutBtn.title = "<%:Restore%>";
                     layoutBtn.innerHTML = _ocIcons.SVG_RESTORE;
                 } else {
-                    self.hideMergeView();
+                    self.hideMergeView(false);
                     layoutBtn.title = "<%:Compare%>";
                     layoutBtn.innerHTML = _ocIcons.SVG_COMPARE;
                 }
@@ -204,6 +242,7 @@ var ConfigEditor = {
 
     show: function(configFile) {
         var self = this;
+        this.loadSequence++;
         this.isOverwrite = false;
         this.currentViewMode = 'original';
         this.currentConfigFile = '';
@@ -220,20 +259,20 @@ var ConfigEditor = {
         var textarea = document.getElementById('config-editor-textarea');
         if (textarea) {
             textarea.value = '';
-            textarea.classList.add('oc-hidden');
+            this.setVisibility(textarea, false);
         }
         ocShowLoading(textarea.parentNode, '<%:Loading config file...%>');
         var mergeview = document.getElementById('config-mergeview-container');
-        if (mergeview) mergeview.classList.add('oc-hidden');
+        this.setVisibility(mergeview, false);
 
         var banner = document.getElementById('overwrite-banner');
-        if (banner) banner.classList.add('oc-hidden');
+        this.setVisibility(banner, false);
 
         var tabs = document.getElementById('config-mode-tabs');
-        if (tabs) tabs.classList.remove('oc-hidden');
+        this.setVisibility(tabs, true);
 
         var layoutBtn = document.getElementById('config-editor-layout');
-        if (layoutBtn) layoutBtn.classList.remove('oc-hidden');
+        this.setVisibility(layoutBtn, true);
 
         if (!configFile) {
             alert('<%:Please select a config file first%>');
@@ -257,13 +296,14 @@ var ConfigEditor = {
             configNameElement.textContent = this.formatDisplayName(configFile);
         }
 
-        this.hideMergeView();
+        this.hideMergeView(true);
         this.updateModeTabs();
         self.loadConfigContent();
     },
 
     showOverwrite: function() {
         var self = this;
+        this.loadSequence++;
         this.isOverwrite = true;
         this.currentViewMode = 'original';
         this.originalContent = '';
@@ -279,20 +319,20 @@ var ConfigEditor = {
         var textarea = document.getElementById('config-editor-textarea');
         if (textarea) {
             textarea.value = '';
-            textarea.classList.add('oc-hidden');
+            this.setVisibility(textarea, false);
         }
         ocShowLoading(textarea.parentNode, '<%:Loading config file...%>');
         var mergeview = document.getElementById('config-mergeview-container');
-        if (mergeview) mergeview.classList.add('oc-hidden');
+        this.setVisibility(mergeview, false);
 
         var banner = document.getElementById('overwrite-banner');
-        if (banner) banner.classList.remove('oc-hidden');
+        this.setVisibility(banner, true);
 
         var tabs = document.getElementById('config-mode-tabs');
-        if (tabs) tabs.classList.add('oc-hidden');
+        this.setVisibility(tabs, false);
 
         var layoutBtn = document.getElementById('config-editor-layout');
-        if (layoutBtn) layoutBtn.classList.add('oc-hidden');
+        this.setVisibility(layoutBtn, false);
 
         if (!this.currentConfigFile) {
             this.currentConfigFile = '/etc/openkill/custom/openkill_custom_overwrite.sh';
@@ -308,7 +348,7 @@ var ConfigEditor = {
             editTitle.textContent = '<%:Overwrite Edit%>: ';
         }
 
-        if (this.overwriteCardBar) this.overwriteCardBar.classList.remove('oc-hidden');
+        this.setVisibility(this.overwriteCardBar, true);
         this.loadOverwriteFiles();
 
         var configNameElement = document.getElementById('config-file-name');
@@ -316,7 +356,7 @@ var ConfigEditor = {
             configNameElement.textContent = this.formatDisplayName(this.currentConfigFile);
         }
 
-        this.hideMergeView();
+        this.hideMergeView(true);
         self.loadConfigContent();
     },
 
@@ -335,7 +375,7 @@ var ConfigEditor = {
         }
         this._currentEditorMode = null;
         var textarea = document.getElementById('config-editor-textarea');
-        if (textarea) textarea.classList.remove('oc-hidden');
+        this.setVisibility(textarea, true);
     },
 
     toggleFullscreen: function(forceState) {
@@ -359,6 +399,8 @@ var ConfigEditor = {
     },
 
     hide: function() {
+        this.loadSequence++;
+        this.overwriteLoadSequence++;
         this.overlay.classList.remove('show');
 
         this._destroyEditor();
@@ -366,7 +408,7 @@ var ConfigEditor = {
 
         this.isModified = false;
         this.originalContent = '';
-        this.overwriteCardBar.classList.add('oc-hidden');
+        this.setVisibility(this.overwriteCardBar, false);
         if (!this.isOverwrite) {
             this.currentConfigFile = '';
         }
@@ -378,9 +420,9 @@ var ConfigEditor = {
 
         if (textarea) {
             ocHideLoading(textarea.parentNode);
-            textarea.classList.add('oc-hidden');
+            this.setVisibility(textarea, false);
         }
-        if (mergeview) mergeview.classList.add('oc-hidden');
+        this.setVisibility(mergeview, false);
         if (layoutBtn) {
             layoutBtn.classList.remove('active');
             layoutBtn.title = "<%:Compare%>";
@@ -420,8 +462,8 @@ var ConfigEditor = {
         var saveBtn = document.getElementById('config-editor-save');
         if (this.isOverwrite) {
             if (tabOriginal && tabRuntime) {
-                tabOriginal.classList.remove('active');
-                tabRuntime.classList.remove('active');
+                this.setModeTab(tabOriginal, false);
+                this.setModeTab(tabRuntime, false);
             }
             if (saveBtn) {
                 saveBtn.disabled = !this.isModified;
@@ -432,16 +474,16 @@ var ConfigEditor = {
         }
         if (tabOriginal && tabRuntime) {
             if (this.currentViewMode === 'original') {
-                tabOriginal.classList.add('active');
-                tabRuntime.classList.remove('active');
+                this.setModeTab(tabOriginal, true);
+                this.setModeTab(tabRuntime, false);
                 if (saveBtn) {
                     saveBtn.disabled = !this.isModified;
                     saveBtn.style.opacity = this.isModified ? '1' : '0.5';
                     saveBtn.style.cursor = this.isModified ? 'pointer' : 'not-allowed';
                 }
             } else {
-                tabOriginal.classList.remove('active');
-                tabRuntime.classList.add('active');
+                this.setModeTab(tabOriginal, false);
+                this.setModeTab(tabRuntime, true);
                 if (saveBtn) {
                     saveBtn.disabled = true;
                     saveBtn.style.opacity = '0.5';
@@ -453,10 +495,21 @@ var ConfigEditor = {
 
     loadConfigContent: function() {
         var self = this;
+        var loadToken = ++this.loadSequence;
+        var requestConfigFile = this.currentConfigFile;
+        var requestViewMode = this.currentViewMode;
+        var requestOverwrite = this.isOverwrite;
+        function isCurrentLoad() {
+            return self.loadSequence === loadToken &&
+                self.currentConfigFile === requestConfigFile &&
+                self.currentViewMode === requestViewMode &&
+                self.isOverwrite === requestOverwrite && self.overlay &&
+                self.overlay.classList.contains('show');
+        }
         var statusText = document.getElementById('config-editor-status-text');
         var textarea = document.getElementById('config-editor-textarea');
         var mergeview = document.getElementById('config-mergeview-container');
-        if (mergeview) mergeview.classList.add('oc-hidden');
+        this.setVisibility(mergeview, false);
 
         statusText.textContent = '<%:Loading...%>';
 
@@ -481,6 +534,7 @@ var ConfigEditor = {
         }
 
         function renderEditor(content, mode, readOnly, lint) {
+            if (!isCurrentLoad()) return;
             textarea.value = content;
 
             var editorKey = mode + '|' + (readOnly ? 'r' : 'w') + '|' + (lint ? 'l' : 'n');
@@ -492,7 +546,7 @@ var ConfigEditor = {
                 });
                 self.isModified = false;
                 self.updateSaveButtonState();
-                textarea.classList.add('oc-hidden');
+                self.setVisibility(textarea, false);
                 ocHideLoading(textarea.parentNode);
                 return;
             }
@@ -560,7 +614,7 @@ var ConfigEditor = {
                 parent: parent
             });
 
-            textarea.classList.add('oc-hidden');
+            self.setVisibility(textarea, false);
             self.editorInstance.dom.style.height = '100%';
             ocHideLoading(textarea.parentNode);
 
@@ -588,6 +642,7 @@ var ConfigEditor = {
                 return r.json();
             })
             .then(function(data) {
+                if (!isCurrentLoad()) return;
                 if (data.status === 'success' && data.content !== undefined) {
                     if (self.currentViewMode === 'runtime' && !self.isOverwrite) {
                         self.runtimeContent = data.content;
@@ -605,6 +660,7 @@ var ConfigEditor = {
                 }
             })
             .catch(function(err) {
+                if (!isCurrentLoad()) return;
                 ocHideLoading(textarea.parentNode);
                 statusText.textContent = '<%:Load failed%>';
             });
@@ -613,25 +669,35 @@ var ConfigEditor = {
     showMergeView: function() {
         var self = this;
         if (this.isOverwrite) return;
+        var mergeToken = ++this.loadSequence;
+        var requestConfigFile = this.currentConfigFile;
+        var requestMode = this.currentViewMode;
+        function isCurrentMerge() {
+            return self.loadSequence === mergeToken &&
+                self.currentConfigFile === requestConfigFile &&
+                self.currentViewMode === requestMode &&
+                !self.isOverwrite && self.overlay &&
+                self.overlay.classList.contains('show');
+        }
         var container = document.getElementById('config-mergeview-container');
         var textarea = document.getElementById('config-editor-textarea');
         var tabs = document.getElementById('config-mode-tabs');
         var editor_help = document.getElementById('config-editor-help');
         var statusText = document.getElementById('config-editor-status-text');
 
-        if (tabs) tabs.classList.add('oc-hidden');
+        this.setVisibility(tabs, false);
         if (textarea) {
-            textarea.classList.add('oc-hidden');
+            this.setVisibility(textarea, false);
             ocHideLoading(textarea.parentNode);
         }
-        if (container) container.classList.remove('oc-hidden');
+        this.setVisibility(container, true);
         if (statusText) statusText.textContent = '<%:Loading...%>';
         if (editor_help) editor_help.innerHTML = '<%:Press%> <b style="color:var(--success-color)">F10</b> <%:to toggle differences,%> <b style="color:var(--success-color)">F11</b> <%:for fullscreen,%> <b style="color:var(--success-color)">Esc</b> <%:to exit fullscreen,%> <b style="color:var(--success-color)">Ctrl + <%:Mouse Wheel%></b> <%:to zoom%>';
 
         var getOriginal = function() {
             return new Promise(function(resolve, reject) {
                 if (self.originalContent) return resolve(self.originalContent);
-                var url = '/cgi-bin/luci/admin/services/openkill/config_file_read?config_file=' + encodeURIComponent(self.currentConfigFile);
+                var url = '/cgi-bin/luci/admin/services/openkill/config_file_read?config_file=' + encodeURIComponent(requestConfigFile);
                 fetch(url).then(function(r){return r.json()}).then(function(data){
                     resolve(data.content || '');
                 }).catch(function(){resolve('')});
@@ -640,7 +706,7 @@ var ConfigEditor = {
         var getRuntime = function() {
             return new Promise(function(resolve, reject) {
                 if (self.runtimeContent) return resolve(self.runtimeContent);
-                var runtimePath = '/etc/openkill/' + encodeURIComponent(self.formatDisplayName(self.currentConfigFile));
+                var runtimePath = '/etc/openkill/' + encodeURIComponent(self.formatDisplayName(requestConfigFile));
                 var url = '/cgi-bin/luci/admin/services/openkill/config_file_read?config_file=' + runtimePath;
                 fetch(url).then(function(r){return r.json()}).then(function(data){
                     resolve(data.content || '');
@@ -651,6 +717,7 @@ var ConfigEditor = {
         this.mergeShowDifferences = true;
 
         Promise.all([getOriginal(), getRuntime()]).then(function(contents){
+            if (!isCurrentMerge()) return;
             var original = contents[0] || '';
             var runtime = contents[1] || '';
             container.innerHTML = '';
@@ -702,7 +769,8 @@ var ConfigEditor = {
         });
     },
 
-    hideMergeView: function() {
+    hideMergeView: function(skipLoad) {
+        this.loadSequence++;
         var container = document.getElementById('config-mergeview-container');
         var textarea = document.getElementById('config-editor-textarea');
         var tabs = document.getElementById('config-mode-tabs');
@@ -710,13 +778,13 @@ var ConfigEditor = {
         var layoutBtn = document.getElementById('config-editor-layout');
         if (container) {
             container.innerHTML = '';
-            container.classList.add('oc-hidden');
+            this.setVisibility(container, false);
         }
-        if (textarea) textarea.classList.remove('oc-hidden');
-        if (!this.isOverwrite && tabs) tabs.classList.remove('oc-hidden');
+        this.setVisibility(textarea, true);
+        if (!this.isOverwrite) this.setVisibility(tabs, true);
         this.mergeViewActive = false;
         window._mergeViewInstance = null;
-        this.loadConfigContent();
+        if (!skipLoad) this.loadConfigContent();
 
         if (layoutBtn) {
             layoutBtn.classList.remove('active');
@@ -865,9 +933,13 @@ var ConfigEditor = {
 
     loadOverwriteFiles: function() {
         var self = this;
+        var loadToken = ++this.overwriteLoadSequence;
+        var editorToken = this.loadSequence;
         fetch('/cgi-bin/luci/admin/services/openkill/overwrite_file_list')
         .then(r => r.json())
         .then(function(data) {
+            if (self.overwriteLoadSequence !== loadToken || self.loadSequence !== editorToken ||
+                !self.overlay || !self.overlay.classList.contains('show') || !self.isOverwrite) return;
             var files = [];
             if (data.overwrite_files) {
                 files = data.overwrite_files.filter(function(f) {
@@ -886,9 +958,13 @@ var ConfigEditor = {
 
     loadOverwriteSubInfo: function() {
         var self = this;
+        var loadToken = ++this.overwriteLoadSequence;
+        var editorToken = this.loadSequence;
         fetch('/cgi-bin/luci/admin/services/openkill/overwrite_subscribe_info')
         .then(r => r.json())
         .then(function(data) {
+            if (self.overwriteLoadSequence !== loadToken || self.loadSequence !== editorToken ||
+                !self.overlay || !self.overlay.classList.contains('show') || !self.isOverwrite) return;
             if (data.status === 'success') {
                 self.overwriteSubInfo = (data && data.data) ? data.data : {};
                 Object.keys(self.overwriteSubInfo).forEach(function(key) {
@@ -1433,6 +1509,12 @@ var ConfigEditor = {
             list.appendChild(card);
         });
 
+        // The card list is retained across renders. Bind its delegated drag
+        // handlers once so a refresh or selection change cannot stack old
+        // closures and apply one reorder more than once.
+        if (list.dataset.overwriteDragBound !== '1') {
+            list.dataset.overwriteDragBound = '1';
+
         list.addEventListener('dragover', function(e) {
             e.preventDefault();
 
@@ -1589,11 +1671,12 @@ var ConfigEditor = {
             ConfigEditor.overwriteDrag.startIndex = null;
             ConfigEditor.overwriteDrag.isTouchDragging = false;
         });
+        }
 
         if (self.isOverwrite) {
-            bar.classList.remove('oc-hidden');
+            self.setVisibility(bar, true);
         } else {
-            bar.classList.add('oc-hidden');
+            self.setVisibility(bar, false);
         }
     },
 
@@ -1674,7 +1757,7 @@ var ConfigEditor = {
         var allChecked = !!selectedMap['all'];
 
         var allOptionHtml = `
-            <label class="overwrite-config-option${allChecked ? ' selected' : ''}" data-path="all" data-all-option="1">
+            <label class="overwrite-config-option${allChecked ? ' selected' : ''}" data-path="all" data-all-option="1" aria-checked="${allChecked ? 'true' : 'false'}">
                 <span class="overwrite-config-option-left">
                     <input type="checkbox" value="all"${allChecked ? ' checked' : ''}>
                     <span class="overwrite-config-option-name" title="<%:Use For All Config File%>"><%:Use For All Config File%></span>
@@ -1690,7 +1773,7 @@ var ConfigEditor = {
             var stateText = checked ? '✓' : '';
             var disabled = allChecked;
             return `
-                <label class="overwrite-config-option${selectedClass}${disabledClass}" data-path="${file.path}">
+                <label class="overwrite-config-option${selectedClass}${disabledClass}" data-path="${file.path}" aria-checked="${checked ? 'true' : 'false'}" aria-disabled="${allChecked ? 'true' : 'false'}">
                     <span class="overwrite-config-option-left">
                         <input type="checkbox" value="${file.path}"${checked}${disabled ? ' disabled' : ''}>
                         <span class="overwrite-config-option-name" title="${file.name}">${file.name}</span>
@@ -1704,11 +1787,11 @@ var ConfigEditor = {
 
         return `
             <div class="overwrite-config-dropdown form-select-wrapper" id="${dropdownId}">
-                <button type="button" class="overwrite-config-dropdown-btn form-select">
+                <button type="button" class="overwrite-config-dropdown-btn form-select" aria-haspopup="true" aria-expanded="false" aria-controls="${dropdownId}-panel">
                     <span class="overwrite-config-dropdown-text"><%:Use For All Config File%></span>
                     <span class="overwrite-config-dropdown-arrow"></span>
                 </button>
-                <div class="overwrite-config-dropdown-panel">
+                <div class="overwrite-config-dropdown-panel" id="${dropdownId}-panel" role="group" aria-hidden="true" hidden>
                     ${optionsHtml}
                 </div>
             </div>
@@ -1740,6 +1823,20 @@ var ConfigEditor = {
         var btn = container.querySelector('.overwrite-config-dropdown-btn');
         var panel = container.querySelector('.overwrite-config-dropdown-panel');
 
+        function setDropdownOpen(open) {
+            var isOpen = !!open;
+            container.classList.toggle('open', isOpen);
+            if (btn) btn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            if (panel) {
+                panel.hidden = !isOpen;
+                panel.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
+                if (!isOpen && panel.contains && document.activeElement &&
+                    panel.contains(document.activeElement) && document.activeElement.blur) {
+                    document.activeElement.blur();
+                }
+            }
+        }
+
         function syncAllExclusiveState() {
             var allInput = container.querySelector('.overwrite-config-option input[type="checkbox"][value="all"]');
             var allOption = allInput ? allInput.closest('.overwrite-config-option') : null;
@@ -1748,6 +1845,7 @@ var ConfigEditor = {
 
             if (allOption) {
                 allOption.classList.toggle('selected', allSelected);
+                allOption.setAttribute('aria-checked', allSelected ? 'true' : 'false');
             }
             if (allState) {
                 allState.textContent = allSelected ? '✓' : '';
@@ -1765,6 +1863,7 @@ var ConfigEditor = {
                     option.classList.toggle('selected', input.checked);
                     option.classList.toggle('disabled-by-all', allSelected);
                     option.setAttribute('aria-disabled', allSelected ? 'true' : 'false');
+                    option.setAttribute('aria-checked', input.checked ? 'true' : 'false');
                 }
                 if (state) {
                     state.textContent = input.checked ? '✓' : '';
@@ -1779,7 +1878,13 @@ var ConfigEditor = {
         if (btn && !btn.disabled) {
             btn.addEventListener('click', function(e) {
                 e.stopPropagation();
-                container.classList.toggle('open');
+                setDropdownOpen(!container.classList.contains('open'));
+            });
+            btn.addEventListener('keydown', function(e) {
+                if (e.key !== 'Enter' && e.key !== ' ') return;
+                e.preventDefault();
+                e.stopPropagation();
+                setDropdownOpen(!container.classList.contains('open'));
             });
         }
 
@@ -1799,6 +1904,7 @@ var ConfigEditor = {
                 var state = option ? option.querySelector('.overwrite-config-option-state') : null;
                 if (option) {
                     option.classList.toggle('selected', input.checked);
+                    option.setAttribute('aria-checked', input.checked ? 'true' : 'false');
                 }
                 if (state) {
                     state.textContent = input.checked ? '✓' : '';
@@ -1815,7 +1921,14 @@ var ConfigEditor = {
 
         document.addEventListener('click', function(e) {
             if (!container.contains(e.target)) {
-                container.classList.remove('open');
+                setDropdownOpen(false);
+            }
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && container.classList.contains('open')) {
+                e.preventDefault();
+                setDropdownOpen(false);
+                if (btn && btn.focus) btn.focus();
             }
         });
     },
@@ -1848,7 +1961,7 @@ var ConfigEditor = {
         removeBtn.addEventListener('click', function() {
             row.parentNode.removeChild(row);
             if (container.children.length === 0) {
-                container.classList.add('oc-hidden');
+                ConfigEditor.setVisibility(container, false);
             }
         });
 
@@ -1856,7 +1969,7 @@ var ConfigEditor = {
         row.appendChild(valueInput);
         row.appendChild(removeBtn);
         container.appendChild(row);
-        container.classList.remove('oc-hidden');
+        this.setVisibility(container, true);
     },
 
     buildOverwriteParamRows: function(container, paramStr) {
@@ -1907,17 +2020,18 @@ var ConfigEditor = {
         var readonly = !!options.readonly;
         var showTabs = !!options.showTabs;
         var activeTab = options.activeTab || 'file';
+        if (activeTab !== 'file' && activeTab !== 'subscribe') activeTab = 'file';
         var fileConfigDropdown = this.renderOverwriteConfigDropdown(sub.config || '', 'overwrite-upload-config-dropdown');
         var subscribeConfigDropdown = this.renderOverwriteConfigDropdown(sub.config || '', 'overwrite-subscribe-config-dropdown');
 
         var tabsHtml = showTabs ? `
             <div class="upload-mode-selector">
-                <div class="mode-tabs">
-                    <button type="button" class="mode-tab${activeTab==='file'?' active':''}" id="overwrite-upload-mode-file" data-mode="file">
+                <div class="mode-tabs" role="tablist" aria-label="<%:Overwrite module mode%>">
+                    <button type="button" class="mode-tab${activeTab==='file'?' active':''}" id="overwrite-upload-mode-file" data-mode="file" role="tab" aria-selected="${activeTab==='file'?'true':'false'}" aria-controls="overwrite-upload-content-file" tabindex="${activeTab==='file'?'0':'-1'}">
                         <svg width="16" height="16"><use href="#oc-icon-upload"/></svg>
                         <%:Upload File%>
                     </button>
-                    <button type="button" class="mode-tab${activeTab==='subscribe'?' active':''}" id="overwrite-upload-mode-subscribe" data-mode="subscribe">
+                    <button type="button" class="mode-tab${activeTab==='subscribe'?' active':''}" id="overwrite-upload-mode-subscribe" data-mode="subscribe" role="tab" aria-selected="${activeTab==='subscribe'?'true':'false'}" aria-controls="overwrite-upload-content-subscribe" tabindex="${activeTab==='subscribe'?'0':'-1'}">
                         <svg width="15" height="15"><use href="#oc-icon-link"/></svg>
                         <%:Subscribe Link%>
                     </button>
@@ -1961,17 +2075,17 @@ var ConfigEditor = {
                 <div class="form-group">
                     <label><%:Type%>:</label>
                     <div class="form-select-wrapper">
-                        <select class="form-select" name="type" id="overwrite-subscribe-type" ${readonly ? 'disabled' : ''}>
+                        <select class="form-select" name="type" id="overwrite-subscribe-type" aria-controls="overwrite-subscribe-url-group overwrite-subscribe-update-group" aria-expanded="${sub.type === 'http' ? 'true' : 'false'}" ${readonly ? 'disabled' : ''}>
                             <option value="file" ${(sub.type === 'file' || !sub.type) ? 'selected' : ''}>file</option>
                             <option value="http" ${sub.type === 'http' ? 'selected' : ''}>http</option>
                         </select>
                     </div>
                 </div>
-                <div class="form-group" id="overwrite-subscribe-url-group" style="display:${sub.type === 'http' ? 'block' : 'none'};">
+                <div class="form-group" id="overwrite-subscribe-url-group" aria-hidden="${sub.type === 'http' ? 'false' : 'true'}"${sub.type === 'http' ? '' : ' hidden'} style="display:${sub.type === 'http' ? 'block' : 'none'};">
                     <label><%:Subscription URL%>:</label>
                     <input type="text" class="form-input" name="url" id="overwrite-subscribe-url" value="${sub.url||''}">
                 </div>
-                <div class="form-group" id="overwrite-subscribe-update-group" style="display:${sub.type === 'http' ? 'block' : 'none'};">
+                <div class="form-group" id="overwrite-subscribe-update-group" aria-hidden="${sub.type === 'http' ? 'false' : 'true'}"${sub.type === 'http' ? '' : ' hidden'} style="display:${sub.type === 'http' ? 'block' : 'none'};">
                     <label><%:Update Time%>:</label>
                     <div class="update-row">
                         <div class="form-select-wrapper">
@@ -1995,13 +2109,13 @@ var ConfigEditor = {
                         </div>
                     </div>
                 </div>
-                <div class="form-group" id="overwrite-subscribe-param-group" style="display:'block';">
+                <div class="form-group" id="overwrite-subscribe-param-group" aria-hidden="false" style="display:block;">
                     <label><%:Environment variable%>:</label>
                     <div class="form-help" style="margin-bottom: unset;"><%:Set environment variables for the overwrite script%></div>
-                    <div id="overwrite-subscribe-param-container" class="oc-hidden"></div>
+                    <div id="overwrite-subscribe-param-container" class="oc-hidden" aria-hidden="true"></div>
                     <button type="button" id="overwrite-subscribe-param-add" class="add-row-btn"><svg><use href="#oc-icon-add"/></svg><span><%:Add Param%></span></button>
                 </div>
-                <div class="upload-progress oc-hidden" id="overwrite-upload-progress">
+                <div class="upload-progress oc-hidden" id="overwrite-upload-progress" aria-hidden="true">
                     <div class="progress-bar">
                         <div class="progress-fill" id="overwrite-progress-fill" style="width:0%;"></div>
                     </div>
@@ -2012,10 +2126,10 @@ var ConfigEditor = {
 
         return `
             ${tabsHtml}
-            <div class="config-upload-content" id="overwrite-upload-content-file" style="${activeTab==='file'?'':'display:none;'}">
+            <div class="config-upload-content" id="overwrite-upload-content-file" role="tabpanel" aria-labelledby="overwrite-upload-mode-file" aria-hidden="${activeTab==='file'?'false':'true'}"${activeTab==='file'?'':' hidden'} style="${activeTab==='file'?'':'display:none;'}">
                 ${fileContent}
             </div>
-            <div class="config-upload-content" id="overwrite-upload-content-subscribe" style="${activeTab==='subscribe'?'':'display:none;'}">
+            <div class="config-upload-content" id="overwrite-upload-content-subscribe" role="tabpanel" aria-labelledby="overwrite-upload-mode-subscribe" aria-hidden="${activeTab==='subscribe'?'false':'true'}"${activeTab==='subscribe'?'':' hidden'} style="${activeTab==='subscribe'?'':'display:none;'}">
                 ${subscribeContent}
             </div>
         `;
@@ -2075,38 +2189,40 @@ var ConfigEditor = {
         var tabSub = model.querySelector('#overwrite-upload-mode-subscribe');
         var contentFile = model.querySelector('#overwrite-upload-content-file');
         var contentSub = model.querySelector('#overwrite-upload-content-subscribe');
-        tabFile.onclick = function() {
-            tabFile.classList.add('active');
-            tabSub.classList.remove('active');
-            contentFile.style.display = 'block';
-            contentSub.style.display = 'none';
-        };
-        tabSub.onclick = function() {
-            tabFile.classList.remove('active');
-            tabSub.classList.add('active');
-            contentFile.style.display = 'none';
-            contentSub.style.display = 'block';
-        };
+        function setActiveMode(mode) {
+            self.setOverwriteMode(tabFile, tabSub, contentFile, contentSub, mode);
+        }
+        function bindModeTab(tab, mode) {
+            if (!tab) return;
+            var activate = function(e) {
+                if (e && e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                setActiveMode(mode);
+                validateAddOverwriteForm();
+            };
+            tab.onclick = activate;
+            tab.onkeydown = activate;
+        }
+        bindModeTab(tabFile, 'file');
+        bindModeTab(tabSub, 'subscribe');
+        setActiveMode(tabFile.classList.contains('active') ? 'file' : 'subscribe');
 
         var typeSelect = model.querySelector('#overwrite-subscribe-type');
         var urlGroup = model.querySelector('#overwrite-subscribe-url-group');
         var updateGroup = model.querySelector('#overwrite-subscribe-update-group');
         if (typeSelect) {
-            if (typeSelect.value === 'http') {
-                urlGroup.style.display = 'block';
-                updateGroup.style.display = 'block';
-            } else {
-                urlGroup.style.display = 'none';
-                updateGroup.style.display = 'none';
+            function syncSubscribeType() {
+                var isHttp = typeSelect.value === 'http';
+                self.setVisibility(urlGroup, isHttp, 'block');
+                self.setVisibility(updateGroup, isHttp, 'block');
+                typeSelect.setAttribute('aria-expanded', isHttp ? 'true' : 'false');
             }
+            syncSubscribeType();
             typeSelect.addEventListener('change', function() {
-                if (typeSelect.value === 'http') {
-                    urlGroup.style.display = 'block';
-                    updateGroup.style.display = 'block';
-                } else {
-                    urlGroup.style.display = 'none';
-                    updateGroup.style.display = 'none';
-                }
+                syncSubscribeType();
             });
         }
 
@@ -2291,7 +2407,7 @@ var ConfigEditor = {
                 var progressText = form.querySelector('#overwrite-progress-text');
                 if (type === 'http') {
                     statusText.textContent = '<%:Downloading subscription content...%>';
-                    progressContainer.classList.remove('oc-hidden');
+                    self.setVisibility(progressContainer, true);
                     var progress = 0;
                     var interval = setInterval(function() {
                         progress = Math.min(progress + Math.random() * 20, 90);
@@ -2396,21 +2512,15 @@ var ConfigEditor = {
         var urlGroup = model.querySelector('#overwrite-subscribe-url-group');
         var updateGroup = model.querySelector('#overwrite-subscribe-update-group');
         if (typeSelect) {
-            if (typeSelect.value === 'http') {
-                urlGroup.style.display = 'block';
-                updateGroup.style.display = 'block';
-            } else {
-                urlGroup.style.display = 'none';
-                updateGroup.style.display = 'none';
+            function syncSubscribeType() {
+                var isHttp = typeSelect.value === 'http';
+                self.setVisibility(urlGroup, isHttp, 'block');
+                self.setVisibility(updateGroup, isHttp, 'block');
+                typeSelect.setAttribute('aria-expanded', isHttp ? 'true' : 'false');
             }
+            syncSubscribeType();
             typeSelect.addEventListener('change', function() {
-                if (typeSelect.value === 'http') {
-                    urlGroup.style.display = 'block';
-                    updateGroup.style.display = 'block';
-                } else {
-                    urlGroup.style.display = 'none';
-                    updateGroup.style.display = 'none';
-                }
+                syncSubscribeType();
             });
         }
 
@@ -2498,7 +2608,7 @@ var ConfigEditor = {
             var statusText = model.querySelector('#overwrite-edit-status-text');
             if (type === 'http') {
                 statusText.textContent = '<%:Downloading subscription content...%>';
-                progressContainer.classList.remove('oc-hidden');
+                self.setVisibility(progressContainer, true);
                 var progress = 0;
                 var interval = setInterval(function() {
                     progress = Math.min(progress + Math.random() * 20, 90);
@@ -2552,7 +2662,7 @@ var ConfigEditor = {
                 return;
             }
         }
-        this.hideMergeView();
+        this.hideMergeView(true);
         this.hide();
 
         if (window.OverwriteSubscribeManager && window.OverwriteSubscribeManager.load) {

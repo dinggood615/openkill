@@ -17,7 +17,18 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 VIEW_ROOT = ROOT / "luci-app-openkill/luasrc/view/openkill"
 STATUS = VIEW_ROOT / "status.htm"
+CONFIG_UPLOAD = VIEW_ROOT / "config_upload.htm"
+CONFIG_EDIT = VIEW_ROOT / "config_edit.htm"
+CONFIG_MERGE = VIEW_ROOT / "config_merge_editor.htm"
+UPDATE = VIEW_ROOT / "update.htm"
+MYIP = VIEW_ROOT / "myip.htm"
+LOG = VIEW_ROOT / "log.htm"
+SETTINGS_THEME = VIEW_ROOT / "settings_theme.htm"
+UPLOAD = VIEW_ROOT / "upload.htm"
+TBLSECTION = VIEW_ROOT / "tblsection.htm"
+SUB_INFO = VIEW_ROOT / "sub_info_show.htm"
 MAKEFILE = ROOT / "luci-app-openkill/Makefile"
+COMMON_JS = ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/js/common.js"
 
 
 def package_version() -> str:
@@ -88,13 +99,20 @@ class LuCIContractTests(unittest.TestCase):
                 f"setDashboardVisibility(DOMCache.{cache_name}, !!status.{field});",
                 source,
             )
-        self.assertIn("classList.toggle('hidden', !visible)", source)
+        self.assertIn(
+            "setStatusVisibility(element, visible, undefined, 'hidden');",
+            source,
+        )
+        self.assertIn("element.hidden = !shouldShow;", source)
+        self.assertIn("element.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');", source)
 
     def test_proxy_actions_are_restored_when_address_returns(self) -> None:
         source = STATUS.read_text(encoding="utf-8")
         self.assertIn("DOMCache.copy_pac_config].forEach", source)
-        self.assertIn("element.style.display = '';", source)
-        self.assertIn("element.style.display = 'none';", source)
+        self.assertIn("setStatusVisibility(element, true);", source)
+        self.assertIn("setStatusVisibility(element, false);", source)
+        self.assertIn("element.hidden = !shouldShow;", source)
+        self.assertIn("element.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');", source)
 
     def test_status_page_exposes_loading_and_live_state_hooks(self) -> None:
         source = STATUS.read_text(encoding="utf-8")
@@ -133,6 +151,242 @@ class LuCIContractTests(unittest.TestCase):
                 self.assertRegex(myip, rf'id="{element_id}"[^>]+aria-label=')
         self.assertIn('body[data-page="admin-services-openkill-client"] .myip-main-card', css)
         self.assertIn('grid-template-columns: repeat(2, minmax(0, 1fr));', css)
+
+    def test_status_settings_are_scoped_and_generation_guarded(self) -> None:
+        source = STATUS.read_text(encoding="utf-8")
+        for hook in (
+            "pendingBySetting",
+            "confirmedValues",
+            "operationSequence",
+            "normalizeValue: function(setting, value)",
+            "shouldApplyPoll: function(setting, value)",
+            "isCurrentPending: function(setting, token)",
+            "if (!self.isCurrentPending(setting, token)) return;",
+        ):
+            with self.subTest(hook=hook):
+                self.assertIn(hook, source)
+        self.assertNotIn("pendingOperations.has('run_mode_' + status.run_mode)", source)
+        self.assertNotIn("pendingOperations.has('rule_mode_' + status.rule_mode)", source)
+
+    def test_hidden_config_children_use_one_visibility_contract(self) -> None:
+        source = STATUS.read_text(encoding="utf-8")
+        self.assertIn("setVisibility: function(element, visible, displayValue)", source)
+        self.assertIn("setStatusVisibility(element, visible, displayValue, 'oc-hidden');", source)
+        self.assertIn("element.hidden = !shouldShow;", source)
+        self.assertIn("element.setAttribute('aria-hidden'", source)
+        self.assertIn("document.activeElement.blur()", source)
+        self.assertIn("this.setVisibility(detailsSection, false, 'flex');", source)
+
+    def test_runtime_optional_children_use_hidden_and_aria_contract(self) -> None:
+        source = STATUS.read_text(encoding="utf-8")
+        self.assertIn("function setStatusVisibility(element, visible, displayValue, hiddenClass)", source)
+        self.assertIn("setStatusVisibility(element, false);", source)
+        self.assertIn("setStatusVisibility(element, visible, undefined, 'hidden');", source)
+        self.assertIn("element.hidden = !shouldShow;", source)
+        self.assertIn("element.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');", source)
+        self.assertIn("controls[i].setAttribute('aria-disabled', available ? 'false' : 'true');", source)
+        self.assertIn("settingControls[j].setAttribute('aria-disabled', available ? 'false' : 'true');", source)
+        self.assertNotRegex(source, r"classList\.(?:add|remove)\('(?:oc-)?hidden'\)")
+
+    def test_segmented_controls_expose_focus_and_disabled_states(self) -> None:
+        css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/oc.css").read_text(encoding="utf-8")
+        self.assertIn(
+            '.oc.openkill-status-page input[type="radio"]:focus-visible + .cbi-button-option',
+            css,
+        )
+        self.assertIn(
+            '.oc.openkill-status-page input[type="radio"]:disabled + .cbi-button-option',
+            css,
+        )
+        self.assertIn("outline-offset: 2px;", css)
+        self.assertIn("cursor: not-allowed;", css)
+
+    def test_running_mode_uses_one_visible_segmented_control(self) -> None:
+        source = STATUS.read_text(encoding="utf-8")
+        self.assertIn('class="card-value mode-status-value"', source)
+        self.assertIn('aria-live="polite"', source)
+        css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/oc.css").read_text(encoding="utf-8")
+        self.assertIn(".oc.openkill-status-page .mode-status-value", css)
+        self.assertIn("clip-path: inset(50%);", css)
+
+    def test_upload_conditional_children_share_visibility_and_tab_contract(self) -> None:
+        source = CONFIG_UPLOAD.read_text(encoding="utf-8")
+        common = COMMON_JS.read_text(encoding="utf-8")
+        for hook in (
+            'role="tablist"',
+            'role="tabpanel"',
+            'aria-controls="advanced-options-container"',
+            'aria-expanded="false"',
+            "setVisibility: function(element, visible, displayValue)",
+            "setModeTabState: function(tab, panel, selected)",
+            "this.setModeTabState(modeFileTab, modeFileContent",
+            "self.setVisibility(advancedOptionsContainer, false)",
+            "self.setVisibility(subConvertOptions, this.checked)",
+            "tabIndex = this.value === 'custom' ? 0 : -1",
+            "syncAgeEncryptionPlacement: function()",
+            "this.syncAgeEncryptionPlacement();",
+            "this.setVisibility(ageOptionGroup, true);",
+        ):
+            with self.subTest(hook=hook):
+                self.assertIn(hook, source)
+        self.assertIn("function ocSetVisibility(element, visible, displayValue)", common)
+        self.assertIn("function ocSetTabState(tab, panel, selected)", common)
+        # Dynamic conditional controls must not rely on a class-only toggle.
+        dynamic = source[source.index("var ConfigUploader = {") :]
+        self.assertNotRegex(dynamic, r"classList\.(?:add|remove)\('oc-hidden'")
+
+    def test_config_editor_invalidates_stale_child_loads(self) -> None:
+        source = CONFIG_EDIT.read_text(encoding="utf-8")
+        for hook in (
+            "loadSequence: 0",
+            "overwriteLoadSequence: 0",
+            "var loadToken = ++this.loadSequence",
+            "function isCurrentLoad()",
+            "if (!isCurrentLoad()) return;",
+            "var mergeToken = ++this.loadSequence",
+            "function isCurrentMerge()",
+            "if (!isCurrentMerge()) return;",
+            "hideMergeView: function(skipLoad)",
+            "if (!skipLoad) this.loadConfigContent();",
+            "setOverwriteMode: function(tabFile, tabSubscribe, contentFile, contentSubscribe, mode)",
+            'aria-haspopup="true" aria-expanded="false" aria-controls="${dropdownId}-panel"',
+            'role="group" aria-hidden="true" hidden',
+            "function setDropdownOpen(open)",
+            "setDropdownOpen(!container.classList.contains('open'))",
+            "setDropdownOpen(false);",
+            "tab.onkeydown = activate;",
+        ):
+            with self.subTest(hook=hook):
+                self.assertIn(hook, source)
+        self.assertIn("this.hideMergeView(true);", source)
+        self.assertRegex(source, r"aria-selected=\"\$\{activeTab==='file'\?'true':'false'\}\"")
+        self.assertIn("if (list.dataset.overwriteDragBound !== '1')", source)
+        self.assertIn("list.dataset.overwriteDragBound = '1';", source)
+        self.assertIn("overwrite-config-dropdown-btn:focus-visible", (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/oc.css").read_text(encoding="utf-8"))
+
+    def test_update_custom_address_uses_scoped_visibility_and_keyboard_contract(self) -> None:
+        source = UPDATE.read_text(encoding="utf-8")
+        for hook in (
+            'id="custom-addr-option" role="button" tabindex="0"',
+            'aria-controls="customOptionInput addCustomOption"',
+            'aria-expanded="false"',
+            'id="customOptionInput" class="custom-option-input oc-hidden"',
+            'id="addCustomOption" role="button" aria-hidden="true" tabindex="-1"',
+            "function setUpdateVisibility(element, visible, hiddenClass)",
+            "function setCustomAddressVisibility(visible)",
+            "selectPopup.onkeydown",
+            "event.key !== 'Enter' && event.key !== ' '",
+        ):
+            with self.subTest(hook=hook):
+                self.assertIn(hook, source)
+        dynamic = source[source.index("function update(btn, type)") :]
+        self.assertNotRegex(dynamic, r"custom(?:OptionInput|Option).*classList\.(?:add|remove)\('oc-hidden'")
+        self.assertIn("setCustomAddressVisibility(false);", dynamic)
+        self.assertIn("setCustomAddressVisibility(true);", dynamic)
+
+    def test_myip_privacy_icon_keeps_visual_and_accessible_state_in_sync(self) -> None:
+        source = MYIP.read_text(encoding="utf-8")
+        eye_markup = source[source.index('id="eye-icon"') : source.index("</svg>", source.index('id="eye-icon"'))]
+        self.assertIn('aria-pressed="false"', eye_markup)
+        for hook in (
+            "function setMyIpVisibility(element, visible)",
+            "setMyIpVisibility(eyeOpen, true);",
+            "setMyIpVisibility(eyeClosed, false);",
+            "eyeIcon.setAttribute('aria-pressed', 'false');",
+            "eyeIcon.setAttribute('aria-pressed', 'true');",
+            "modeIcon.setAttribute('aria-label'",
+        ):
+            with self.subTest(hook=hook):
+                self.assertIn(hook, source)
+
+    def test_legacy_merge_tabs_and_help_use_visibility_and_selection_contract(self) -> None:
+        source = CONFIG_MERGE.read_text(encoding="utf-8")
+        for hook in (
+            'role="tablist"',
+            'id="tab-original-config" role="tab" aria-selected="true"',
+            'id="tab-runtime-config" role="tab" aria-selected="false"',
+            'id="oc-merge-help" class="oc-hidden" aria-hidden="true"',
+            'id="oc-merge-help-normal" aria-hidden="true"',
+            "function setMergeVisibility(element, visible)",
+            "function setMergeTabState(tab, selected)",
+            "setMergeVisibility(helpNormal, !isMerge);",
+            "setMergeVisibility(helpMerge, !!isMerge);",
+            "setMergeTabState(tabOriginal, true);",
+        ):
+            with self.subTest(hook=hook):
+                self.assertIn(hook, source)
+        dynamic = source[source.index("function config_merge_editor(") :]
+        self.assertNotRegex(dynamic, r"classList\.(?:add|remove)\('oc-hidden'")
+
+    def test_log_tabs_keep_selected_panel_and_keyboard_state_aligned(self) -> None:
+        source = LOG.read_text(encoding="utf-8")
+        for hook in (
+            'role="tablist"',
+            'role="tab" aria-selected="true" tabindex="0"',
+            'role="tab" aria-selected="false" tabindex="-1"',
+            'role="tabpanel" aria-hidden="false"',
+            'role="tabpanel" aria-hidden="true" hidden',
+            "function setLogTabState(li, panel, selected)",
+            "ocSetTabState(link, panel, !!selected);",
+            "link.setAttribute('aria-controls', divs[i].id);",
+            "link.onkeydown = handleTabSwitch;",
+        ):
+            with self.subTest(hook=hook):
+                self.assertIn(hook, source)
+
+    def test_settings_cards_and_search_clear_hidden_focus(self) -> None:
+        source = SETTINGS_THEME.read_text(encoding="utf-8")
+        for hook in (
+            "function setSearchVisibility(element, visible)",
+            "element._ocSearchVisibility",
+            "element.hidden = true;",
+            "document.activeElement.blur()",
+            "function setAdvancedTabVisibility(item, visible)",
+            "body.setAttribute('aria-hidden', isExpanded ? 'false' : 'true');",
+            "advancedItems.forEach(function(item)",
+            "setSearchVisibility(fields[j], found);",
+            "setSearchVisibility(cards[k], !query || cardMatch);",
+        ):
+            with self.subTest(hook=hook):
+                self.assertIn(hook, source)
+
+    def test_legacy_upload_notice_uses_shared_visibility_state(self) -> None:
+        source = UPLOAD.read_text(encoding="utf-8")
+        self.assertIn('id="upload-result" aria-live="polite"', source)
+        self.assertIn("ocSetVisibility(defaultNote, false);", source)
+        self.assertIn("ocSetVisibility(result, false);", source)
+        self.assertIn("ocSetVisibility(defaultNote, true);", source)
+        self.assertNotRegex(source, r"classList\.(?:add|remove)\('oc-hidden'")
+
+    def test_dynamic_table_tabs_keep_panels_and_classes_aligned(self) -> None:
+        source = TBLSECTION.read_text(encoding="utf-8")
+        for hook in (
+            'role="tablist"',
+            'role="tab" aria-selected="true" tabindex="0"',
+            'role="tab" aria-selected="false" tabindex="-1"',
+            'role="tabpanel" aria-hidden="false"',
+            'role="tabpanel" aria-hidden="true" hidden',
+            "function setTableTabState",
+            "function activateTableTab",
+            "tab.classList.toggle('cbi-tab', isSelected);",
+            "ocSetVisibility(panel, isSelected, 'block');",
+            "link.onkeydown = handleTabSwitch;",
+            "tab.ontouchstart = handleTabSwitch;",
+        ):
+            with self.subTest(hook=hook):
+                self.assertIn(hook, source)
+        self.assertNotIn("className = 'cbi-tab-disabled'", source)
+        css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/oc.css").read_text(encoding="utf-8")
+        self.assertIn('cbi-tabmenu li[role="presentation"] a[role="tab"]:focus-visible', css)
+
+    def test_subscription_summary_does_not_overwrite_base_classes(self) -> None:
+        source = SUB_INFO.read_text(encoding="utf-8")
+        self.assertIn('class="sub_tab openkill-subscription-summary-text"', source)
+        self.assertIn('role="status" aria-live="polite" aria-hidden="true"', source)
+        self.assertIn("function setSubscriptionInfoState_<%=idname%>(id, visible)", source)
+        self.assertIn("element.classList.toggle('sub_tab_show', shouldShow);", source)
+        self.assertIn("ocSetVisibility(element, shouldShow);", source)
+        self.assertNotIn('className = "sub_tab_show"', source)
 
 
 if __name__ == "__main__":

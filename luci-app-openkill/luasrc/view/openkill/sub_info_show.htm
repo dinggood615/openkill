@@ -10,10 +10,11 @@
 	local idname = math.random(1000)..(string.match(filename, "[%w_]+") or "")
 %>
 
+<script src="/luci-static/resources/openkill/js/common.js?v=<%=plugin_version%>"></script>
 <script src="/luci-static/resources/openkill/js/oc-icons.js?v=<%=plugin_version%>"></script>
 <div class="oc">
     <div class="sub_div openkill-subscription-summary">
-        <span id='<%=idname%>' class="sub_tab openkill-subscription-summary-text"></span>
+        <span id='<%=idname%>' class="sub_tab openkill-subscription-summary-text" role="status" aria-live="polite" aria-hidden="true"></span>
         <button type="button" class="sub_setting openkill-subscription-summary-action" title='<%:Refresh%>' alt='<%:Refresh%>' onclick='return sub_info_refresh_<%=idname%>(true)'>
             <svg viewBox="0 0 24 24"><use href="#oc-icon-refresh"/></svg>
         </button>
@@ -31,6 +32,25 @@
 var retry_<%=idname%> = 0;
 var s_<%=idname%>;
 sub_info_refresh_<%=idname%>(false);
+
+function setSubscriptionInfoState_<%=idname%>(id, visible) {
+    var element = document.getElementById(id);
+    if (!element) return;
+    var shouldShow = !!visible;
+    element.classList.toggle('sub_tab_show', shouldShow);
+    if (typeof ocSetVisibility === 'function') {
+        ocSetVisibility(element, shouldShow);
+        // ocSetVisibility owns the shared hidden/ARIA/focus contract; the
+        // legacy classes above retain this field's fade-in presentation.
+    } else {
+        element.hidden = !shouldShow;
+        element.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+        if (!shouldShow && element.contains && document.activeElement &&
+            element.contains(document.activeElement) && document.activeElement.blur) {
+            document.activeElement.blur();
+        }
+    }
+}
 
 function progressbar_<%=idname%>(v, m, pc, np, f, t, tr) {
     var screenWidth = window.innerWidth || document.documentElement.clientWidth;
@@ -172,11 +192,13 @@ function initDragScroll_<%=idname%>() {
 };
 
 function dispaly_progressbar(id, status) {
-    document.getElementById(id).className = "sub_tab_show";
+    var element = document.getElementById(id);
+    if (!element) return;
+    setSubscriptionInfoState_<%=idname%>(id, true);
     if (status && status.providers && status.providers.length > 0) {
         if (status.providers.length === 1) {
             var provider = status.providers[0];
-            document.getElementById(id).innerHTML = window["progressbar_" + id](
+            element.innerHTML = window["progressbar_" + id](
                 (provider.surplus ? provider.surplus : provider.used),
                 (provider.total),
                 (provider.percent),
@@ -184,7 +206,7 @@ function dispaly_progressbar(id, status) {
                 (provider.expire),
                 (provider.day_left)
             );
-            var textShow = document.getElementById(id).querySelector('.text_show');
+            var textShow = element.querySelector('.text_show');
             if (textShow && textShow.scrollWidth > textShow.clientWidth) {
                 var size = parseFloat(window.getComputedStyle(textShow).fontSize) || 12;
                 while (textShow.scrollWidth > textShow.clientWidth && size > 6) {
@@ -193,10 +215,10 @@ function dispaly_progressbar(id, status) {
                 }
             }
         } else {
-            document.getElementById(id).innerHTML = window["progressbar_multi_" + id](status.providers);
+            element.innerHTML = window["progressbar_multi_" + id](status.providers);
         }
     } else {
-        document.getElementById(id).innerHTML = "<span><%:No Sub Info Found%></span>";
+        element.innerHTML = "<span><%:No Sub Info Found%></span>";
     }
 };
 
@@ -229,8 +251,9 @@ function sub_info_refresh_<%=idname%>(force) {
     }
 
     if (!save_info) {
-        document.getElementById('<%=idname%>').className = "sub_tab_show";
-        document.getElementById('<%=idname%>').innerHTML = "<span><%:Collecting data...%></span>";
+        var summary = document.getElementById('<%=idname%>');
+        setSubscriptionInfoState_<%=idname%>('<%=idname%>', true);
+        if (summary) summary.innerHTML = "<span><%:Collecting data...%></span>";
     }
 
 	XHR.get('<%=luci.dispatcher.build_url("admin", "services", "openkill", "sub_info_get")%>', {filename: "<%=filename%>"}, function(x, status) {

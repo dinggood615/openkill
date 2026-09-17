@@ -34,7 +34,7 @@
 <div class="upload-note openkill-config-tool-note" id="upload-note">
 	<div class="upload-note-default" id="upload-note-default"><%:Note: Please Upload File According To File Type, File Will Be Saved To The Prompt Path%></div>
 	<% if msg and msg ~= "" then %>
-	<div class="upload-result" id="upload-result"><%=pcdata(msg)%></div>
+	<div class="upload-result" id="upload-result" aria-live="polite"><%=pcdata(msg)%></div>
 	<% end %>
 </div>
 </div>
@@ -46,10 +46,10 @@
 	var result = document.getElementById('upload-result');
 	var defaultNote = document.getElementById('upload-note-default');
 	if (result && defaultNote) {
-		defaultNote.classList.add('oc-hidden');
+		ocSetVisibility(defaultNote, false);
 		setTimeout(function() {
-			result.classList.add('oc-hidden');
-			defaultNote.classList.remove('oc-hidden');
+			ocSetVisibility(result, false);
+			ocSetVisibility(defaultNote, true);
 		}, 10000);
 	}
 })();

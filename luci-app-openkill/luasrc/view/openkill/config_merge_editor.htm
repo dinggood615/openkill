@@ -9,12 +9,12 @@
 
 <div id="my_editor_div" class="oc-flex-center">
 	<div id="config-mode-tabs" class="oc-flex-center" style="width:100%;">
-		<div class="mode-tabs">
-			<button type="button" class="mode-tab active" id="tab-original-config">
+		<div class="mode-tabs" role="tablist" aria-label="<%:Config view%>">
+			<button type="button" class="mode-tab active" id="tab-original-config" role="tab" aria-selected="true" aria-controls="my_editor_div" tabindex="0">
 			<svg width="16" height="16"><use href="#oc-icon-list"/></svg>
 			<span><%:Original Config%></span>
 		</button>
-		<button type="button" class="mode-tab" id="tab-runtime-config">
+		<button type="button" class="mode-tab" id="tab-runtime-config" role="tab" aria-selected="false" aria-controls="my_editor_div" tabindex="-1">
 			<svg width="16" height="16"><use href="#oc-icon-zap"/></svg>
 			<span><%:Runtime Config%></span>
 			</button>
@@ -26,9 +26,9 @@
 	<svg width="24" height="24"><use href="#oc-icon-compare"/></svg>
 </button>
 
-<div id="oc-merge-help" class="oc-hidden">
-	<span id="oc-merge-help-normal"><%:Press%> <b style="color:var(--success-color)">F11</b> <%:for fullscreen,%> <b style="color:var(--success-color)">Esc</b> <%:to exit fullscreen,%> <b style="color:var(--success-color)">Ctrl + <%:Mouse Wheel%></b> <%:to zoom%></span>
-	<span id="oc-merge-help-merge" class="oc-hidden"><%:Press%> <b style="color:var(--success-color)">F10</b> <%:to toggle differences,%> <b style="color:var(--success-color)">F11</b> <%:for fullscreen,%> <b style="color:var(--success-color)">Esc</b> <%:to exit fullscreen,%> <b style="color:var(--success-color)">Ctrl + <%:Mouse Wheel%></b> <%:to zoom%></span>
+<div id="oc-merge-help" class="oc-hidden" aria-hidden="true">
+	<span id="oc-merge-help-normal" aria-hidden="true"><%:Press%> <b style="color:var(--success-color)">F11</b> <%:for fullscreen,%> <b style="color:var(--success-color)">Esc</b> <%:to exit fullscreen,%> <b style="color:var(--success-color)">Ctrl + <%:Mouse Wheel%></b> <%:to zoom%></span>
+	<span id="oc-merge-help-merge" class="oc-hidden" aria-hidden="true"><%:Press%> <b style="color:var(--success-color)">F10</b> <%:to toggle differences,%> <b style="color:var(--success-color)">F11</b> <%:for fullscreen,%> <b style="color:var(--success-color)">Esc</b> <%:to exit fullscreen,%> <b style="color:var(--success-color)">Ctrl + <%:Mouse Wheel%></b> <%:to zoom%></span>
 </div>
 
 <script type="text/javascript">//<![CDATA[
@@ -41,6 +41,29 @@ var _ocIcons = {
 
 // Uses EditorView.updateListener instead of view.dispatch override.
 // dispatch() can receive TransactionSpec objects which lack docChanged.
+
+function setMergeVisibility(element, visible) {
+	if (!element) return;
+	if (typeof ocSetVisibility === 'function') {
+		ocSetVisibility(element, visible);
+		return;
+	}
+	var shouldShow = !!visible;
+	element.classList.toggle('oc-hidden', !shouldShow);
+	element.hidden = !shouldShow;
+	element.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+	if (!shouldShow && element.contains && document.activeElement &&
+		element.contains(document.activeElement) && document.activeElement.blur) {
+		document.activeElement.blur();
+	}
+}
+
+function setMergeTabState(tab, selected) {
+	if (!tab) return;
+	tab.classList.toggle('active', !!selected);
+	tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+	tab.tabIndex = selected ? 0 : -1;
+}
 
 function config_merge_editor(id, id2, target, target2, readOnly, readOnly2, wid, height) {
 	id.style.display = "none";
@@ -81,7 +104,7 @@ function config_merge_editor(id, id2, target, target2, readOnly, readOnly2, wid,
 
 	var helpEl = document.getElementById('oc-merge-help');
 	if (helpEl) {
-		helpEl.classList.remove('oc-hidden');
+		setMergeVisibility(helpEl, true);
 		var footer = document.createElement('div');
 		footer.className = 'config-editor-footer';
 		footer.style.cssText = 'border-radius:var(--radius-sm);margin: 8px 0;';
@@ -164,7 +187,7 @@ function config_merge_editor(id, id2, target, target2, readOnly, readOnly2, wid,
 			if (state.isMerge) {
 				state.showUse = true;
 				_createSingleMergeEditor(state.useContent, false);
-				document.getElementById('my_editor_div').classList.remove('oc-hidden');
+				setMergeVisibility(document.getElementById('my_editor_div'), true);
 			} else if (!state.showUse) {
 				state.showUse = true;
 				_switchSingleTab(state.useContent, false);
@@ -190,7 +213,7 @@ function config_merge_editor(id, id2, target, target2, readOnly, readOnly2, wid,
 			if (state.isMerge) {
 				state.showUse = false;
 				_createSingleMergeEditor(state.defContent, true);
-				document.getElementById('my_editor_div').classList.remove('oc-hidden');
+				setMergeVisibility(document.getElementById('my_editor_div'), true);
 			} else if (state.showUse) {
 				state.showUse = false;
 				_switchSingleTab(state.defContent, true);
@@ -256,7 +279,7 @@ function _createSingleMergeEditor(content, readOnly) {
 	}));
 
 	var mergeStatus = document.querySelector('.config-editor-status');
-	if (mergeStatus) mergeStatus.classList.add('oc-hidden');
+	setMergeVisibility(mergeStatus, false);
 
 	var view = new CM6.EditorView({
 		state: CM6.EditorState.create({ doc: content, extensions: exts }),
@@ -331,9 +354,9 @@ function _renderMergeView() {
 	if (btn && mv.dom) mv.dom.appendChild(btn);
 
 	var mergeStatus = document.querySelector('.config-editor-status');
-	if (mergeStatus) mergeStatus.classList.remove('oc-hidden');
+	setMergeVisibility(mergeStatus, true);
 	var mergeLabel = document.getElementById('oc-merge-mode-label');
-	if (mergeLabel) mergeLabel.classList.remove('oc-hidden');
+	setMergeVisibility(mergeLabel, true);
 
 	window._mergeViewInstance = mv;
 	window._ocMergeShowDifferences = true;
@@ -368,12 +391,10 @@ function _updateMergeHelpText(isMerge) {
 	var helpNormal = document.getElementById('oc-merge-help-normal');
 	var helpMerge = document.getElementById('oc-merge-help-merge');
 	if (helpNormal) {
-		if (isMerge) helpNormal.classList.add('oc-hidden');
-		else helpNormal.classList.remove('oc-hidden');
+		setMergeVisibility(helpNormal, !isMerge);
 	}
 	if (helpMerge) {
-		if (isMerge) helpMerge.classList.remove('oc-hidden');
-		else helpMerge.classList.add('oc-hidden');
+		setMergeVisibility(helpMerge, !!isMerge);
 	}
 }
 
@@ -395,10 +416,10 @@ function _toggleMergeView() {
 	if (state.isMerge) {
 		state.showUse = true;
 		_createSingleMergeEditor(state.useContent, false);
-		document.getElementById('my_editor_div').classList.remove('oc-hidden');
+		setMergeVisibility(document.getElementById('my_editor_div'), true);
 	} else {
 		_renderMergeView();
-		document.getElementById('my_editor_div').classList.add('oc-hidden');
+		setMergeVisibility(document.getElementById('my_editor_div'), false);
 	}
 	_updateMergeToggleBtn();
 	_updateMergeTabs(state.isMerge);
@@ -429,16 +450,16 @@ function _updateMergeTabs(isMerge) {
 	var tabRuntime = document.getElementById('tab-runtime-config');
 	if (!tabOriginal || !tabRuntime) return;
 	if (isMerge) {
-		tabOriginal.classList.remove('active');
-		tabRuntime.classList.remove('active');
+		setMergeTabState(tabOriginal, false);
+		setMergeTabState(tabRuntime, false);
 	} else {
 		var state = window._mergeEditorState;
 		if (state && state.showUse) {
-			tabOriginal.classList.add('active');
-			tabRuntime.classList.remove('active');
+			setMergeTabState(tabOriginal, true);
+			setMergeTabState(tabRuntime, false);
 		} else {
-			tabOriginal.classList.remove('active');
-			tabRuntime.classList.add('active');
+			setMergeTabState(tabOriginal, false);
+			setMergeTabState(tabRuntime, true);
 		}
 	}
 }

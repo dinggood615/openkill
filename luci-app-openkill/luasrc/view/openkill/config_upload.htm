@@ -3,6 +3,7 @@
     local fs = require "luci.openkill"
     local plugin_version = fs.oc_version()
 %>
+    <script src="/luci-static/resources/openkill/js/common.js?v=<%=plugin_version%>"></script>
     <script src="/luci-static/resources/openkill/js/oc-icons.js?v=<%=plugin_version%>"></script>
     <script src="/luci-static/resources/openkill/js/subconverter-version.js?v=<%=plugin_version%>"></script>
     <div class="config-upload-model-overlay" id="config-upload-overlay">
@@ -19,19 +20,19 @@
             </div>
             <div class="config-upload-content">
                 <div class="upload-mode-selector">
-                    <div class="mode-tabs">
-                        <button type="button" class="mode-tab active" id="upload-mode-file" data-mode="file">
+                    <div class="mode-tabs" role="tablist" aria-label="<%:Upload mode%>">
+                        <button type="button" class="mode-tab active" id="upload-mode-file" data-mode="file" role="tab" aria-selected="true" aria-controls="mode-file-content" tabindex="0">
                             <svg width="16" height="16"><use href="#oc-icon-upload"/></svg>
                             <%:Upload File%>
                         </button>
-                        <button type="button" class="mode-tab" id="upload-mode-subscribe" data-mode="subscribe">
+                        <button type="button" class="mode-tab" id="upload-mode-subscribe" data-mode="subscribe" role="tab" aria-selected="false" aria-controls="mode-subscribe-content" tabindex="-1">
                             <svg width="15" height="15"><use href="#oc-icon-link"/></svg>
                             <%:Subscribe Link%>
                         </button>
                     </div>
                 </div>
 
-                <div class="upload-mode-content" id="mode-file-content">
+                <div class="upload-mode-content" id="mode-file-content" role="tabpanel" aria-labelledby="upload-mode-file" aria-hidden="false">
                     <div class="upload-zone" id="upload-zone">
                         <div class="upload-icon">
                             <svg width="48" height="48"><use href="#oc-icon-upload"/></svg>
@@ -45,18 +46,18 @@
 
                     <div class="form-group">
                         <label class="form-checkbox">
-                            <input type="checkbox" id="advanced-options-enable-file" class="advanced-options-enable">
+                            <input type="checkbox" id="advanced-options-enable-file" class="advanced-options-enable" aria-controls="advanced-options-container-file" aria-expanded="false">
                             <span class="checkmark"></span>
                             <%:Advanced Options%>
                         </label>
                         <div class="form-help"><%:Show more upload options%></div>
                     </div>
 
-                    <div class="advanced-options-container oc-hidden" id="advanced-options-container-file">
+                    <div class="advanced-options-container oc-hidden" id="advanced-options-container-file" aria-hidden="true">
                     </div>
                 </div>
 
-                <div class="upload-mode-content oc-hidden" id="mode-subscribe-content">
+                <div class="upload-mode-content oc-hidden" id="mode-subscribe-content" role="tabpanel" aria-labelledby="upload-mode-subscribe" aria-hidden="true" hidden>
                     <div class="subscribe-form">
                         <div class="form-group">
                             <label for="subscribe-url-input"><%:Subscription URL%>:</label>
@@ -74,36 +75,36 @@
                                     <option value="custom"><%:Custom%></option>
                                 </select>
                             </div>
-                            <input type="text" id="subscribe-ua-custom" placeholder="<%:Enter custom User-Agent%>" class="form-input oc-hidden" style="margin-top: 8px;" />
+                            <input type="text" id="subscribe-ua-custom" placeholder="<%:Enter custom User-Agent%>" class="form-input oc-hidden" style="margin-top: 8px;" aria-hidden="true" tabindex="-1" />
                         </div>
 
                         <div class="form-group">
                             <label><%:Custom Headers%> (<%:Optional%>):</label>
                             <div class="form-help" style="margin-bottom:0;"><%:Add custom HTTP headers to the subscription request%></div>
-                            <div id="subscribe-headers-container" class="oc-hidden"></div>
+                            <div id="subscribe-headers-container" class="oc-hidden" aria-hidden="true"></div>
                             <button type="button" id="subscribe-headers-add" class="add-row-btn"><svg><use href="#oc-icon-add"/></svg><span><%:Add Header%></span></button>
                         </div>
 
                         <div class="form-group">
                             <label class="form-checkbox">
-                                <input type="checkbox" id="advanced-options-enable">
+                            <input type="checkbox" id="advanced-options-enable" aria-controls="advanced-options-container" aria-expanded="false">
                                 <span class="checkmark"></span>
                                 <%:Advanced Options%>
                             </label>
                             <div class="form-help"><%:Show more subscription options%></div>
                         </div>
 
-                        <div class="advanced-options-container oc-hidden" id="advanced-options-container">
+                        <div class="advanced-options-container oc-hidden" id="advanced-options-container" aria-hidden="true">
                             <div class="form-group">
                                 <label class="form-checkbox">
-                                    <input type="checkbox" id="sub-convert-enable">
+                                    <input type="checkbox" id="sub-convert-enable" aria-controls="sub-convert-options" aria-expanded="false">
                                     <span class="checkmark"></span>
                                     <%:Subscribe Convert Online%>
                                 </label>
                                 <div class="form-help"><%:Convert Subscribe Online With Template%></div>
                             </div>
 
-                            <div class="sub-convert-options oc-hidden" id="sub-convert-options">
+                            <div class="sub-convert-options oc-hidden" id="sub-convert-options" aria-hidden="true">
                                 <div class="form-group">
                                     <label for="convert-address-input"><%:Convert Address%>:</label>
                                     <div class="form-select-wrapper">
@@ -113,7 +114,7 @@
                                             <option value="custom"><%:Custom%></option>
                                         </select>
                                     </div>
-                                    <input type="text" id="convert-address-custom" placeholder="<%:Enter custom convert address%>" class="form-input oc-hidden" style="margin-top: 8px;" />
+                                    <input type="text" id="convert-address-custom" placeholder="<%:Enter custom convert address%>" class="form-input oc-hidden" style="margin-top: 8px;" aria-hidden="true" tabindex="-1" />
                                     <div id="subconverter-version-status-upload" class="subconverter-version-status" data-state="idle" hidden>
                                         <span class="subconverter-version-label"></span>
                                         <span class="subconverter-version-text"></span>
@@ -148,7 +149,7 @@
                                     </div>
                                 </div>
 
-                                <div class="form-group oc-hidden" id="custom-template-group">
+                                <div class="form-group oc-hidden" id="custom-template-group" aria-hidden="true">
                                     <label for="custom-template-input"><%:Custom Template URL%>:</label>
                                     <input type="text" id="custom-template-input" placeholder="<%:Enter custom template URL%>" class="form-input" />
                                 </div>
@@ -300,7 +301,7 @@
                     <div class="filename-extension">.yaml</div>
                 </div>
 
-                <div class="upload-progress oc-hidden" id="upload-progress">
+                <div class="upload-progress oc-hidden" id="upload-progress" aria-hidden="true">
                     <div class="progress-bar">
                         <div class="progress-fill" id="upload-progress-fill"></div>
                     </div>
@@ -547,6 +548,40 @@ var ConfigUploader = {
     subconverterVersionChecker: null,
     _linkRe: null,
 
+    setVisibility: function(element, visible, displayValue) {
+        if (typeof ocSetVisibility === 'function') {
+            ocSetVisibility(element, visible, displayValue);
+            return;
+        }
+        if (!element) return;
+        var shouldShow = !!visible;
+        element.classList.toggle('oc-hidden', !shouldShow);
+        element.hidden = !shouldShow;
+        element.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+        if (displayValue !== undefined) {
+            element.style.display = shouldShow ? displayValue : 'none';
+        } else if (shouldShow) {
+            element.style.removeProperty('display');
+        }
+        if (!shouldShow && element.contains && document.activeElement &&
+            element.contains(document.activeElement) && document.activeElement.blur) {
+            document.activeElement.blur();
+        }
+    },
+
+    setModeTabState: function(tab, panel, selected) {
+        if (typeof ocSetTabState === 'function') {
+            ocSetTabState(tab, panel, selected);
+            return;
+        }
+        if (tab) {
+            tab.classList.toggle('active', !!selected);
+            tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+            tab.tabIndex = selected ? 0 : -1;
+        }
+        this.setVisibility(panel, selected);
+    },
+
     init: function() {
         this.overlay = document.getElementById('config-upload-overlay');
         this.model = document.getElementById('config-upload-model');
@@ -618,7 +653,6 @@ var ConfigUploader = {
         var advancedOptionsContainer = document.getElementById('advanced-options-container');
         var advancedOptionsEnableFile = document.getElementById('advanced-options-enable-file');
         var advancedOptionsContainerFile = document.getElementById('advanced-options-container-file');
-        var ageFormNode = document.getElementById('age-encryption-group');
         var subVersionStatus = document.getElementById('subconverter-version-status-upload');
 
         if (window.OpenKillSubconverterVersion && subVersionStatus) {
@@ -647,56 +681,55 @@ var ConfigUploader = {
         filenameInput.addEventListener('input', this.updateSubmitButton.bind(this));
 
         subscribeUaSelect.addEventListener('change', function() {
-            subscribeUaCustom.classList.toggle('oc-hidden', this.value !== 'custom');
+            self.setVisibility(subscribeUaCustom, this.value === 'custom');
+            if (subscribeUaCustom) subscribeUaCustom.tabIndex = this.value === 'custom' ? 0 : -1;
         });
 
         advancedOptionsEnable.addEventListener('change', function() {
             if (this.checked) {
-                advancedOptionsContainer.classList.remove('oc-hidden');
-                if (ageFormNode && advancedOptionsContainer && ageFormNode.parentNode !== advancedOptionsContainer) {
-                    advancedOptionsContainer.appendChild(ageFormNode);
-                }
+                self.setVisibility(advancedOptionsContainer, true);
+                this.setAttribute('aria-expanded', 'true');
+                self.syncAgeEncryptionPlacement();
             } else {
-                advancedOptionsContainer.classList.add('oc-hidden');
+                self.setVisibility(advancedOptionsContainer, false);
+                this.setAttribute('aria-expanded', 'false');
                 self.resetAdvancedOptions();
                 self.updateSubmitButton();
-                if (ageFormNode && advancedOptionsContainer && ageFormNode.parentNode !== advancedOptionsContainer) {
-                    advancedOptionsContainer.appendChild(ageFormNode);
-                }
+                self.syncAgeEncryptionPlacement();
             }
         });
 
         if (advancedOptionsEnableFile) {
             advancedOptionsEnableFile.addEventListener('change', function() {
                 if (this.checked) {
-                    advancedOptionsContainerFile.classList.remove('oc-hidden');
-                    if (ageFormNode && advancedOptionsContainerFile && ageFormNode.parentNode !== advancedOptionsContainerFile) {
-                        advancedOptionsContainerFile.appendChild(ageFormNode);
-                    }
+                    self.setVisibility(advancedOptionsContainerFile, true);
+                    this.setAttribute('aria-expanded', 'true');
+                    self.syncAgeEncryptionPlacement();
                 } else {
-                    advancedOptionsContainerFile.classList.add('oc-hidden');
+                    self.setVisibility(advancedOptionsContainerFile, false);
+                    this.setAttribute('aria-expanded', 'false');
                     self.resetAdvancedOptions();
                     self.updateSubmitButton();
-                    if (ageFormNode && advancedOptionsContainer && ageFormNode.parentNode === advancedOptionsContainerFile) {
-                        advancedOptionsContainer.appendChild(ageFormNode);
-                    }
+                    self.syncAgeEncryptionPlacement();
                 }
             });
         }
 
         subConvertEnable.addEventListener('change', function() {
-            subConvertOptions.classList.toggle('oc-hidden', !this.checked);
+            self.setVisibility(subConvertOptions, this.checked);
+            this.setAttribute('aria-expanded', this.checked ? 'true' : 'false');
             self.updateSubconverterVersionStatus();
             self.updateSubmitButton();
         });
 
         convertAddressSelect.addEventListener('change', function() {
-            convertAddressCustom.classList.toggle('oc-hidden', this.value !== 'custom');
+            self.setVisibility(convertAddressCustom, this.value === 'custom');
+            if (convertAddressCustom) convertAddressCustom.tabIndex = this.value === 'custom' ? 0 : -1;
             self.updateSubconverterVersionStatus();
         });
 
         templateSelect.addEventListener('change', function() {
-            customTemplateGroup.classList.toggle('oc-hidden', this.value !== '0');
+            self.setVisibility(customTemplateGroup, this.value === '0');
         });
 
         var ageGenerateBtn = document.getElementById('age-generate-btn');
@@ -854,7 +887,8 @@ var ConfigUploader = {
 
                     if (hasAge && advFileEnable && advFileContainer) {
                         advFileEnable.checked = true;
-                        advFileContainer.classList.remove('oc-hidden');
+                        this.setVisibility(advFileContainer, true);
+                        advFileEnable.setAttribute('aria-expanded', 'true');
                         
                         if (ageNode && ageNode.parentNode !== advFileContainer) advFileContainer.appendChild(ageNode);
                     }
@@ -864,8 +898,10 @@ var ConfigUploader = {
 
         if (subscribeData) {
             if (subscribeData.config_age_hidden) {
-                advFileEnable.parentNode.parentNode.style.display = 'none';
-                ageNode.style.display = 'none';
+                var ageOptionGroup = advFileEnable && advFileEnable.parentNode ?
+                    advFileEnable.parentNode.parentNode : null;
+                this.setVisibility(ageOptionGroup, false);
+                this.setVisibility(ageNode, false);
             }
         }
 
@@ -884,41 +920,76 @@ var ConfigUploader = {
     },
 
     resetAdvancedOptions: function() {
-        document.getElementById('sub-convert-enable').checked = false;
-        document.getElementById('sub-convert-options').classList.add('oc-hidden');
-        document.getElementById('convert-address-input').selectedIndex = 0;
-        document.getElementById('convert-address-custom').classList.add('oc-hidden');
-        document.getElementById('convert-address-custom').value = '';
+        var subConvertEnable = document.getElementById('sub-convert-enable');
+        var subConvertOptions = document.getElementById('sub-convert-options');
+        if (subConvertEnable) subConvertEnable.checked = false;
+        this.setVisibility(subConvertOptions, false);
+        if (subConvertEnable) subConvertEnable.setAttribute('aria-expanded', 'false');
+        var convertAddressSelect = document.getElementById('convert-address-input');
+        if (convertAddressSelect) convertAddressSelect.selectedIndex = 0;
+        var convertAddressCustom = document.getElementById('convert-address-custom');
+        this.setVisibility(convertAddressCustom, false);
+        if (convertAddressCustom) convertAddressCustom.tabIndex = -1;
+        if (convertAddressCustom) convertAddressCustom.value = '';
 
         var templateSelect = document.getElementById('template-select');
         if (templateSelect && templateSelect.options.length > 1) {
             templateSelect.selectedIndex = 0;
         }
 
-        document.getElementById('custom-template-group').classList.add('oc-hidden');
-        document.getElementById('custom-template-input').value = '';
+        this.setVisibility(document.getElementById('custom-template-group'), false);
+        var customTemplateInput = document.getElementById('custom-template-input');
+        if (customTemplateInput) customTemplateInput.value = '';
 
-        document.getElementById('emoji-enable').checked = false;
-        document.getElementById('udp-enable').checked = false;
-        document.getElementById('skip-cert-verify').checked = false;
-        document.getElementById('sort-enable').checked = false;
-        document.getElementById('node-type-enable').checked = false;
-        document.getElementById('rule-provider-enable').checked = false;
-        document.getElementById('custom-params-input').value = '';
+        var resetIds = ['emoji-enable', 'udp-enable', 'skip-cert-verify', 'sort-enable',
+            'node-type-enable', 'rule-provider-enable'];
+        resetIds.forEach(function(id) {
+            var control = document.getElementById(id);
+            if (control) control.checked = false;
+        });
+        var customParamsInput = document.getElementById('custom-params-input');
+        if (customParamsInput) customParamsInput.value = '';
 
-        document.getElementById('keyword-input').value = '';
-        document.getElementById('exclude-keyword-input').value = '';
-        document.getElementById('exclude-expire').checked = false;
-        document.getElementById('exclude-traffic').checked = false;
-        document.getElementById('exclude-plan').checked = false;
-        document.getElementById('exclude-website').checked = false;
-        document.getElementById('age-secret-input').value = '';
-        document.getElementById('age-public-input').value = '';
+        var resetValues = ['keyword-input', 'exclude-keyword-input'];
+        resetValues.forEach(function(id) {
+            var valueControl = document.getElementById(id);
+            if (valueControl) valueControl.value = '';
+        });
+        ['exclude-expire', 'exclude-traffic', 'exclude-plan', 'exclude-website'].forEach(function(id) {
+            var checkbox = document.getElementById(id);
+            if (checkbox) checkbox.checked = false;
+        });
+        var ageSecretInput = document.getElementById('age-secret-input');
+        var agePublicInput = document.getElementById('age-public-input');
+        if (ageSecretInput) ageSecretInput.value = '';
+        if (agePublicInput) agePublicInput.value = '';
         var advFileEnable = document.getElementById('advanced-options-enable-file');
         if (advFileEnable) advFileEnable.checked = false;
         var advFileContainer = document.getElementById('advanced-options-container-file');
-        if (advFileContainer) advFileContainer.classList.add('oc-hidden');
+        if (advFileContainer) this.setVisibility(advFileContainer, false);
+        if (advFileEnable) advFileEnable.setAttribute('aria-expanded', 'false');
+        var ageNode = document.getElementById('age-encryption-group');
+        var ageOptionGroup = advFileEnable && advFileEnable.parentNode ?
+            advFileEnable.parentNode.parentNode : null;
+        // A hidden age option belongs to one edit session only. Restore both
+        // its placement and its visibility before the next config is shown;
+        // otherwise a prior file edit can strand it in the file panel or keep
+        // it hidden for the following subscription edit.
+        this.setVisibility(ageOptionGroup, true);
+        this.setVisibility(ageNode, true);
+        this.syncAgeEncryptionPlacement();
         if (this.subconverterVersionChecker) this.subconverterVersionChecker.hide();
+    },
+
+    syncAgeEncryptionPlacement: function() {
+        var ageNode = document.getElementById('age-encryption-group');
+        var subscribeContainer = document.getElementById('advanced-options-container');
+        var fileContainer = document.getElementById('advanced-options-container-file');
+        var fileEnable = document.getElementById('advanced-options-enable-file');
+        if (!ageNode) return;
+        var target = this.currentMode === 'file' && fileEnable && fileEnable.checked && fileContainer ?
+            fileContainer : subscribeContainer;
+        if (target && ageNode.parentNode !== target) target.appendChild(ageNode);
     },
 
     reset: function() {
@@ -932,13 +1003,15 @@ var ConfigUploader = {
         document.getElementById('config-filename-input').value = '';
         document.getElementById('subscribe-url-input').value = '';
         document.getElementById('subscribe-ua-input').value = 'clash-verge/v2.4.5';
-        document.getElementById('subscribe-ua-custom').classList.add('oc-hidden');
+        this.setVisibility(document.getElementById('subscribe-ua-custom'), false);
+        document.getElementById('subscribe-ua-custom').tabIndex = -1;
         var hdrContainer = document.getElementById('subscribe-headers-container');
         hdrContainer.innerHTML = '';
-        hdrContainer.classList.add('oc-hidden');
+        this.setVisibility(hdrContainer, false);
 
         document.getElementById('advanced-options-enable').checked = false;
-        document.getElementById('advanced-options-container').classList.add('oc-hidden');
+        this.setVisibility(document.getElementById('advanced-options-container'), false);
+        document.getElementById('advanced-options-enable').setAttribute('aria-expanded', 'false');
         document.getElementById('config-upload-cancel').disabled = false;
         this.resetAdvancedOptions();
 
@@ -947,7 +1020,7 @@ var ConfigUploader = {
             templateSelect.selectedIndex = 0;
         }
 
-        document.getElementById('upload-progress').classList.add('oc-hidden');
+        this.setVisibility(document.getElementById('upload-progress'), false);
         document.getElementById('config-upload-status-text').textContent = '<%:Ready to add config%>';
         document.getElementById('config-upload-submit').textContent = '<%:Add Config%>';
         this.updateSubmitButton();
@@ -967,12 +1040,14 @@ var ConfigUploader = {
             if (data.sub_ua === 'clash.meta/1.19.20' || data.sub_ua === 'clash-verge/v2.4.5' || data.sub_ua === 'Clash' || data.sub_ua === 'custom') {
                 document.getElementById('subscribe-ua-input').value = data.sub_ua;
                 if (data.sub_ua === 'custom') {
-                    document.getElementById('subscribe-ua-custom').classList.remove('oc-hidden');
+                    this.setVisibility(document.getElementById('subscribe-ua-custom'), true);
+                    document.getElementById('subscribe-ua-custom').tabIndex = 0;
                     document.getElementById('subscribe-ua-custom').value = data.sub_ua_custom || '';
                 }
             } else {
                 document.getElementById('subscribe-ua-input').value = 'custom';
-                document.getElementById('subscribe-ua-custom').classList.remove('oc-hidden');
+                this.setVisibility(document.getElementById('subscribe-ua-custom'), true);
+                document.getElementById('subscribe-ua-custom').tabIndex = 0;
                 document.getElementById('subscribe-ua-custom').value = data.sub_ua;
             }
         }
@@ -993,23 +1068,29 @@ var ConfigUploader = {
         }
 
         if (data.sub_convert === '1' || data.convert_address || data.template || data.custom_template_url || data.emoji === 'true' || data.udp === 'true' || data.skip_cert_verify === 'true' || data.sort === 'true' || data.node_type === 'true' || data.rule_provider === 'true' || data.custom_params || data.keyword || data.ex_keyword || data.de_ex_keyword || data.sub_headers || data.config_age_secret || data.config_age_public || data.config_age_algo) {
+            var advancedEnable = document.getElementById('advanced-options-enable');
             document.getElementById('advanced-options-enable').checked = true;
-            document.getElementById('advanced-options-container').classList.remove('oc-hidden');
+            this.setVisibility(document.getElementById('advanced-options-container'), true);
+            advancedEnable.setAttribute('aria-expanded', 'true');
 
             if (data.sub_convert === '1') {
+                var subConvertEnable = document.getElementById('sub-convert-enable');
                 document.getElementById('sub-convert-enable').checked = true;
-                document.getElementById('sub-convert-options').classList.remove('oc-hidden');
+                this.setVisibility(document.getElementById('sub-convert-options'), true);
+                subConvertEnable.setAttribute('aria-expanded', 'true');
 
                 if (data.convert_address) {
                     if (data.convert_address === 'https://api.wcc.best/sub' || data.convert_address === 'https://api.asailor.org/sub') {
                         document.getElementById('convert-address-input').value = data.convert_address;
                         if (data.convert_address === 'custom') {
-                            document.getElementById('convert-address-custom').classList.remove('oc-hidden');
+                            this.setVisibility(document.getElementById('convert-address-custom'), true);
+                            document.getElementById('convert-address-custom').tabIndex = 0;
                             document.getElementById('convert-address-custom').value = data.convert_address_custom || '';
                         }
                     } else {
                         document.getElementById('convert-address-input').value = 'custom';
-                        document.getElementById('convert-address-custom').classList.remove('oc-hidden');
+                        this.setVisibility(document.getElementById('convert-address-custom'), true);
+                        document.getElementById('convert-address-custom').tabIndex = 0;
                         document.getElementById('convert-address-custom').value = data.convert_address;
                     }
                 }
@@ -1026,11 +1107,11 @@ var ConfigUploader = {
                     }
                     if (!found && data.template !== '0') {
                         templateSelect.value = '0';
-                        document.getElementById('custom-template-group').classList.remove('oc-hidden');
+                        this.setVisibility(document.getElementById('custom-template-group'), true);
                         document.getElementById('custom-template-input').value = data.template;
                     } else if (data.template === '0') {
                         templateSelect.value = '0';
-                        document.getElementById('custom-template-group').classList.remove('oc-hidden');
+                        this.setVisibility(document.getElementById('custom-template-group'), true);
                         document.getElementById('custom-template-input').value = data.custom_template_url || data.custom_template || '';
                     }
                 }
@@ -1077,6 +1158,9 @@ var ConfigUploader = {
     },
 
     switchMode: function(mode) {
+        if (mode !== 'file' && mode !== 'subscribe') {
+            mode = this.isEditMode ? 'subscribe' : 'file';
+        }
         this.currentMode = mode;
 
         var modeFileTab = document.getElementById('upload-mode-file');
@@ -1086,47 +1170,18 @@ var ConfigUploader = {
         var statusText = document.getElementById('config-upload-status-text');
         var uploadZone = document.getElementById('upload-zone');
 
-        if (this.isEditMode) {
-            modeFileTab.classList.add('oc-hidden');
-        } else {
-            modeFileTab.classList.remove('oc-hidden');
-        }
-        modeSubscribeTab.classList.remove('oc-hidden');
+        this.setVisibility(modeFileTab, !this.isEditMode);
+        this.setVisibility(modeSubscribeTab, true);
+        this.setModeTabState(modeFileTab, modeFileContent, mode === 'file' && !this.isEditMode);
+        this.setModeTabState(modeSubscribeTab, modeSubscribeContent, mode === 'subscribe' || this.isEditMode);
 
-        modeFileTab.classList.remove('active');
-        modeSubscribeTab.classList.remove('active');
-        modeFileContent.classList.add('oc-hidden');
-        modeSubscribeContent.classList.add('oc-hidden');
-
-        if (mode === 'file') {
-            modeFileTab.classList.add('active');
-            modeFileContent.classList.remove('oc-hidden');
+        if (mode === 'file' && !this.isEditMode) {
             statusText.textContent = '<%:Ready to upload file%>';
-        } else if (mode === 'subscribe') {
-            modeSubscribeTab.classList.add('active');
-            modeSubscribeContent.classList.remove('oc-hidden');
+        } else if (mode === 'subscribe' || this.isEditMode) {
             statusText.textContent = this.isEditMode ? '<%:Ready to edit subscription%>' : '<%:Ready to add subscription%>';
         }
 
-        var ageNode = document.getElementById('age-encryption-group');
-        var advancedOptionsEnableEl = document.getElementById('advanced-options-enable');
-        var advancedOptionsContainerEl = document.getElementById('advanced-options-container');
-        var advancedOptionsEnableFileEl = document.getElementById('advanced-options-enable-file');
-        var advancedOptionsContainerFileEl = document.getElementById('advanced-options-container-file');
-
-        if (ageNode) {
-            if (mode === 'file') {
-                if (advancedOptionsEnableFileEl && advancedOptionsEnableFileEl.checked && advancedOptionsContainerFileEl) {
-                    if (ageNode.parentNode !== advancedOptionsContainerFileEl) advancedOptionsContainerFileEl.appendChild(ageNode);
-                } else if (advancedOptionsContainerEl) {
-                    if (ageNode.parentNode !== advancedOptionsContainerEl) advancedOptionsContainerEl.appendChild(ageNode);
-                }
-            } else if (mode === 'subscribe') {
-                if (advancedOptionsContainerEl) {
-                    if (ageNode.parentNode !== advancedOptionsContainerEl) advancedOptionsContainerEl.appendChild(ageNode);
-                }
-            }
-        }
+        this.syncAgeEncryptionPlacement();
 
         this.selectedFile = null;
         uploadZone.classList.remove('has-file');
@@ -1275,7 +1330,7 @@ var ConfigUploader = {
             return;
         }
 
-        progressContainer.classList.remove('oc-hidden');
+        this.setVisibility(progressContainer, true);
 
         var progress = 0;
         var progressInterval = setInterval(function() {
@@ -1437,7 +1492,7 @@ var ConfigUploader = {
         submitBtn.disabled = true;
         cancelBtn.disabled = true;
         statusText.textContent = this.isEditMode ? '<%:Updating subscription...%>' : '<%:Adding subscription...%>';
-        progressContainer.classList.remove('oc-hidden');
+        this.setVisibility(progressContainer, true);
 
         var progress = 0;
         var progressInterval = setInterval(function() {
@@ -1582,7 +1637,7 @@ var ConfigUploader = {
         removeBtn.addEventListener('click', function() {
             row.parentNode.removeChild(row);
             if (container.children.length === 0) {
-                container.classList.add('oc-hidden');
+                ConfigUploader.setVisibility(container, false);
             }
         });
 
@@ -1590,7 +1645,7 @@ var ConfigUploader = {
         row.appendChild(valueInput);
         row.appendChild(removeBtn);
         container.appendChild(row);
-        container.classList.remove('oc-hidden');
+        ConfigUploader.setVisibility(container, true);
     },
 
     collectHeaders: function() {
@@ -1624,7 +1679,7 @@ var ConfigUploader = {
         this.isProcessing = false;
         submitBtn.disabled = false;
         cancelBtn.disabled = false;
-        progressContainer.classList.add('oc-hidden');
+        this.setVisibility(progressContainer, false);
     }
 };
 

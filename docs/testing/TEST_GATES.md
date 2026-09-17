@@ -54,8 +54,28 @@ accessible controls. The preview check builds a local page from the real
 status and IP templates and production CSS, then verifies the local-only
 fixture contains no LuCI template expressions or external URLs. It does not
 claim a live LuCI backend or device result. A browser pass, when Chrome is
-available, is supplementary rendering evidence and is recorded separately
-from the unified gate.
+available, is run by `scripts/test-ui-browser.py` as part of the same unified
+gate. It loads the production template, CSS, `SettingsManager` and
+`ConfigFileManager` visibility method, then exercises request races, label
+clicks, hidden-child focus recovery and 1920/1366/768/390 CSS-pixel layouts
+against an in-page mock backend. Every request is constrained to the local
+preview server; console errors, page errors, overflow and external requests
+fail the case. Missing Playwright or a browser is reported as the explicit
+`PLAYWRIGHT_UNAVAILABLE`/`PLAYWRIGHT_BROWSER_UNAVAILABLE` environment result,
+never as a generic pass.
+
+The same UI contract now covers the conditional controls that share the
+status-page interaction pattern: the custom CDN row in `update.htm`, the
+privacy and mode icons in `myip.htm`, the legacy merge editor tabs/help
+panels, the log-source tabs, settings cards/search results, dynamic CBI table
+tabs in `tblsection.htm`, and subscription summaries in `sub_info_show.htm`.
+Their visibility changes update native `hidden`, `aria-hidden`, focus and
+selection state together; source-level regressions are intentionally kept in
+the unified UI contract suite when a full LuCI backend is unavailable.
+The browser interaction probe also exercises the overwrite editor's exclusive
+config selection and verifies that its list-level drag/touch listeners are
+bound once across card rerenders. Resetting upload options is checked to move
+the age-encryption group back to its owning mode before the next edit.
 
 `full` runs the complete local matrix. Fixture suites run with the native
 Windows interpreter, while runtime, installer, network, snapshot/FW4, Stage D

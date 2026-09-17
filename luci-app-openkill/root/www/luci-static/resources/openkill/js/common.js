@@ -171,6 +171,47 @@ function winOpen(url) {
 	return false;
 }
 
+/*
+ * Keep a conditional control's visual, semantic and focus state in sync.
+ * LuCI pages use both the legacy `oc-hidden` class and native `hidden`
+ * attributes; updating only one of them leaves stale children in the tab
+ * order or lets an inline display rule resurrect a collapsed section.
+ */
+function ocSetVisibility(element, visible, displayValue) {
+    if (!element) return;
+
+    var shouldShow = !!visible;
+    if (element.classList) element.classList.toggle('oc-hidden', !shouldShow);
+    element.hidden = !shouldShow;
+    element.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+
+    if (displayValue !== undefined) {
+        element.style.display = shouldShow ? displayValue : 'none';
+    } else if (shouldShow) {
+        element.style.removeProperty('display');
+    }
+
+    if (!shouldShow && element.contains && document.activeElement &&
+        element.contains(document.activeElement) &&
+        typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+    }
+}
+
+/* A small companion for tabs whose panel visibility is conditional. */
+function ocSetTabState(tab, panel, selected) {
+    if (tab) {
+        tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+        tab.tabIndex = selected ? 0 : -1;
+        tab.classList.toggle('active', !!selected);
+    }
+    if (panel) {
+        ocSetVisibility(panel, selected);
+        panel.setAttribute('role', 'tabpanel');
+        if (tab && tab.id) panel.setAttribute('aria-labelledby', tab.id);
+    }
+}
+
 function ocGetLogColor(log) {
 	for (var levelKey in window.levelTranslations) {
 		var translatedText = '[' + window.levelTranslations[levelKey] + ']';

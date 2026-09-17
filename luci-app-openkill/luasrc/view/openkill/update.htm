@@ -116,14 +116,14 @@
                         <span class="ver-text ver-plugin">--</span>
                         <span class="ver-text ver-core">--</span>
                     </div>
-                    <div class="select-option" data-value="custom" id="custom-addr-option">
+                    <div class="select-option" data-value="custom" id="custom-addr-option" role="button" tabindex="0" aria-controls="customOptionInput addCustomOption" aria-expanded="false">
                         <span><%:Custom Your CDN URL%></span>
                         <span class="oc-flex-center" style="height:100%;">
                             <svg width="18" height="18"><use href="#oc-icon-chevron-down"/></svg>
                         </span>
                     </div>
-                    <input type="text" id="customOptionInput" class="custom-option-input oc-hidden" value="" placeholder="<%:Type CDN URL, Format Like%> https://ghfast.top/">
-                    <div class="select-option oc-hidden" id="addCustomOption"><%:Add%></div>
+                    <input type="text" id="customOptionInput" class="custom-option-input oc-hidden" value="" placeholder="<%:Type CDN URL, Format Like%> https://ghfast.top/" aria-hidden="true" tabindex="-1">
+                    <div class="select-option oc-hidden" id="addCustomOption" role="button" aria-hidden="true" tabindex="-1"><%:Add%></div>
                 </div>
                 <div class="addr-list-loading oc-hidden" id="addr-list-loading">
                     <div class="addr-list-spinner"></div>
@@ -191,6 +191,39 @@
     var forceRefresh = false;
     var infoCache = {};
     var currentProxyAddr = '';
+
+    function setUpdateVisibility(element, visible, hiddenClass) {
+        if (!element) return;
+        var shouldShow = !!visible;
+        var legacyClass = hiddenClass || 'oc-hidden';
+        if (typeof ocSetVisibility === 'function') {
+            if (legacyClass !== 'oc-hidden') element.classList.toggle(legacyClass, !shouldShow);
+            ocSetVisibility(element, shouldShow);
+        } else {
+            element.classList.toggle(legacyClass, !shouldShow);
+            element.hidden = !shouldShow;
+            element.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+            if (!shouldShow && element.contains && document.activeElement &&
+                element.contains(document.activeElement) && document.activeElement.blur) {
+                document.activeElement.blur();
+            }
+        }
+        element.hidden = !shouldShow;
+        element.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+    }
+
+    function setCustomAddressVisibility(visible) {
+        var customInput = document.getElementById('customOptionInput');
+        var addButton = document.getElementById('addCustomOption');
+        var customOption = document.getElementById('custom-addr-option');
+        setUpdateVisibility(customInput, visible);
+        setUpdateVisibility(addButton, visible);
+        if (customInput) customInput.tabIndex = visible ? 0 : -1;
+        if (addButton) addButton.tabIndex = visible ? 0 : -1;
+        if (customOption) {
+            customOption.setAttribute('aria-expanded', visible ? 'true' : 'false');
+        }
+    }
 
     window.levelTranslations = {
         'info': '<%:Info%>',
@@ -939,15 +972,21 @@
         var addCustomOption = document.getElementById('addCustomOption');
 
         currentDownloadType = type || 'one_key';
-        customOptionInput.classList.add('oc-hidden');
-        addCustomOption.classList.add('oc-hidden');
+        setCustomAddressVisibility(false);
         customOptionInput.value = 'https://ghfast.top/';
         fetchedBranch = null;
         addrDataReceived = false;
         resetDataStatus();
 
-        selectPopup.classList.remove('hidden');
+        setUpdateVisibility(selectPopup, true, 'hidden');
         selectPopup.onclick = function(event) { click_handler(event); };
+        selectPopup.onkeydown = function(event) {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            var option = event.target.closest ? event.target.closest('.select-option') : null;
+            if (!option || option.classList.contains('addr-header')) return;
+            event.preventDefault();
+            click_handler(event);
+        };
         setAddrListLoading(true);
         initAllData();
         initHeaderDrag();
@@ -1069,16 +1108,13 @@
         }
 
         if (optionElem && optionElem.dataset.value === 'custom' && !customInput.classList.contains('oc-hidden')) {
-            customInput.classList.add('oc-hidden');
-            addBtn.classList.add('oc-hidden');
+            setCustomAddressVisibility(false);
         } else if (optionElem && optionElem.dataset.value === 'custom') {
-            customInput.classList.remove('oc-hidden');
-            addBtn.classList.remove('oc-hidden');
+            setCustomAddressVisibility(true);
             customInput.focus();
-        } else if (target === customInput) {
-            customInput.classList.remove('oc-hidden');
-            addBtn.classList.remove('oc-hidden');
-        } else if (target === addBtn) {
+        } else if (target === customInput || (target.closest && target.closest('#customOptionInput'))) {
+            setCustomAddressVisibility(true);
+        } else if (target === addBtn || (target.closest && target.closest('#addCustomOption'))) {
             var val = customInput.value.trim();
             if (val !== '' && isValidURL(val)) {
                 var listBody = document.querySelector('#addr-list-body .addr-list-scroll') || document.getElementById('addr-list-body');
@@ -1087,8 +1123,7 @@
                 div.dataset.value = val;
                 div.innerHTML = '<span class="addr-row-index"></span><span class="addr-row-url">' + val + '</span><span class="addr-status">--</span><span class="ver-text ver-plugin">--</span><span class="ver-text ver-core">--</span>';
                 listBody.insertBefore(div, document.getElementById('custom-addr-option'));
-                customInput.classList.add('oc-hidden');
-                addBtn.classList.add('oc-hidden');
+                setCustomAddressVisibility(false);
                 renderProxyStates();
                 refreshAddrInfo({merge: true, cancel: true, user: true});
             } else {
@@ -1214,7 +1249,7 @@
         var customInput = document.getElementById('customOptionInput');
         var addBtn = document.getElementById('addCustomOption');
         if (!versionTabMode) {
-            popup.classList.add('hidden');
+            setUpdateVisibility(popup, false, 'hidden');
             popup.style.transform = '';
             popup.style.left = '';
             popup.style.top = '';
@@ -1228,8 +1263,7 @@
         if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
         if (versionRetryTimer) { clearInterval(versionRetryTimer); versionRetryTimer = null; }
         if (retryTimer) { clearInterval(retryTimer); retryTimer = null; }
-        customInput.classList.add('oc-hidden');
-        addBtn.classList.add('oc-hidden');
+        setCustomAddressVisibility(false);
     }
 
     function setBtnBusy(btn, busy, busyText) {

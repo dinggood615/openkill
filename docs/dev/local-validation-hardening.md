@@ -85,7 +85,27 @@ responses. `scripts/test-ui-preview.py` builds a local-only preview from the
 same production templates and styles so responsive layout, mock state changes
 and icon hooks can be checked without a router or external request. A browser
 run against that preview is supplementary evidence; neither check claims a
-live LuCI backend or device validation.
+live LuCI backend or device validation. The browser gate executes the
+production status `SettingsManager` and config visibility method against a
+localhost-only mock. It covers stale-poll/request ordering, label selection,
+hidden-child focus removal, and the four supported viewport widths. The running
+mode's API value remains available to assistive technology while the visible
+segmented control has one authoritative set of options.
+
+The UI contract also keeps related conditional views aligned. Config upload
+and editor tabs update their panel visibility and ARIA selection together;
+custom CDN fields, merge-help panels, log-source tabs, settings-card search
+results, the IP privacy/mode icons, dynamic CBI table tabs and subscription
+summaries clear focus when hidden and restore the same state when shown. The
+browser evidence executes the production status, upload and editor
+coordinators; the update, legacy merge, log, IP, table and subscription view
+changes have deterministic source contracts because their complete LuCI
+backend is not part of the local preview.
+The upload editor also restores the age-encryption group to the correct mode
+after a reset, so a hidden file option cannot remain attached to the
+subscription panel (or vice versa). Overwrite cards bind their delegated
+drag/touch handlers once across rerenders, preventing a refresh or selection
+change from replaying one interaction through stale closures.
 
 Official Mihomo compatibility downloads remain fail-closed: if the local
 WSL TLS/DNS/network path cannot reach the release API or asset, the unified

@@ -25,6 +25,7 @@ class TestGateRunner(unittest.TestCase):
         self.assertGreater(len(gates.build_cases("full")), len(gates.build_cases("fast")))
         self.assertGreaterEqual(len(gates.build_cases("device-preflight")), len(gates.NATIVE_TESTS))
         self.assertIn("test-ui-contract", {case.name for case in gates.build_cases("fast")})
+        self.assertIn("test-ui-browser", {case.name for case in gates.build_cases("fast")})
 
     def test_dependency_key_is_content_bound(self):
         case = gates.Case("fixture", "scripts/test-3e2-safe-config.py")
@@ -42,6 +43,18 @@ class TestGateRunner(unittest.TestCase):
         names = {item["path"] for item in inputs}
         self.assertIn("luci-app-openkill/luasrc/view/openkill/status.htm", names)
         self.assertIn("luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css", names)
+
+    def test_ui_browser_declares_browser_environment_skip(self):
+        cases = {case.name: case for case in gates.NATIVE_TESTS}
+        self.assertIn("PLAYWRIGHT_UNAVAILABLE", cases["test-ui-browser"].skip_policy)
+        self.assertIn("PLAYWRIGHT_BROWSER_UNAVAILABLE", cases["test-ui-browser"].skip_policy)
+
+    def test_ui_browser_cache_binds_browser_runtime_identity(self):
+        case = gates.Case("test-ui-browser", "scripts/test-ui-browser.py")
+        with mock.patch.object(gates, "browser_runtime_identity", side_effect=("browser-a", "browser-b")):
+            first, _ = gates.dependency_key(case)
+            second, _ = gates.dependency_key(case)
+        self.assertNotEqual(first, second)
 
     def test_candidate_identity_fails_closed_on_worktree_change(self):
         manifest = {"head": "head", "runner_source_hash": "runner", "artifacts": [], "canonical_config": {}}
@@ -120,6 +133,16 @@ class TestGateRunner(unittest.TestCase):
     def test_documented_non_core_environment_skip_can_remain_allowed(self):
         records = [{"name": "test-nft-syntax", "status": "NOT_RUN_ENVIRONMENT"}]
         self.assertTrue(gates.gate_overall("full", records))
+
+    def test_browser_unavailability_is_explicit_environment_skip(self):
+        process = subprocess.CompletedProcess(
+            [sys.executable], 0, "OPENKILL_ENVIRONMENT_LIMIT=PLAYWRIGHT_BROWSER_UNAVAILABLE\n", ""
+        )
+        status, reason = gates.classify_output(
+            gates.Case("test-ui-browser", None, skip_policy=("PLAYWRIGHT_BROWSER_UNAVAILABLE",)),
+            process,
+        )
+        self.assertEqual((status, reason), ("NOT_RUN_ENVIRONMENT", "PLAYWRIGHT_BROWSER_UNAVAILABLE"))
 
     def test_network_guard_delta_detects_route_proxy_and_dns_changes(self):
         before = {"available": True, **{key: {"hash": key} for key in ("default_route", "dns", "proxy", "adapters", "listeners", "wsl_running")}}

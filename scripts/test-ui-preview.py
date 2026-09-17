@@ -39,6 +39,16 @@ class LocalUIPreviewTests(unittest.TestCase):
         self.assertIn('aria-busy="true"', html)
         self.assertIn("var live = state === 'running';", html)
         self.assertIn("toggle.disabled = state === 'loading' || state === 'unknown' || state === 'error';", html)
+        self.assertIn("var SettingsManager = {", html)
+        self.assertIn("var ConfigFileManager = {", html)
+        self.assertIn("window.openkillSetStatusVisibility = setStatusVisibility;", html)
+        self.assertIn("var ConfigUploader = {", html)
+        self.assertIn("var ConfigEditor = {", html)
+        self.assertIn("/luci-app-openkill/root/www/luci-static/resources/openkill/js/common.js", html)
+        self.assertIn("window.ConfigUploader = ConfigUploader;", html)
+        self.assertIn("window.SettingsManager.switchSetting('run_mode'", html)
+        self.assertIn("preview.settings = window.SettingsManager || null;", html)
+        self.assertIn("preview.configManager = window.ConfigFileManager || null;", html)
         self.assertIn("'_daip', '_mix_proxy'", html)
         self.assertIn("'_webm': 'Metacubexd'", html)
         self.assertIn("'_flush_dns_cache_btn': '清理 DNS 缓存'", html)
@@ -53,6 +63,11 @@ class LocalUIPreviewTests(unittest.TestCase):
         self.assertIn("dashboard-actions-section", source)
         self.assertIn("subscription-info-details", source)
         self.assertIn("data-preview-state", load_builder().PREVIEW_SCRIPT)
+        self.assertIn("_extract_settings_manager", load_builder().__dict__)
+        self.assertIn("_extract_config_file_manager", load_builder().__dict__)
+        self.assertIn("_extract_status_visibility_helper", load_builder().__dict__)
+        self.assertIn("_extract_config_uploader", load_builder().__dict__)
+        self.assertIn("_extract_config_editor", load_builder().__dict__)
 
 
 if __name__ == "__main__":

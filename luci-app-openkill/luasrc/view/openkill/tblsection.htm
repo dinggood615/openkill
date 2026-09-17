@@ -251,32 +251,32 @@ local sectiontype = "_"..self.config.."_"..string.match(self.sectiontype, "[%w_]
     <div class="cbi-section-descr"><%=self.description%></div>
     <%- local count = 0 -%>
     <div id="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tabmenu">
-        <ul class="cbi-tabmenu">
+        <ul class="cbi-tabmenu" role="tablist" aria-label="<%:Configuration tabs%>">
             <%- 
             if self.sectiontype == "dns_servers" then
                 for i, tab in ipairs(e) do
                     if i == 1 then
             -%>
-                        <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab" data-group="<%=tab.name%>"><a title="<%=tab.name%>"><%=tab.title%></a></li>
+                        <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab" role="presentation" data-group="<%=tab.name%>"><a href="#" role="tab" aria-selected="true" tabindex="0" title="<%=tab.name%>"><%=tab.title%></a></li>
                     <%- else -%>
-                        <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab-disabled" data-group="<%=tab.name%>"><a title="<%=tab.name%>"><%=tab.title%></a></li>
+                        <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab-disabled" role="presentation" data-group="<%=tab.name%>"><a href="#" role="tab" aria-selected="false" tabindex="-1" title="<%=tab.name%>"><%=tab.title%></a></li>
                     <%- end -%>
                 <%- end -%>
             <%- elseif #e ~= 1 then
                 for i, tab in ipairs(e) do
                     if tab.name == cfg_name and cfg_name then
                 -%>
-                        <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab" data-group="<%=tab.name%>"><a title="<%=tab.name%>"><%=tab.name%></a></li>
+                        <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab" role="presentation" data-group="<%=tab.name%>"><a href="#" role="tab" aria-selected="true" tabindex="0" title="<%=tab.name%>"><%=tab.name%></a></li>
                     <%- elseif not cfg_name and tab.name == "all" then -%>
-                        <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab" data-group="<%=tab.name%>"><a title="<%:All%>"><%:All%></a></li>
+                        <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab" role="presentation" data-group="<%=tab.name%>"><a href="#" role="tab" aria-selected="true" tabindex="0" title="<%:All%>"><%:All%></a></li>
                     <%- elseif tab.name == "all" then -%>
-                <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab-disabled" data-group="<%=tab.name%>"><a title="<%:All%>"><%:All%></a></li>
+                <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab-disabled" role="presentation" data-group="<%=tab.name%>"><a href="#" role="tab" aria-selected="false" tabindex="-1" title="<%:All%>"><%:All%></a></li>
                     <%- else -%>
-                        <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab-disabled" data-group="<%=tab.name%>"><a title="<%=tab.name%>"><%=tab.name%></a></li>
+                        <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab-disabled" role="presentation" data-group="<%=tab.name%>"><a href="#" role="tab" aria-selected="false" tabindex="-1" title="<%=tab.name%>"><%=tab.name%></a></li>
                     <%- end -%>
                 <%- end -%>
             <%- else -%>
-                <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab" data-group="all"><a title="<%:All%>"><%:All%></a></li>
+                <li name="tab-header-<%=self.config%>-<%=self.sectiontype%>" class="cbi-tab" role="presentation" data-group="all"><a href="#" role="tab" aria-selected="true" tabindex="0" title="<%:All%>"><%:All%></a></li>
             <%- end -%>
         </ul>
     </div>
@@ -285,18 +285,18 @@ local sectiontype = "_"..self.config.."_"..string.match(self.sectiontype, "[%w_]
             if self.sectiontype == "dns_servers" then
                 if tab.name == "nameserver" then
             -%>
-                    <div class="dom-<%=self.config%>-<%=self.sectiontype%>" style="display: block;" data-group="<%=tab.name%>">
+                    <div class="dom-<%=self.config%>-<%=self.sectiontype%>" style="display: block;" role="tabpanel" aria-hidden="false" data-group="<%=tab.name%>">
                 <%- else -%>
-                    <div class="dom-<%=self.config%>-<%=self.sectiontype%>" data-group="<%=tab.name%>">
+                    <div class="dom-<%=self.config%>-<%=self.sectiontype%>" role="tabpanel" aria-hidden="true" hidden data-group="<%=tab.name%>">
                 <%- end -%>
             <%- elseif #e ~= 1 and tab.name == cfg_name and cfg_name then -%>
-                <div class="dom-<%=self.config%>-<%=self.sectiontype%>" style="display: block;" data-group="<%=tab.name%>">
+                <div class="dom-<%=self.config%>-<%=self.sectiontype%>" style="display: block;" role="tabpanel" aria-hidden="false" data-group="<%=tab.name%>">
             <%- elseif #e ~= 1 and tab.name == "all" and not cfg_name then -%>
-                <div class="dom-<%=self.config%>-<%=self.sectiontype%>" style="display: block;" data-group="<%=tab.name%>">
+                <div class="dom-<%=self.config%>-<%=self.sectiontype%>" style="display: block;" role="tabpanel" aria-hidden="false" data-group="<%=tab.name%>">
             <%- elseif #e == 1 then -%>
-                <div class="dom-<%=self.config%>-<%=self.sectiontype%>" style="display: block;" data-group="all">
+                <div class="dom-<%=self.config%>-<%=self.sectiontype%>" style="display: block;" role="tabpanel" aria-hidden="false" data-group="all">
             <%- else -%>
-                <div class="dom-<%=self.config%>-<%=self.sectiontype%>" data-group="<%=tab.name%>">
+                <div class="dom-<%=self.config%>-<%=self.sectiontype%>" role="tabpanel" aria-hidden="true" hidden data-group="<%=tab.name%>">
             <%- end -%>
                 <table class="table cbi-section-table">
                     <tr class="tr cbi-section-table-titles">
@@ -455,11 +455,49 @@ local sectiontype = "_"..self.config.."_"..string.match(self.sectiontype, "[%w_]
     var titles<%=sectiontype%> = document.getElementsByName('tab-header-<%=self.config%>-<%=self.sectiontype%>');
     var divs<%=sectiontype%> = document.getElementsByClassName('dom-<%=self.config%>-<%=self.sectiontype%>');
 
+    function setTableTabState<%=sectiontype%>(tab, panel, selected) {
+        if (!tab || !panel) return;
+        var link = tab.querySelector('a');
+        var isSelected = !!selected;
+        tab.classList.toggle('cbi-tab', isSelected);
+        tab.classList.toggle('cbi-tab-disabled', !isSelected);
+        tab.setAttribute('role', 'presentation');
+        if (link) {
+            link.setAttribute('role', 'tab');
+            link.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+            link.tabIndex = isSelected ? 0 : -1;
+        }
+        if (typeof ocSetVisibility === 'function') {
+            ocSetVisibility(panel, isSelected, 'block');
+        } else {
+            panel.hidden = !isSelected;
+            panel.style.display = isSelected ? 'block' : 'none';
+            panel.setAttribute('aria-hidden', isSelected ? 'false' : 'true');
+            if (!isSelected && panel.contains && document.activeElement &&
+                panel.contains(document.activeElement) && document.activeElement.blur) {
+                document.activeElement.blur();
+            }
+        }
+        panel.setAttribute('role', 'tabpanel');
+        if (link && link.id) panel.setAttribute('aria-labelledby', link.id);
+    }
+
+    function activateTableTab<%=sectiontype%>(index, persist) {
+        index = parseInt(index, 10);
+        if (isNaN(index) || index < 0 || index >= titles<%=sectiontype%>.length ||
+            titles<%=sectiontype%>.length !== divs<%=sectiontype%>.length) return false;
+        for (var j = 0; j < titles<%=sectiontype%>.length; j++) {
+            setTableTabState<%=sectiontype%>(titles<%=sectiontype%>[j], divs<%=sectiontype%>[j], j === index);
+        }
+        if (persist) localStorage.setItem("titles<%=sectiontype%>", String(index));
+        return true;
+    }
+
     function switch_to_tab<%=sectiontype%>(tab_name){
         if(titles<%=sectiontype%>.length != divs<%=sectiontype%>.length) return;
 
         for(var j=0; j < titles<%=sectiontype%>.length; j++){
-            if(titles<%=sectiontype%>[j].className === 'cbi-tab'){
+            if(titles<%=sectiontype%>[j].classList.contains('cbi-tab')){
                 localStorage.setItem("titles<%=sectiontype%>", j);
                 break;
             }
@@ -480,30 +518,37 @@ local sectiontype = "_"..self.config.."_"..string.match(self.sectiontype, "[%w_]
         if(titles<%=sectiontype%>.length != divs<%=sectiontype%>.length) return;
 
         if (localStorage.getItem("id<%=sectiontype%>")) {
-            if (document.getElementById(localStorage.getItem("id<%=sectiontype%>"))) {
-                document.getElementById(localStorage.getItem("id<%=sectiontype%>")).scrollIntoView();
-            };
+            var target = document.getElementById(localStorage.getItem("id<%=sectiontype%>"));
+            if (target && target.scrollIntoView) target.scrollIntoView();
             localStorage.removeItem("id<%=sectiontype%>");
         };
 
-        if (localStorage.getItem("titles<%=sectiontype%>")) {
-            if (titles<%=sectiontype%>[localStorage.getItem("titles<%=sectiontype%>")]) {
-                for(var j=0; j < titles<%=sectiontype%>.length; j++){
-                    titles<%=sectiontype%>[j].className = 'cbi-tab-disabled';
-                    divs<%=sectiontype%>[j].style.display = 'none';
-                };
-                titles<%=sectiontype%>[localStorage.getItem("titles<%=sectiontype%>")].className = 'cbi-tab';
-                divs<%=sectiontype%>[localStorage.getItem("titles<%=sectiontype%>")].style.display = 'block';
-            };
+        var activeIndex = 0;
+        for (var current = 0; current < titles<%=sectiontype%>.length; current++) {
+            if (titles<%=sectiontype%>[current].classList.contains('cbi-tab')) {
+                activeIndex = current;
+                break;
+            }
+        }
+        var savedIndex = localStorage.getItem("titles<%=sectiontype%>");
+        if (savedIndex !== null) {
+            var parsedIndex = parseInt(savedIndex, 10);
+            if (!isNaN(parsedIndex) && parsedIndex >= 0 && parsedIndex < titles<%=sectiontype%>.length) {
+                activeIndex = parsedIndex;
+            }
             localStorage.removeItem("titles<%=sectiontype%>");
-        };
+        }
 
         for(var i=0; i < titles<%=sectiontype%>.length; i++){
             var li<%=sectiontype%> = titles<%=sectiontype%>[i];
+            var panel<%=sectiontype%> = divs<%=sectiontype%>[i];
             li<%=sectiontype%>.id = i;
 
             var a<%=sectiontype%> = li<%=sectiontype%>.querySelector('a');
             if (a<%=sectiontype%>) {
+                a<%=sectiontype%>.id = 'cbi-tab-<%=self.config%>-<%=self.sectiontype%>-' + i;
+                a<%=sectiontype%>.setAttribute('aria-controls', 'cbi-panel-<%=self.config%>-<%=self.sectiontype%>-' + i);
+                panel<%=sectiontype%>.id = 'cbi-panel-<%=self.config%>-<%=self.sectiontype%>-' + i;
                 if (a<%=sectiontype%>.scrollWidth > a<%=sectiontype%>.clientWidth) {
                     a<%=sectiontype%>.style.textAlign = 'left';
                 } else {
@@ -511,26 +556,22 @@ local sectiontype = "_"..self.config.."_"..string.match(self.sectiontype, "[%w_]
                 }
             }
 
-            li<%=sectiontype%>.onclick = function(){
-                for(var j=0; j < titles<%=sectiontype%>.length; j++){
-                    titles<%=sectiontype%>[j].className = 'cbi-tab-disabled';
-                    divs<%=sectiontype%>[j].style.display = 'none';
-                };
-                this.className = 'cbi-tab';
-                divs<%=sectiontype%>[this.id].style.display = 'block';
-                localStorage.setItem("titles<%=sectiontype%>",this.id);
-            };
-
-            li<%=sectiontype%>.onTouchStart = function(){
-                for(var j=0; j < titles<%=sectiontype%>.length; j++){
-                    titles<%=sectiontype%>[j].className = 'cbi-tab-disabled';
-                    divs<%=sectiontype%>[j].style.display = 'none';
-                };
-                this.className = 'cbi-tab';
-                divs<%=sectiontype%>[this.id].style.display = 'block';
-                localStorage.setItem("titles<%=sectiontype%>",this.id);
-            };
+            (function(tab, panel, index, link) {
+                function handleTabSwitch(e) {
+                    if (e) {
+                        if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
+                    if (tab.classList.contains('cbi-tab')) return;
+                    activateTableTab<%=sectiontype%>(index, true);
+                }
+                tab.onclick = handleTabSwitch;
+                tab.ontouchstart = handleTabSwitch;
+                if (link) link.onkeydown = handleTabSwitch;
+            })(li<%=sectiontype%>, panel<%=sectiontype%>, i, a<%=sectiontype%>);
         };
+        activateTableTab<%=sectiontype%>(activeIndex, false);
     };
 //]]>
 </script>

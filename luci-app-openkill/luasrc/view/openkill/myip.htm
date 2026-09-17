@@ -31,7 +31,7 @@
                                 <p class="myip-section-title">
                                     <%:IP Address%>
                                     <span class="myip-toolbar">
-                                        <svg id="eye-icon" class="myip-icon-btn" role="button" tabindex="0" aria-label="<%:Hide IP%>" width="20" height="20" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" onclick="return privacy_my_ip(this)" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); return privacy_my_ip(this); }">
+                                        <svg id="eye-icon" class="myip-icon-btn" role="button" tabindex="0" aria-label="<%:Hide IP%>" aria-pressed="false" width="20" height="20" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" onclick="return privacy_my_ip(this)" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); return privacy_my_ip(this); }">
                                             <title><%:Hide IP%></title>
                                             <use id="eye-open" href="#oc-icon-eye"></use>
                                             <use id="eye-closed" class="oc-hidden" href="#oc-icon-eye-off"></use>
@@ -639,6 +639,22 @@
         IP.getIpsbIP();
     };
 
+    function setMyIpVisibility(element, visible) {
+        if (!element) return;
+        if (typeof ocSetVisibility === 'function') {
+            ocSetVisibility(element, visible);
+            return;
+        }
+        var shouldShow = !!visible;
+        element.classList.toggle('oc-hidden', !shouldShow);
+        element.hidden = !shouldShow;
+        element.setAttribute('aria-hidden', shouldShow ? 'false' : 'true');
+        if (!shouldShow && element.contains && document.activeElement &&
+            element.contains(document.activeElement) && document.activeElement.blur) {
+            document.activeElement.blur();
+        }
+    }
+
     function update_eye_icon(isOpen) {
         var eyeIcon = document.getElementById('eye-icon');
         var eyeOpen = document.getElementById('eye-open');
@@ -646,13 +662,21 @@
         var titleElement = eyeIcon.querySelector('title');
 
         if (isOpen) {
-            eyeOpen.classList.remove('oc-hidden');
-            eyeClosed.classList.add('oc-hidden');
+            setMyIpVisibility(eyeOpen, true);
+            setMyIpVisibility(eyeClosed, false);
             if (titleElement) titleElement.textContent = '<%:Hide IP%>';
+            if (eyeIcon) {
+                eyeIcon.setAttribute('aria-label', '<%:Hide IP%>');
+                eyeIcon.setAttribute('aria-pressed', 'false');
+            }
         } else {
-            eyeOpen.classList.add('oc-hidden');
-            eyeClosed.classList.remove('oc-hidden');
+            setMyIpVisibility(eyeOpen, false);
+            setMyIpVisibility(eyeClosed, true);
             if (titleElement) titleElement.textContent = '<%:Show IP%>';
+            if (eyeIcon) {
+                eyeIcon.setAttribute('aria-label', '<%:Show IP%>');
+                eyeIcon.setAttribute('aria-pressed', 'true');
+            }
         }
     };
 
@@ -729,6 +753,7 @@
             paths[2].setAttribute('stroke', '#333');
             smallRect.setAttribute('fill', '#FFF');
             if (titleElement) titleElement.textContent = '<%:Router Mode%>';
+            modeIcon.setAttribute('aria-label', '<%:Router Mode%>');
         } else {
             rect.setAttribute('fill', '#6B7280');
             rect.setAttribute('stroke', '#9CA3AF');
@@ -737,6 +762,7 @@
             paths[2].setAttribute('stroke', '#9CA3AF');
             smallRect.setAttribute('fill', '#D1D5DB');
             if (titleElement) titleElement.textContent = '<%:Browser Mode%>';
+            modeIcon.setAttribute('aria-label', '<%:Browser Mode%>');
         }
     }
 

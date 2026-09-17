@@ -3,21 +3,22 @@
     local fs = require "luci.openkill"
     local plugin_version = fs.oc_version()
 %>
+<script src="/luci-static/resources/openkill/js/common.js?v=<%=plugin_version%>"></script>
 <script src="/luci-static/resources/openkill/js/oc-icons.js?v=<%=plugin_version%>"></script>
 <body>
     <div id="tab" class="oc openkill-log-console">
         <div id="tab-header" class="openkill-log-source-tabs">
-            <ul class="oc-tabmenu openkill-log-tabs">
-                <li name="tab-header" class="oc-tab"><a href="#"><svg width="14" height="14"><use href="#oc-icon-package"/></svg><span><%:Plugin Logs%></span></a></li>
-                <li name="tab-header" class="oc-tab-disabled"><a href="#"><svg width="14" height="14"><use href="#oc-icon-cpu"/></svg><span><%:Core Logs%></span></a></li>
-                <li name="tab-header" class="oc-tab-disabled"><a href="#"><svg width="14" height="14"><use href="#oc-icon-bug"/></svg><span><%:Debug Logs%></span></a></li>
+            <ul class="oc-tabmenu openkill-log-tabs" role="tablist" aria-label="<%:Log source%>">
+                <li name="tab-header" class="oc-tab" role="presentation"><a href="#" role="tab" aria-selected="true" tabindex="0"><svg width="14" height="14" aria-hidden="true"><use href="#oc-icon-package"/></svg><span><%:Plugin Logs%></span></a></li>
+                <li name="tab-header" class="oc-tab-disabled" role="presentation"><a href="#" role="tab" aria-selected="false" tabindex="-1"><svg width="14" height="14" aria-hidden="true"><use href="#oc-icon-cpu"/></svg><span><%:Core Logs%></span></a></li>
+                <li name="tab-header" class="oc-tab-disabled" role="presentation"><a href="#" role="tab" aria-selected="false" tabindex="-1"><svg width="14" height="14" aria-hidden="true"><use href="#oc-icon-bug"/></svg><span><%:Debug Logs%></span></a></li>
             </ul>
         </div>
         <div id="tab-content" class="openkill-log-console-body">
-            <div class="dom openkill-log-panel openkill-log-panel-plugin" style="display: block;">
+            <div class="dom openkill-log-panel openkill-log-panel-plugin" role="tabpanel" aria-hidden="false" style="display: block;">
                 <textarea id="cbid.openkill.config.clog" class="oc-input-textarea" style="display:inline" data-update="change" rows="32" cols="60" readonly="readonly" ></textarea>
             </div>
-            <div class="dom openkill-log-panel openkill-log-panel-core">
+            <div class="dom openkill-log-panel openkill-log-panel-core" role="tabpanel" aria-hidden="true" hidden>
                 <textarea id="core_log" class="oc-input-textarea" style="display:inline" data-update="change" rows="32" cols="60" readonly="readonly" ></textarea>
                 <div class="radio-button openkill-log-level-controls">
                     <input type="radio" id="info" name="radios" value="info" checked onclick="return switch_log_level(this.value)"/>
@@ -32,7 +33,7 @@
                     <label for="silent"><%:Silent%></label>
                 </div>
             </div>
-            <div class="dom openkill-log-panel openkill-log-panel-debug">
+            <div class="dom openkill-log-panel openkill-log-panel-debug" role="tabpanel" aria-hidden="true" hidden>
                 <textarea id="debug_log" class="oc-input-textarea oc-hidden" data-update="change" rows="32" cols="60" readonly="readonly" ></textarea>
                 <div id="debug-render-wrapper" class="openkill-log-debug-preview">
                     <div id="debug-rendered"></div>
@@ -923,6 +924,28 @@ function poll_log(){
     );
 };
 
+function setLogTabState(li, panel, selected) {
+    if (!li || !panel) return;
+    var link = li.querySelector('a');
+    li.classList.toggle('oc-tab', !!selected);
+    li.classList.toggle('oc-tab-disabled', !selected);
+    panel.classList.toggle('active', !!selected);
+    if (typeof ocSetTabState === 'function') {
+        ocSetTabState(link, panel, !!selected);
+    } else {
+        panel.hidden = !selected;
+        panel.setAttribute('aria-hidden', selected ? 'false' : 'true');
+        if (!selected && panel.contains && document.activeElement &&
+            panel.contains(document.activeElement) && document.activeElement.blur) {
+            document.activeElement.blur();
+        }
+    }
+    if (link) {
+        link.setAttribute('aria-selected', selected ? 'true' : 'false');
+        link.tabIndex = selected ? 0 : -1;
+    }
+}
+
 window.onload = function(){
     var titles = document.getElementsByName('tab-header');
     var divs = document.getElementsByClassName('dom');
@@ -931,56 +954,64 @@ window.onload = function(){
     var tc = document.getElementById('tab-content');
     if (tc) tc.style.position = 'relative';
 
-    divs[0].classList.add('active');
-
     for(var i=0; i<titles.length; i++){
         var li = titles[i];
+        var link = li.querySelector('a');
         li.id = i;
-        function handleTabSwitch(tab) {
-            return function(e) {
-                if (tab.className === 'oc-tab') return;
+        li.setAttribute('role', 'presentation');
+        if (!divs[i].id) divs[i].id = 'openkill-log-panel-' + i;
+        if (link) {
+            link.id = 'openkill-log-tab-' + i;
+            link.setAttribute('aria-controls', divs[i].id);
+        }
+        setLogTabState(li, divs[i], i === 0);
+        (function(tab, panel, tabIndex) {
+            function handleTabSwitch(e) {
+                if (e) {
+                    if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                if (tab.classList.contains('oc-tab')) return;
                 var prevTabId = -1;
                 for(var j=0; j<titles.length; j++){
-                    if (titles[j].className === 'oc-tab') prevTabId = j;
-                    titles[j].className = 'oc-tab-disabled';
-                    divs[j].classList.remove('active');
+                    if (titles[j].classList.contains('oc-tab')) prevTabId = j;
+                    setLogTabState(titles[j], divs[j], j === tabIndex);
                 }
-                tab.className = 'oc-tab';
-                divs[tab.id].classList.add('active');
 
                 if (prevTabId == 1 && editor_core) {
                     coreLogAccumulator = editor_core.getValue();
                     cl.value = coreLogAccumulator;
                 }
 
-                if (tab.id == 0 && typeof editor_oc !== 'undefined' && editor_oc) {
+                if (tabIndex == 0 && typeof editor_oc !== 'undefined' && editor_oc) {
                     setCursorToFirstLineEnd(editor_oc);
                 }
 
-                if (tab.id == 1 && !coreEditorInitialized) {
+                if (tabIndex == 1 && !coreEditorInitialized) {
                     coreEditorInitialized = true;
                     if (typeof log_editor === 'function' && cl) {
                         cl.value = coreLogAccumulator.replace(/\n+$/, '');
                         log_editor(cl, 'core', true, '100%', '540px');
                     }
-                } else if (tab.id == 1 && editor_core) {
+                } else if (tabIndex == 1 && editor_core) {
                     editor_core.setValue(coreLogAccumulator.replace(/\n+$/, ''));
                     editor_core.refresh();
                     setCursorToFirstLineEnd(editor_core);
                 }
 
-                if (tab.id == 2 && typeof editor_debug !== 'undefined' && editor_debug) {
+                if (tabIndex == 2 && typeof editor_debug !== 'undefined' && editor_debug) {
                     setCursorToFirstLineEnd(editor_debug);
                 }
 
-                pollInterval = (tab.id == 1) ? 5000 : 1000;
+                pollInterval = (tabIndex == 1) ? 5000 : 1000;
                 clearTimeout(r);
                 poll_log();
-            };
-        }
-
-        li.onclick = handleTabSwitch(li);
-        li.ontouchstart = handleTabSwitch(li);
+            }
+            li.onclick = handleTabSwitch;
+            li.ontouchstart = handleTabSwitch;
+            if (link) link.onkeydown = handleTabSwitch;
+        })(li, divs[i], i);
     }
     get_log_level();
     poll_log();

@@ -148,6 +148,58 @@ def _extract_status() -> str:
     return _clean_markup(status.replace('<%+openkill/page_header%>', header))
 
 
+def _extract_settings_manager() -> str:
+    """Extract the production status control coordinator for the preview.
+
+    The full LuCI status script needs a router-backed XHR environment, so the
+    preview cannot execute it wholesale.  The settings coordinator is
+    self-contained and owns the radio/segmented-control race fixes; injecting
+    this exact source into a local mock lets browser checks exercise production
+    event handling without copying that logic into a preview-only script.
+    """
+    source = (VIEW_ROOT / "status.htm").read_text(encoding="utf-8")
+    start = source.index("    var SettingsManager = {")
+    end = source.index("\n    var pluginToggleUserAction", start)
+    return _clean_markup(source[start:end].strip())
+
+
+def _extract_config_file_manager() -> str:
+    """Extract the production config visibility coordinator for browser QA."""
+    source = (VIEW_ROOT / "status.htm").read_text(encoding="utf-8")
+    start = source.index("    var ConfigFileManager = {")
+    end = source.index("\n    var SubscriptionManager = {", start)
+    return _clean_markup(source[start:end].strip())
+
+
+def _extract_status_visibility_helper() -> str:
+    """Extract the production hidden-state helper used by optional controls."""
+    source = (VIEW_ROOT / "status.htm").read_text(encoding="utf-8")
+    start = source.index("    function setStatusVisibility(element, visible, displayValue, hiddenClass)")
+    end = source.index("\n    function clearRuntimeUnavailableMarkers", start)
+    return _clean_markup(source[start:end].strip()) + "\nwindow.openkillSetStatusVisibility = setStatusVisibility;"
+
+
+def _extract_config_uploader() -> str:
+    """Extract the production mode/conditional-control coordinator.
+
+    The full uploader needs LuCI endpoints, so the browser harness supplies a
+    local DOM fixture while executing this exact production object.  Only its
+    event/state methods are exercised; no upload request is sent.
+    """
+    source = (VIEW_ROOT / "config_upload.htm").read_text(encoding="utf-8")
+    start = source.index("var ConfigUploader = {")
+    end = source.index("\n};\n\ndocument.addEventListener('DOMContentLoaded'", start) + len("\n};")
+    return _clean_markup(source[start:end].strip()) + "\nwindow.ConfigUploader = ConfigUploader;"
+
+
+def _extract_config_editor() -> str:
+    """Extract the production editor state coordinator for race testing."""
+    source = (VIEW_ROOT / "config_edit.htm").read_text(encoding="utf-8")
+    start = source.index("var ConfigEditor = {")
+    end = source.index("\n};\n\ndocument.addEventListener('DOMContentLoaded'", start) + len("\n};")
+    return _clean_markup(source[start:end].strip()) + "\nwindow.ConfigEditor = ConfigEditor;"
+
+
 def _extract_myip() -> str:
     source = (VIEW_ROOT / "myip.htm").read_text(encoding="utf-8")
     start = source.index('<fieldset class="cbi-section">')
@@ -292,13 +344,17 @@ PREVIEW_SCRIPT = r"""
             });
             ['_web', '_webo', '_webz'].forEach(function (id) {
                 var optionalDashboard = document.getElementById(id);
-                if (optionalDashboard) optionalDashboard.classList.add('hidden');
+                if (optionalDashboard) {
+                    window.openkillSetStatusVisibility(optionalDashboard, false, undefined, 'hidden');
+                }
             });
             var activeDashboard = document.getElementById('_webm');
-            if (activeDashboard) activeDashboard.classList.remove('hidden');
+            if (activeDashboard) {
+                window.openkillSetStatusVisibility(activeDashboard, true, undefined, 'hidden');
+            }
             ['plugin-version-display', 'core-version-display'].forEach(function (id) {
                 var item = document.getElementById(id);
-                if (item) item.classList.remove('oc-hidden');
+                if (item) window.openkillSetStatusVisibility(item, true, undefined, 'oc-hidden');
             });
             var pluginVersion = document.getElementById('plugin-version-text');
             var coreVersion = document.getElementById('core-version-text');
@@ -326,6 +382,26 @@ PREVIEW_SCRIPT = r"""
                 if (latency) latency.textContent = item[1];
                 if (dot) { dot.classList.remove('testing'); dot.classList.add('success'); dot.title = '本地模拟'; }
             });
+            if (window.SettingsManager) {
+                window.switch_run_mode = function (value) {
+                    return window.SettingsManager.switchSetting('run_mode', value, '/local-preview');
+                };
+                window.switch_rule_mode = function (value) {
+                    return window.SettingsManager.switchSetting('rule_mode', value, '/local-preview');
+                };
+                window.switch_oc_setting_oversea = function (value) {
+                    return window.SettingsManager.switchSetting('oversea', value, '/local-preview');
+                };
+                window.switch_meta_sniffer = function (value) {
+                    return window.SettingsManager.switchSetting('meta_sniffer', value, '/local-preview');
+                };
+                window.switch_respect_rules = function (value) {
+                    return window.SettingsManager.switchSetting('respect_rules', value, '/local-preview');
+                };
+                window.switch_stream_unlock = function (value) {
+                    return window.SettingsManager.switchSetting('stream_unlock', value, '/local-preview');
+                };
+            }
             ['togglePlugin','restartCore','editOverwrite','toggleThemeMode','winOpen','switch_run_mode','switch_rule_mode',
              'switch_oc_setting_oversea','switch_meta_sniffer','switch_respect_rules','switch_stream_unlock','refreshSubscriptionInfo',
              'setSubscriptionUrl','switchConfig','updateConfig','editConfig','editSubscribe','uploadConfig','copyAddress','copySecret',
@@ -334,7 +410,11 @@ PREVIEW_SCRIPT = r"""
              'refresh_myip','ip_skk'].forEach(function (name) {
                 if (!window[name]) window[name] = function () { return false; };
             });
-            window.openkillPreview = { actions: [], setState: setState };
+            var preview = window.openkillPreview || { actions: [], requests: [] };
+            preview.setState = setState;
+            preview.settings = window.SettingsManager || null;
+            preview.configManager = window.ConfigFileManager || null;
+            window.openkillPreview = preview;
             document.addEventListener('click', function (event) {
                 var control = event.target.closest('button, input[type="button"], .icon-btn, .myip-icon-btn');
                 if (!control) return;
@@ -350,6 +430,48 @@ PREVIEW_SCRIPT = r"""
             });
             setState('running');
         })();
+"""
+
+
+PREVIEW_PRODUCTION_BOOTSTRAP = r"""
+        (function () {
+            var byId = function (id) { return document.getElementById(id); };
+            var names = function (name) { return document.getElementsByName(name); };
+            window.openkillPreview = window.openkillPreview || { actions: [], requests: [] };
+            var preview = window.openkillPreview;
+            var DOMCache = {
+                meta_sniffer_on: byId('meta_sniffer_on'),
+                meta_sniffer_off: byId('meta_sniffer_off'),
+                respect_rules_on: byId('respect_rules_on'),
+                respect_rules_off: byId('respect_rules_off'),
+                oc_setting_oversea_0: byId('oc_setting_oversea_0'),
+                oc_setting_oversea_1: byId('oc_setting_oversea_1'),
+                oc_setting_oversea_2: byId('oc_setting_oversea_2'),
+                stream_unlock_on: byId('stream_unlock_on'),
+                stream_unlock_off: byId('stream_unlock_off'),
+                radio: names('radios'),
+                radio_ru: names('radios-ru')
+            };
+            var XHR = {
+                get: function (endpoint, params, callback) {
+                    preview.requests.push({ endpoint: endpoint, params: params });
+                    setTimeout(function () { callback({ status: 200 }, {}); }, 0);
+                }
+            };
+            window.DOMCache = DOMCache;
+            window.XHR = XHR;
+            window.openkillPreview.settingsDomCache = DOMCache;
+            window.openkillPreview.settingsXHR = XHR;
+        })();
+"""
+
+
+PREVIEW_CONFIG_BOOTSTRAP = r"""
+        var ocFormatUnixTime = function (value) { return String(value || ''); };
+        var ocFormatFileSize = function (value) { return String(value || ''); };
+        var StateManager = { cachedXHRGet: function () {}, cachedXHRGetWithParams: function () {} };
+        var SubscriptionManager = { currentConfigFile: '', getSubscriptionInfo: function () {} };
+        var OverwriteSubscribeManager = { data: {}, render: function () {} };
 """
 
 
@@ -383,12 +505,27 @@ def build_preview(output: Path) -> Path:
     __MYIP__
   </main>
   <script src="/luci-app-openkill/root/www/luci-static/resources/openkill/js/oc-icons.js"></script>
+  <script src="/luci-app-openkill/root/www/luci-static/resources/openkill/js/common.js"></script>
+  <script>__PREVIEW_CONFIG_BOOTSTRAP__</script>
+  <script>__PRODUCTION_STATUS_VISIBILITY_HELPER__</script>
+  <script>__PRODUCTION_CONFIG_UPLOADER__</script>
+  <script>__PRODUCTION_CONFIG_EDITOR__</script>
+  <script>__PRODUCTION_CONFIG_FILE_MANAGER__</script>
+  <script>__PREVIEW_PRODUCTION_BOOTSTRAP__</script>
+  <script>__PRODUCTION_SETTINGS_MANAGER__</script>
   <script>__PREVIEW_SCRIPT__</script>
 </body>
 </html>
 """
     html = html.replace("__PREVIEW_STYLE__", PREVIEW_STYLE.strip())
     html = html.replace("__PREVIEW_SCRIPT__", PREVIEW_SCRIPT.strip())
+    html = html.replace("__PREVIEW_CONFIG_BOOTSTRAP__", PREVIEW_CONFIG_BOOTSTRAP.strip())
+    html = html.replace("__PRODUCTION_STATUS_VISIBILITY_HELPER__", _extract_status_visibility_helper())
+    html = html.replace("__PRODUCTION_CONFIG_UPLOADER__", _extract_config_uploader())
+    html = html.replace("__PRODUCTION_CONFIG_EDITOR__", _extract_config_editor())
+    html = html.replace("__PRODUCTION_CONFIG_FILE_MANAGER__", _extract_config_file_manager())
+    html = html.replace("__PREVIEW_PRODUCTION_BOOTSTRAP__", PREVIEW_PRODUCTION_BOOTSTRAP.strip())
+    html = html.replace("__PRODUCTION_SETTINGS_MANAGER__", _extract_settings_manager())
     html = html.replace("__STATUS__", _extract_status())
     html = html.replace("__MYIP__", _extract_myip())
     target = output / "index.html"

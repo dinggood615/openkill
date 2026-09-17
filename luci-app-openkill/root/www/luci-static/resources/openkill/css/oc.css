@@ -321,6 +321,11 @@ html[data-darkmode="true"] #cbi-openkill.openkill-settings {
     background: var(--ok-primary-soft);
 }
 
+#cbi-openkill.openkill-settings .cbi-tabmenu li[role="presentation"] a[role="tab"]:focus-visible {
+    outline: 2px solid var(--ok-primary);
+    outline-offset: 2px;
+}
+
 #cbi-openkill.openkill-settings .cbi-tabmenu li.cbi-tabmenu-tab-active a,
 #cbi-openkill.openkill-settings .cbi-tabmenu li.active a {
     color: #ffffff;
@@ -1706,6 +1711,19 @@ html[data-darkmode="true"] .oc svg {
     background: var(--primary-color);
     color: var(--text-on-primary);
     box-shadow: var(--shadow-sm);
+}
+
+/* Keep the keyboard state visible even though the radio input is visually
+ * compacted into the adjacent segmented-control label.  A disabled setting
+ * must also look and behave disabled while its request is settling. */
+.oc.openkill-status-page input[type="radio"]:focus-visible + .cbi-button-option {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+}
+
+.oc.openkill-status-page input[type="radio"]:disabled + .cbi-button-option {
+    cursor: not-allowed;
+    opacity: 0.55;
 }
 
 .oc .value-indicator {
@@ -3702,6 +3720,11 @@ html[data-darkmode="true"] .oc .overwrite-banner svg circle {
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
+}
+.oc .overwrite-config-dropdown-btn:focus-visible,
+.oc .overwrite-config-option input:focus-visible + .overwrite-config-option-name {
+    outline: 2px solid var(--ok-color-primary, var(--primary-color));
+    outline-offset: 2px;
 }
 .oc .overwrite-config-dropdown-text {
     overflow: hidden;
@@ -8019,6 +8042,23 @@ html[data-darkmode=true] .oc #addCustomOption:hover {
 .oc.openkill-status-page .mode-row .sub-card,
 .oc.openkill-status-page .stats-grid .sub-card {
     min-height: 118px;
+}
+
+/* The selected running mode is already represented by the segmented control.
+ * Keep the API-backed value available to assistive technology without adding
+ * a second visual option that makes the control look like it has a stray
+ * child item. */
+.oc.openkill-status-page .mode-status-value {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
 }
 
 .oc.openkill-status-page .cbi-button-group {
