@@ -1,24 +1,24 @@
 # Current status
 
-CURRENT_HEAD: `b522172e95ebd1be3be4634e5a8adc8374a6408f` (observed before the UI/gate follow-up)
+CURRENT_HEAD: `af83a54ab5cf72dcf64fe7bf73a02a5edca00504` (observed before this status record commit)
 VERSION: `2026-1128`
 CURRENT_PHASE: `LOCAL_VALIDATION_HARDENING_WORK_PACKAGE`
-CURRENT_STATUS: `IN_PROGRESS — UI presentation fixes and final clean-HEAD gate verification`
+CURRENT_STATUS: `PASS — UI presentation fixes and local validation hardening complete`
 BLOCKER: `REAL_DEVICE_GATE` — the next typed-shadow retry still needs explicit device-phase approval
 DEVICE_STATE: `.102` was not accessed in this work package; prior R2C evidence records a healthy retained baseline
-DEVICE_RETRY_READY: `PENDING_FINAL_CLEAN_HEAD_PREFLIGHT` (device verification remains pending)
+DEVICE_RETRY_READY: `YES` (purely local preflight; device verification remains pending)
 NEXT_ACTION: `PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE` after explicit device-phase approval
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
 REAL_PACKET_PATH: `NOT_TESTED`
-FAST_GATE: `PENDING_FINAL_CLEAN_HEAD_RUN` (previous local result: `20260916T140505Z-2412`)
-FULL_GATE: `PENDING_FINAL_CLEAN_HEAD_RUN` (previous local result: `20260916T140752Z-19340`; nft CLI recorded as `NOT_RUN_ENVIRONMENT`)
-DEVICE_PREFLIGHT: `PENDING_FINAL_CLEAN_HEAD_RUN` (previous local result: `20260916T142142Z-21440`; nft CLI recorded as `NOT_RUN_ENVIRONMENT`)
-DEVICE_CANDIDATE_ID: `PENDING_FINAL_CLEAN_HEAD_RUN`
-RESULTING_HEAD: resolve with `git rev-parse HEAD` after the local hardening commit; the recorded `CURRENT_HEAD` is the pre-commit observation
+FAST_GATE: `PASS` (`20260917T000352Z-23232`; clean HEAD `af83a54`)
+FULL_GATE: `PASS` (`20260916T233617Z-16992`; clean HEAD `af83a54`; nft CLI recorded as `NOT_RUN_ENVIRONMENT`)
+DEVICE_PREFLIGHT: `PASS` (`20260916T234940Z-8624`; clean HEAD `af83a54`; nft CLI recorded as `NOT_RUN_ENVIRONMENT`; status-only commit follows)
+DEVICE_CANDIDATE_ID: `8a50672b2d482a4516cb055553dab345c75cfbba699e5947b4521f5ee4a45927`
+RESULTING_HEAD: resolve with `git rev-parse HEAD` after this status record commit; the recorded `CURRENT_HEAD` is the pre-commit observation
 
 IMPLEMENTED: R3C internal typed sidecar producer, canonical D2D fixture, typed ownership/DNS model, isolated staged execution, unified local gates and LuCI presentation fixes
-LOCAL_VERIFIED: prior gate evidence above; final clean-HEAD fast/full/device-preflight verification pending
+LOCAL_VERIFIED: fast/full/device-preflight evidence above; the status-only record commit does not change candidate artifacts or production behavior
 DEVICE_VERIFIED: `NO` for the R3A/R3C candidate
 RELEASED: `NO` (2026-1128 package remains the verified release baseline)
 
