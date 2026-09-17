@@ -1,9 +1,9 @@
 # Current status
 
-CURRENT_HEAD: `9591f8981e87c95bf300978b5713f65fc9d1a42e` (observed before this status update; resolve final HEAD with Git after the commit)
+CURRENT_HEAD: `21595737c0165120cc4c759055a30cd5cd4a6587` (observed before this status update; resolve final HEAD with Git after the commit)
 VERSION: `2026-1128`
 CURRENT_PHASE: `LOCAL_VALIDATION_HARDENING_WORK_PACKAGE`
-CURRENT_STATUS: `LOCAL_VALIDATION_HARDENING_COMPLETE — process ownership, host-network guard, environment classification, candidate preflight and local status-page preview are verified`
+CURRENT_STATUS: `LOCAL_VALIDATION_HARDENING_COMPLETE — process ownership, host-network guard, environment classification, candidate identity, full local matrix and local status-page preview are verified; current preflight is blocked by an external host-listener drift`
 BLOCKER: `DEVICE_CONTINUITY_SOURCE_NONCONVERGENCE` — `/tmp/openkill-network.desired` and `/tmp/openkill-network.applied` stably differ in the IPv6 rule/prefix fields; resolve that source contract before another device run
 DEVICE_STATE: `.102` remains healthy and RUNNING from frozen R3B evidence; this work package made no device contact or service/package/UCI/dataplane/config change
 DEVICE_RETRY_READY: `NO`
@@ -14,7 +14,7 @@ REAL_PACKET_PATH: `NOT_TESTED`
 HOST_NETWORK_INCIDENT_CAUSE: `UNCONFIRMED`
 HOST_NETWORK_SETTINGS_CHANGED_BY_THIS_WORK: `0`
 TEST_PROCESS_CLEANUP: `PASS`
-HOST_NETWORK_GUARD: `PASS` (WSL inventory lifecycle is recorded explicitly; no route, DNS, proxy, adapter, or listener drift observed)
+HOST_NETWORK_GUARD: `PASS` (the guard is fail-closed and the successful full run saw no drift; the latest preflight correctly stopped on an external listener snapshot change)
 ENVIRONMENT_ERROR_CLASSIFICATION: `PASS` (required Core cases passed; `NFT_CLI_UNAVAILABLE` is explicit and bounded)
 UI_STATIC_CONTRACT: `PASS`
 UI_BROWSER_VALIDATION: `PASS` (local Chrome/Playwright preview at 1920/1366/768/390 CSS px; evidence under `artifacts/test-evidence/ui-preview`)
@@ -23,15 +23,15 @@ UI_REFERENCE_ALIGNMENT: `PASS` (flowing two-column dashboard, full-width connect
 IPV6_SOURCE_ROOT_CAUSE: `UNRESOLVED`
 CONTINUITY_CONTRACT_PRESERVED: `PASS`
 WRITER_HASHES_UNCHANGED: `PASS`
-FAST_GATE: `PASS` — `20260917T043958Z-23296` (14/14, no cache)
-FULL_GATE: `PASS` — `20260917T044427Z-3236` (36 cases; 35 PASS, 1 explicit `NFT_CLI_UNAVAILABLE`)
-DEVICE_PREFLIGHT: `PASS` — `20260917T060544Z-23508` (29 cases; one explicit `NFT_CLI_UNAVAILABLE`)
-DEVICE_CANDIDATE_ID: `128c8cc3d67ec206697deec06e5d51f8ca49262776c7d9564009da07dd490d2e`
-DEVICE_EVIDENCE: `artifacts/test-evidence/20260917T060544Z-23508`; historical R3B device evidence remains under `artifacts/test-evidence/r3b-device-f83d592f18b685fe62b9b94a4f907e5465ac13f3e1488a27b8bff5d1cd5ea763`
+FAST_GATE: `PASS` — `20260917T074012Z-12568` (15/15, no cache)
+FULL_GATE: `PASS` — `20260917T074755Z-1568` (37 PASS; 1 explicit `NFT_CLI_UNAVAILABLE`)
+DEVICE_PREFLIGHT: `FAIL` — `20260917T082058Z-8780` stopped fail-closed at `test-shadow-production-typed` because the read-only host listener snapshot changed; the earlier `20260917T080236Z-14144` stopped at `test-classifier-contract` for the same guard
+DEVICE_CANDIDATE_ID: `78087ba8a3d8877db1d309d09d374d3c3527639ba6555ff746f91aed7de91a54`
+DEVICE_EVIDENCE: `artifacts/test-evidence/20260917T082058Z-8780`; latest full evidence is `artifacts/test-evidence/20260917T074755Z-1568`; historical R3B device evidence remains under `artifacts/test-evidence/r3b-device-f83d592f18b685fe62b9b94a4f907e5465ac13f3e1488a27b8bff5d1cd5ea763`
 RESULTING_HEAD: resolve with `git rev-parse HEAD` after this status commit; the recorded `CURRENT_HEAD` is the pre-commit observation
 
 IMPLEMENTED: R3C internal typed sidecar producer, canonical D2D fixture, typed ownership/DNS model, isolated staged execution, unified local gates, LuCI presentation fixes, T0/T1/T2 runtime-DNS continuity checks, multi-listener core-owned DNS socket selection, owned-process cleanup, and read-only host-network guarding
-LOCAL_VERIFIED: focused shadow suites and clean fast/full/device-preflight evidence pass; WSL-only lifecycle changes are explicitly classified; the 1000-call continuity stress runs in private WSL `/tmp`; device cycles stopped fail-closed at continuity before typed parity
+LOCAL_VERIFIED: focused shadow suites and clean fast/full evidence pass; the latest device-preflight was blocked by a host listener drift and therefore is not a readiness proof; WSL-only lifecycle changes are explicitly classified; the 1000-call continuity stress runs in private WSL `/tmp`; device cycles stopped fail-closed at continuity before typed parity
 DEVICE_VERIFIED: `NO` for the R3A/R3C candidate (`.102` runtime stayed healthy, but typed parity was NOT_RUN)
 RELEASED: `NO` (2026-1128 package remains the verified release baseline)
 
