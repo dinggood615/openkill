@@ -67,6 +67,13 @@ class AutonomousWorkflowTests(unittest.TestCase):
         self.assertIn("inputs.release_gate == true && inputs.publish == true", source)
         self.assertNotIn("prune-published-packages.sh", source)
 
+    def test_formal_ipk_build_resets_sdk_package_selection(self):
+        source = self.read(".github/workflows/compile_new_ipk.yml")
+        self.assertIn("/^CONFIG_PACKAGE_[^=]*=/d", source)
+        self.assertIn("selected_package_count", source)
+        self.assertIn('Refusing an unexpectedly broad package selection', source)
+        self.assertIn('make -j"$(nproc)" package/luci-app-openkill/compile', source)
+
     def test_missing_release_notes_fail_before_external_commands(self):
         with tempfile.TemporaryDirectory() as directory:
             env = dict(os.environ, RELEASE_VERSION="9999-9999", PACKAGE_FORMAT="ipk",

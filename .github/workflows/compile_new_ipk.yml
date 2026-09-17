@@ -313,11 +313,32 @@ jobs:
 
       - name: Compile OpenKill
         run: |
+          set -Eeuo pipefail
           cd tmp/${{ matrix.target.sdk_dir }}
           if [ -f ../${{ matrix.target.sdk_tar }} ]; then
+            # SDK archives often carry every package as a module.  Leaving
+            # those stale selections in place makes a single-package release
+            # compile LLVM and the rest of the toolchain.  Reset package
+            # symbols before selecting OpenKill so the release build remains
+            # bounded to the package under audit.
+            sed -i \
+              -e '/^CONFIG_PACKAGE_[^=]*=/d' \
+              -e '/^# CONFIG_PACKAGE_[^ ]* is not set$/d' \
+              .config
+            printf 'CONFIG_PACKAGE_luci-app-openkill=m\n' >> .config
             make defconfig
+            selected_package_count=$(grep -c '^CONFIG_PACKAGE_.*=[ym]$' .config || true)
+            echo "CONFIG_PACKAGE count: $selected_package_count"
+            if grep -q '^CONFIG_ALL=y' .config || grep -q '^CONFIG_ALL_KMODS=y' .config; then
+              echo 'Refusing a broad CONFIG_ALL/CONFIG_ALL_KMODS build.' >&2
+              exit 1
+            fi
+            if [ "$selected_package_count" -gt 64 ]; then
+              echo "Refusing an unexpectedly broad package selection: $selected_package_count" >&2
+              exit 1
+            fi
           fi
-          make package/luci-app-openkill/compile V=99
+          make -j"$(nproc)" package/luci-app-openkill/compile V=99
           if [ ! -f bin/packages/x86_64/base/${{ matrix.target.artifact_pattern }} ]; then
             mkdir -p bin/packages/x86_64/base
             find bin -name "luci-app-openkill_*.ipk" -exec cp {} bin/packages/x86_64/base/ \; 2>/dev/null || true
