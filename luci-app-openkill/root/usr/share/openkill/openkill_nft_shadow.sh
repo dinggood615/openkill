@@ -834,16 +834,20 @@ openkill_shadow_capture_runtime_dns()
    esac
 
    # OPENKILL_DNS_ENDPOINT and its aliases describe desired/readiness intent,
-   # not a live socket.  Mihomo commonly exposes an API or proxy TCP port in
-   # addition to DNS.  Use the process-owned UDP listener as the DNS evidence:
-   # a DNS socket must be observable as UDP, while unrelated TCP listeners are
-   # ignored.  Core names are restricted to the binaries OpenKill supports;
-   # an unknown process name, multiple UDP ports, or no UDP evidence is a
-   # source gap.  The selected endpoint is still the socket address emitted by
-   # netstat, never a value inferred from configuration intent.
+   # not a live socket.  Mihomo commonly exposes an API or proxy UDP/TCP port
+   # in addition to DNS.  Use the process-owned UDP listener as the DNS
+   # evidence, joining it to the *actual* dnsmasq upstream port only to select
+   # the service role.  The returned endpoint is still the socket address
+   # emitted by netstat; the upstream value is never copied into it.  Core
+   # names are restricted to the binaries OpenKill supports.  An unknown core,
+   # an ambiguous join, or no matching UDP socket is a source gap.
    if [ -z "$openkill_shadow_runtime_dns_mihomo" ] && command -v netstat >/dev/null 2>&1; then
+      openkill_shadow_runtime_dns_upstream_port=${openkill_shadow_runtime_dns_upstream##*#}
+      case "$openkill_shadow_runtime_dns_upstream_port" in
+         ''|*[!0-9]*) return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP" ;;
+      esac
       openkill_shadow_runtime_dns_mihomo=$(netstat -nlp 2>/dev/null |
-         awk '
+         awk -v wanted="$openkill_shadow_runtime_dns_upstream_port" '
             function core_process(value, name) {
                name=value
                sub(/^.*\//, "", name)
@@ -851,7 +855,9 @@ openkill_shadow_capture_runtime_dns()
             }
             $1 ~ /^udp/ && $4 ~ /:[0-9]+$/ && core_process($NF) {
                value=$4
-               if (!(value in seen)) { seen[value]=1; count++ }
+               port=value
+               sub(/^.*:/, "", port)
+               if (port == wanted && !(value in seen)) { seen[value]=1; count++ }
             }
             END {
                if (count == 1) for (value in seen) print value
@@ -859,7 +865,7 @@ openkill_shadow_capture_runtime_dns()
             }')
       openkill_shadow_runtime_dns_mihomo_rc=$?
       [ "$openkill_shadow_runtime_dns_mihomo_rc" -eq 0 ] || return "$OPENKILL_NFT_SHADOW_RC_SOURCE_GAP"
-      [ -z "$openkill_shadow_runtime_dns_mihomo" ] || openkill_shadow_runtime_dns_mihomo_source=netstat-mihomo-udp
+      [ -z "$openkill_shadow_runtime_dns_mihomo" ] || openkill_shadow_runtime_dns_mihomo_source=netstat-mihomo-udp-upstream-join
    fi
 
    for openkill_shadow_runtime_dns_value in \

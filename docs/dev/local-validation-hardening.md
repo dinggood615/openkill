@@ -9,9 +9,10 @@ token is created. `DNSMASQ_LISTEN_TARGET` and
 `DNSMASQ_UPSTREAM_TARGET` come from the committed dnsmasq state; the
 `MIHOMO_DNS_LISTENER` actual value comes from one unambiguous, process-owned
 UDP socket in the bounded `netstat` evidence. The process name must be one of
-the supported Mihomo/Clash core names, so unrelated TCP control or proxy ports
-do not make a valid DNS listener ambiguous. Multiple core-owned UDP ports,
-unknown core names, or missing UDP evidence are a source gap.
+the supported Mihomo/Clash core names. When the core exposes several UDP
+ports, the actual dnsmasq upstream port is used only as a role join; the
+listener value still comes from the matching process-owned socket. A missing
+or ambiguous join, unknown core name, or missing UDP evidence is a source gap.
 `OPENKILL_DNS_ENDPOINT` is a readiness/configuration intent used by init and
 is never treated as live listener evidence. Fixture-only runs may use their
 checked-in runtime snapshot because that source is explicitly labelled as

@@ -415,7 +415,7 @@ printf 'tcp        0      0 127.0.0.1:7874          0.0.0.0:*               LIST
         )
         self.assertIn("RC=0", process.stdout, process.stderr)
         self.assertIn("LISTENER=127.0.0.1:7874", process.stdout, process.stderr)
-        self.assertIn("SOURCE=netstat-mihomo-udp", process.stdout, process.stderr)
+        self.assertIn("SOURCE=netstat-mihomo-udp-upstream-join", process.stdout, process.stderr)
 
     def test_mihomo_listener_selects_unique_udp_socket_with_other_core_ports(self) -> None:
         fake_bin = self.harness.root / "multi-runtime-dns-bin"
@@ -453,7 +453,7 @@ printf 'tcp        0      0 127.0.0.1:7874          0.0.0.0:*               LIST
         )
         self.assertIn("RC=0", process.stdout, process.stderr)
         self.assertIn("LISTENER=127.0.0.1:7874", process.stdout, process.stderr)
-        self.assertIn("SOURCE=netstat-mihomo-udp", process.stdout, process.stderr)
+        self.assertIn("SOURCE=netstat-mihomo-udp-upstream-join", process.stdout, process.stderr)
 
     def test_multiple_mihomo_udp_sockets_fail_closed_as_source_gap(self) -> None:
         fake_bin = self.harness.root / "ambiguous-runtime-dns-bin"
@@ -471,7 +471,7 @@ printf 'tcp        0      0 127.0.0.1:7874          0.0.0.0:*               LIST
             fake_bin / "netstat",
             "#!/bin/sh\n"
             "printf 'udp 0 0 127.0.0.1:7874 0.0.0.0:* 123/mihomo\\n'\n"
-            "printf 'udp 0 0 127.0.0.1:7875 0.0.0.0:* 123/mihomo\\n'\n",
+            "printf 'udp 0 0 0.0.0.0:7874 0.0.0.0:* 123/mihomo\\n'\n",
         )
         (fake_bin / "uci").chmod(0o700)
         (fake_bin / "netstat").chmod(0o700)

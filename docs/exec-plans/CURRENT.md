@@ -1,24 +1,24 @@
 # Current status
 
-CURRENT_HEAD: `5c086964129783d940df7ae69a0321f61a5822b7` (observed before this local hardening commit)
+CURRENT_HEAD: `70599b11a38eae1c0a7c02c895d9087c74339365` (observed before this listener-provenance fix commit)
 VERSION: `2026-1128`
 CURRENT_PHASE: `LOCAL_VALIDATION_HARDENING_WORK_PACKAGE`
-CURRENT_STATUS: `IN_PROGRESS — runtime DNS continuity and Mihomo listener provenance hardening`
-BLOCKER: `LOCAL_VALIDATION_HARDENING` — focused fixes must pass the clean fast/full/preflight gates before the approved `.102` retry
+CURRENT_STATUS: `IN_PROGRESS — multi-listener DNS provenance and T0/T1/T2 continuity hardening`
+BLOCKER: `LOCAL_VALIDATION_HARDENING` — the listener-join fix must pass a new clean fast/full/preflight sequence before the approved `.102` retry
 DEVICE_STATE: `.102` has not been accessed in this iteration; prior R2C/R3 evidence records a healthy retained baseline
 DEVICE_RETRY_READY: `PENDING_FINAL_PREFLIGHT`
 NEXT_ACTION: `fast → full --no-cache → device-preflight --no-cache`, then the already-approved `PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
 REAL_PACKET_PATH: `NOT_TESTED`
-FAST_GATE: `PENDING` (must run on the resulting clean source commit)
-FULL_GATE: `PENDING` (must run with `--no-cache` on the resulting clean source commit)
-DEVICE_PREFLIGHT: `PENDING` (must regenerate candidate identity after the focused observer change)
+FAST_GATE: `INVALIDATED_BY_LISTENER_FIX` (previous run `20260917T013838Z-2628` was bound before this change)
+FULL_GATE: `INVALIDATED_BY_LISTENER_FIX` (previous run `20260917T014127Z-20204` was bound before this change)
+DEVICE_PREFLIGHT: `PENDING` (must regenerate candidate identity after the listener-join change)
 DEVICE_CANDIDATE_ID: `PENDING_FINAL_PREFLIGHT`
 RESULTING_HEAD: resolve with `git rev-parse HEAD` after the hardening commit; the recorded `CURRENT_HEAD` is the pre-commit observation
 
-IMPLEMENTED: R3C internal typed sidecar producer, canonical D2D fixture, typed ownership/DNS model, isolated staged execution, unified local gates, LuCI presentation fixes, and T0/T1/T2 runtime-DNS continuity checks
-LOCAL_VERIFIED: focused shadow suites and local policy gate pass; resulting clean fast/full/device-preflight evidence is pending for this observer change
+IMPLEMENTED: R3C internal typed sidecar producer, canonical D2D fixture, typed ownership/DNS model, isolated staged execution, unified local gates, LuCI presentation fixes, T0/T1/T2 runtime-DNS continuity checks, and multi-listener core-owned DNS socket selection
+LOCAL_VERIFIED: focused shadow suites (20/20 producer, 11/11 continuity, 14/14 typed, 23/23 self-sufficiency, 7/7 BusyBox) and local policy gate pass; clean fast/full/device-preflight evidence is pending for this listener fix
 DEVICE_VERIFIED: `NO` for the R3A/R3C candidate
 RELEASED: `NO` (2026-1128 package remains the verified release baseline)
 
@@ -574,15 +574,17 @@ renderer, parser, network, firewall, installer, package, version, release and
 central-apply behavior were not changed.
 
 The observer now treats `OPENKILL_DNS_ENDPOINT` as readiness/configuration
-intent only.  Automatic actual `MIHOMO_DNS_LISTENER` evidence comes from one
-unambiguous Mihomo-owned `netstat` listener row; dnsmasq values and all source
-kinds are frozen before the continuity token and consumed without a
-comparator-stage live reread.  Missing or ambiguous sources remain a typed
-`MODEL_GAP`.  The staged regression copies the observer, renderer, semantic
-manifest and TUN template into a private directory, appends a temporary marker
-to the staged observer, records all candidate paths/hashes and runs five
-automatic cycles without external typed sidecars.  The marker proves the
-temporary observer executed; the runner source contains no repository helper,
+intent only.  Automatic actual `MIHOMO_DNS_LISTENER` evidence comes from a
+supported-core-owned UDP `netstat` socket, joined to the actual dnsmasq
+upstream port when Mihomo has multiple listeners; the returned endpoint is
+still taken from the socket row.  DNS sources are frozen at T0 and re-sampled
+only at the T1/T2 continuity boundaries, while the producer/comparator never
+performs a live reread.  Missing or ambiguous sources remain a typed
+`MODEL_GAP`/stale cycle.  The staged regression copies the observer, renderer,
+semantic manifest and TUN template into a private directory, verifies the
+observer hash through a separate wrapper without modifying candidate bytes,
+records all candidate paths/hashes and runs five automatic cycles without
+external typed sidecars.  The runner source contains no repository helper,
 renderer or template fallback.
 
 The single `scripts/openkill-test-gates.py` executor provides `fast`, `full`,
