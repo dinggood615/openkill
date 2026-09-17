@@ -554,7 +554,7 @@ esac
                     "set -e",
                     "tmp=$(mktemp)",
                     "trap 'rm -f \"$tmp\"' EXIT",
-                    f"{quote(wsl_path(RENDERER))} \"$1\" \"$tmp\"",
+                    f"sh {quote(wsl_path(RENDERER))} \"$1\" \"$tmp\"",
                     "sed 's/dport 53/dport 54/g' \"$tmp\" > \"$2\"",
                 )
             )
