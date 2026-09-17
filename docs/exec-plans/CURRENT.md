@@ -1,30 +1,30 @@
 # Current status
 
-CURRENT_HEAD: `bdfb94d2f97767fb4fe1d0e2d9009b7c4a45e4b0` (observed before this local hardening work package)
+CURRENT_HEAD: `1dc6e7c7ac178055b4d6f66c6bc65c3aad129691` (observed before this status update; resolve final HEAD with Git after the commit)
 VERSION: `2026-1128`
 CURRENT_PHASE: `LOCAL_VALIDATION_HARDENING_WORK_PACKAGE`
-CURRENT_STATUS: `IN_PROGRESS — process ownership, host-network guard and evidence classification are being hardened locally`
+CURRENT_STATUS: `LOCAL_VALIDATION_HARDENING_COMPLETE — process ownership, host-network guard and environment classification are locally verified; final clean-HEAD preflight remains`
 BLOCKER: `DEVICE_CONTINUITY_SOURCE_NONCONVERGENCE` — `/tmp/openkill-network.desired` and `/tmp/openkill-network.applied` stably differ in the IPv6 rule/prefix fields; resolve that source contract before another device run
 DEVICE_STATE: `.102` remains healthy and RUNNING; no service, package, UCI, dataplane, or canonical-config change was made
 DEVICE_RETRY_READY: `NO`
-NEXT_ACTION: `finish local process/network/evidence gates, then obtain an explicitly approved device maintenance step for the IPv6 source convergence`
+NEXT_ACTION: `complete the clean-HEAD device-preflight locally, then obtain an explicitly approved device maintenance step for the IPv6 source convergence`
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
 REAL_PACKET_PATH: `NOT_TESTED`
 HOST_NETWORK_INCIDENT_CAUSE: `UNCONFIRMED`
 HOST_NETWORK_SETTINGS_CHANGED_BY_THIS_WORK: `0`
-TEST_PROCESS_CLEANUP: `IN_PROGRESS`
-HOST_NETWORK_GUARD: `IN_PROGRESS`
-ENVIRONMENT_ERROR_CLASSIFICATION: `IN_PROGRESS`
+TEST_PROCESS_CLEANUP: `PASS`
+HOST_NETWORK_GUARD: `PASS` (WSL inventory lifecycle is recorded explicitly; no route, DNS, proxy, adapter, or listener drift observed)
+ENVIRONMENT_ERROR_CLASSIFICATION: `PASS` (required Core cases passed; `NFT_CLI_UNAVAILABLE` is explicit and bounded)
 IPV6_SOURCE_ROOT_CAUSE: `UNRESOLVED`
 CONTINUITY_CONTRACT_PRESERVED: `PASS`
 WRITER_HASHES_UNCHANGED: `PASS`
-FAST_GATE: `PASS` — `20260917T021444Z-24520`
-FULL_GATE: `PASS` — `20260917T021740Z-10528`
-DEVICE_PREFLIGHT: `PASS` — `20260917T023225Z-24796`
-DEVICE_CANDIDATE_ID: `f83d592f18b685fe62b9b94a4f907e5465ac13f3e1488a27b8bff5d1cd5ea763`
-DEVICE_EVIDENCE: `artifacts/test-evidence/r3b-device-f83d592f18b685fe62b9b94a4f907e5465ac13f3e1488a27b8bff5d1cd5ea763`
-RESULTING_HEAD: resolve with `git rev-parse HEAD` after this documentation commit; the recorded `CURRENT_HEAD` is the pre-commit observation
+FAST_GATE: `PASS` — `20260917T043958Z-23296` (14/14, no cache)
+FULL_GATE: `PASS` — `20260917T044427Z-3236` (36 cases; 35 PASS, 1 explicit `NFT_CLI_UNAVAILABLE`)
+DEVICE_PREFLIGHT: `PENDING` — run with `--no-cache` after this status commit on the resulting clean HEAD
+DEVICE_CANDIDATE_ID: `pending final clean-HEAD preflight`
+DEVICE_EVIDENCE: `historical R3B evidence remains under artifacts/test-evidence/r3b-device-f83d592f18b685fe62b9b94a4f907e5465ac13f3e1488a27b8bff5d1cd5ea763`
+RESULTING_HEAD: resolve with `git rev-parse HEAD` after this status commit; the recorded `CURRENT_HEAD` is the pre-commit observation
 
 IMPLEMENTED: R3C internal typed sidecar producer, canonical D2D fixture, typed ownership/DNS model, isolated staged execution, unified local gates, LuCI presentation fixes, T0/T1/T2 runtime-DNS continuity checks, and multi-listener core-owned DNS socket selection
 LOCAL_VERIFIED: focused shadow suites and clean fast/full/device-preflight evidence pass; device cycles stopped fail-closed at continuity before typed parity
