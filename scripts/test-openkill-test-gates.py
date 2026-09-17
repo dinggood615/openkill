@@ -33,6 +33,8 @@ class TestGateRunner(unittest.TestCase):
         names = {item["path"] for item in inputs}
         self.assertIn("scripts/test-3e2-safe-config.py", names)
         self.assertIn("scripts/fixtures/3e2-safe.yaml", names)
+        self.assertIn("scripts/openkill_shadow_semantic_model.py", names)
+        self.assertIn("scripts/verify_3e2_safe_config.py", names)
 
     def test_ui_dependency_key_includes_rendered_sources(self):
         case = gates.Case("test-ui-contract", "scripts/test-ui-contract.py")
@@ -82,14 +84,86 @@ class TestGateRunner(unittest.TestCase):
             [sys.executable],
             1,
             "",
-            "ssl.SSLCertVerificationError: CERTIFICATE_VERIFY_FAILED",
+            "OPENKILL_ENVIRONMENT_LIMIT=CORE_RELEASE_UNAVAILABLE\nDETAIL=URLError",
         )
         status, reason = gates.classify_output(
-            gates.Case("core", None, skip_policy=("CORE_RELEASE_UNAVAILABLE",)),
+            gates.Case("test-core-v1_19_30-wsl", None, skip_policy=("CORE_RELEASE_UNAVAILABLE",)),
             process,
         )
         self.assertEqual(status, "NOT_RUN_ENVIRONMENT")
         self.assertEqual(reason, "CORE_RELEASE_UNAVAILABLE")
+
+    def test_generic_urlopen_traceback_is_a_failure(self):
+        process = subprocess.CompletedProcess(
+            [sys.executable],
+            1,
+            "",
+            "Traceback: urllib.error.URLError: urlopen error: fixture failure",
+        )
+        status, reason = gates.classify_output(
+            gates.Case("test-core-v1_19_30-wsl", None, skip_policy=("CORE_RELEASE_UNAVAILABLE",)),
+            process,
+        )
+        self.assertEqual(status, "FAIL")
+        self.assertEqual(reason, "RETURN_CODE_1")
+
+    def test_timeout_is_never_an_environment_skip(self):
+        process = subprocess.CompletedProcess([sys.executable], 124, "", "timeout")
+        status, reason = gates.classify_output(gates.Case("test-core", None), process)
+        self.assertEqual((status, reason), ("FAIL", "TIMEOUT"))
+
+    def test_required_core_environment_limit_blocks_complete_gate(self):
+        records = [{"name": "test-core-v1_19_30-wsl", "status": "NOT_RUN_ENVIRONMENT"}]
+        self.assertFalse(gates.gate_overall("full", records))
+        self.assertFalse(gates.gate_overall("device-preflight", records))
+
+    def test_documented_non_core_environment_skip_can_remain_allowed(self):
+        records = [{"name": "test-nft-syntax", "status": "NOT_RUN_ENVIRONMENT"}]
+        self.assertTrue(gates.gate_overall("full", records))
+
+    def test_network_guard_delta_detects_route_proxy_and_dns_changes(self):
+        before = {"available": True, **{key: {"hash": key} for key in ("default_route", "dns", "proxy", "adapters", "listeners", "wsl_running")}}
+        after = json.loads(json.dumps(before))
+        after["default_route"]["hash"] = "changed"
+        delta = gates.network_guard_delta(before, after)
+        self.assertEqual(delta["status"], "FAIL")
+        self.assertIn("default_route", delta["unexpected"])
+
+    def test_network_guard_allows_only_wsl_scoped_changes(self):
+        before = {"available": True, **{key: {"hash": key} for key in ("default_route", "dns", "proxy", "adapters", "listeners", "wsl_running")}}
+        after = json.loads(json.dumps(before))
+        after["adapters"]["hash"] = "changed"
+        after["wsl_running"]["hash"] = "changed"
+        delta = gates.network_guard_delta(before, after, wsl_case=True)
+        self.assertEqual(delta["status"], "PASS")
+        self.assertEqual(delta["unexpected"], [])
+
+    def test_network_guard_rejects_host_listener_change_during_wsl_case(self):
+        before = {"available": True, **{key: {"hash": key} for key in ("default_route", "dns", "proxy", "adapters", "listeners", "wsl_running")}}
+        after = json.loads(json.dumps(before))
+        after["listeners"]["hash"] = "changed"
+        delta = gates.network_guard_delta(before, after, wsl_case=True)
+        self.assertEqual(delta["status"], "FAIL")
+        self.assertEqual(delta["unexpected"], ["listeners"])
+
+    def test_wsl_command_carries_a_token_scoped_marker(self):
+        command = gates.command_for(
+            gates.Case("policy", "scripts/local-gate.sh", environment="wsl"),
+            "token123",
+        )
+        if gates.wsl_available():
+            self.assertIn("/tmp/openkill-test-runs/token123", command[-1])
+            self.assertIn("OPENKILL_TEST_RUN_TOKEN", command[-1])
+            self.assertIn("\\$dir", command[-1])
+
+    def test_wsl_inventory_probe_is_read_only_and_version_compatible(self):
+        snapshot_source = gates.host_network_snapshot.__code__.co_consts
+        self.assertTrue(any("hashed host-network state" in str(value) for value in snapshot_source))
+        # The command is intentionally kept in the implementation rather than
+        # using ``--running``, which returns 0xffffffff on the supported host.
+        if gates.wsl_available():
+            probe = gates._fingerprint_command(["wsl.exe", "-l", "-v"])
+            self.assertTrue(probe["available"], probe)
 
     def test_ruby_dependent_wsl_cases_declare_ruby_skip(self):
         cases = {case.name: case for case in gates.WSL_TESTS}
@@ -110,10 +184,11 @@ class TestGateRunner(unittest.TestCase):
 
     def test_evidence_contract_is_machine_readable(self):
         source = gates.ROOT.joinpath("scripts/openkill-test-gates.py").read_text(encoding="utf-8")
-        for filename in ("summary.json", "summary.txt", "environment.txt", "hashes.txt", "tests.tsv", "skips.tsv", "candidate-manifest.json"):
+        for filename in ("summary.json", "summary.txt", "environment.txt", "hashes.txt", "tests.tsv", "skips.tsv", "candidate-manifest.json", "network-guard.json"):
             self.assertIn(filename, source)
-        payload = json.loads('{"device_access": 0, "central_apply": 0, "packet_test": 0}')
+        payload = json.loads('{"device_access": 0, "host_network_settings_changed_by_work": 0, "central_apply": 0, "packet_test": 0}')
         self.assertEqual(payload["device_access"], 0)
+        self.assertEqual(payload["host_network_settings_changed_by_work"], 0)
 
 
 if __name__ == "__main__":

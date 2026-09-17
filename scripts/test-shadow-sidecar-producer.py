@@ -622,6 +622,8 @@ esac
         staged_renderer = staged / "openkill_nft_renderer.sh"
         staged_manifest = staged_shadow / "semantic_model_v1.tsv"
         staged_template = staged_shadow / "input_tun_v1.tsv"
+        staged_capture = staged / "legacy.capture"
+        shutil.copy2(CAPTURE, staged_capture)
         # Keep candidate bytes unchanged.  A separate wrapper records that the
         # staged observer was sourced and verifies its bytes before execution;
         # the marker is therefore execution metadata, never candidate content.
@@ -638,7 +640,7 @@ esac
             "command -v openkill_shadow_compare_nft >/dev/null 2>&1 || exit 98\n",
         )
         staged_wrapper.chmod(0o700)
-        identity_inputs = (staged_helper, staged_manifest, staged_renderer, staged_template)
+        identity_inputs = (staged_helper, staged_manifest, staged_renderer, staged_template, staged_capture)
         identity = hashlib.sha256(
             "\n".join(
                 f"{path.name}:{hashlib.sha256(path.read_bytes()).hexdigest()}"
@@ -667,10 +669,12 @@ esac
                     f"printf 'MANIFEST_PATH=%s\\n' {quote(wsl_path(staged_manifest))}; "
                     f"printf 'RENDERER_PATH=%s\\n' {quote(wsl_path(staged_renderer))}; "
                     f"printf 'TEMPLATE_PATH=%s\\n' {quote(wsl_path(staged_template))}; "
+                    f"printf 'CAPTURE_PATH=%s\\n' {quote(wsl_path(staged_capture))}; "
                     f"printf 'EXECUTION_IDENTITY_HASH=%s\\n' {quote(identity)}"
                 ),
                 OPENKILL_NFT_SHADOW_RENDERER=wsl_path(staged_renderer),
                 OPENKILL_NFT_SHADOW_TEMPLATE_DIR=wsl_path(staged_shadow),
+                OPENKILL_NFT_SHADOW_CAPTURE_FIXTURE=wsl_path(staged_capture),
                 OPENKILL_NFT_SHADOW_SOURCE_FILE=None,
                 OPENKILL_NETWORK_DESIRED=wsl_path(desired),
                 OPENKILL_NETWORK_APPLIED_FILE=wsl_path(applied),
@@ -688,6 +692,7 @@ esac
             self.assertIn(f"MANIFEST_PATH={wsl_path(staged_manifest)}", process.stdout)
             self.assertIn(f"RENDERER_PATH={wsl_path(staged_renderer)}", process.stdout)
             self.assertIn(f"TEMPLATE_PATH={wsl_path(staged_template)}", process.stdout)
+            self.assertIn(f"CAPTURE_PATH={wsl_path(staged_capture)}", process.stdout)
             self.assertIn(f"EXECUTION_IDENTITY_HASH={identity}", process.stdout)
         self.assertIsNotNone(self.harness.last_runner)
         runner_text = self.harness.last_runner.read_text(encoding="utf-8")
@@ -695,7 +700,9 @@ esac
         self.assertNotIn(wsl_path(HELPER), runner_text)
         self.assertNotIn(wsl_path(RENDERER), runner_text)
         self.assertNotIn(wsl_path(TEMPLATE_DIR), runner_text)
+        self.assertNotIn(wsl_path(CAPTURE), runner_text)
         self.assertEqual(hashlib.sha256(staged_helper.read_bytes()).hexdigest(), observer_sha)
+        self.assertEqual(hashlib.sha256(staged_capture.read_bytes()).hexdigest(), hashlib.sha256(CAPTURE.read_bytes()).hexdigest())
         self.assertTrue(all(status.get("status") == "MATCH" for status in statuses))
         self.assertEqual({status.get("actual_owned_hash") for status in statuses}, {statuses[0].get("actual_owned_hash")})
         self.assertEqual({status.get("desired_owned_hash") for status in statuses}, {statuses[0].get("desired_owned_hash")})

@@ -1,16 +1,24 @@
 # Current status
 
-CURRENT_HEAD: `45b94aee217c49395197a088d17f1f591c9648e6` (observed before this status update)
+CURRENT_HEAD: `bdfb94d2f97767fb4fe1d0e2d9009b7c4a45e4b0` (observed before this local hardening work package)
 VERSION: `2026-1128`
-CURRENT_PHASE: `PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`
-CURRENT_STATUS: `PARTIAL — three independent staged production cycles stopped at STALE before typed comparison`
+CURRENT_PHASE: `LOCAL_VALIDATION_HARDENING_WORK_PACKAGE`
+CURRENT_STATUS: `IN_PROGRESS — process ownership, host-network guard and evidence classification are being hardened locally`
 BLOCKER: `DEVICE_CONTINUITY_SOURCE_NONCONVERGENCE` — `/tmp/openkill-network.desired` and `/tmp/openkill-network.applied` stably differ in the IPv6 rule/prefix fields; resolve that source contract before another device run
 DEVICE_STATE: `.102` remains healthy and RUNNING; no service, package, UCI, dataplane, or canonical-config change was made
 DEVICE_RETRY_READY: `NO`
-NEXT_ACTION: `reconcile the stable IPv6 desired/applied runtime source before requesting a new device retry`
+NEXT_ACTION: `finish local process/network/evidence gates, then obtain an explicitly approved device maintenance step for the IPv6 source convergence`
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
 REAL_PACKET_PATH: `NOT_TESTED`
+HOST_NETWORK_INCIDENT_CAUSE: `UNCONFIRMED`
+HOST_NETWORK_SETTINGS_CHANGED_BY_THIS_WORK: `0`
+TEST_PROCESS_CLEANUP: `IN_PROGRESS`
+HOST_NETWORK_GUARD: `IN_PROGRESS`
+ENVIRONMENT_ERROR_CLASSIFICATION: `IN_PROGRESS`
+IPV6_SOURCE_ROOT_CAUSE: `UNRESOLVED`
+CONTINUITY_CONTRACT_PRESERVED: `PASS`
+WRITER_HASHES_UNCHANGED: `PASS`
 FAST_GATE: `PASS` — `20260917T021444Z-24520`
 FULL_GATE: `PASS` — `20260917T021740Z-10528`
 DEVICE_PREFLIGHT: `PASS` — `20260917T023225Z-24796`

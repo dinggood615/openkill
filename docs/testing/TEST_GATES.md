@@ -15,7 +15,7 @@ under `artifacts/test-evidence/<run-id>/`:
 
 ```text
 summary.json  summary.txt  environment.txt  hashes.txt
-tests.tsv     skips.tsv    candidate-manifest.json
+tests.tsv     skips.tsv    candidate-manifest.json  network-guard.json
 ```
 
 The directory is ignored by Git. The evidence key for each case includes the
@@ -25,13 +25,27 @@ command, environment and the case's allowed skip policy. Fast mode may reuse a m
 allowed result from the cache; `full` and `device-preflight` always execute
 their cases again. A changed input
 therefore invalidates only the affected evidence rather than relying on a
-commit id alone.
+commit id alone. Every case receives a unique run token and executes with an
+owned process boundary. Native timeouts terminate the exact PID tree; WSL
+invocations also leave a token-scoped marker and verify token-owned Linux
+descendants after cleanup. The evidence records the PID, cleanup status and
+orphan count. A timeout or orphan is always a failure, and no unrelated
+process is selected by name.
+
+The runner records a read-only host-network snapshot before the suite and
+after each case. Default routes, DNS, proxy settings, adapter state, listening
+endpoints and the list of already-running WSL instances are hashed so
+sensitive values are not printed. An unexplained change aborts the remaining
+cases; no automatic network repair is attempted. Starting a stopped WSL distro
+may change its virtual adapter and inventory for that WSL case; a host listener
+change remains unexpected and fails the suite.
 
 `fast` is the short feedback loop. It runs the policy checks, compile and diff
 checks, canonical configuration, UCI lifecycle, typed producer/shadow,
 semantic model, and production-shadow writer-freeze suites. Continuity and
 the slower self-sufficiency replay remain in the full and device-preflight
-modes.
+modes. Process ownership, runner classification and the no-network Core
+contract run before WSL bootstrap so local failures are found early.
 
 The fast suite also runs `scripts/test-ui-contract.py`. This local LuCI
 template contract check verifies that every OpenKill stylesheet uses the
@@ -49,9 +63,17 @@ use. The `nft` CLI case is reported as `NOT_RUN_ENVIRONMENT` with reason
 `NFT_CLI_UNAVAILABLE` when the host does not provide the binary. Ruby-dependent
 tests retain their documented `RUBY_UNAVAILABLE` skip. WSL absence is reported
 as `SKIP_ALLOWED` with reason `WSL_UNAVAILABLE`. The Mihomo release-download
-cases additionally use `CORE_RELEASE_UNAVAILABLE` when the host's TLS, DNS or
-network path prevents the official API or asset download. The runner records
-each reason explicitly; there are no silent or generic skips.
+cases additionally use `CORE_RELEASE_UNAVAILABLE` only when `test-core.py`
+emits its explicit `OPENKILL_ENVIRONMENT_LIMIT=CORE_RELEASE_UNAVAILABLE`
+marker for a transport failure. A generic traceback (including `urlopen
+error`), checksum failure, assertion failure or timeout is a required failure.
+Cache hits retain the original skip reason and evidence path and never convert
+an unexecuted check into a fresh execution.
+
+Because the compatible Mihomo Core is required evidence for a complete
+candidate, a `CORE_RELEASE_UNAVAILABLE` result makes `full` and
+`device-preflight` fail closed; it is reported with its explicit reason and
+must not be turned into device readiness.
 
 `device-preflight` is still completely local. It repeats the source,
 canonical-config, staged-observer, internal-sidecar, provenance, continuity,

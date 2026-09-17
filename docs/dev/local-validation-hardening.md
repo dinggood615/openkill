@@ -88,3 +88,35 @@ WSL TLS/DNS/network path cannot reach the release API or asset, the unified
 runner records `CORE_RELEASE_UNAVAILABLE` as an explicit environment-limited
 case. A download or checksum that reaches the test but fails validation is
 still a required failure.
+
+The gate runner executes each case inside an owned process boundary. Native
+timeouts use an exact PID tree (or a POSIX process group); WSL cases carry a
+token-scoped temporary marker and verify that token-owned Linux processes are
+gone after cancellation. Unrelated processes are never selected by executable
+name. Timeout, orphan and cleanup status are recorded per case.
+
+Before the first case and after every case the runner takes a read-only,
+hashed host-network snapshot covering IPv4/IPv6 default routes, DNS, proxy
+settings, adapters, listeners and the WSL distro inventory. A route, DNS,
+proxy or unexplained adapter change aborts the remaining cases and is kept in
+`network-guard.json`; the runner never attempts to repair the host. Starting a
+stopped WSL distro may change its virtual adapter and inventory for that WSL
+case, while a host listener change remains unexpected.
+
+The cache key includes the imported OpenKill Python model modules, verifier,
+fixtures, runner source and tool versions. A cache hit preserves the original
+skip reason and evidence location; it cannot turn a missing required Core or a
+new environment into a pass. Generic traceback text such as `urlopen error`
+is a failure. Only `test-core.py`'s explicit
+`OPENKILL_ENVIRONMENT_LIMIT=CORE_RELEASE_UNAVAILABLE` marker may produce the
+documented Core environment status.
+The unified result still fails `full` and `device-preflight` when a required
+Core case is environment-limited, so missing Core evidence cannot become a
+readiness claim.
+
+The R3B device evidence remains a source-convergence blocker. Its three
+`STALE` cycles are reproduced locally by pairing an IPv6-ready applied state
+with the earlier non-ready desired state. The test preserves the T0/T1/T2
+contract and proves that copying one side or relaxing equality would hide a
+lifecycle source defect; no production writer or device state is changed by
+this work package.

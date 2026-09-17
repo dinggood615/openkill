@@ -14,10 +14,16 @@ from pathlib import Path
 import socket
 import struct
 import subprocess
+import sys
 import tempfile
 import threading
 import time
+import urllib.error
 import urllib.request
+
+
+class CoreReleaseUnavailable(RuntimeError):
+    """The host could not reach the official release transport."""
 
 
 def free_port(socktype=socket.SOCK_STREAM):
@@ -32,8 +38,13 @@ def download_core(tag, destination):
     token = os.environ.get('GITHUB_TOKEN')
     if token:
         headers['Authorization'] = 'Bearer ' + token
-    with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=30) as response:
-        release = json.load(response)
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=30) as response:
+            release = json.load(response)
+    except urllib.error.HTTPError as error:
+        raise RuntimeError(f"release API returned HTTP {error.code}") from error
+    except (urllib.error.URLError, TimeoutError, OSError) as error:
+        raise CoreReleaseUnavailable(f"release API transport: {type(error).__name__}: {error}") from error
     assets = [a for a in release['assets'] if a['name'].startswith('mihomo-linux-amd64-compatible-') and a['name'].endswith('.gz')]
     if len(assets) != 1:
         raise RuntimeError('Official compatible amd64 asset is ambiguous or absent')
@@ -41,8 +52,13 @@ def download_core(tag, destination):
     digest = asset.get('digest', '')
     if not digest.startswith('sha256:'):
         raise RuntimeError('Official release asset has no SHA256 digest')
-    with urllib.request.urlopen(asset['browser_download_url'], timeout=90) as response:
-        data = response.read()
+    try:
+        with urllib.request.urlopen(asset['browser_download_url'], timeout=90) as response:
+            data = response.read()
+    except urllib.error.HTTPError as error:
+        raise RuntimeError(f"release asset returned HTTP {error.code}") from error
+    except (urllib.error.URLError, TimeoutError, OSError) as error:
+        raise CoreReleaseUnavailable(f"release asset transport: {type(error).__name__}: {error}") from error
     if hashlib.sha256(data).hexdigest() != digest.split(':', 1)[1]:
         raise RuntimeError('Mihomo download checksum mismatch')
     destination.write_bytes(gzip.decompress(data))
@@ -91,6 +107,8 @@ def run_tests(core, directory):
     control, mixed, dns = free_port(), free_port(), free_port(socket.SOCK_DGRAM)
     config = dict(baseline, **{'external-controller': f'127.0.0.1:{control}', 'secret': 'test-secret',
                               'mixed-port': mixed, 'allow-lan': False, 'bind-address': '127.0.0.1',
+                              'tun': {'enable': False, 'auto-route': False, 'auto-redirect': False,
+                                      'device': 'utun'},
                               'hosts': {'probe.test': '127.0.0.1'},
                               'dns': {'enable': True, 'listen': f'127.0.0.1:{dns}', 'use-hosts': True,
                                       'enhanced-mode': 'redir-host', 'nameserver': ['127.0.0.1:9']}})
@@ -161,6 +179,14 @@ if __name__ == '__main__':
     with tempfile.TemporaryDirectory(prefix='openkill-core-test-') as tmp:
         directory = Path(tmp)
         core = Path(args.core).resolve() if args.core else directory / 'mihomo'
-        if not args.core:
-            print('Testing official stable', download_core(args.release, core))
-        run_tests(core, directory)
+        try:
+            if not args.core:
+                print('Testing official stable', download_core(args.release, core))
+            run_tests(core, directory)
+        except CoreReleaseUnavailable as error:
+            print(
+                "OPENKILL_ENVIRONMENT_LIMIT=CORE_RELEASE_UNAVAILABLE\n"
+                f"DETAIL={type(error).__name__}: {error}",
+                file=sys.stderr,
+            )
+            raise SystemExit(75)

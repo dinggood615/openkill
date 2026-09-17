@@ -266,6 +266,33 @@ class ContinuityTests(unittest.TestCase):
         self.assertEqual(status.get("status"), "STALE")
         self.assertFalse(marker.exists())
 
+    def test_r3b_ipv6_desired_applied_source_split_is_stably_stale(self) -> None:
+        """Reproduce the recorded .102 blocker without touching a device.
+
+        The applied state represents an IPv6-ready generation while the
+        desired state represents the earlier non-ready generation.  The
+        continuity contract must reject the pair before capture or rendering;
+        copying either side or relaxing the equality would hide a lifecycle
+        source defect.
+        """
+        for attempt in range(3):
+            desired, applied = self.h.base_state()
+            _write(
+                desired,
+                self.h.state_text
+                .replace("MARK=0x162", "MARK=0x162\nIPV6_PROXY_RULE=0\nIPV6_TUN_ROUTE=0\nLOCALNETWORK6_PREFIXES=", 1)
+                .replace("LOCALNETWORK6_PREFIXES=\n", "LOCALNETWORK6_PREFIXES=2001:db8:dead::/64\n", 1),
+            )
+            _write(
+                applied,
+                self.h.state_text
+                .replace("MARK=0x162", "MARK=0x162\nIPV6_PROXY_RULE=1\nIPV6_TUN_ROUTE=1\nLOCALNETWORK6_PREFIXES=2001:db8:beef::/64", 1),
+            )
+            process, status = self.h.compare(desired, applied, self.h.root / f"r3b-telemetry-{attempt}")
+            self.assertEqual(self.h.rc(process), 6, process.stderr)
+            self.assertEqual(status.get("status"), "STALE")
+            self.assertEqual(status.get("reason"), "automatic-state-source")
+
     def test_pre_snapshot_race_is_stale_and_renderer_is_not_invoked(self) -> None:
         desired, applied = self.h.base_state()
         marker = self.h.root / "renderer-called"
