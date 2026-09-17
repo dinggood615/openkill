@@ -99,9 +99,12 @@ Before the first case and after every case the runner takes a read-only,
 hashed host-network snapshot covering IPv4/IPv6 default routes, DNS, proxy
 settings, adapters, listeners and the WSL distro inventory. A route, DNS,
 proxy or unexplained adapter change aborts the remaining cases and is kept in
-`network-guard.json`; the runner never attempts to repair the host. Starting a
-stopped WSL distro may change its virtual adapter and inventory for that WSL
-case, while a host listener change remains unexpected.
+`network-guard.json`; the runner never attempts to repair the host. WSL may
+also stop an idle distro between native cases; a change limited to the WSL
+inventory is recorded as `WSL_LIFECYCLE_OBSERVED` and is allowed because it is
+not a host network setting change. Starting a stopped WSL distro may change its
+virtual adapter and inventory for that WSL case, while a host listener change
+remains unexpected.
 
 The cache key includes the imported OpenKill Python model modules, verifier,
 fixtures, runner source and tool versions. A cache hit preserves the original

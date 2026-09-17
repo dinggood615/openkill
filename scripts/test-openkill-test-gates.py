@@ -138,6 +138,16 @@ class TestGateRunner(unittest.TestCase):
         self.assertEqual(delta["status"], "PASS")
         self.assertEqual(delta["unexpected"], [])
 
+    def test_network_guard_records_idle_wsl_lifecycle_between_native_cases(self):
+        before = {"available": True, **{key: {"hash": key} for key in ("default_route", "dns", "proxy", "adapters", "listeners", "wsl_running")}}
+        after = json.loads(json.dumps(before))
+        after["wsl_running"]["hash"] = "changed"
+        delta = gates.network_guard_delta(before, after)
+        self.assertEqual(delta["status"], "PASS")
+        self.assertEqual(delta["classification"], "WSL_LIFECYCLE_OBSERVED")
+        self.assertEqual(delta["expected_wsl_changes"], ["wsl_running"])
+        self.assertEqual(delta["unexpected"], [])
+
     def test_network_guard_rejects_host_listener_change_during_wsl_case(self):
         before = {"available": True, **{key: {"hash": key} for key in ("default_route", "dns", "proxy", "adapters", "listeners", "wsl_running")}}
         after = json.loads(json.dumps(before))

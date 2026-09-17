@@ -718,17 +718,27 @@ def network_guard_delta(before: dict[str, object], after: dict[str, object], *, 
     keys = ("default_route", "dns", "proxy", "adapters", "listeners", "wsl_running")
     changed = [key for key in keys if before.get(key) != after.get(key)]
     expected: list[str] = []
+    classification = "NO_CHANGE"
+    # WSL may stop an idle distro between two short native cases.  This is a
+    # read-only lifecycle observation, not a host network mutation.  Keep it
+    # explicit in evidence while continuing to fail closed on route, DNS,
+    # proxy, adapter or listener changes.
+    if changed == ["wsl_running"] and not wsl_case:
+        expected = ["wsl_running"]
+        classification = "WSL_LIFECYCLE_OBSERVED"
     # Starting a stopped WSL distro may add its virtual adapter and change the
     # distro inventory.  Host listener changes remain unexpected: a test must
     # not expose a new socket merely because it ran inside WSL.
     if wsl_case and changed and set(changed).issubset({"adapters", "wsl_running"}):
         expected = list(changed)
+        classification = "WSL_BOOTSTRAP_OBSERVED"
     unexpected = [key for key in changed if key not in expected]
     return {
         "available": bool(before.get("available") and after.get("available")),
         "changed": changed,
         "expected_wsl_changes": expected,
         "unexpected": unexpected,
+        "classification": classification,
         "status": "PASS" if not unexpected and before.get("available") and after.get("available") else "FAIL",
     }
 
