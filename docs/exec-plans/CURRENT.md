@@ -1,13 +1,13 @@
 # Current status
 
-CURRENT_HEAD: `36a0923220ca722c1be91fef7736fb826e113558` (observed before release-preparation changes; resolve the resulting HEAD with Git)
+CURRENT_HEAD: `0ae5fb418514d609923a632a56250907d52a74bb` (released source commit; resolve the resulting master HEAD after this status-only update)
 VERSION: `2026-1129`
-CURRENT_PHASE: `RELEASE_CANDIDATE_AND_UI_HARDENING`
-CURRENT_STATUS: `release-preparation metadata and Development CI UI coverage are staged for exact-commit validation; local UI and shadow gates remain verified on the preceding clean candidate`
-BLOCKER: `RELEASE_GATES_PENDING` — `.102` is a VMware test machine with limited IPv6 compatibility; its historical IPv6 continuity split is retained as an environment limitation and is not treated as a product defect
-DEVICE_STATE: `.102` remains healthy and RUNNING from frozen R3B evidence; typed IPv6 parity is not claimed, and this work package made no device contact or service/package/UCI/dataplane/config change
-DEVICE_RETRY_READY: `NO` (full IPv6 device evidence is deferred to an IPv6-capable environment)
-NEXT_ACTION: `run exact-commit local gates, push after review, then Development CI → RC Build → Formal Release`
+CURRENT_PHASE: `RELEASED_2026-1129`
+CURRENT_STATUS: `Formal Release v2026-1129-ipk completed from 0ae5fb4; the package and channel metadata were verified against the published SHA256`
+BLOCKER: `DEVICE_TYPED_PARITY_UNVERIFIED` — `.102` is a VMware test machine with limited IPv6 compatibility; historical R3B IPv6 continuity split remains deferred and is not a product defect conclusion
+DEVICE_STATE: `.102` was not contacted in this release work; prior R3B evidence remains historical, typed device parity is not claimed, and no service/package/UCI/dataplane/config change was made
+DEVICE_RETRY_READY: `NO` (device validation requires a separately approved, IPv6-capable environment)
+NEXT_ACTION: `use the published 2026-1129 IPK for approved installation testing; keep central dataplane and packet-path validation deferred`
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
 REAL_PACKET_PATH: `NOT_TESTED`
@@ -33,7 +33,7 @@ RESULTING_HEAD: resolve with `git rev-parse HEAD` after this status commit; the 
 IMPLEMENTED: R3C internal typed sidecar producer, canonical D2D fixture, typed ownership/DNS model, isolated staged execution, unified local gates, LuCI presentation and conditional-control fixes, T0/T1/T2 runtime-DNS continuity checks, multi-listener core-owned DNS socket selection, owned-process cleanup, and read-only host-network guarding
 LOCAL_VERIFIED: focused UI/interaction suites, clean fast/full gates and clean device-preflight pass; the browser run executes production status/upload/editor coordinators at 1920/1366/768/390 CSS px with local mocks; WSL-only lifecycle changes and the explicit NFT CLI limitation are classified; the 1000-call continuity stress runs in private WSL `/tmp`; historical device cycles stopped fail-closed at IPv6 source continuity, which is deferred because `.102` is a VMware IPv6-limited test environment
 DEVICE_VERIFIED: `NO` for the R3A/R3C candidate (`.102` runtime stayed healthy, but typed parity was NOT_RUN)
-RELEASED: `NO` (2026-1128 package remains the verified release baseline)
+RELEASED: `YES` — `v2026-1129-ipk` points to `0ae5fb418514d609923a632a56250907d52a74bb`; IPK SHA256 `3017bd1569e1851105dbebceea306496fe8f7d2776aff88402bf4e1433e521d4`
 
 The detailed phase records below are retained as historical evidence. The
 single local gate runner and the hardening decisions are documented in
