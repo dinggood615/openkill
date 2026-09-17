@@ -105,6 +105,26 @@ class ContinuityHarness:
 
     def close(self) -> None:
         self.temp.cleanup()
+        # WSL runs the helper as root and can leave Windows-mounted files
+        # behind when a subprocess is interrupted.  Retry cleanup inside the
+        # exact, test-owned temporary directory; the parent/name checks keep
+        # this from ever becoming a general-purpose recursive delete.
+        if self.root.exists():
+            temp_root = Path(tempfile.gettempdir()).resolve()
+            root = self.root.resolve()
+            if root.parent == temp_root and root.name.startswith("openkill-shadow-continuity-"):
+                if shutil.which("wsl.exe"):
+                    try:
+                        subprocess.run(
+                            ["wsl.exe", "-u", "root", "--", "rm", "-rf", "--", _wsl(root)],
+                            capture_output=True,
+                            timeout=15,
+                            check=False,
+                        )
+                    except (OSError, subprocess.TimeoutExpired):
+                        pass
+                if self.root.exists():
+                    shutil.rmtree(self.root, ignore_errors=True)
 
     def base_state(self) -> tuple[Path, Path]:
         desired = self.root / "desired"
@@ -215,22 +235,37 @@ class ContinuityTests(unittest.TestCase):
 
     def test_noop_token_is_stable_for_1000_computations(self) -> None:
         desired, applied = self.h.base_state()
-        output = self.h.root / "token"
-        work = self.h.root / "loop-work"
-        token_command = (
-            f"openkill_shadow_auto_continuity_token {_quote(_wsl(output))} {_quote(_wsl(work))} "
-            f"{_quote(_wsl(desired))} {_quote(_wsl(applied))} "
-            f"{_quote(_wsl(self.h.root / 'missing-snapshot'))} "
-            f"{_quote(_wsl(self.h.root / 'missing-node4'))} {_quote(_wsl(self.h.root / 'missing-node6'))}"
+        # The continuity implementation is intentionally exercised 1000 times,
+        # but keeping every transient file on /mnt/c makes the test sensitive
+        # to Windows-mounted filesystem latency.  Copy the exact inputs into a
+        # private WSL /tmp directory once, then perform the same calls there.
+        # This changes only the test transport; the production helper and its
+        # canonicalization work remain the code under test.
+        body = "\n".join(
+            (
+                "root=$(mktemp -d /tmp/openkill-shadow-continuity.XXXXXX) || exit 80",
+                "trap 'rm -rf \"$root\"' EXIT HUP INT TERM",
+                f"cp {_quote(_wsl(HELPER))} \"$root/helper.sh\" || exit 81",
+                f"cp {_quote(_wsl(desired))} \"$root/desired\" || exit 82",
+                f"cp {_quote(_wsl(applied))} \"$root/applied\" || exit 83",
+                ". \"$root/helper.sh\" || exit 84",
+                "export OPENKILL_NFT_SHADOW=1 OPENKILL_NFT_SHADOW_FORCE=1",
+                "export OPENKILL_NETWORK_DESIRED=\"$root/desired\" OPENKILL_NETWORK_APPLIED_FILE=\"$root/applied\"",
+                "export OPENKILL_NETWORK_SNAPSHOT=\"$root/missing-snapshot\" OPENKILL_NFT_SHADOW_NODE4_FILE=\"$root/missing-node4\" OPENKILL_NFT_SHADOW_NODE6_FILE=\"$root/missing-node6\"",
+                "export OPENKILL_TUN_OWNER=OPENKILL OPENKILL_RUN_MODE=TUN OPENKILL_PROXY_PORT=7892 OPENKILL_TPROXY_PORT=7895",
+                "export OPENKILL_DNS_PORT=7874 OPENKILL_ROUTER_SELF_PROXY=0 OPENKILL_FWMARK=0x162 OPENKILL_FWMASK=0xffffffff OPENKILL_ROUTE_TABLE=354 OPENKILL_RULE_PREF=1888",
+                "first=; i=0",
+                "while [ \"$i\" -lt 1000 ]; do",
+                "  openkill_shadow_auto_continuity_token \"$root/token\" \"$root/work\" \"$root/desired\" \"$root/applied\" \"$root/missing-snapshot\" \"$root/missing-node4\" \"$root/missing-node6\" >/dev/null || exit 90",
+                "  current=$(sed -n '1p' \"$root/token\") || exit 91",
+                "  [ -n \"$first\" ] || first=$current",
+                "  [ \"$first\" = \"$current\" ] || exit 92",
+                "  i=$((i + 1))",
+                "done",
+                "echo COUNT=$i HASH=$first",
+            )
         )
-        body = (
-            "first=; i=0; "
-            f"while [ $i -lt 1000 ]; do {token_command} >/dev/null || exit 90; "
-            "current=$(sed -n '1p' " + _quote(_wsl(output)) + "); "
-            "[ -n \"$first\" ] || first=$current; [ \"$first\" = \"$current\" ] || exit 91; "
-            "i=$((i + 1)); done; echo COUNT=$i HASH=$first"
-        )
-        process = self.h.run(body, self.h.env(desired, applied, self.h.root / "unused"), timeout=180)
+        process = self.h.run(body, {}, timeout=180)
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertIn("COUNT=1000", process.stdout)
 

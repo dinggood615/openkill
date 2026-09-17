@@ -95,6 +95,13 @@ token-scoped temporary marker and verify that token-owned Linux processes are
 gone after cancellation. Unrelated processes are never selected by executable
 name. Timeout, orphan and cleanup status are recorded per case.
 
+The continuity regression keeps its 1000-call determinism check, but copies its
+fixture inputs and transient hash files into a test-owned WSL `/tmp` directory
+before the loop. This avoids treating slow Windows-mounted I/O as a hung
+continuity implementation. The harness removes that exact directory on normal
+exit and retries cleanup inside WSL after interruption; it never performs a
+general temporary-directory sweep.
+
 Before the first case and after every case the runner takes a read-only,
 hashed host-network snapshot covering IPv4/IPv6 default routes, DNS, proxy
 settings, adapters, listeners and the WSL distro inventory. A route, DNS,
