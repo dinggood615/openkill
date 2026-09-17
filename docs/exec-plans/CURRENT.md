@@ -1,13 +1,13 @@
 # Current status
 
-CURRENT_HEAD: `1dc6e7c7ac178055b4d6f66c6bc65c3aad129691` (observed before this status update; resolve final HEAD with Git after the commit)
+CURRENT_HEAD: `2882e796c3b8864c41d968a5a1d28bb9635ed105` (observed before this status update; resolve final HEAD with Git after the commit)
 VERSION: `2026-1128`
 CURRENT_PHASE: `LOCAL_VALIDATION_HARDENING_WORK_PACKAGE`
-CURRENT_STATUS: `LOCAL_VALIDATION_HARDENING_COMPLETE — process ownership, host-network guard and environment classification are locally verified; final clean-HEAD preflight remains`
+CURRENT_STATUS: `LOCAL_VALIDATION_HARDENING_COMPLETE — process ownership, host-network guard, environment classification and candidate preflight are locally verified`
 BLOCKER: `DEVICE_CONTINUITY_SOURCE_NONCONVERGENCE` — `/tmp/openkill-network.desired` and `/tmp/openkill-network.applied` stably differ in the IPv6 rule/prefix fields; resolve that source contract before another device run
 DEVICE_STATE: `.102` remains healthy and RUNNING; no service, package, UCI, dataplane, or canonical-config change was made
 DEVICE_RETRY_READY: `NO`
-NEXT_ACTION: `complete the clean-HEAD device-preflight locally, then obtain an explicitly approved device maintenance step for the IPv6 source convergence`
+NEXT_ACTION: `after the final identity-only preflight, obtain an explicitly approved device maintenance step for the IPv6 source convergence`
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
 REAL_PACKET_PATH: `NOT_TESTED`
@@ -21,8 +21,8 @@ CONTINUITY_CONTRACT_PRESERVED: `PASS`
 WRITER_HASHES_UNCHANGED: `PASS`
 FAST_GATE: `PASS` — `20260917T043958Z-23296` (14/14, no cache)
 FULL_GATE: `PASS` — `20260917T044427Z-3236` (36 cases; 35 PASS, 1 explicit `NFT_CLI_UNAVAILABLE`)
-DEVICE_PREFLIGHT: `PENDING` — run with `--no-cache` after this status commit on the resulting clean HEAD
-DEVICE_CANDIDATE_ID: `pending final clean-HEAD preflight`
+DEVICE_PREFLIGHT: `PASS` — `20260917T050207Z-25192` (29 cases; final identity-only refresh follows this status commit)
+DEVICE_CANDIDATE_ID: `3018ff88774a8c39c383c7ad54cfff45681d6fbd6909aa5a90a20c951d3472cd`
 DEVICE_EVIDENCE: `historical R3B evidence remains under artifacts/test-evidence/r3b-device-f83d592f18b685fe62b9b94a4f907e5465ac13f3e1488a27b8bff5d1cd5ea763`
 RESULTING_HEAD: resolve with `git rev-parse HEAD` after this status commit; the recorded `CURRENT_HEAD` is the pre-commit observation
 
