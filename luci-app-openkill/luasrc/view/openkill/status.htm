@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="/luci-static/resources/openkill/css/oc.css?v=<%=plugin_version%>">
 <link rel="stylesheet" href="/luci-static/resources/openkill/css/flat.css?v=<%=plugin_version%>">
 </head>
-<div class="oc openkill-status-page" role="region" aria-label="<%:OpenKill runtime status%>">
+<div class="oc openkill-status-page" role="region" aria-label="<%:OpenKill runtime status%>" data-runtime-state="loading" aria-busy="true">
                 <%+openkill/page_header%>
 <div class="main-cards-container dashboard-v1-layout">
                     <div class="main-card dashboard-primary-column">
@@ -31,19 +31,19 @@
                                 <div class="runtime-profile" id="runtime-profile" aria-live="polite">
                                     <span class="runtime-chip runtime-chip-core" id="runtime-core-chip">
                                         <svg width="12" height="12"><use href="#oc-icon-cpu"/></svg>
-                                        <span>Meta</span>
+                                        <span><%:Collecting data...%></span>
                                     </span>
                                     <span class="runtime-chip" id="runtime-compatibility-chip">
                                         <svg width="12" height="12"><use href="#oc-icon-shield-check"/></svg>
-                                        <span>稳定兼容</span>
+                                        <span><%:Collecting data...%></span>
                                     </span>
                                     <span class="runtime-chip" id="runtime-ipv6-chip">
                                         <svg width="12" height="12"><use href="#oc-icon-globe"/></svg>
-                                        <span><%:IPv6 disabled%></span>
+                                        <span><%:Collecting data...%></span>
                                     </span>
                                     <span class="runtime-chip" id="runtime-watchdog-chip">
                                         <svg width="12" height="12"><use href="#oc-icon-shield-check"/></svg>
-                                        <span><%:Watchdog%> 60s</span>
+                                        <span><%:Collecting data...%></span>
                                     </span>
                                 </div>
                                 <div class="core-main-controls">
@@ -68,12 +68,12 @@
                                     </div>
                                 </div>
                                 <div class="card-actions">
-                                    <button type="button" class="icon-btn theme-toggle-btn" id="theme-toggle" onclick="toggleThemeMode()">
+                                    <button type="button" class="icon-btn theme-toggle-btn" id="theme-toggle" aria-label="<%:Auto Theme%>" title="<%:Auto Theme%>" onclick="toggleThemeMode()">
                                         <svg id="sun-icon" width="14" height="14"><use href="#oc-icon-sun"/></svg>
                                         <svg id="moon-icon" width="14" height="14" class="oc-hidden"><use href="#oc-icon-moon"/></svg>
                                         <svg id="auto-icon" width="14" height="14" class="oc-hidden"><use href="#oc-icon-auto-theme"/></svg>
                                     </button>
-                                    <button type="button" class="icon-btn action-btn" id="logo_btn" title="Mihomo" onclick="return winOpen('https://www.github.com/metacubex/mihomo');">
+                                    <button type="button" class="icon-btn action-btn" id="logo_btn" title="Mihomo" aria-label="Mihomo" onclick="return winOpen('https://www.github.com/metacubex/mihomo');">
                                         <img id="_logo" src="/luci-static/resources/openkill/img/logo.png?v=<%=plugin_version%>" loading="lazy" width="14px" height="14px" alt="OpenKill"/>
                                         <span class="logo-text">技术支持：<span class="mihomo-link">Mihomo</span></span>
                                     </button>
@@ -377,21 +377,81 @@
         runtime_watchdog_chip: document.getElementById('runtime-watchdog-chip')
     };
 
+    // Keep the top-level status truthful when the backend is still loading,
+    // returns an incomplete payload, or becomes unreachable.  A valid status
+    // response contains both booleans; anything else is deliberately unknown
+    // so stale healthy values are never presented as live runtime state.
+    var runtimeStateLabels = {
+        loading: '<%:Collecting data...%>',
+        running: '<%:Running%>',
+        stopped: '<%:Not Running%>',
+        disabled: '<%:Disabled%>',
+        unknown: '<%:Unknown%>',
+        error: '<%:Error%>'
+    };
+
+    function classifyRuntimeState(status) {
+        if (!status || typeof status !== 'object' ||
+            typeof status.clash !== 'boolean' ||
+            typeof status.service_enabled !== 'boolean') {
+            return 'unknown';
+        }
+        if (status.clash) return 'running';
+        return status.service_enabled ? 'stopped' : 'disabled';
+    }
+
+    function setRuntimeState(status, forcedState) {
+        var state = forcedState || classifyRuntimeState(status);
+        var page = document.querySelector('.openkill-status-page');
+        if (page) {
+            page.dataset.runtimeState = state;
+            page.setAttribute('aria-busy', state === 'loading' ? 'true' : 'false');
+        }
+
+        var indicator = DOMCache.clash;
+        if (indicator) {
+            indicator.dataset.state = state;
+            indicator.setAttribute('aria-live', 'polite');
+            indicator.textContent = runtimeStateLabels[state] || runtimeStateLabels.unknown;
+            indicator.setAttribute('aria-label', runtimeStateLabels[state] || runtimeStateLabels.unknown);
+            if (state === 'loading' || state === 'unknown' || state === 'error') {
+                indicator.classList.add('runtime-unavailable');
+            } else {
+                indicator.classList.remove('runtime-unavailable');
+            }
+        }
+
+        var toggle = document.getElementById('plugin_toggle');
+        if (toggle) {
+            toggle.disabled = state === 'loading' || state === 'unknown' || state === 'error';
+            if (state === 'running') toggle.checked = true;
+            if (state === 'stopped' || state === 'disabled') toggle.checked = false;
+        }
+        return state;
+    }
+
     var getDashboardBaseURL = ocGetDashboardBaseURL;
     var buildDashboardURL = ocBuildDashboardURL;
     var bytesToSize = ocFormatBytes;
     var debounceButton = ocDebounce;
 
-    // Keep the dashboard's compact runtime profile aligned with the four-stage
-    // baseline. Values are read-only summaries; settings remain editable in
-    // Plugin Settings and Overwrite Settings.
+    // Keep the dashboard's compact runtime profile aligned with the runtime
+    // state. Values are read-only summaries and are unavailable until a live
+    // running response has been confirmed.
     function updateRuntimeProfile(status) {
+        var hasRuntimeState = !!(status && typeof status === 'object' &&
+            typeof status.clash === 'boolean' &&
+            typeof status.service_enabled === 'boolean');
+        var runtimeIsRunning = hasRuntimeState && status.clash === true;
         var coreChip = DOMCache.runtime_core_chip;
         if (coreChip) {
             var coreLabel = coreChip.querySelector('span:last-child');
             if (coreLabel) {
-                coreLabel.textContent = (status && status.core_type ? status.core_type : 'Meta') + ' <%:Stable%>';
+                coreLabel.textContent = runtimeIsRunning ?
+                    ((status.core_type || 'Meta') + ' <%:Stable%>') : '<%:Not Available%>';
             }
+            coreChip.classList.toggle('runtime-chip-muted', !runtimeIsRunning);
+            coreChip.title = runtimeIsRunning ? 'OpenKill 核心运行状态' : '核心运行状态暂不可用';
         }
 
         var compatibilityChip = DOMCache.runtime_compatibility_chip;
@@ -404,15 +464,15 @@
                 (requestedNative && owner !== 'mihomo');
             var nativeMode = requestedNative && owner === 'mihomo' && !fallbackMode;
             var performanceMode = profile === 'performance' && owner === 'openkill' && !fallbackMode;
-            var label = fallbackMode ? '稳定兼容（原生回退）' :
-                (nativeMode ? 'Mihomo 原生接管' : (performanceMode ? '高性能双栈' : '稳定兼容'));
+            var label = !runtimeIsRunning ? '<%:Not Available%>' : (fallbackMode ? '稳定兼容（原生回退）' :
+                (nativeMode ? 'Mihomo 原生接管' : (performanceMode ? '高性能双栈' : '稳定兼容')));
             if (compatibilityLabel) compatibilityLabel.textContent = label;
-            compatibilityChip.classList.toggle('runtime-chip-success', performanceMode || nativeMode);
-            compatibilityChip.classList.toggle('runtime-chip-warning', fallbackMode);
-            compatibilityChip.classList.toggle('runtime-chip-muted', !performanceMode && !nativeMode && !fallbackMode);
-            compatibilityChip.title = fallbackMode ? 'Mihomo 原生接管预检未通过，已安全回退到 OpenKill 管理；请查看运行日志' :
+            compatibilityChip.classList.toggle('runtime-chip-success', runtimeIsRunning && (performanceMode || nativeMode));
+            compatibilityChip.classList.toggle('runtime-chip-warning', runtimeIsRunning && fallbackMode);
+            compatibilityChip.classList.toggle('runtime-chip-muted', !runtimeIsRunning || (!performanceMode && !nativeMode && !fallbackMode));
+            compatibilityChip.title = !runtimeIsRunning ? '运行状态暂不可用，兼容性未验证' : (fallbackMode ? 'Mihomo 原生接管预检未通过，已安全回退到 OpenKill 管理；请查看运行日志' :
                 (nativeMode ? 'Mihomo 管理 TUN、路由和防火墙' :
-                (performanceMode ? 'OpenKill 接管并启用高性能双栈参数' : 'OpenKill 统一管理 TUN、DNS 和防火墙'));
+                (performanceMode ? 'OpenKill 接管并启用高性能双栈参数' : 'OpenKill 统一管理 TUN、DNS 和防火墙')));
         }
 
         var ipv6Chip = DOMCache.runtime_ipv6_chip;
@@ -421,11 +481,13 @@
             var ipv6Enabled = !!(status && status.ipv6_enable);
             var ipv6Dns = !!(status && status.ipv6_dns);
             if (ipv6Label) {
-                ipv6Label.textContent = ipv6Enabled ? (ipv6Dns ? '<%:IPv6 + DNS%>' : '<%:IPv6%>') : '<%:IPv4%>';
+                ipv6Label.textContent = !runtimeIsRunning ? '<%:Not Available%>' :
+                    (ipv6Enabled ? (ipv6Dns ? '<%:IPv6 + DNS%>' : '<%:IPv6%>') : '<%:IPv4%>');
             }
-            ipv6Chip.classList.toggle('runtime-chip-success', ipv6Enabled);
-            ipv6Chip.classList.toggle('runtime-chip-muted', !ipv6Enabled);
-            ipv6Chip.title = ipv6Enabled ? (ipv6Dns ? '<%:IPv6 proxy and AAAA DNS are enabled%>' : '<%:IPv6 proxy is enabled; AAAA DNS is disabled%>') : '<%:IPv6 proxy is disabled%>';
+            ipv6Chip.classList.toggle('runtime-chip-success', runtimeIsRunning && ipv6Enabled);
+            ipv6Chip.classList.toggle('runtime-chip-muted', !runtimeIsRunning || !ipv6Enabled);
+            ipv6Chip.title = !runtimeIsRunning ? '运行状态暂不可用，IPv6 未验证' :
+                (ipv6Enabled ? (ipv6Dns ? '<%:IPv6 proxy and AAAA DNS are enabled%>' : '<%:IPv6 proxy is enabled; AAAA DNS is disabled%>') : '<%:IPv6 proxy is disabled%>');
         }
 
         var watchdogChip = DOMCache.runtime_watchdog_chip;
@@ -433,8 +495,86 @@
             var watchdogLabel = watchdogChip.querySelector('span:last-child');
             var seconds = parseInt(status && status.watchdog_interval, 10);
             if (!isFinite(seconds) || seconds < 15) seconds = 60;
-            if (watchdogLabel) watchdogLabel.textContent = '<%:Watchdog%> ' + seconds + 's';
-            watchdogChip.title = '<%:Read-only health monitor interval%>: ' + seconds + 's';
+            if (watchdogLabel) watchdogLabel.textContent = runtimeIsRunning ? '<%:Watchdog%> ' + seconds + 's' : '<%:Not Available%>';
+            watchdogChip.classList.toggle('runtime-chip-muted', !runtimeIsRunning);
+            watchdogChip.title = runtimeIsRunning ? '<%:Read-only health monitor interval%>: ' + seconds + 's' : '守护进程状态暂不可用';
+        }
+    }
+
+    function setRuntimeControlsAvailable(available) {
+        var controls = [
+            DOMCache.web, DOMCache.webo, DOMCache.webm, DOMCache.webz,
+            DOMCache.close_all_connection, DOMCache.reload_firewall,
+            DOMCache.flush_dns_cache, DOMCache.one_key_update
+        ];
+        for (var i = 0; i < controls.length; i++) {
+            if (!controls[i]) continue;
+            controls[i].disabled = !available;
+            controls[i].classList.toggle('runtime-unavailable', !available);
+        }
+
+        var settingControls = document.querySelectorAll(
+            'input[name="radios"], input[name="radios-ru"], ' +
+            '#meta_sniffer_on, #meta_sniffer_off, #respect_rules_on, #respect_rules_off, ' +
+            '#oc_setting_oversea_0, #oc_setting_oversea_1, #oc_setting_oversea_2, ' +
+            '#stream_unlock_on, #stream_unlock_off'
+        );
+        for (var j = 0; j < settingControls.length; j++) {
+            settingControls[j].disabled = !available;
+        }
+    }
+
+    function clearRuntimeUnavailableMarkers() {
+        var fields = [
+            DOMCache.mode, DOMCache.daip, DOMCache.mix_proxy,
+            document.getElementById('upload_'), document.getElementById('download_'),
+            document.getElementById('uploadtotal_'), document.getElementById('downloadtotal_'),
+            document.getElementById('connect_t'), document.getElementById('mem_t'),
+            document.getElementById('cpu_t'), document.getElementById('load_a')
+        ];
+        for (var i = 0; i < fields.length; i++) {
+            if (fields[i]) fields[i].classList.remove('runtime-unavailable');
+        }
+    }
+
+    function clearRuntimePresentation(state) {
+        var label = runtimeStateLabels[state] || runtimeStateLabels.unknown;
+        var fields = [
+            DOMCache.mode, DOMCache.daip, DOMCache.mix_proxy,
+            document.getElementById('upload_'), document.getElementById('download_'),
+            document.getElementById('uploadtotal_'), document.getElementById('downloadtotal_'),
+            document.getElementById('connect_t'), document.getElementById('mem_t'),
+            document.getElementById('cpu_t'), document.getElementById('load_a')
+        ];
+        for (var i = 0; i < fields.length; i++) {
+            if (!fields[i]) continue;
+            fields[i].textContent = label;
+            fields[i].classList.add('runtime-unavailable');
+            fields[i].removeAttribute('title');
+        }
+
+        if (DOMCache.oclog) {
+            DOMCache.oclog.classList.add('oc-hidden');
+            DOMCache.oclog.textContent = '';
+        }
+        [DOMCache.copy_secret, DOMCache.copy_address, DOMCache.copy_mix_address,
+            DOMCache.copy_mix_secret, DOMCache.copy_pac_config].forEach(function(element) {
+            if (element) element.style.display = 'none';
+        });
+        setRuntimeControlsAvailable(false);
+
+        if (typeof SystemStatusManager !== 'undefined' && SystemStatusManager) {
+            SystemStatusManager.stop();
+            SystemStatusManager.resetSysStats();
+        }
+        if (typeof NetworkStatsManager !== 'undefined' && NetworkStatsManager) {
+            NetworkStatsManager.stop();
+            NetworkStatsManager.resetStats();
+        }
+        for (var k = 0; k < fields.length; k++) {
+            if (!fields[k]) continue;
+            fields[k].textContent = label;
+            fields[k].classList.add('runtime-unavailable');
         }
     }
 
@@ -2705,13 +2845,27 @@
     // the dashboard responsive while reducing repeated LuCI requests.
     XHR.poll(15, '<%=luci.dispatcher.build_url("admin", "services", "openkill", "status")%>', null, function(x, status) {
         if (x && x.status == 200) {
-            updateRuntimeProfile(status || {});
+            status = status && typeof status === 'object' ? status : null;
+            var runtimeState = setRuntimeState(status);
+            updateRuntimeProfile(status);
+            if (runtimeState !== 'running') {
+                StateManager.current_status = status || {};
+                clearRuntimePresentation(runtimeState);
+                if (DOMCache.clash) DOMCache.clash.setAttribute('aria-label', runtimeStateLabels[runtimeState]);
+                clashversion_check();
+                return;
+            }
+            if (!SettingsManager.pendingOperations || SettingsManager.pendingOperations.size === 0) {
+                setRuntimeControlsAvailable(true);
+            }
+            clearRuntimeUnavailableMarkers();
             var updates = [];
 
             if (!pluginToggleUserAction) {
                 updates.push({
                     element: DOMCache.clash,
-                    content: status.clash ? '<b style=color:var(--success-color)>' + status.core_type +'&nbsp;<%:Running%></b>' : '<b style=color:var(--error-color)><%:Not Running%></b>'
+                    content: runtimeState === 'disabled' ? '<b style=color:var(--warning-color)><%:Disabled%></b>' :
+                        (status.clash ? '<b style=color:var(--success-color)>' + (status.core_type || 'Meta') +'&nbsp;<%:Running%></b>' : '<b style=color:var(--error-color)><%:Not Running%></b>')
                 });
 
                 updatePluginToggleState(status.clash);
@@ -2785,6 +2939,7 @@
             updates.push({element: document.getElementById('_one_key_update_btn'), content: oneKeyUpdateContent});
 
             StateManager.batchUpdateDOM(updates);
+            if (DOMCache.clash) DOMCache.clash.setAttribute('aria-label', runtimeStateLabels[runtimeState]);
 
             function setDashboardVisibility(element, visible) {
                 if (element) element.classList.toggle('hidden', !visible);
@@ -2854,6 +3009,10 @@
                 NetworkStatsManager.stop();
                 NetworkStatsManager.resetStats();
             }
+        } else {
+            updateRuntimeProfile(null);
+            clearRuntimePresentation('error');
+            setRuntimeState(null, 'error');
         }
         clashversion_check();
     });
@@ -3481,15 +3640,7 @@
         toggleElement.disabled = true;
         pluginToggleUserAction = true;
         var action = isEnabled ? 'start' : 'stop';
-
-        if (DOMCache.clash) {
-            if (isEnabled) {
-                var coreType = (StateManager.current_status && StateManager.current_status.core_type) || '';
-                DOMCache.clash.innerHTML = '<b style=color:var(--success-color)>' + coreType + '&nbsp;<%:Running%></b>';
-            } else {
-                DOMCache.clash.innerHTML = '<b style=color:var(--error-color)><%:Not Running%></b>';
-            }
-        }
+        setRuntimeState(StateManager.current_status, 'loading');
         StateManager.current_status.clash = isEnabled;
 
         var requestParams = { action: action };
@@ -3509,7 +3660,9 @@
             if (x && x.status == 200) {
                 setTimeout(function() {
                     pluginToggleUserAction = false;
-                    updatePluginToggleState(StateManager.current_status.clash || false);
+                    if (classifyRuntimeState(StateManager.current_status) !== 'unknown') {
+                        updatePluginToggleState(StateManager.current_status.clash || false);
+                    }
                 }, 2000);
             } else {
                 toggleElement.checked = !isEnabled;
@@ -3523,6 +3676,7 @@
                 if (DOMCache.clash) {
                     DOMCache.clash.innerHTML = '<b style="color:var(--error-color)"><%:Operation Failed%></b>';
                 }
+                setRuntimeState(StateManager.current_status, 'error');
 
                 pluginToggleUserAction = false;
             }

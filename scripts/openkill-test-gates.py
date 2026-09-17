@@ -86,6 +86,7 @@ NATIVE_TESTS: tuple[Case, ...] = tuple(
         Path("test-core-download-contract.py"),
         Path("test-openkill-test-gates.py"),
         Path("test-ui-contract.py"),
+        Path("test-ui-preview.py"),
         Path("test-uci-lifecycle.py"),
     )
 )
@@ -211,13 +212,16 @@ def dependency_files(case: Case) -> list[Path]:
         paths.append(ROOT / "scripts/test-core.py")
     if case.name == "compileall":
         paths.extend(sorted((ROOT / "scripts").glob("*.py")))
-    if case.name == "test-ui-contract":
+    if case.name in ("test-ui-contract", "test-ui-preview"):
         paths.extend(sorted((ROOT / "luci-app-openkill/luasrc/view/openkill").glob("*.htm")))
         paths.extend((
             ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/oc.css",
             ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css",
             ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/js/common.js",
+            ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/js/oc-icons.js",
         ))
+        if case.name == "test-ui-preview":
+            paths.append(ROOT / "scripts/build-ui-preview.py")
     if case.name == "test-openkill-test-gates":
         paths.append(RUNNER_PATH)
     if case.name == "test-process-ownership":
@@ -776,6 +780,7 @@ def build_cases(mode: str) -> list[Case]:
         "test-core-download-contract",
         "test-production-shadow",
         "test-ui-contract",
+        "test-ui-preview",
     )
     native_by_name = {case.name: case for case in NATIVE_TESTS}
     if mode == "fast":

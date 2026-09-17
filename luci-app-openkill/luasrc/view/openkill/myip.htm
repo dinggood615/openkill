@@ -31,7 +31,7 @@
                                 <p class="myip-section-title">
                                     <%:IP Address%>
                                     <span class="myip-toolbar">
-                                        <svg id="eye-icon" class="myip-icon-btn" width="20" height="20" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" onclick="return privacy_my_ip(this)">
+                                        <svg id="eye-icon" class="myip-icon-btn" role="button" tabindex="0" aria-label="<%:Hide IP%>" width="20" height="20" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" onclick="return privacy_my_ip(this)" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); return privacy_my_ip(this); }">
                                             <title><%:Hide IP%></title>
                                             <use id="eye-open" href="#oc-icon-eye"></use>
                                             <use id="eye-closed" class="oc-hidden" href="#oc-icon-eye-off"></use>
@@ -70,7 +70,7 @@
                                 <p class="myip-section-title">
                                     <%:Access Check%>
                                     <span class="myip-toolbar">
-                                        <svg id="mode-icon" class="mode-icon myip-icon-btn" width="22" height="22" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" onclick="return toggle_mode_by_icon(this)">
+                                        <svg id="mode-icon" class="mode-icon myip-icon-btn" role="button" tabindex="0" aria-label="<%:Router Mode%>" width="22" height="22" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" onclick="return toggle_mode_by_icon(this)" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); return toggle_mode_by_icon(this); }">
                                             <title><%:Router Mode%></title>
                                             <rect x="4" y="28" width="40" height="14" rx="2" fill="#2F88FF" stroke="#333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
                                             <path d="M14 35L22 35" stroke="#FFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -78,7 +78,7 @@
                                             <path d="M12 28L12 8" stroke="#333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
                                             <path d="M36 28V8" stroke="#333" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
                                         </svg>
-                                        <svg id="data-refresh-icon" class="myip-icon-btn" width="20" height="20" onclick="return refresh_myip(this)">
+                                        <svg id="data-refresh-icon" class="myip-icon-btn" role="button" tabindex="0" aria-label="<%:Refresh%>" width="20" height="20" onclick="return refresh_myip(this)" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); return refresh_myip(this); }">
                                             <title><%:Refresh%></title>
                                             <use href="#oc-icon-refresh"/>
                                         </svg>

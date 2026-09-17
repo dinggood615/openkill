@@ -99,10 +99,40 @@ class LuCIContractTests(unittest.TestCase):
     def test_status_page_exposes_loading_and_live_state_hooks(self) -> None:
         source = STATUS.read_text(encoding="utf-8")
         self.assertIn('aria-live="polite"', source)
+        self.assertIn('data-runtime-state="loading"', source)
+        self.assertIn('aria-busy="true"', source)
         self.assertIn("<%:Collecting data...%>", source)
         self.assertIn("<%:Not Running%>", source)
+        self.assertIn("<%:Disabled%>", source)
+        self.assertIn("<%:Unknown%>", source)
+        self.assertIn("<%:Error%>", source)
         self.assertIn("<%:Not Available%>", source)
         self.assertIn("status || {}", source)
+
+    def test_runtime_state_machine_fails_closed_for_incomplete_or_failed_status(self) -> None:
+        source = STATUS.read_text(encoding="utf-8")
+        self.assertIn("function classifyRuntimeState(status)", source)
+        self.assertIn("typeof status.clash !== 'boolean'", source)
+        self.assertIn("typeof status.service_enabled !== 'boolean'", source)
+        self.assertIn("return status.service_enabled ? 'stopped' : 'disabled';", source)
+        self.assertIn("function setRuntimeState(status, forcedState)", source)
+        self.assertIn("setRuntimeState(null, 'error');", source)
+        self.assertIn("updateRuntimeProfile(null);", source)
+        self.assertIn("if (runtimeState !== 'running')", source)
+
+    def test_status_controls_have_accessible_names_and_mobile_metric_layout(self) -> None:
+        source = STATUS.read_text(encoding="utf-8")
+        myip = (VIEW_ROOT / "myip.htm").read_text(encoding="utf-8")
+        css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css").read_text(encoding="utf-8")
+        self.assertRegex(source, r'id="theme-toggle"[^>]+aria-label=')
+        self.assertRegex(source, r'id="logo_btn"[^>]+aria-label=')
+        for element_id in ("eye-icon", "mode-icon", "data-refresh-icon"):
+            with self.subTest(element=element_id):
+                self.assertRegex(myip, rf'id="{element_id}"[^>]+role="button"')
+                self.assertRegex(myip, rf'id="{element_id}"[^>]+tabindex="0"')
+                self.assertRegex(myip, rf'id="{element_id}"[^>]+aria-label=')
+        self.assertIn('body[data-page="admin-services-openkill-client"] .myip-main-card', css)
+        self.assertIn('grid-template-columns: repeat(2, minmax(0, 1fr));', css)
 
 
 if __name__ == "__main__":

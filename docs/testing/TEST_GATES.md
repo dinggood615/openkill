@@ -47,13 +47,15 @@ the slower self-sufficiency replay remain in the full and device-preflight
 modes. Process ownership, runner classification and the no-network Core
 contract run before WSL bootstrap so local failures are found early.
 
-The fast suite also runs `scripts/test-ui-contract.py`. This local LuCI
-template contract check verifies that every OpenKill stylesheet uses the
-installed package version for cache invalidation, that status-page JavaScript
-hooks resolve to unique DOM ids, that subscription details have their required
-container, and that dashboard actions can reappear after a runtime transition.
-It does not claim a full LuCI/browser rendering test; a target-specific LuCI
-preview remains a separate manual check.
+The fast suite also runs `scripts/test-ui-contract.py` and
+`scripts/test-ui-preview.py`. The contract check verifies cache-busting,
+DOM hooks, explicit running/stopped/disabled/unknown/error state handling and
+accessible controls. The preview check builds a local page from the real
+status and IP templates and production CSS, then verifies the local-only
+fixture contains no LuCI template expressions or external URLs. It does not
+claim a live LuCI backend or device result. A browser pass, when Chrome is
+available, is supplementary rendering evidence and is recorded separately
+from the unified gate.
 
 `full` runs the complete local matrix. Fixture suites run with the native
 Windows interpreter, while runtime, installer, network, snapshot/FW4, Stage D

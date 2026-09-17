@@ -76,12 +76,16 @@ run cannot be reported as device-ready evidence. Fast-mode cache keys include
 the UI templates and stylesheets used by the LuCI contract test, while full
 and device-preflight always execute their cases.
 
-The LuCI contract check also covers the presentation fixes in this work
-package: stylesheet cache keys are rendered from the installed package
-version, the subscription detail wrapper has the id used by its JavaScript,
-and dashboard/proxy controls restore their visible state when a later status
-poll reports recovery. It is a static template regression check; it does not
-claim that a live LuCI backend or browser session was exercised.
+The LuCI checks also cover the presentation fixes in this work package:
+stylesheet cache keys are rendered from the installed package version, the
+subscription detail wrapper has the id used by its JavaScript, dashboard and
+proxy controls restore their visible state after a later poll, and the runtime
+state machine fails closed for loading, stopped, disabled, unknown and error
+responses. `scripts/test-ui-preview.py` builds a local-only preview from the
+same production templates and styles so responsive layout, mock state changes
+and icon hooks can be checked without a router or external request. A browser
+run against that preview is supplementary evidence; neither check claims a
+live LuCI backend or device validation.
 
 Official Mihomo compatibility downloads remain fail-closed: if the local
 WSL TLS/DNS/network path cannot reach the release API or asset, the unified

@@ -450,6 +450,67 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-se
     }
 }
 
+/* ===== OpenKill Runtime State and Wide Connectivity Closeout =====
+ * The state attribute is written by status.htm from the status API.  These
+ * selectors only communicate the state visually; they never infer health
+ * from a missing or stale response. */
+.oc.openkill-status-page[data-runtime-state="loading"] .core-status-row .sub-card,
+.oc.openkill-status-page[data-runtime-state="unknown"] .core-status-row .sub-card,
+.oc.openkill-status-page[data-runtime-state="error"] .core-status-row .sub-card {
+    border-color: var(--ok-flat-border, #414650);
+}
+
+.oc.openkill-status-page[data-runtime-state="stopped"] .core-status-row .value-indicator,
+.oc.openkill-status-page[data-runtime-state="disabled"] .core-status-row .value-indicator,
+.oc.openkill-status-page[data-runtime-state="unknown"] .core-status-row .value-indicator,
+.oc.openkill-status-page[data-runtime-state="error"] .core-status-row .value-indicator {
+    color: var(--ok-flat-muted, #a9afbc);
+    border-color: var(--ok-flat-border, #414650);
+    background: var(--ok-flat-surface-muted, #2d3037);
+}
+
+.oc.openkill-status-page[data-runtime-state="error"] .core-status-row .value-indicator {
+    color: var(--ok-color-danger, #f87171);
+}
+
+.oc.openkill-status-page .runtime-chip-muted {
+    opacity: .78;
+}
+
+.oc.openkill-status-page .runtime-unavailable {
+    color: var(--ok-flat-muted, #a9afbc) !important;
+    background: var(--ok-flat-surface-muted, #2d3037);
+}
+
+.oc.openkill-status-page button.runtime-unavailable {
+    cursor: default;
+    opacity: .78;
+}
+
+body[data-page="admin-services-openkill-client"] .myip-main-card,
+body[data-page="admin-services-openkill-client"] .myip-content-grid {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+}
+
+.oc.openkill-status-page .card-title,
+.oc.openkill-status-page .card-content,
+.oc.openkill-status-page .card-value,
+.oc.openkill-status-page .stat-label,
+.oc.openkill-status-page .stat-value,
+.oc.openkill-status-page .config-file-name,
+.oc.openkill-status-page .version-text {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 430px) {
+    .oc.openkill-status-page .dashboard-v1-layout .dashboard-metrics-section {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
 @media (max-width: 900px) {
     #cbi-openkill.openkill-settings .openkill-settings-card-stack {
         grid-template-columns: 1fr;

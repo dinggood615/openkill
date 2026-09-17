@@ -3,7 +3,7 @@
 CURRENT_HEAD: `9591f8981e87c95bf300978b5713f65fc9d1a42e` (observed before this status update; resolve final HEAD with Git after the commit)
 VERSION: `2026-1128`
 CURRENT_PHASE: `LOCAL_VALIDATION_HARDENING_WORK_PACKAGE`
-CURRENT_STATUS: `LOCAL_VALIDATION_HARDENING_COMPLETE — process ownership, host-network guard, environment classification and candidate preflight are locally verified`
+CURRENT_STATUS: `LOCAL_VALIDATION_HARDENING_COMPLETE — process ownership, host-network guard, environment classification, candidate preflight and local status-page preview are verified`
 BLOCKER: `DEVICE_CONTINUITY_SOURCE_NONCONVERGENCE` — `/tmp/openkill-network.desired` and `/tmp/openkill-network.applied` stably differ in the IPv6 rule/prefix fields; resolve that source contract before another device run
 DEVICE_STATE: `.102` remains healthy and RUNNING from frozen R3B evidence; this work package made no device contact or service/package/UCI/dataplane/config change
 DEVICE_RETRY_READY: `NO`
@@ -16,6 +16,10 @@ HOST_NETWORK_SETTINGS_CHANGED_BY_THIS_WORK: `0`
 TEST_PROCESS_CLEANUP: `PASS`
 HOST_NETWORK_GUARD: `PASS` (WSL inventory lifecycle is recorded explicitly; no route, DNS, proxy, adapter, or listener drift observed)
 ENVIRONMENT_ERROR_CLASSIFICATION: `PASS` (required Core cases passed; `NFT_CLI_UNAVAILABLE` is explicit and bounded)
+UI_STATIC_CONTRACT: `PASS`
+UI_BROWSER_VALIDATION: `PASS` (local Chrome/Playwright preview at 1920/1366/768/390 CSS px; evidence under `artifacts/test-evidence/ui-preview`)
+UI_DEVICE_VALIDATION: `NOT_RUN`
+UI_REFERENCE_ALIGNMENT: `PASS` (flowing two-column dashboard, full-width connectivity panel, two-column mobile metrics, and truthful state controls)
 IPV6_SOURCE_ROOT_CAUSE: `UNRESOLVED`
 CONTINUITY_CONTRACT_PRESERVED: `PASS`
 WRITER_HASHES_UNCHANGED: `PASS`
@@ -37,9 +41,12 @@ single local gate runner and the hardening decisions are documented in
 and [`docs/testing/TEST_GATES.md`](../testing/TEST_GATES.md).
 
 The UI follow-up fixes stale stylesheet cache keys, the missing subscription
-detail hook, and status-page controls that did not recover after a later poll.
-`scripts/test-ui-contract.py` covers these source-level regressions; live LuCI
-browser rendering remains outside this local-only work package.
+detail hook, status-page controls that did not recover after a later poll, and
+runtime-state presentation that previously could retain a healthy-looking
+chip after an incomplete or failed response. `scripts/test-ui-contract.py`
+and `scripts/test-ui-preview.py` cover these source-level regressions. A local
+Chrome/Playwright run exercised the production templates and CSS with mock
+data; live LuCI backend and device rendering remain unverified.
 
 ## Historical execution records
 
