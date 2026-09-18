@@ -298,8 +298,11 @@ class DualStackRoutingTests(unittest.TestCase):
     def test_ipv6_control_plane_is_never_proxy_marked(self):
         source = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
         for chain in ('openkill_mangle_v6', 'openkill_mangle_output_v6'):
-            self.assertIn('ip6 nexthdr udp th dport {546,547} counter return', source)
-            self.assertIn('ip6 nexthdr icmpv6 icmpv6 type { nd-neighbor-solicit', source)
+            # `meta l4proto` and the ICMPv6 expression remain valid when an
+            # IPv6 extension header is present; the older `ip6 nexthdr`
+            # spelling only matched the immediate next header.
+            self.assertIn('meta l4proto udp th dport {546,547} counter return', source)
+            self.assertIn('icmpv6 type { nd-neighbor-solicit', source)
         self.assertIn('packet-too-big', source)
         self.assertIn('parameter-problem', source)
 
@@ -359,7 +362,8 @@ class DualStackRoutingTests(unittest.TestCase):
     def test_vpn_remote_service_ports_bypass_interception(self):
         source = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
         self.assertIn('openkill_service_ports', source)
-        self.assertIn('1194 9993 21114 21115 21116 21117 21118 21119', source)
+        self.assertIn('service_ports="$(uci_get_config remote_service_ports)"', source)
+        self.assertIn('[ -n "$service_ports" ] || service_ports="1194 9993"', source)
         for chain in ('openkill', 'openkill_mangle', 'openkill_mangle_output',
                       'openkill_output', 'openkill_v6', 'openkill_mangle_v6',
                       'openkill_mangle_output_v6'):
@@ -371,7 +375,7 @@ class DualStackRoutingTests(unittest.TestCase):
         block = source.split("   nft 'add set inet fw4 openkill_service_ports", 1)[1]
         block = "   nft 'add set inet fw4 openkill_service_ports" + block.split('\n   #bypass gateway compatible', 1)[0]
         for enabled, ports, expected in [
-                ('1', '', ['1194', '9993', '21114', '21115', '21116', '21117', '21118', '21119']),
+                ('1', '', ['1194', '9993']),
                 ('0', '', []), ('1', '443 21116', ['443', '21116']),
                 ('1', '0 65536 invalid 1194 999999999999', ['1194'])]:
             with self.subTest(enabled=enabled, ports=ports):
