@@ -1,14 +1,14 @@
 # Current status
 
-CURRENT_HEAD: `d481e444f87aa842a8893da81801ed71438d9689` (observed master HEAD before the bounded implementation re-review)
+CURRENT_HEAD: `c7d9d7a5a0999a720df167f27acf8bb51aee16c7` (observed master HEAD before this main-branch status update)
 VERSION: `2026-1129`
 CURRENT_PHASE: `REVIEW_FIX_LOCAL_GATE_RC_DEVICE_STAGE_A`
 CURRENT_STATUS: `The user has now authorized bounded candidate installation and staged tests on 192.168.1.103; implementation re-review and exact-commit local delivery are in progress`
 BLOCKER: `NONE_FOR_LOCAL_SCOPE` — device installation remains gated on an exact-commit Development CI result and a matching RC IPK
 DEVICE_STATE: `192.168.1.103` is Kwrt 25.12-SNAPSHOT x86/64 on VMware, dnsmasq 2.93 and firewall4 2025.03.17~b6e51575-r2 are present, PassWall is configured/enabled but its global runtime switch is `0` and no proxy listener is running; only read-only inspection and SSH public-key installation were performed
 DEVICE_RETRY_READY: `YES_WITH_RC_IPK` (SSH BatchMode key access is ready; install only after package hash, backup and rollback checks)
-NEXT_ACTION: `re-review and repair the route-set/DNS/adblock contracts, run local behavior gates, push the exact commit for Development CI, then build and verify a non-published RC IPK`
-RESULTING_HEAD: resolve with `git rev-parse HEAD` after the next status-only update; this status records the pre-commit observation above
+NEXT_ACTION: `verify Development CI for c7d9d7a, then trigger the non-published RC IPK workflow from master`
+RESULTING_HEAD: resolve with `git rev-parse HEAD` after this status-only update; this status records the pre-commit observation above
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
 REAL_PACKET_PATH: `NOT_TESTED`
@@ -59,15 +59,13 @@ IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable se
   Dropbear host private keys were excluded. BatchMode SSH was rechecked after
   backup and PassWall remains enabled at the service layer with no OpenKill or
   Mihomo process present.
-- The bounded implementation commits are `1619f315397d287cd0f7b8a8fd6ed6c7c0c22820`
-  and `f3409c644e7053db4de53b2578f74f691fe8f939` (the latter fixes the
-  generated dnsmasq section mapping).
-  Branch `codex/openkill-device-validation` exists locally but has not reached
-  origin because this host has no GitHub write credential. Anonymous
-  `git ls-remote` works; `git push` with terminal prompts disabled returns
-  `could not read Username for 'https://github.com'`. Development CI and the RC
-  workflow therefore remain pending on the exact commit, and no device package
-  installation has been attempted.
+- The bounded implementation commits are `1619f315397d287cd0f7b8a8fd6ed6c7c0c22820`,
+  `f3409c644e7053db4de53b2578f74f691fe8f939`, and the documentation status
+  commit `c7d9d7a5a0999a720df167f27acf8bb51aee16c7`. They are now fast-forwarded
+  and pushed to `origin/master`; the disposable validation branch is not used
+  for CI or package construction. Development CI #108 is running for exact
+  commit `c7d9d7a`, and the RC workflow remains gated on its result. No device
+  package installation has been attempted.
 
 ## Local optimization phase (2026-09-18)
 
