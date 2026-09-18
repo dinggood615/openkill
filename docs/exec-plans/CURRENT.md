@@ -40,7 +40,10 @@ REAL_PACKET_PATH: `NOT_TESTED`
   was restored byte-for-byte and remains unmodified.
 - Device and real RustDesk/DNS leak verification remain `NOT_RUN` until an
   explicitly approved device phase. Exact-commit Development CI is still
-  pending because the working tree has not been committed.
+  pending because this local environment has not dispatched the workflow.
+- Observed implementation baseline was `b3fa5b6fcdba4074b78e182516fa612a73652b7d`;
+  resulting local implementation commit is
+  `b3a3425c6495f7e42da1c683055a8fcfde5b6a4c`.
 - Resume condition: after local gates, record the observed resulting HEAD and
   keep native takeover mappings, real DNS egress, anti-AD effectiveness and
   RustDesk relay/UDP behavior as device-validation items.
