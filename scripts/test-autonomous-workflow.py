@@ -57,7 +57,7 @@ class AutonomousWorkflowTests(unittest.TestCase):
         self.assertIn('make package/luci-base/host/compile V=s', source)
         self.assertIn('CONFIG_ALL_NONSHARED CONFIG_BUILDBOT', source)
         self.assertIn("# CONFIG_USE_APK is not set", source)
-        self.assertIn('make CONFIG_USE_APK= package/luci-app-openkill/compile V=s', source)
+        self.assertIn('make -C "$SDK_DIR/package/luci-app-openkill" TOPDIR="$SDK_DIR" CONFIG_USE_APK= compile V=s', source)
         self.assertNotIn('make -j"$(nproc)" package/luci-app-openkill/compile', source)
 
     def test_formal_release_has_no_push_trigger_and_requires_gate(self):
