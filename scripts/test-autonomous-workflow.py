@@ -54,6 +54,9 @@ class AutonomousWorkflowTests(unittest.TestCase):
         self.assertIn("/^CONFIG_PACKAGE_[^=]*=/d", source)
         self.assertIn("selected_package_count", source)
         self.assertIn('Refusing an unexpectedly broad package selection', source)
+        self.assertIn('make package/luci-base/host/compile V=s', source)
+        self.assertIn('CONFIG_ALL_NONSHARED CONFIG_BUILDBOT', source)
+        self.assertIn("# CONFIG_USE_APK is not set", source)
         self.assertIn('make CONFIG_USE_APK= package/luci-app-openkill/compile V=s', source)
         self.assertNotIn('make -j"$(nproc)" package/luci-app-openkill/compile', source)
 

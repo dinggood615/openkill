@@ -119,52 +119,30 @@ jobs:
           rm -rf package/luci-app-openkill
           cp -a "$GITHUB_WORKSPACE/luci-app-openkill" package/luci-app-openkill
 
-          # SDK archives commonly ship with every package selected as a
-          # module.  Disabling CONFIG_ALL alone leaves those stale
-          # CONFIG_PACKAGE_* entries in place, so `make package/.../compile`
-          # starts compiling unrelated packages (notably LLVM).  Reset all
-          # package selections before selecting the one package under audit.
-          # Some SDK archives do not ship a top-level .config.  Create an
-          # empty one in that case so defconfig cannot fall back to a broad
-          # SDK selection.
+          # Prime the host-side LuCI helper from the SDK before its package
+          # metadata is scrubbed.  The package has no source compile step,
+          # but its translation build needs po2lmo in the host staging tree.
+          make package/luci-base/host/compile V=s
+
+          # SDK archives commonly ship with broad package selectors.  Load
+          # feed metadata once, then scrub every package/all-build selector
+          # without running defconfig again; a second defconfig can restore
+          # the SDK's full kernel/module graph.
           [ -f .config ] || : > .config
-          sed -i \
-            -e '/^CONFIG_PACKAGE_[^=]*=/d' \
-            -e '/^# CONFIG_PACKAGE_[^ ]* is not set$/d' \
-            .config
-          for symbol in CONFIG_ALL CONFIG_ALL_KMODS; do
-            if grep -q "^${symbol}=" .config; then
-              sed -i "s/^${symbol}=.*/# ${symbol} is not set/" .config
-            elif ! grep -q "^# ${symbol} is not set$" .config; then
-              printf '# %s is not set\n' "$symbol" >> .config
-            fi
-          done
-          if [ -f ./scripts/config ] && [ -x ./scripts/config ]; then
-            ./scripts/config --module CONFIG_PACKAGE_luci-app-openkill
-          else
-            grep -q '^CONFIG_PACKAGE_luci-app-openkill=m' .config || echo 'CONFIG_PACKAGE_luci-app-openkill=m' >> .config
-          fi
           make defconfig
-          # defconfig may repopulate an SDK's default package modules.  Do a
-          # final package-only reset after defconfig and before counting/building.
           sed -i \
             -e '/^CONFIG_PACKAGE_[^=]*=/d' \
             -e '/^# CONFIG_PACKAGE_[^ ]* is not set$/d' \
+            -e '/^CONFIG_USE_APK=.*$/d' \
+            -e '/^# CONFIG_USE_APK is not set$/d' \
             .config
-          for symbol in CONFIG_ALL CONFIG_ALL_KMODS; do
-            if grep -q "^${symbol}=" .config; then
-              sed -i "s/^${symbol}=.*/# ${symbol} is not set/" .config
-            elif ! grep -q "^# ${symbol} is not set$" .config; then
-              printf '# %s is not set\n' "$symbol" >> .config
-            fi
+          for symbol in CONFIG_ALL CONFIG_ALL_KMODS CONFIG_ALL_NONSHARED CONFIG_BUILDBOT; do
+            sed -i -E "/^${symbol}=.*$/d; /^# ${symbol} is not set$/d" .config
+            printf '# %s is not set\n' "$symbol" >> .config
           done
-          if [ -f ./scripts/config ] && [ -x ./scripts/config ]; then
-            ./scripts/config --module CONFIG_PACKAGE_luci-app-openkill
-          else
-            printf 'CONFIG_PACKAGE_luci-app-openkill=m\n' >> .config
-          fi
+          printf '# CONFIG_USE_APK is not set\nCONFIG_PACKAGE_luci-app-openkill=m\n' >> .config
           echo 'Selected package summary:'
-          grep -E '^CONFIG_PACKAGE_(luci-app-openkill|firewall4|iptables|openssl|ruby|rust|llvm|gmp)' .config || true
+          grep -E '^CONFIG_(PACKAGE_(luci-app-openkill|firewall4|iptables|openssl|ruby|rust|llvm|gmp)|ALL|ALL_KMODS|ALL_NONSHARED|BUILDBOT|USE_APK)' .config || true
           selected_package_count=$(grep -c '^CONFIG_PACKAGE_.*=[ym]$' .config || true)
           echo "CONFIG_PACKAGE count: $selected_package_count"
           if grep -q '^CONFIG_ALL=y' .config || grep -q '^CONFIG_ALL_KMODS=y' .config; then
