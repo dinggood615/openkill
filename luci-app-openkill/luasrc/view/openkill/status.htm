@@ -473,9 +473,18 @@
             compatibilityChip.classList.toggle('runtime-chip-success', runtimeIsRunning && (performanceMode || nativeMode));
             compatibilityChip.classList.toggle('runtime-chip-warning', runtimeIsRunning && fallbackMode);
             compatibilityChip.classList.toggle('runtime-chip-muted', !runtimeIsRunning || (!performanceMode && !nativeMode && !fallbackMode));
-            compatibilityChip.title = !runtimeIsRunning ? '运行状态暂不可用，兼容性未验证' : (fallbackMode ? 'Mihomo 原生接管预检未通过，已安全回退到 OpenKill 管理；请查看运行日志' :
+            var dnsPrivacy = status && status.dns_privacy_mode ? status.dns_privacy_mode : 'split';
+            var adblockMode = status && status.adblock_mode ? status.adblock_mode : 'off';
+            var adblockEffective = status && status.adblock_dns_effective ? '生效' : '未生效';
+            var regionReason = status && status.china_ip_route_effective_reason ? status.china_ip_route_effective_reason : 'not-started';
+            var regionRequested = status && status.china_ip_route_requested ? status.china_ip_route_requested : '0';
+            var regionEffective = status && status.china_ip_route_effective ? status.china_ip_route_effective : '0';
+            var compatibilityBase = fallbackMode ? 'Mihomo 原生接管预检未通过，已安全回退到 OpenKill 管理；请查看运行日志' :
                 (nativeMode ? 'Mihomo 管理 TUN、路由和防火墙' :
-                (performanceMode ? 'OpenKill 接管并启用高性能双栈参数' : 'OpenKill 统一管理 TUN、DNS 和防火墙')));
+                (performanceMode ? 'OpenKill 接管并启用高性能双栈参数' : 'OpenKill 统一管理 TUN、DNS 和防火墙'));
+            compatibilityChip.title = !runtimeIsRunning ? '运行状态暂不可用，兼容性未验证' : compatibilityBase +
+                '；DNS 隐私：' + dnsPrivacy + '；广告：' + adblockMode + '（DNS ' + adblockEffective + ')' +
+                '；IPv4 区域请求/实际：' + regionRequested + '/' + regionEffective + '；原因：' + regionReason;
         }
 
         var ipv6Chip = DOMCache.runtime_ipv6_chip;

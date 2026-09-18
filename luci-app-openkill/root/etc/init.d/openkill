@@ -23,9 +23,16 @@ openkill_shadow_stable_boundary()
    openkill_shadow_compare_nft || true
 }
 
+# Resolve one stable dnsmasq section once and use the same section for every
+# backup, mutation and restore.  Anonymous index selectors can point at a
+# different instance after another dnsmasq section is added or reordered.
+DNSMASQ_SECTION="$(uci -q show dhcp 2>/dev/null | sed -n 's/^dhcp\.\([^.=]*\)=dnsmasq$/\1/p' | head -n 1)"
+[ -n "$DNSMASQ_SECTION" ] || DNSMASQ_SECTION="@dnsmasq[0]"
+DNSMASQ_UCI="dhcp.${DNSMASQ_SECTION}"
+
 [ -f /etc/openwrt_release ] && {
 FW4=$(command -v fw4)
-DEFAULT_DNSMASQ_CFGID="$(uci -q show "dhcp.@dnsmasq[0]" | awk 'NR==1 {split($0, conf, /[.=]/); print conf[2]}')"
+DEFAULT_DNSMASQ_CFGID="$(uci -q show "$DNSMASQ_UCI" | awk 'NR==1 {split($0, conf, /[.=]/); print conf[2]}')"
 if [ -f "/tmp/etc/dnsmasq.conf.$DEFAULT_DNSMASQ_CFGID" ]; then
    DNSMASQ_CONF_DIR="$(awk -F '=' '/^conf-dir=/ {print $2}' "/tmp/etc/dnsmasq.conf.$DEFAULT_DNSMASQ_CFGID")"
 else
@@ -104,14 +111,23 @@ set_dnsmasq_server() {
      return
    fi
 
-   uci -q add_list dhcp.@dnsmasq[0].server="$1"
+   uci -q add_list "$DNSMASQ_UCI.server"="$1"
 }
 
 load_ip_route_pass() {
    local settype backend source4 source6 out4 out6 changed
+   out4="${DNSMASQ_CONF_DIR}/dnsmasq_openkill_chnroute_pass.conf"
+   out6="${DNSMASQ_CONF_DIR}/dnsmasq_openkill_chnroute6_pass.conf"
    if dnsmasq --version | grep -q 'Compile time options:.* nftset'; then settype="nftset"; else settype="ipset"; fi
    backend="$settype"
-   [ "$settype" = ipset ] && [ -n "$FW4" ] && LOG_WARN "Dnsmasq not Support nftset, Use ipset..."
+   if [ "$settype" = ipset ] && [ -n "$FW4" ]; then
+      # fw4 rules consume nft sets.  An ipset-only dnsmasq build cannot feed
+      # those sets, so silently falling back would make domain exceptions look
+      # active while the packet path ignores them.
+      LOG_ERROR "dnsmasq lacks nftset support on fw4; domain IP exceptions are disabled safely."
+      rm -f "$out4" "$out6"
+      return 1
+   fi
    [ "$enable_redirect_dns" = "2" ] && return 0
    mkdir -p "$DNSMASQ_CONF_DIR" || return 1
    source4=$(mktemp); source6=$(mktemp)
@@ -119,8 +135,6 @@ load_ip_route_pass() {
    [ -f /etc/openkill/custom/openkill_custom_chnroute6_pass.list ] && cat /etc/openkill/custom/openkill_custom_chnroute6_pass.list >>"$source6"
    printf '%s\n' $(uci_get_config "china_ip_route_pass") >>"$source4"
    printf '%s\n' $(uci_get_config "china_ip6_route_pass") >>"$source6"
-   out4="$DNSMASQ_CONF_DIR/dnsmasq_openkill_chnroute_pass.conf"
-   out6="$DNSMASQ_CONF_DIR/dnsmasq_openkill_chnroute6_pass.conf"
    changed=0
    if [ "$china_ip_route" != 0 ] || [ "$disable_udp_quic" = 1 ]; then
       if [ "$settype" = nftset ]; then nft 'add set inet fw4 china_ip_route_pass { type ipv4_addr; flags interval; auto-merge; }' 2>/dev/null || true; else ipset -! create china_ip_route_pass hash:net family inet hashsize 1024 maxelem 1000000; fi
@@ -134,8 +148,74 @@ load_ip_route_pass() {
       openkill_replace_if_changed "$out6.new" "$out6" && changed=1 || true
       rm -f "$out6.new"
    fi
+   [ "$china_ip_route" != 0 ] || [ "$disable_udp_quic" = 1 ] || rm -f "$out4"
+   [ "$ipv6_enable" -eq 1 ] && { [ "$china_ip6_route" != 0 ] || [ "$disable_udp_quic" = 1 ]; } || rm -f "$out6"
    rm -f "$source4" "$source6"
    [ "$changed" -eq 1 ] || return 0
+}
+
+# Render one complete nft pass set from both file and UCI inputs.  The old
+# conditional only entered this block when the file contained an IP, so a UCI
+#-only exception was discarded.  Keep domains out of the address set and
+# leave an empty set safe for the normal (non-complement) path.
+render_nft_pass_set() {
+   local family target custom_file output uci_key source_file element_file nft_set_type
+   family="$1"; target="$2"; custom_file="$3"; output="$4"; uci_key="$5"
+   source_file="${output}.source.$$"
+   element_file="${output}.elements.$$"
+   : > "$source_file" || return 1
+   [ -f "$custom_file" ] && cat "$custom_file" >> "$source_file"
+   printf '%s\n' $(uci_get_config "$uci_key") >> "$source_file"
+   if [ "$family" = 4 ]; then
+      awk '
+         !/^([[:space:]]*#|[[:space:]]*$)/ {
+            gsub(/[[:space:]]/, "", $0); n = split($0, cidr, "/")
+            valid = (n <= 2); octets = split(cidr[1], part, ".")
+            if (octets != 4) valid = 0
+            for (i = 1; i <= 4; i++) if (part[i] !~ /^[0-9]+$/ || part[i] > 255) valid = 0
+            if (n == 2 && (cidr[2] !~ /^[0-9]+$/ || cidr[2] > 32)) valid = 0
+            if (valid) print
+         }
+      ' "$source_file" | sort -u > "$element_file"
+      nft_set_type="ipv4_addr"
+   else
+      awk '
+         !/^([[:space:]]*#|[[:space:]]*$)/ {
+            gsub(/[[:space:]]/, "", $0); n = split($0, cidr, "/"); ip = cidr[1]
+            valid = (n <= 2 && index(ip, ":") > 0 && ip ~ /^[0-9A-Fa-f:]+$/)
+            if (n == 2 && (cidr[2] !~ /^[0-9]+$/ || cidr[2] > 128)) valid = 0
+            marker = ip; double_colon = gsub(/::/, "X", marker)
+            if (double_colon > 1 || (double_colon == 0 && gsub(/:/, ":", ip) != 7)) valid = 0
+            if (double_colon == 0) {
+               groups = split(ip, part, ":")
+               if (groups != 8) valid = 0
+               for (i = 1; i <= groups; i++) if (part[i] !~ /^[0-9A-Fa-f]{1,4}$/) valid = 0
+            } else {
+               compressed = $0; sub(/\/.*/, "", compressed); gsub(/::/, ":X:", compressed)
+               groups = split(compressed, part, ":"); nonempty = 0
+               for (i = 1; i <= groups; i++) if (part[i] != "" && part[i] != "X") { if (part[i] !~ /^[0-9A-Fa-f]{1,4}$/) valid = 0; nonempty++ }
+               if (nonempty >= 8) valid = 0
+            }
+            if (valid) print
+         }
+      ' "$source_file" | sort -u > "$element_file"
+      nft_set_type="ipv6_addr"
+   fi
+   {
+      # Keep the definition-before-set order used by the main chnroute
+      # generator.  This lets nft parse the element constant in one atomic
+      # file even when the set already exists and was flushed by the caller.
+      if [ -s "$element_file" ]; then
+         echo "define $target = {"
+         awk '{printf("    %s,\n", $0)}' "$element_file" | sed '$ s/.$//'
+         echo "}"
+      fi
+      echo "add set inet fw4 $target { type $nft_set_type; flags interval; auto-merge; }"
+      if [ -s "$element_file" ]; then
+         echo "add element inet fw4 $target \$$target"
+      fi
+   } > "$output"
+   rm -f "$source_file" "$element_file"
 }
 change_dnsmasq() {
    if ! /etc/init.d/dnsmasq enabled; then
@@ -147,6 +227,9 @@ change_dnsmasq() {
 
    # 第二 DNS 服务
    /usr/share/openkill/openkill_custom_domain_dns.sh
+   # Optional anti-AD dnsmasq filter.  This is independent from DNS privacy
+   # and is rebuilt atomically before dnsmasq reloads.
+   /usr/share/openkill/openkill_adblock.sh
 
    # Both the legacy redirect mode (1) and the fw4 firewall mode (2)
    # must feed the router's own dnsmasq queries into Mihomo.  Mode 2
@@ -156,22 +239,22 @@ change_dnsmasq() {
       if [ "$(uci_get_config "redirect_dns")" != "1" ]; then
          uci -q del openkill.config.dnsmasq_server
          config_load "dhcp"
-         config_list_foreach "$(uci -q show dhcp.@dnsmasq[0].server |awk -F '.' '{print $2}')" "server" save_dnsmasq_server
-         uci -q set openkill.config.dnsmasq_noresolv="$(uci -q get dhcp.@dnsmasq[0].noresolv)"
-         uci -q set openkill.config.dnsmasq_resolvfile="$(uci -q get dhcp.@dnsmasq[0].resolvfile)"
+         config_list_foreach "$(uci -q show "$DNSMASQ_UCI.server" |awk -F '.' '{print $2}')" "server" save_dnsmasq_server
+         uci -q set openkill.config.dnsmasq_noresolv="$(uci -q get "$DNSMASQ_UCI.noresolv")"
+         uci -q set openkill.config.dnsmasq_resolvfile="$(uci -q get "$DNSMASQ_UCI.resolvfile")"
       fi
-      uci -q del dhcp.@dnsmasq[-1].server
-      uci -q add_list dhcp.@dnsmasq[0].server=127.0.0.1#"$dns_port"
-      uci -q delete dhcp.@dnsmasq[0].resolvfile
-      uci -q set dhcp.@dnsmasq[0].noresolv=1
-      uci -q set dhcp.@dnsmasq[0].localuse=1
+      uci -q del "$DNSMASQ_UCI.server"
+      uci -q add_list "$DNSMASQ_UCI.server"=127.0.0.1#"$dns_port"
+      uci -q delete "$DNSMASQ_UCI.resolvfile"
+      uci -q set "$DNSMASQ_UCI.noresolv=1"
+      uci -q set "$DNSMASQ_UCI.localuse=1"
       uci -q set openkill.config.redirect_dns=1
-      uci -q set openkill.config.dnsmasq_cachesize="$(uci -q get dhcp.@dnsmasq[0].cachesize)"
-      uci -q set dhcp.@dnsmasq[0].cachesize=0
+      uci -q set openkill.config.dnsmasq_cachesize="$(uci -q get "$DNSMASQ_UCI.cachesize")"
+      uci -q set "$DNSMASQ_UCI.cachesize=0"
       uci -q set openkill.config.cachesize_dns=1
    else
       # Remove residual Dnsmasq redirect left
-      uci -q del_list dhcp.@dnsmasq[0].server="127.0.0.1#$dns_port"
+      uci -q del_list "$DNSMASQ_UCI.server"="127.0.0.1#$dns_port"
       uci -q set openkill.config.redirect_dns=0
       uci -q set openkill.config.cachesize_dns=0
    fi
@@ -180,8 +263,8 @@ change_dnsmasq() {
       # Allow AAAA answers independently of the IPv6 interception mode.  The
       # previous condition only handled legacy ip6tables + dnsmasq redirect
       # mode, so firewall redirect mode silently filtered AAAA records.
-      uci -q set openkill.config.dnsmasq_filter_aaaa="$(uci -q get dhcp.@dnsmasq[0].filter_aaaa)"
-      uci -q set dhcp.@dnsmasq[0].filter_aaaa=0
+      uci -q set openkill.config.dnsmasq_filter_aaaa="$(uci -q get "$DNSMASQ_UCI.filter_aaaa")"
+      uci -q set "$DNSMASQ_UCI.filter_aaaa=0"
       uci -q set openkill.config.filter_aaaa_dns=1
    else
       uci -q set openkill.config.filter_aaaa_dns=0
@@ -209,44 +292,45 @@ revert_dnsmasq()
    default_resolvfile=$(uci_get_config "default_resolvfile")
 
    rm -rf ${DNSMASQ_CONF_DIR}/dnsmasq_openkill_custom_domain.conf
+   rm -rf ${DNSMASQ_CONF_DIR}/dnsmasq_openkill_adblock.conf
    rm -rf ${DNSMASQ_CONF_DIR}/dnsmasq_openkill_chnroute_pass.conf
    rm -rf ${DNSMASQ_CONF_DIR}/dnsmasq_openkill_chnroute6_pass.conf
 
    [ "$redirect_dns" -eq 1 ] && {
-      uci -q del dhcp.@dnsmasq[-1].server
+      uci -q del "$DNSMASQ_UCI.server"
       [ -n "$dnsmasq_server" ] && {
          config_load "openkill"
          config_list_foreach "config" "dnsmasq_server" set_dnsmasq_server
       }
 
-      if [ "$dnsmasq_noresolv" == "0" ] || [ -z "$dnsmasq_noresolv" ] || [ -z "$(uci -q show dhcp.@dnsmasq[0].server)" ]; then
-         uci -q set dhcp.@dnsmasq[0].noresolv=0
+      if [ "$dnsmasq_noresolv" == "0" ] || [ -z "$dnsmasq_noresolv" ] || [ -z "$(uci -q show "$DNSMASQ_UCI.server")" ]; then
+         uci -q set "$DNSMASQ_UCI.noresolv=0"
          if [ -n "$dnsmasq_resolvfile" ] && [ -n "$(grep nameserver $dnsmasq_resolvfile)" ]; then
-            uci -q set dhcp.@dnsmasq[0].resolvfile="$dnsmasq_resolvfile"
+            uci -q set "$DNSMASQ_UCI.resolvfile=$dnsmasq_resolvfile"
          elif [ -n "$default_resolvfile" ] && [ -n "$(grep nameserver $default_resolvfile)" ]; then
-            uci -q set dhcp.@dnsmasq[0].resolvfile="$default_resolvfile"
+            uci -q set "$DNSMASQ_UCI.resolvfile=$default_resolvfile"
          elif [ -s "/tmp/resolv.conf.d/resolv.conf.auto" ] && [ -n "$(grep "nameserver" /tmp/resolv.conf.d/resolv.conf.auto)" ]; then
-            uci -q set dhcp.@dnsmasq[0].resolvfile=/tmp/resolv.conf.d/resolv.conf.auto
+            uci -q set "$DNSMASQ_UCI.resolvfile=/tmp/resolv.conf.d/resolv.conf.auto"
             uci -q set openkill.config.default_resolvfile=/tmp/resolv.conf.d/resolv.conf.auto
          elif [ -s "/tmp/resolv.conf.auto" ] && [ -n "$(grep "nameserver" /tmp/resolv.conf.auto)" ]; then
-            uci -q set dhcp.@dnsmasq[0].resolvfile=/tmp/resolv.conf.auto
+            uci -q set "$DNSMASQ_UCI.resolvfile=/tmp/resolv.conf.auto"
             uci -q set openkill.config.default_resolvfile=/tmp/resolv.conf.auto
          else
-            uci -q set dhcp.@dnsmasq[0].resolvfile=/tmp/resolv.conf.d/resolv.conf.auto
+            uci -q set "$DNSMASQ_UCI.resolvfile=/tmp/resolv.conf.d/resolv.conf.auto"
             uci -q set openkill.config.default_resolvfile=/tmp/resolv.conf.d/resolv.conf.auto
          fi
-         uci -q set dhcp.@dnsmasq[0].localuse=1
+         uci -q set "$DNSMASQ_UCI.localuse=1"
       fi
    }
 
    [ "$cachesize_dns" -eq 1 ] && {
-      uci -q set dhcp.@dnsmasq[0].cachesize="$dnsmasq_cachesize"
+      uci -q set "$DNSMASQ_UCI.cachesize=$dnsmasq_cachesize"
       uci -q set openkill.config.cachesize_dns=0
       uci -q delete openkill.config.dnsmasq_cachesize
    }
 
    [ "$filter_aaaa_dns" -eq 1 ] && {
-      uci -q set dhcp.@dnsmasq[0].filter_aaaa="$dnsmasq_filter_aaaa"
+      uci -q set "$DNSMASQ_UCI.filter_aaaa=$dnsmasq_filter_aaaa"
       uci -q set openkill.config.filter_aaaa_dns=0
       uci -q delete openkill.config.dnsmasq_filter_aaaa
    }
@@ -259,9 +343,9 @@ revert_dnsmasq()
    uci -q commit dhcp
    uci -q commit openkill
 
-   masq_port=$(uci -q get dhcp.@dnsmasq[0].port)
+   masq_port=$(uci -q get "$DNSMASQ_UCI.port")
    if [ "$(nslookup www.apple.com 127.0.0.1:${masq_port} >/dev/null 2>&1 || echo $?)" = "1" ]; then
-      resolv_file=$(uci -q get dhcp.@dnsmasq[0].resolvfile)
+      resolv_file=$(uci -q get "$DNSMASQ_UCI.resolvfile")
       wan_dns=$(/usr/share/openkill/openkill_get_network.lua "dns")
       wan6_dns=$(/usr/share/openkill/openkill_get_network.lua "dns6")
       mkdir -p "$(dirname "$resolv_file")"
@@ -502,6 +586,7 @@ write_run_quick()
       # a stale YAML generated by an older DNS/firewall implementation.
       add_quick_path /usr/share/openkill/yml_change.sh
       add_quick_path /usr/share/openkill/yml_rules_change.sh
+      add_quick_path /usr/share/openkill/openkill_adblock.sh
    } | while read -r file; do
       [ -n "$file" ] && [ -e "$file" ] && echo "$file #edited time# $(date -r "$file")" >> "/tmp/openkill.change"
    done
@@ -1699,14 +1784,58 @@ apply_node_endpoint_sets()
    cp /tmp/openkill-node6.desired /tmp/openkill-node6
 }
 
+route_set_has_elements()
+{
+   local route_file route_family
+   route_file="$1"
+   route_family="$2"
+   [ -s "$route_file" ] || return 1
+   if [ "$route_family" = 4 ]; then
+      grep -Eq '(^|[^0-9])([0-9]+\.){3}[0-9]+([/[:space:],}]|$)' "$route_file"
+   else
+      grep -Eiq '(^|[^0-9A-Fa-f])([0-9A-Fa-f]*:){2,}[0-9A-Fa-f]*([/[:space:],}]|$)' "$route_file"
+   fi
+}
+
 set_firewall()
 {
    # Mihomo-native mode owns all TUN routing and redirect rules.  OpenKill
    # must not add a second set of nftables/iptables rules in that mode.
    if [ "$tun_owner" = "mihomo" ]; then
       openkill_remove_proxy_runtime
+      printf '%s\n' "requested_ipv4=$(uci_get_config china_ip_route || echo 0)" "effective_ipv4=0" "requested_ipv6=$(uci_get_config china_ip6_route || echo 0)" "effective_ipv6=0" "reason=native-owner" > /tmp/openkill-region-effective.state.$$
+      mv -f /tmp/openkill-region-effective.state.$$ /tmp/openkill-region-effective.state
       return 0
    fi
+
+   # Complement mode ("outside the region") is unsafe when the downloaded
+   # region set is empty: nft's `!= @empty_set` would match every address and
+   # turn a failed update into broad direct routing.  Treat missing/invalid
+   # IPv4 or IPv6 data as disabled for this effective run; keep the UCI
+   # request intact so the UI can show that a refresh is required.
+   route4_file=/etc/openkill/china_ip_route.ipset
+   route6_file=/etc/openkill/china_ip6_route.ipset
+   [ "$small_flash_memory" = "1" ] && route4_file=/tmp/etc/openkill/china_ip_route.ipset
+   [ "$small_flash_memory" = "1" ] && route6_file=/tmp/etc/openkill/china_ip6_route.ipset
+   requested_china_ip_route="$china_ip_route"
+   requested_china_ip6_route="$china_ip6_route"
+   region_effective_reason=ready
+   if [ "$china_ip_route" != "0" ] && ! route_set_has_elements "$route4_file" 4; then
+      LOG_WARN "IPv4 region set is empty or invalid; disabling effective region bypass for this run."
+      china_ip_route=0
+      region_effective_reason=ipv4-data-unavailable
+   fi
+   if [ "$ipv6_enable" = "1" ] && [ "$china_ip6_route" != "0" ] && ! route_set_has_elements "$route6_file" 6; then
+      LOG_WARN "IPv6 region set is empty or invalid; disabling effective region bypass for this run."
+      china_ip6_route=0
+      if [ "$region_effective_reason" = "ready" ]; then
+         region_effective_reason=ipv6-data-unavailable
+      else
+         region_effective_reason="$region_effective_reason,ipv6-data-unavailable"
+      fi
+   fi
+   region_state_tmp=/tmp/openkill-region-effective.state.$$
+   printf '%s\n' "requested_ipv4=$requested_china_ip_route" "effective_ipv4=$china_ip_route" "requested_ipv6=$requested_china_ip6_route" "effective_ipv6=$china_ip6_route" "reason=$region_effective_reason" > "$region_state_tmp" && mv -f "$region_state_tmp" /tmp/openkill-region-effective.state
 
 prepare_openkill_include
 
@@ -1763,17 +1892,7 @@ if [ -n "$FW4" ]; then
       done
 
       if [ "$enable_redirect_dns" != "2" ]; then
-         echo "add set inet fw4 china_ip_route_pass { type ipv4_addr; flags interval; auto-merge; }" >/tmp/openkill_china_ip_route_pass.list
-         [ -z `(awk '!/^$/&&!/^#/&&!/([0-9a-zA-Z-]{1,}\.)+([a-zA-Z]{2,})/{printf("    %s\n",$0)}' /etc/openkill/custom/openkill_custom_chnroute_pass.list)` ] || {
-            echo "define china_ip_route_pass = {" >>/tmp/openkill_china_ip_route_pass.list
-            awk '!/^$/&&!/^#/&&!/([0-9a-zA-Z-]{1,}\.)+([a-zA-Z]{2,})/{printf("    %s,\n",$0)}' /etc/openkill/custom/openkill_custom_chnroute_pass.list |sed '$ s/.$//' >>/tmp/openkill_china_ip_route_pass.list 2>/dev/null
-            for ip in $(uci_get_config "china_ip_route_pass"); do
-               [ -z "$ip" ] && continue
-               echo "$ip" | awk '!/^$/&&!/^#/&&!/([0-9a-zA-Z-]{1,}\.)+([a-zA-Z]{2,})/{printf("    %s,\n",$0)}' |sed '$ s/.$//'
-            done >>/tmp/openkill_china_ip_route_pass.list 2>/dev/null
-            echo "}" >>/tmp/openkill_china_ip_route_pass.list
-            echo 'add element inet fw4 china_ip_route_pass $china_ip_route_pass' >>/tmp/openkill_china_ip_route_pass.list
-         }
+         render_nft_pass_set 4 china_ip_route_pass /etc/openkill/custom/openkill_custom_chnroute_pass.list /tmp/openkill_china_ip_route_pass.list china_ip_route_pass
          nft 'flush set inet fw4 china_ip_route_pass'
          nft -f '/tmp/openkill_china_ip_route_pass.list'
          rm -rf /tmp/openkill_china_ip_route_pass.list
@@ -1847,16 +1966,16 @@ if [ -n "$FW4" ]; then
       done
    fi
 
-   # VPN/remote-access service ports.  These are kept outside the proxy
-   # interception chains so OpenVPN handshakes and RustDesk/ZeroTier
-   # rendezvous traffic keep their original socket and route.  Traffic from
-   # an established OpenVPN tunnel is still handled normally by the TUN rules.
+   # VPN/remote-access service ports. These are kept outside the proxy
+   # interception chains only when the legacy compatibility switch is
+   # explicitly enabled. RustDesk is handled by scoped domain rules in the
+   # generated core profile and is not added to this global port set.
    nft 'add set inet fw4 openkill_service_ports { type inet_service; flags interval; }'
    nft 'flush set inet fw4 openkill_service_ports'
    if [ "$(uci_get_config remote_service_bypass || echo 1)" != "0" ]; then
       local service_ports service_port
       service_ports="$(uci_get_config remote_service_ports)"
-      [ -n "$service_ports" ] || service_ports="1194 9993 21114 21115 21116 21117 21118 21119"
+      [ -n "$service_ports" ] || service_ports="1194 9993"
       for service_port in $service_ports; do
          case "$service_port" in ''|*[!0-9]*) continue ;; esac
          [ "${#service_port}" -le 5 ] || continue
@@ -1899,7 +2018,7 @@ if [ -n "$FW4" ]; then
       fi
    fi
 
-   DNSPORT=$(uci -q get dhcp.@dnsmasq[0].port)
+   DNSPORT=$(uci -q get "$DNSMASQ_UCI.port")
    if [ -z "$DNSPORT" ]; then
       DNSPORT=$(netstat -nlp |grep -E '127.0.0.1:.*dnsmasq' |awk -F '127.0.0.1:' '{print $2}' |awk '{print $1}' |head -1 || echo 53)
    fi
@@ -2266,17 +2385,7 @@ if [ -n "$FW4" ]; then
          done
 
          if [ "$enable_redirect_dns" != "2" ]; then
-            echo "add set inet fw4 china_ip6_route_pass { type ipv6_addr; flags interval; auto-merge; }" >/tmp/openkill_china_ip6_route_pass.list
-            [ -z `(awk '!/^$/&&!/^#/&&!/([0-9a-zA-Z-]{1,}\.)+([a-zA-Z]{2,})/{printf("    %s,\n",$0)}' /etc/openkill/custom/openkill_custom_chnroute6_pass.list)` ] || {
-               echo "define china_ip6_route_pass = {" >>/tmp/openkill_china_ip6_route_pass.list
-               awk '!/^$/&&!/^#/&&!/([0-9a-zA-Z-]{1,}\.)+([a-zA-Z]{2,})/{printf("    %s,\n",$0)}' /etc/openkill/custom/openkill_custom_chnroute6_pass.list |sed '$ s/.$//' >>/tmp/openkill_china_ip6_route_pass.list 2>/dev/null
-               for ip in $(uci_get_config "china_ip6_route_pass"); do
-                  [ -z "$ip" ] && continue
-                  echo "$ip" | awk '!/^$/&&!/^#/&&!/([0-9a-zA-Z-]{1,}\.)+([a-zA-Z]{2,})/{printf("    %s,\n",$0)}' |sed '$ s/.$//'
-               done >>/tmp/openkill_china_ip6_route_pass.list 2>/dev/null
-               echo "}" >>/tmp/openkill_china_ip6_route_pass.list
-               echo 'add element inet fw4 china_ip6_route_pass $china_ip6_route_pass' >>/tmp/openkill_china_ip6_route_pass.list
-            }
+            render_nft_pass_set 6 china_ip6_route_pass /etc/openkill/custom/openkill_custom_chnroute6_pass.list /tmp/openkill_china_ip6_route_pass.list china_ip6_route_pass
             nft 'flush set inet fw4 china_ip6_route_pass'
             nft -f '/tmp/openkill_china_ip6_route_pass.list'
             rm -rf /tmp/openkill_china_ip6_route_pass.list
@@ -2295,14 +2404,14 @@ if [ -n "$FW4" ]; then
                      ACBLACKDNSFILTER="$ACBLACKDNSFILTER ether saddr != @lan_ac_black_macs"
                   fi
                fi
-               nft "insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ${ACBLACKDNSFILTER} counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\""
+               nft "insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ${ACBLACKDNSFILTER} counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\""
             else
-               nft "insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ip6 saddr @lan_ac_white_ipv6s counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\""
-               nft "insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ether saddr @lan_ac_white_macs counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\""
+               nft "insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ip6 saddr @lan_ac_white_ipv6s counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\""
+               nft "insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ether saddr @lan_ac_white_macs counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\""
             fi
             if [ "$router_self_proxy" = 1 ]; then
                nft 'add chain inet fw4 nat_output { type nat hook output priority -1; }'
-               nft "insert rule inet fw4 nat_output position 0 skgid != 65534 meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ip6 daddr {::1} counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\""
+               nft "insert rule inet fw4 nat_output position 0 skgid != 65534 meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ip6 daddr {::1} counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\""
             fi
          elif [ "$enable_redirect_dns" -eq 2 ]; then
             if [ "$lan_ac_mode" != "1" ]; then
@@ -2315,15 +2424,15 @@ if [ -n "$FW4" ]; then
                      ACBLACKDNSFILTER="$ACBLACKDNSFILTER ether saddr != @lan_ac_black_macs"
                   fi
                fi
-               nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ${ACBLACKDNSFILTER} counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\""
+               nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ${ACBLACKDNSFILTER} counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\""
             else
-               nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ip6 saddr @lan_ac_white_ipv6s counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\""
-               nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ether saddr @lan_ac_white_macs counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\""
+               nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ip6 saddr @lan_ac_white_ipv6s counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\""
+               nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ether saddr @lan_ac_white_macs counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\""
             fi
-            nft 'insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 counter jump openkill_dns_redirect'
+            nft 'insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 counter jump openkill_dns_redirect'
             if [ "$router_self_proxy" = 1 ]; then
                nft 'add chain inet fw4 nat_output { type nat hook output priority -1; }'
-               nft "insert rule inet fw4 nat_output position 0 meta nfproto {ipv6} ip6 nexthdr {tcp,udp} th dport 53 ip6 daddr {::1} meta skgid != 65534 counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\""
+               nft "insert rule inet fw4 nat_output position 0 meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ip6 daddr {::1} meta skgid != 65534 counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\""
             fi
          fi
       fi
@@ -2371,7 +2480,7 @@ if [ -n "$FW4" ]; then
          fi
          nft 'add rule inet fw4 openkill_v6 ip6 saddr @lan_ac_black_ipv6s counter return'
          nft 'add rule inet fw4 openkill_v6 ether saddr @lan_ac_black_macs counter return'
-         nft add rule inet fw4 openkill_v6 ip6 nexthdr {tcp} ip6 daddr { "$fakeip_range6" } counter redirect to "$proxy_port"
+         nft add rule inet fw4 openkill_v6 meta l4proto tcp ip6 daddr { "$fakeip_range6" } counter redirect to "$proxy_port"
          nft 'add rule inet fw4 openkill_v6 ip6 daddr @wan_ac_black_ipv6s counter return'
          nft 'add rule inet fw4 openkill_v6 th dport @wan_ac_black_ports counter return'
 
@@ -2388,8 +2497,8 @@ if [ -n "$FW4" ]; then
             [ "$enable_redirect_dns" != "2" ] && rule="$rule ip6 daddr != @china_ip6_route_pass"
             nft "add rule inet fw4 openkill_v6 $rule counter return"
          fi
-         nft add rule inet fw4 openkill_v6 ip6 nexthdr {tcp} counter redirect to "$proxy_port"
-         nft 'add rule inet fw4 dstnat ip6 nexthdr {tcp} counter jump openkill_v6'
+         nft add rule inet fw4 openkill_v6 meta l4proto tcp counter redirect to "$proxy_port"
+         nft 'add rule inet fw4 dstnat meta l4proto tcp counter jump openkill_v6'
       fi
 
       #TProxy & TUN & Redirect udp
@@ -2403,8 +2512,8 @@ if [ -n "$FW4" ]; then
          # IPv6 control-plane traffic must remain native.  Keep DHCPv6 and
          # ICMPv6 path/neighbor signalling out of proxy marking so ND, RA and
          # Packet Too Big continue to work with netifd source-specific routes.
-         nft 'add rule inet fw4 openkill_mangle_v6 ip6 nexthdr udp th dport {546,547} counter return'
-         nft 'add rule inet fw4 openkill_mangle_v6 ip6 nexthdr icmpv6 icmpv6 type { nd-neighbor-solicit, nd-neighbor-advert, nd-router-solicit, nd-router-advert, packet-too-big, destination-unreachable, time-exceeded, parameter-problem } counter return'
+         nft 'add rule inet fw4 openkill_mangle_v6 meta l4proto udp th dport {546,547} counter return'
+         nft 'add rule inet fw4 openkill_mangle_v6 icmpv6 type { nd-neighbor-solicit, nd-neighbor-advert, nd-router-solicit, nd-router-advert, packet-too-big, destination-unreachable, time-exceeded, parameter-problem } counter return'
          if [ "$lan_ac_mode" = "1" ] && [ -n "$(uci_get_config "lan_ac_white_ips")" ] && [ -n "$(uci_get_config "lan_ac_white_macs")" ]; then
             nft 'add rule inet fw4 openkill_mangle_v6 ether saddr != @lan_ac_white_macs ip6 saddr != @lan_ac_white_ipv6s counter return'
          else
@@ -2415,17 +2524,17 @@ if [ -n "$FW4" ]; then
          nft 'add rule inet fw4 openkill_mangle_v6 ether saddr @lan_ac_black_macs counter return'
          if [ "$ipv6_mode" -ne 1 ] && [ "$ipv6_mode" -ne 3 ]; then
             if [ "$ipv6_mode" -eq 0 ]; then
-               nft add rule inet fw4 openkill_mangle_v6 ip6 nexthdr {tcp} ip6 daddr { "$fakeip_range6" } mark set "$PROXY_FWMARK" tproxy ip6 to :"$tproxy_port" counter accept
+               nft add rule inet fw4 openkill_mangle_v6 meta l4proto tcp ip6 daddr { "$fakeip_range6" } mark set "$PROXY_FWMARK" tproxy ip6 to :"$tproxy_port" counter accept
             else
-               nft add rule inet fw4 openkill_mangle_v6 ip6 nexthdr {tcp} ip6 daddr { "$fakeip_range6" } mark set "$PROXY_FWMARK" counter
+               nft add rule inet fw4 openkill_mangle_v6 meta l4proto tcp ip6 daddr { "$fakeip_range6" } mark set "$PROXY_FWMARK" counter
             fi
          fi
 
          if [ "$ipv6_mode" -eq 2 ] || [ "$ipv6_mode" -eq 3 ]; then
-            nft add rule inet fw4 openkill_mangle_v6 ip6 nexthdr {udp} ip6 daddr { "$fakeip_range6" } mark set "$PROXY_FWMARK" counter
+            nft add rule inet fw4 openkill_mangle_v6 meta l4proto udp ip6 daddr { "$fakeip_range6" } mark set "$PROXY_FWMARK" counter
          else
             if [ "$enable_v6_udp_proxy" -eq 1 ]; then
-               nft add rule inet fw4 openkill_mangle_v6 ip6 nexthdr {udp} ip6 daddr { "$fakeip_range6" } mark set "$PROXY_FWMARK" tproxy ip6 to :"$tproxy_port" counter accept
+               nft add rule inet fw4 openkill_mangle_v6 meta l4proto udp ip6 daddr { "$fakeip_range6" } mark set "$PROXY_FWMARK" tproxy ip6 to :"$tproxy_port" counter accept
             fi
          fi
          nft 'add rule inet fw4 openkill_mangle_v6 ip6 daddr @wan_ac_black_ipv6s counter return'
@@ -2446,25 +2555,25 @@ if [ -n "$FW4" ]; then
 
          #icmpv6
          if [ "$ipv6_mode" -eq 2 ] || [ "$ipv6_mode" -eq 3 ]; then
-             nft add rule inet fw4 openkill_mangle_v6 meta nfproto '{ipv6}' ip6 nexthdr icmpv6 icmpv6 type echo-request mark set "$PROXY_FWMARK" counter accept comment \"OpenKill ICMPv6 Redirect\"
+            nft add rule inet fw4 openkill_mangle_v6 meta nfproto '{ipv6}' icmpv6 type echo-request mark set "$PROXY_FWMARK" counter accept comment \"OpenKill ICMPv6 Redirect\"
          fi
       fi
 
       #tcp Tproxy && TUN
       if [ "$ipv6_mode" -ne 1 ] && [ "$ipv6_mode" -ne 3 ]; then
          if [ "$ipv6_mode" -eq 0 ]; then
-            nft add rule inet fw4 openkill_mangle_v6 ip6 nexthdr {tcp} mark set "$PROXY_FWMARK" tproxy ip6 to :"$tproxy_port" counter accept comment \"OpenKill TCP Tproxy\"
+            nft add rule inet fw4 openkill_mangle_v6 meta l4proto tcp mark set "$PROXY_FWMARK" tproxy ip6 to :"$tproxy_port" counter accept comment \"OpenKill TCP Tproxy\"
          else
-            nft add rule inet fw4 openkill_mangle_v6 ip6 nexthdr {tcp} mark set "$PROXY_FWMARK" counter
+            nft add rule inet fw4 openkill_mangle_v6 meta l4proto tcp mark set "$PROXY_FWMARK" counter
          fi
       fi
 
       #udp
       if [ "$ipv6_mode" -eq 2 ] || [ "$ipv6_mode" -eq 3 ]; then
-         nft add rule inet fw4 openkill_mangle_v6 ip6 nexthdr {udp} mark set "$PROXY_FWMARK" counter
+         nft add rule inet fw4 openkill_mangle_v6 meta l4proto udp mark set "$PROXY_FWMARK" counter
       else
          if [ "$enable_v6_udp_proxy" -eq 1 ]; then
-            nft add rule inet fw4 openkill_mangle_v6 ip6 nexthdr {udp} mark set "$PROXY_FWMARK" tproxy ip6 to :"$tproxy_port" counter accept comment \"OpenKill UDP Tproxy\"
+            nft add rule inet fw4 openkill_mangle_v6 meta l4proto udp mark set "$PROXY_FWMARK" tproxy ip6 to :"$tproxy_port" counter accept comment \"OpenKill UDP Tproxy\"
          fi
       fi
 
@@ -2477,7 +2586,7 @@ if [ -n "$FW4" ]; then
             nft 'add chain inet fw4 openkill_output_v6'
             nft 'flush chain inet fw4 openkill_output_v6'
             if [ "$en_mode" = "fake-ip" ]; then
-               nft add rule inet fw4 openkill_output ip6 nexthdr {tcp} ip6 daddr { "$fakeip_range6" } counter redirect to "$proxy_port"
+               nft add rule inet fw4 openkill_output meta l4proto tcp ip6 daddr { "$fakeip_range6" } counter redirect to "$proxy_port"
             fi
             nft 'add rule inet fw4 openkill_output_v6 skgid == 65534 counter return'
             nft 'add rule inet fw4 openkill_output_v6 ip6 daddr @localnetwork6 counter return'
@@ -2500,7 +2609,7 @@ if [ -n "$FW4" ]; then
                nft "add rule inet fw4 openkill_output_v6 $rule counter return"
             fi
 
-            nft add rule inet fw4 openkill_output_v6 ip6 nexthdr {tcp} counter redirect to "$proxy_port"
+            nft add rule inet fw4 openkill_output_v6 meta l4proto tcp counter redirect to "$proxy_port"
             nft 'add chain inet fw4 nat_output { type nat hook output priority -1; }'
             nft 'add rule inet fw4 nat_output meta nfproto {ipv6} counter jump openkill_output_v6'
          fi
@@ -2513,19 +2622,19 @@ if [ -n "$FW4" ]; then
          nft 'add rule inet fw4 openkill_mangle_output_v6 ct direction reply counter return'
          nft 'add rule inet fw4 openkill_mangle_output_v6 th dport @openkill_service_ports counter return'
          nft 'add rule inet fw4 openkill_mangle_output_v6 th sport @openkill_service_ports counter return'
-         nft 'add rule inet fw4 openkill_mangle_output_v6 ip6 nexthdr udp th dport {546,547} counter return'
-         nft 'add rule inet fw4 openkill_mangle_output_v6 ip6 nexthdr icmpv6 icmpv6 type { nd-neighbor-solicit, nd-neighbor-advert, nd-router-solicit, nd-router-advert, packet-too-big, destination-unreachable, time-exceeded, parameter-problem } counter return'
+         nft 'add rule inet fw4 openkill_mangle_output_v6 meta l4proto udp th dport {546,547} counter return'
+         nft 'add rule inet fw4 openkill_mangle_output_v6 icmpv6 type { nd-neighbor-solicit, nd-neighbor-advert, nd-router-solicit, nd-router-advert, packet-too-big, destination-unreachable, time-exceeded, parameter-problem } counter return'
          if ([ "$ipv6_mode" -eq 1 ] && [ "$enable_v6_udp_proxy" -eq 1 ]) || [ "$ipv6_mode" -eq 3 ]; then
-            nft add rule inet fw4 openkill_mangle_output_v6 ip6 nexthdr {udp} ip6 daddr { "$fakeip_range6" } mark set "$PROXY_FWMARK" counter
+            nft add rule inet fw4 openkill_mangle_output_v6 meta l4proto udp ip6 daddr { "$fakeip_range6" } mark set "$PROXY_FWMARK" counter
          fi
          if ([ "$ipv6_mode" -eq 0 ] && [ "$enable_v6_udp_proxy" -eq 1 ]) || [ "$ipv6_mode" -eq 2 ]; then
             if [ "$en_mode" = "fake-ip" ]; then
-               nft add rule inet fw4 openkill_mangle_output_v6 ip6 nexthdr '{tcp,udp}' ip6 daddr { "$fakeip_range6" } mark set "$PROXY_FWMARK" counter
+               nft add rule inet fw4 openkill_mangle_output_v6 meta l4proto '{tcp,udp}' ip6 daddr { "$fakeip_range6" } mark set "$PROXY_FWMARK" counter
             fi
          fi
          if [ "$ipv6_mode" -eq 0 ] && [ "$enable_v6_udp_proxy" -ne 1 ]; then
             if [ "$en_mode" = "fake-ip" ]; then
-               nft add rule inet fw4 openkill_mangle_output_v6 ip6 nexthdr {tcp} ip6 daddr { "$fakeip_range6" } mark set "$PROXY_FWMARK" counter
+               nft add rule inet fw4 openkill_mangle_output_v6 meta l4proto tcp ip6 daddr { "$fakeip_range6" } mark set "$PROXY_FWMARK" counter
             fi
          fi
          nft 'add rule inet fw4 openkill_mangle_output_v6 ip6 daddr @wan_ac_black_ipv6s counter return'
@@ -2546,18 +2655,18 @@ if [ -n "$FW4" ]; then
 
          #icmpv6
          if [ "$ipv6_mode" -eq 2 ] || [ "$ipv6_mode" -eq 3 ]; then
-            nft add rule inet fw4 openkill_mangle_output_v6 meta nfproto '{ipv6}' ip6 nexthdr icmpv6 icmpv6 type echo-request mark set "$PROXY_FWMARK" counter accept comment \"OpenKill ICMPv6 Redirect\"
+            nft add rule inet fw4 openkill_mangle_output_v6 meta nfproto '{ipv6}' icmpv6 type echo-request mark set "$PROXY_FWMARK" counter accept comment \"OpenKill ICMPv6 Redirect\"
          fi
 
          if ([ "$ipv6_mode" -eq 1 ] && [ "$enable_v6_udp_proxy" -eq 1 ]) || [ "$ipv6_mode" -eq 3 ]; then
-            nft add rule inet fw4 openkill_mangle_output_v6 ip6 nexthdr {udp} mark set "$PROXY_FWMARK" counter
+         nft add rule inet fw4 openkill_mangle_output_v6 meta l4proto udp mark set "$PROXY_FWMARK" counter
          fi
          if ([ "$ipv6_mode" -eq 0 ] && [ "$enable_v6_udp_proxy" -eq 1 ]) || [ "$ipv6_mode" -eq 2 ]; then
-            nft add rule inet fw4 openkill_mangle_output_v6 ip6 nexthdr tcp mark set "$PROXY_FWMARK" counter
-            nft add rule inet fw4 openkill_mangle_output_v6 ip6 nexthdr udp mark set "$PROXY_FWMARK" counter
+            nft add rule inet fw4 openkill_mangle_output_v6 meta l4proto tcp mark set "$PROXY_FWMARK" counter
+            nft add rule inet fw4 openkill_mangle_output_v6 meta l4proto udp mark set "$PROXY_FWMARK" counter
          fi
          if [ "$ipv6_mode" -eq 0 ] && [ "$enable_v6_udp_proxy" -ne 1 ]; then
-            nft add rule inet fw4 openkill_mangle_output_v6 ip6 nexthdr {tcp} mark set "$PROXY_FWMARK" counter
+            nft add rule inet fw4 openkill_mangle_output_v6 meta l4proto tcp mark set "$PROXY_FWMARK" counter
          fi
          nft 'add rule inet fw4 mangle_output meta nfproto {ipv6} counter jump openkill_mangle_output_v6'
       fi
@@ -2622,7 +2731,7 @@ if [ -n "$FW4" ]; then
                #nft delete rule inet fw4 input $(nft -a list chain inet fw4 input |grep "@localnetwork6" |awk -F '# ' '{print$2}')
                nft insert rule inet fw4 input position 0 iifname "$wan6_int" ip6 saddr != @localnetwork6 counter jump openkill_wan6_input
             done
-            nft add rule inet fw4 openkill_wan6_input ip6 nexthdr '{tcp,udp}' th dport "{$proxy_port,$tproxy_port,$cn_port,$http_port,$socks_port,$mixed_port,$dns_port}" counter reject
+            nft add rule inet fw4 openkill_wan6_input meta l4proto '{tcp,udp}' th dport "{$proxy_port,$tproxy_port,$cn_port,$http_port,$socks_port,$mixed_port,$dns_port}" counter reject
          else
             LOG_WARN "Can't Settting Only Intranet Allowed Function, Get IPv6 WAN Interfaces error, Please Verify The Firewall's WAN Zone Name is wan, Ignore This IF The Device Does not Have a WAN Interfaces..."
          fi
@@ -2638,9 +2747,9 @@ if [ -n "$FW4" ]; then
       fi
       if [ "$ipv6_enable" -eq 1 ] || [ "$ipv6_dns" -eq 1 ]; then
          if [ "$ipv6_mode" -ne 2 ] && [ "$ipv6_mode" -ne 3 ]; then
-            nft insert rule inet fw4 input position 0 ip6 nexthdr icmpv6 icmpv6 type echo-request ip6 daddr { $fakeip_range6 } counter reject with icmpv6 admin-prohibited comment \"OpenKill ICMPv6 INPUT REJECT\"
-            nft insert rule inet fw4 forward position 0 ip6 nexthdr icmpv6 icmpv6 type echo-request ip6 daddr { $fakeip_range6 } counter reject with icmpv6 admin-prohibited comment \"OpenKill ICMPv6 FORWARD REJECT\"
-            nft insert rule inet fw4 output position 0 ip6 nexthdr icmpv6 icmpv6 type echo-request ip6 daddr { $fakeip_range6 } $noowner counter reject with icmpv6 admin-prohibited comment \"OpenKill ICMPv6 OUTPUT REJECT\"
+            nft insert rule inet fw4 input position 0 icmpv6 type echo-request ip6 daddr { $fakeip_range6 } counter reject with icmpv6 admin-prohibited comment \"OpenKill ICMPv6 INPUT REJECT\"
+            nft insert rule inet fw4 forward position 0 icmpv6 type echo-request ip6 daddr { $fakeip_range6 } counter reject with icmpv6 admin-prohibited comment \"OpenKill ICMPv6 FORWARD REJECT\"
+            nft insert rule inet fw4 output position 0 icmpv6 type echo-request ip6 daddr { $fakeip_range6 } $noowner counter reject with icmpv6 admin-prohibited comment \"OpenKill ICMPv6 OUTPUT REJECT\"
          fi
       fi
    fi
@@ -2784,7 +2893,7 @@ if [ -z "$FW4" ]; then
       fi
    fi
 
-   DNSPORT=$(uci -q get dhcp.@dnsmasq[0].port)
+   DNSPORT=$(uci -q get "$DNSMASQ_UCI.port")
    if [ -z "$DNSPORT" ]; then
       DNSPORT=$(netstat -nlp |grep -E '127.0.0.1:.*dnsmasq' |awk -F '127.0.0.1:' '{print $2}' |awk '{print $1}' |head -1 || echo 53)
    fi

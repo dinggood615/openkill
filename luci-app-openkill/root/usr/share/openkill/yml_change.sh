@@ -15,6 +15,26 @@ custom_proxy_server_policy=$(uci_get_config "custom_proxy_server_policy" || echo
 custom_host=$(uci_get_config "custom_host" || echo 0)
 enable_custom_dns=$(uci_get_config "enable_custom_dns" || echo 0)
 append_wan_dns=$(uci_get_config "append_wan_dns" || echo 0)
+dns_privacy_mode=$(uci_get_config "dns_privacy_mode" || echo split)
+case "$dns_privacy_mode" in split|strict) ;; *) dns_privacy_mode=split ;; esac
+adblock_mode=$(uci_get_config "adblock_mode" || echo off)
+case "$adblock_mode" in off|standard|enhanced) ;; *) adblock_mode=off ;; esac
+adblock_rule_url=$(uci_get_config "adblock_rule_url" || echo https://anti-ad.net/clash.yaml)
+adblock_rule_url=$(printf '%s' "$adblock_rule_url" | sed 's/[^A-Za-z0-9:/.?&=%+,-]//g')
+case "$adblock_rule_url" in https://*) ;; *) adblock_rule_url=https://anti-ad.net/clash.yaml ;; esac
+adblock_rule_format=$(uci_get_config "adblock_rule_format" || echo yaml)
+case "$adblock_rule_format" in yaml|mrs) ;; *) adblock_rule_format=yaml ;; esac
+rustdesk_compatibility=$(uci_get_config "rustdesk_compatibility" || echo 0)
+case "$rustdesk_compatibility" in 1) ;; *) rustdesk_compatibility=0 ;; esac
+: > /tmp/openkill_rustdesk_domains
+if [ "$rustdesk_compatibility" = "1" ]; then
+   for rustdesk_domain in $(uci_get_config "rustdesk_server_domains"); do
+      case "$rustdesk_domain" in
+         *[!A-Za-z0-9_.-]*|.*|*-*.) continue ;;
+         *.*) printf '%s\n' "$rustdesk_domain" | tr '[:upper:]' '[:lower:]' >> /tmp/openkill_rustdesk_domains ;;
+      esac
+   done
+fi
 custom_fallback_filter=$(uci_get_config "custom_fallback_filter" || echo 0)
 china_ip_route=$(uci_get_config "china_ip_route" || echo 0)
 china_ip6_route=$(uci_get_config "china_ip6_route" || echo 0)
@@ -364,6 +384,15 @@ def merge_list_from_file(dns_hash, key, file_path)
    (dns_hash[key] ||= []).unshift(*lines).uniq!
 end
 
+def openkill_adblock_domains(file_path)
+   return [] unless File.exist?(file_path)
+   File.readlines(file_path).map { |line| line.sub(/#.*/, '').strip.downcase }
+      .select { |domain| domain.match?(/\A(?:[a-z0-9_-]+\.)+[a-z]{2,}\z/) }
+      .uniq
+rescue
+   []
+end
+
 
 begin
    config_file = '$5'
@@ -449,6 +478,8 @@ begin
 
    enable_custom_dns = '$enable_custom_dns' == '1'
    append_wan_dns = '$append_wan_dns' == '1'
+   dns_privacy_mode = '$dns_privacy_mode'
+   rustdesk_compatibility = '$rustdesk_compatibility'
    custom_fakeip_filter = '$custom_fakeip_filter' == '1'
    china_ip_route = '$china_ip_route' != '0'
    china_ip6_route = '$china_ip6_route' != '0'
@@ -944,6 +975,42 @@ begin
          Value['dns']['fallback'] ||= ['https://dns.cloudflare.com/dns-query', 'https://dns.google/dns-query']
       end
 
+      # Both privacy profiles remove plain public resolvers from ordinary
+      # query paths. Encrypted resolvers remain subject to Mihomo routing;
+      # strict mode additionally sends the ordinary nameserver through rules.
+      # proxy-server-nameserver is handled separately as the documented node
+      # bootstrap exception needed to avoid a proxy/DNS deadlock.
+      encrypted_server = lambda { |server| server.to_s.match?(/\A(?:https?|tls|quic):\/\//i) }
+      if dns_privacy_mode == 'split' || dns_privacy_mode == 'strict'
+         Value['dns']['nameserver'] = Value['dns']['nameserver'].to_a.select { |server| encrypted_server.call(server) }
+         Value['dns']['nameserver'] = ['https://doh.pub/dns-query'] if Value['dns']['nameserver'].empty?
+         Value['dns']['fallback'] = Value['dns']['fallback'].to_a.select { |server| encrypted_server.call(server) }
+         Value['dns']['fallback'] = ['https://dns.cloudflare.com/dns-query#RULES', 'https://dns.google/dns-query#RULES'] if Value['dns']['fallback'].empty?
+         if Value['dns']['direct-nameserver'].is_a?(Array)
+            Value['dns']['direct-nameserver'].select! { |server| encrypted_server.call(server) }
+            Value['dns'].delete('direct-nameserver') if Value['dns']['direct-nameserver'].empty?
+         end
+         %w[nameserver-policy proxy-server-nameserver-policy].each do |policy_key|
+            next unless Value['dns'][policy_key].is_a?(Hash)
+            Value['dns'][policy_key].each do |key, value|
+               if value.is_a?(Array)
+                  value.select! { |server| encrypted_server.call(server) }
+               elsif !encrypted_server.call(value)
+                  Value['dns'][policy_key].delete(key)
+               end
+            end
+            Value['dns'][policy_key].delete_if { |_key, value| value.respond_to?(:empty?) && value.empty? }
+         end
+      end
+      if dns_privacy_mode == 'strict'
+         Value['dns']['nameserver'] = Value['dns']['nameserver'].map do |server|
+            text = server.to_s
+            text.include?('#') ? text : text + '#RULES'
+         end.uniq
+         Value['dns']['respect-rules'] = true
+         YAML.LOG_TIP('Strict DNS privacy removed plain public resolvers; proxy-server-nameserver remains the node bootstrap exception.')
+      end
+
       # Overseas fallback DNS must not be sent directly through a restricted
       # WAN by default.  Mihomo supports the special #RULES suffix, which
       # sends the resolver connection through the same routing policy as the
@@ -998,6 +1065,52 @@ begin
             (Value['dns']['proxy-server-nameserver'] ||= []).concat(default_proxy_servers).uniq!
             YAML.LOG_TIP('Proxy-server-nameserver Option Maybe All Setted The Proxy Option, Auto Set Proxy-server-nameserver Option to【%s】For Avoiding Proxies Server Resolve Loop...' % [default_proxy_servers.join(', ')])
       end
+   end
+
+   # Ad filtering is a separate routing decision.  The downloaded anti-AD
+   # provider is placed before ordinary business rules; user blocks win over
+   # user allows, while PASS only skips this provider and continues to the
+   # normal policy chain.  It therefore never turns an allow-list entry into
+   # an implicit DIRECT route.
+   begin
+      rules = Value['rules'].is_a?(Array) ? Value['rules'] : []
+      providers = Value['rule-providers'].is_a?(Hash) ? Value['rule-providers'] : {}
+      providers.delete('openkill-anti-ad')
+      rules.reject! { |rule| rule.to_s.include?('RULE-SET,openkill-anti-ad,') }
+      adblock_allow = openkill_adblock_domains('/etc/openkill/custom/openkill_adblock_allow.list')
+      adblock_block = openkill_adblock_domains('/etc/openkill/custom/openkill_adblock_block.list')
+      generated_adblock_rules = adblock_allow.map { |domain| "DOMAIN-SUFFIX,#{domain},PASS" } + adblock_block.map { |domain| "DOMAIN-SUFFIX,#{domain},REJECT" }
+      rules.reject! { |rule| generated_adblock_rules.include?(rule.to_s) }
+      rustdesk_domains = openkill_adblock_domains('/tmp/openkill_rustdesk_domains')
+      rustdesk_rules = rustdesk_domains.map { |domain| "DOMAIN-SUFFIX,#{domain},DIRECT" }
+      rules.reject! { |rule| rustdesk_rules.include?(rule.to_s) }
+      if rustdesk_compatibility == '1' && rustdesk_rules.any?
+         # Insert before the subscription provider; user block/allow rules are
+         # unshifted below and therefore retain higher priority.
+         rules.unshift(*rustdesk_rules)
+         YAML.LOG_TIP('RustDesk compatibility is limited to the user-specified ID/relay domains; dynamic peer traffic remains under normal policy.')
+      elsif rustdesk_compatibility == '1'
+         YAML.LOG_WARN('RustDesk compatibility is enabled but no server domains are configured; no broad port bypass was created.')
+      end
+      if '$adblock_mode' != 'off'
+         providers['openkill-anti-ad'] = {
+            'type' => 'http',
+            'behavior' => 'domain',
+            'format' => '$adblock_rule_format',
+            'interval' => 86400,
+            'url' => '$adblock_rule_url',
+            'path' => './rule_provider/openkill-anti-ad.' + '$adblock_rule_format'
+         }
+         rules.unshift('RULE-SET,openkill-anti-ad,REJECT')
+         YAML.LOG_TIP('Adblock provider enabled with %s format; DNS and core filters use the same profile.' % ['$adblock_rule_format'])
+      end
+      rules.unshift(*adblock_allow.map { |domain| "DOMAIN-SUFFIX,#{domain},PASS" })
+      rules.unshift(*adblock_block.map { |domain| "DOMAIN-SUFFIX,#{domain},REJECT" })
+      rules.uniq!
+      Value['rules'] = rules
+      Value['rule-providers'] = providers
+   rescue Exception => e
+      YAML.LOG_ERROR('Set Adblock Rules Failed,【%s】' % [e.message])
    end
    write_config = true
    rescue Exception => e

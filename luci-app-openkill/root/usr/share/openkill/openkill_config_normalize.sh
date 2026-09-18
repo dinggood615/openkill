@@ -19,6 +19,19 @@ set_default proxy_mode rule
 set_default find_process_mode off
 set_default geodata_loader memconservative
 set_default enable_tcp_concurrent 1
+dns_privacy_mode="$(uci -q get openkill.config.dns_privacy_mode 2>/dev/null || true)"
+case "$dns_privacy_mode" in split|strict) ;; *) uci -q set openkill.config.dns_privacy_mode=split; changed=1 ;; esac
+
+# Optional anti-AD integration is fail-closed: an invalid mode is disabled,
+# while an unavailable list keeps the last valid generated file.
+adblock_mode="$(uci -q get openkill.config.adblock_mode 2>/dev/null || true)"
+case "$adblock_mode" in off|standard|enhanced) ;; *) uci -q set openkill.config.adblock_mode=off; changed=1 ;; esac
+adblock_rule_format="$(uci -q get openkill.config.adblock_rule_format 2>/dev/null || true)"
+case "$adblock_rule_format" in yaml|mrs) ;; *) uci -q set openkill.config.adblock_rule_format=yaml; changed=1 ;; esac
+adblock_interval="$(uci -q get openkill.config.adblock_update_interval 2>/dev/null || true)"
+case "$adblock_interval" in ''|*[!0-9]*|0) uci -q set openkill.config.adblock_update_interval=86400; changed=1 ;; esac
+rustdesk_compatibility="$(uci -q get openkill.config.rustdesk_compatibility 2>/dev/null || true)"
+case "$rustdesk_compatibility" in 0|1) ;; *) uci -q set openkill.config.rustdesk_compatibility=0; changed=1 ;; esac
 set_default enable_unified_delay 1
 set_default disable_udp_quic 0
 

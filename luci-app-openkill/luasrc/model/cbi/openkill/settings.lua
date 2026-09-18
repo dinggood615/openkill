@@ -6,6 +6,13 @@ local DISP = require "luci.dispatcher"
 local UTIL = require "luci.util"
 local fs = require "luci.openkill"
 local uci = require "luci.model.uci".cursor()
+local dnsmasq_section = "@dnsmasq[0]"
+uci:foreach("dhcp", "dnsmasq", function(section)
+	if section[".name"] then
+		dnsmasq_section = section[".name"]
+		return false
+	end
+end)
 local json = require "luci.jsonc"
 local datatype = require "luci.cbi.datatypes"
 local net = require "luci.model.network".init()
@@ -88,6 +95,16 @@ o = s:taboption("compatibility", Flag, "remote_service_bypass", "旧版服务端
 o.default = "0"
 o.rmempty = false
 o.description = "默认关闭。仅在 OpenKill 统一管理且 firewall4 需要兼容旧版服务时启用；端口匹配会绕过代理，不是服务自动识别。不要把 RustDesk 的通用端口作为全局绕过。"
+
+o = s:taboption("compatibility", Flag, "rustdesk_compatibility", "RustDesk 兼容策略")
+o.default = "0"
+o.rmempty = false
+o.description = "默认关闭。启用后只为下方填写的 RustDesk ID/Relay 服务域名生成核心层 DIRECT 规则；不按 21114-21119 对全网放行，不放行全部 443、VPN 网段或 LAN，也不保证动态点对点打洞。广告允许列表不会自动改变此出口策略。"
+
+o = s:taboption("compatibility", DynamicList, "rustdesk_server_domains", "RustDesk ID/Relay 服务域名")
+o.datatype = "or(host, string)"
+o:depends("rustdesk_compatibility", "1")
+o.description = "只填写实际使用的 hbbs/hbbr 域名，例如自建服务域名；官方文档中的 21114-21119 端口由服务端用途决定，本选项不会创建通用端口绕过。动态点对点地址仍按正常区域、DNS 和代理策略处理。"
 
 o = s:taboption("compatibility", DynamicList, "remote_service_ports", "服务端口绕过列表")
 o.datatype = "port"
@@ -197,6 +214,13 @@ o:value("0.0.0.0", translate("All LAN interfaces (advanced)"))
 o.default = "127.0.0.1"
 o.rmempty = false
 
+o = s:taboption("dns", ListValue, "dns_privacy_mode", "DNS 隐私档位")
+o:value("split", "分流隐私（推荐）")
+o:value("strict", "严格隐私（失败不明文回退）")
+o.default = "split"
+o.rmempty = false
+o.description = "分流档位分别管理直连与代理 DNS 出口；严格档会移除普通查询路径中的明文公网解析器，使用加密解析并按规则出口发送。节点引导解析保留独立的直接 IPv4 例外；本地域名、终端自建 DoH/DoT 和未授权旁路仍需设备策略配合。"
+
 o = s:taboption("compatibility", Flag, "bypass_gateway_compatible", translate("Bypass Gateway Compatible"))
 o.description = translate("If The Network Cannot be Connected in Bypass Gateway Mode, Please Try to Enable.")..font_red..bold_on..translate("Suggestion: If The Device Does Not Have WLAN, Please Disable The Lan Interface's Bridge Option")..bold_off..font_off
 o.default = 0
@@ -242,9 +266,9 @@ o.description = translate("If DNS is abnormal after stopping the OpenKill, pleas
 o.inputtitle = translate("Fix")
 o.inputstyle = "reload"
 o.write = function()
-	uci:set("dhcp", "@dnsmasq[0]", "noresolv", "0")
-	uci:set("dhcp", "@dnsmasq[0]", "localuse", "1")
-	local resolv_file = uci:get("dhcp", "@dnsmasq[0]", "resolvfile")
+	uci:set("dhcp", dnsmasq_section, "noresolv", "0")
+	uci:set("dhcp", dnsmasq_section, "localuse", "1")
+	local resolv_file = uci:get("dhcp", dnsmasq_section, "resolvfile")
 	local need_fix = false
 	if not resolv_file or resolv_file == "" then
 		need_fix = true
@@ -261,7 +285,7 @@ o.write = function()
 			if NXFS.access(f) then
 				local content = fs.readfile(f) or ""
 				if content:find("nameserver") then
-					uci:set("dhcp", "@dnsmasq[0]", "resolvfile", f)
+					uci:set("dhcp", dnsmasq_section, "resolvfile", f)
 					resolv_file = f
 					need_fix = false
 					break
@@ -273,7 +297,7 @@ o.write = function()
 		resolv_file = "/tmp/resolv.conf.d/resolv.conf.auto"
 		SYS.call("mkdir -p /tmp/resolv.conf.d")
 		fs.writefile(resolv_file, "# Interface lan\nnameserver 119.29.29.29\nnameserver 8.8.8.8\n")
-		uci:set("dhcp", "@dnsmasq[0]", "resolvfile", resolv_file)
+		uci:set("dhcp", dnsmasq_section, "resolvfile", resolv_file)
 	end
 	uci:set("openkill", "config", "redirect_dns", "0")
 	uci:commit("dhcp")
@@ -292,6 +316,67 @@ o.description = translate("Specify DNS Server For List, Only One IP Server Addre
 o.default = "114.114.114.114"
 o.placeholder = translate("114.114.114.114 or 127.0.0.1#5300")
 o:depends{enable_redirect_dns = "1", enable_custom_domain_dns_server = "1"}
+
+o = s:taboption("dns", ListValue, "adblock_mode", "广告屏蔽档位")
+o:value("off", "关闭（保留 DNS 隐私与代理策略）")
+o:value("standard", "标准（推荐，anti-AD 域名规则）")
+o:value("enhanced", "增强（核心规则/MRS，误拦风险更高）")
+o.default = "off"
+o.rmempty = false
+o.description = "标准档已同时覆盖受控 DNS 与 Mihomo 连接路径；增强档允许使用官方 Mihomo MRS 或更严格的用户阻止列表，主要改善核心加载效率并提高拦截强度，不自动叠加重复大列表。硬编码 IP、自建 DoH、第一方共域名广告和 HTTPS 内容不会被此功能完整识别。"
+
+o = s:taboption("dns", Value, "adblock_rule_url", "广告规则源")
+o.default = "https://anti-ad.net/clash.yaml"
+o.description = "只接受 HTTPS。默认使用 anti-AD 原生 Mihomo/Clash YAML；若改用 MRS，必须确认来源实际提供 MRS 二进制。下载失败保留最后有效版本。"
+o:depends("adblock_mode", "standard")
+o:depends("adblock_mode", "enhanced")
+
+o = s:taboption("dns", ListValue, "adblock_rule_format", "规则源格式")
+o:value("yaml", "YAML（anti-AD 默认）")
+o:value("mrs", "MRS（二进制来源）")
+o.default = "yaml"
+o:depends("adblock_mode", "standard")
+o:depends("adblock_mode", "enhanced")
+
+o = s:taboption("dns", Value, "adblock_update_interval", "规则更新间隔（秒）")
+o.datatype = "uinteger"
+o.default = "86400"
+o:depends("adblock_mode", "standard")
+o:depends("adblock_mode", "enhanced")
+
+adblock_allowlist = s:taboption("dns", Value, "adblock_allowlist", "广告允许列表")
+adblock_allowlist.template = "cbi/tvalue"
+adblock_allowlist.rows = 8
+adblock_allowlist.wrap = "off"
+adblock_allowlist.description = "每行一个域名。仅跳过广告规则，继续使用正常 DNS 隐私、区域和代理策略，不生成 DIRECT。"
+adblock_allowlist:depends("adblock_mode", "standard")
+adblock_allowlist:depends("adblock_mode", "enhanced")
+function adblock_allowlist.cfgvalue(self, section)
+	return fs.readfile("/etc/openkill/custom/openkill_adblock_allow.list") or ""
+end
+function adblock_allowlist.write(self, section, value)
+	if value then
+		fs.writefile("/etc/openkill/custom/openkill_adblock_allow.list", value:gsub("\r\n?", "\n"))
+	end
+	return true
+end
+
+adblock_blocklist = s:taboption("dns", Value, "adblock_blocklist", "广告阻止列表")
+adblock_blocklist.template = "cbi/tvalue"
+adblock_blocklist.rows = 8
+adblock_blocklist.wrap = "off"
+adblock_blocklist.description = "每行一个域名。用户阻止优先于允许列表和订阅规则。"
+adblock_blocklist:depends("adblock_mode", "standard")
+adblock_blocklist:depends("adblock_mode", "enhanced")
+function adblock_blocklist.cfgvalue(self, section)
+	return fs.readfile("/etc/openkill/custom/openkill_adblock_block.list") or ""
+end
+function adblock_blocklist.write(self, section, value)
+	if value then
+		fs.writefile("/etc/openkill/custom/openkill_adblock_block.list", value:gsub("\r\n?", "\n"))
+	end
+	return true
+end
 
 custom_domain_dns = s:taboption("dns", Value, "custom_domain_dns")
 custom_domain_dns.template = "cbi/tvalue"
@@ -576,12 +661,21 @@ o:depends("en_mode", "redir-host")
 o:depends("en_mode", "redir-host-tun")
 o:depends("en_mode", "redir-host-mix")
 
+local function validate_region_route_mode(self, value, section)
+	local profile = HTTP.formvalue("cbid.openkill." .. section .. ".compatibility_profile") or uci:get("openkill", section, "compatibility_profile") or "stable"
+	if profile == "native" and value ~= "0" then
+		return nil, "Mihomo 原生接管当前不映射 OpenKill 区域 IP 集合；请先切换到稳定/高性能 OpenKill 接管模式。"
+	end
+	return value
+end
+
 o = s:taboption("traffic_control", ListValue, "china_ip_route", translate("China IP Route"))
-o.description = translate("Bypass Specified Regions Network Flows, Improve Performance, If Inaccessibility on Bypass Gateway, Try to Enable Bypass Gateway Compatible Option")
+o.description = "关闭=不按区域返回；绕过大陆=仅已验证中国 IPv4 集合中的真实地址快速绕过；绕过大陆集合以外=集合完整时才对集合外地址快速绕过。空集、坏数据和补集模式会安全停用本次区域返回；Fake-IP 域名仍先由 Mihomo 按域名策略决定。"
 o.default = 0
 o:value("0", translate("Disable"))
 o:value("1", translate("Bypass Mainland China"))
 o:value("2", translate("Bypass Overseas"))
+o.validate = validate_region_route_mode
 
 o = s:taboption("traffic_control", Flag, "intranet_allowed", translate("Only intranet allowed"))
 o.description = translate("When Enabled, The Control Panel And The Connection Broker Port Will Not Be Accessible From The Public Network")
@@ -1581,12 +1675,13 @@ end
 end
 
 o = s:taboption("ipv6", ListValue, "china_ip6_route", translate("China IPv6 Route"))
-o.description = translate("Bypass Specified Regions Network Flows, Improve Performance, If Inaccessibility on Bypass Gateway, Try to Enable Bypass Gateway Compatible Option")
+o.description = "IPv6 与 IPv4 独立校验但使用同一更新代次；空集、坏数据或缺少 fw4 nftset 时不启用补集快速绕过。IPv6 保留 RA/ND/PMTU，不能用关闭 AAAA 掩盖路由故障；Fake-IP 域名先由 Mihomo 按域名策略决定。"
 o.default = 0
 o:value("0", translate("Disable"))
 o:value("1", translate("Bypass Mainland China"))
 o:value("2", translate("Bypass Overseas"))
 o:depends("ipv6_enable", "1")
+o.validate = validate_region_route_mode
 
 
 o = s:taboption("ipv6", Value, "local_network6_pass", translate("Local IPv6 Network Bypassed List"))

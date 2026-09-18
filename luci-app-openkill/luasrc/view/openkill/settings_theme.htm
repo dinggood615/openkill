@@ -29,7 +29,9 @@
         network: [
             {id: 'dns-local', title: '<%:DNS & Local Resolution%>', fullWidth: true, keys: [
                 'dns_listen_address', 'enable_redirect_dns', 'flush_dns_cache', 'dnsmasq_fix',
-                'enable_custom_domain_dns_server', 'custom_domain_dns_server', 'custom_domain_dns'
+                'dns_privacy_mode', 'enable_custom_domain_dns_server', 'custom_domain_dns_server', 'custom_domain_dns',
+                'adblock_mode', 'adblock_rule_url', 'adblock_rule_format', 'adblock_update_interval',
+                'adblock_allowlist', 'adblock_blocklist'
             ]},
             {id: 'ipv6-tun', title: '<%:IPv6 & TUN%>', keys: [
                 'ipv6_enable', 'ipv6_mode', 'stack_type_v6', 'enable_v6_udp_proxy',
@@ -75,7 +77,7 @@
         compatibility: [
             {id: 'vpn-policy', title: 'VPN 访问策略', keys: ['_compat_policy', '_compat_scope', 'compatibility_profile']},
             {id: 'remote-service', title: '远程访问绕过', keys: [
-                'remote_service_bypass', 'remote_service_ports', 'wan_ac_black_ips',
+                'remote_service_bypass', 'rustdesk_compatibility', 'rustdesk_server_domains', 'remote_service_ports', 'wan_ac_black_ips',
                 'wan_ac_black_ports', 'wan_interface_mode', 'wan_interface_name'
             ]},
             {id: 'device-compatibility', title: '<%:Device Compatibility%>', keys: [
@@ -110,6 +112,8 @@
 
     var FULL_WIDTH_KEYS = {
         custom_domain_dns: true,
+        adblock_allowlist: true,
+        adblock_blocklist: true,
         local_network_pass: true,
         chnroute_pass: true,
         local_network6_pass: true,

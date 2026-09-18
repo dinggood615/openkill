@@ -30,6 +30,21 @@ config openkill 'config'
 	option dns_listen_address '127.0.0.1'
 	option dashboard_forward_ssl '0'
 	option enable_custom_dns '1'
+	# split keeps direct/ proxy DNS decisions separate; strict removes plain
+	# public resolvers from ordinary query paths and fails closed to encrypted
+	# fallback. Node bootstrap remains an explicit, visible exception.
+	option dns_privacy_mode 'split'
+	# Ad blocking is independent from DNS privacy and proxy routing.  The
+	# standard profile uses anti-AD domain filtering plus a Mihomo rule provider;
+	# enhanced permits a verified Mihomo MRS source or stricter user blocks.
+	option adblock_mode 'off'
+	option adblock_rule_url 'https://anti-ad.net/clash.yaml'
+	option adblock_rule_format 'yaml'
+	option adblock_dns_url 'https://anti-ad.net/anti-ad-domains.txt'
+	option adblock_update_interval '86400'
+	# Keep RustDesk compatibility explicitly scoped to configured ID/relay
+	# domains. This does not identify dynamic peers or force all traffic DIRECT.
+	option rustdesk_compatibility '0'
 	option ipv6_enable '1'
 	option ipv6_dns '1'
 	option enable_custom_clash_rules '0'
@@ -72,7 +87,7 @@ config openkill 'config'
 	option custom_fakeip_filter '0'
 	option custom_host '0'
 	option custom_name_policy '0'
-	option append_wan_dns '1'
+	option append_wan_dns '0'
 	option stream_auto_select '0'
 	# Watchdog maintenance cadence (seconds/cycles).  The health observer never
 	# starts a duplicate core; procd remains the sole restart owner.

@@ -1487,6 +1487,10 @@ function action_status()
 	local rule_data = action_rule_mode(true)
 	local oc_data = action_oc_settings(true)
 	local proxy_data = action_proxy_info(true)
+	local region_state = fs.readfile("/tmp/openkill-region-effective.state") or ""
+	local function state_value(name, fallback)
+		return region_state:match(name .. "=([^\n]+)") or fallback
+	end
 
 	local result = {
 		-- status fields
@@ -1515,6 +1519,16 @@ function action_status()
 		-- happens in Plugin Settings / Overwrite Settings.
 		ipv6_enable = fs.uci_get_config("config", "ipv6_enable") == "1",
 		ipv6_dns = fs.uci_get_config("config", "ipv6_dns") == "1",
+		dns_privacy_mode = fs.uci_get_config("config", "dns_privacy_mode") or "split",
+		adblock_mode = fs.uci_get_config("config", "adblock_mode") or "off",
+		adblock_rule_format = fs.uci_get_config("config", "adblock_rule_format") or "yaml",
+		adblock_dns_effective = (fs.readfile("/tmp/openkill-adblock.state") or ""):find("effective=1", 1, true) ~= nil,
+		rustdesk_compatibility = fs.uci_get_config("config", "rustdesk_compatibility") == "1",
+		china_ip_route_requested = fs.uci_get_config("config", "china_ip_route") or "0",
+		china_ip6_route_requested = fs.uci_get_config("config", "china_ip6_route") or "0",
+		china_ip_route_effective = state_value("effective_ipv4", "0"),
+		china_ip6_route_effective = state_value("effective_ipv6", "0"),
+		china_ip_route_effective_reason = state_value("reason", "not-started"),
 		watchdog_interval = fs.uci_get_config("config", "watchdog_interval") or "60",
 		find_process_mode = fs.uci_get_config("config", "find_process_mode") or "off",
 		geodata_loader = fs.uci_get_config("config", "geodata_loader") or "memconservative",

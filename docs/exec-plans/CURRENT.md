@@ -11,6 +11,39 @@ NEXT_ACTION: `use the published 2026-1129 IPK for approved installation testing;
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
 REAL_PACKET_PATH: `NOT_TESTED`
+
+## Local optimization phase (2026-09-18)
+
+- Phase: `PHASE_LOCAL_DNS_REGION_ADBLOCK_RUSTDESK_HARDENING`.
+- Scope: local source changes only. The requested work covers stable dnsmasq
+  section selection, safer IPv4/IPv6 region-pass handling, IPv6 transport
+  matching, optional anti-AD Mihomo rule-provider integration, and a bounded
+  RustDesk compatibility exception. No device, packet-path, CENTRAL_ACTIVE,
+  or central nft operation is permitted in this phase.
+- Contracts: preserve the existing DNS listener split (`dnsmasq :53` to
+  Mihomo `127.0.0.1:7874`), the OpenKill/Mihomo ownership mutex, current Mark
+  ABI, legacy writer continuity, and shadow read-only semantics. New adblock
+  and RustDesk controls must fail closed and remain independent of DNS
+  privacy and region bypass decisions.
+- Implemented locally: stable dnsmasq instance identity; fail-closed and
+  atomically validated IPv4/IPv6 route sets; fw4 nftset capability guard;
+  extension-header-safe IPv6 protocol matching; split/strict encrypted DNS
+  filtering; anti-AD DNS plus Mihomo provider rules with user exceptions;
+  scoped RustDesk ID/relay domain rules; effective-state reporting in LuCI;
+  and quick-start invalidation for the new generator.
+- Evidence: shell syntax checks passed for all five changed production
+  scripts; UI contract `23/23`, UI interaction `1/1`, classifier contract
+  `17/17`, and `git diff --check` passed. `scripts/local-gate.sh` passed on
+  the same source after temporarily normalizing the pre-existing CRLF copy of
+  `shadow/semantic_model_v1.tsv`; the native Windows checkout otherwise fails
+  its typed-manifest header check before evaluating this diff. The manifest
+  was restored byte-for-byte and remains unmodified.
+- Device and real RustDesk/DNS leak verification remain `NOT_RUN` until an
+  explicitly approved device phase. Exact-commit Development CI is still
+  pending because the working tree has not been committed.
+- Resume condition: after local gates, record the observed resulting HEAD and
+  keep native takeover mappings, real DNS egress, anti-AD effectiveness and
+  RustDesk relay/UDP behavior as device-validation items.
 HOST_NETWORK_INCIDENT_CAUSE: `UNCONFIRMED`
 HOST_NETWORK_SETTINGS_CHANGED_BY_THIS_WORK: `0`
 TEST_PROCESS_CLEANUP: `PASS`
