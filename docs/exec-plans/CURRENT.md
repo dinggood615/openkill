@@ -79,6 +79,8 @@ REAL_PACKET_PATH: `NOT_TESTED`
   public-key authentication succeeded in `BatchMode` as root. The supplied
   password was used only for this one-time public-key installation and was not
   persisted.
+- Local SSH convenience alias `openkill-103` now points to the dedicated key
+  with `BatchMode yes`; a key-only alias connection was verified as root.
 - Device read-only evidence: `/etc/openwrt_release` reports Kwrt
   `25.12-SNAPSHOT` x86/64 with Linux `6.12.103`; dnsmasq listens on LAN,
   WAN-side, Docker and IPv6 addresses; its active resolv file contains WAN
