@@ -54,7 +54,8 @@ class AutonomousWorkflowTests(unittest.TestCase):
         self.assertIn("/^CONFIG_PACKAGE_[^=]*=/d", source)
         self.assertIn("selected_package_count", source)
         self.assertIn('Refusing an unexpectedly broad package selection', source)
-        self.assertIn('make -j"$(nproc)" package/luci-app-openkill/compile', source)
+        self.assertIn('make CONFIG_USE_APK= package/luci-app-openkill/compile V=s', source)
+        self.assertNotIn('make -j"$(nproc)" package/luci-app-openkill/compile', source)
 
     def test_formal_release_has_no_push_trigger_and_requires_gate(self):
         source = self.read(".github/workflows/compile_new_ipk.yml")

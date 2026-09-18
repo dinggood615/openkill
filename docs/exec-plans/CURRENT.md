@@ -1,13 +1,13 @@
 # Current status
 
-CURRENT_HEAD: `f65d4267d9ae0bbfe7aa046dc02d91b8ca2117f2` (observed master HEAD before this status update)
+CURRENT_HEAD: `770fee5373d3adf53afacbf7d9a3421b4321a51f` (observed master HEAD before this status update)
 VERSION: `2026-1129`
 CURRENT_PHASE: `REVIEW_FIX_LOCAL_GATE_RC_DEVICE_STAGE_A`
-CURRENT_STATUS: `Master-only implementation re-review and exact-commit CI are green; candidate packaging and the authorized 192.168.1.103 device phase are next`
-BLOCKER: `NONE_FOR_LOCAL_SCOPE` — device installation remains gated on an exact-commit Development CI result and a matching RC IPK
+CURRENT_STATUS: `Master-only implementation re-review and exact-commit CI are green; RC dependency expansion is being bounded before the authorized 192.168.1.103 device phase`
+BLOCKER: `NONE_FOR_LOCAL_SCOPE` — the two RC attempts were canceled after SDK LLVM expansion; device installation remains gated on a bounded matching RC IPK
 DEVICE_STATE: `192.168.1.103` is Kwrt 25.12-SNAPSHOT x86/64 on VMware, dnsmasq 2.93 and firewall4 2025.03.17~b6e51575-r2 are present, PassWall is configured/enabled but its global runtime switch is `0` and no proxy listener is running; only read-only inspection and SSH public-key installation were performed
 DEVICE_RETRY_READY: `YES_WITH_RC_IPK` (SSH BatchMode key access is ready; install only after package hash, backup and rollback checks)
-NEXT_ACTION: `trigger the non-published RC IPK workflow from master, verify the artifact, then begin the recorded device backup/install gate`
+NEXT_ACTION: `commit and verify the serial single-package RC workflow, trigger the non-published RC IPK workflow from master, then begin the recorded device backup/install gate`
 RESULTING_HEAD: resolve with `git rev-parse HEAD` after this status-only update; this status records the pre-commit observation above
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
@@ -67,6 +67,24 @@ IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable se
   exact commit `f65d4267d9ae0bbfe7aa046dc02d91b8ca2117f2`: static, v1.19.30,
   and latest compatibility jobs all succeeded. No device package installation
   has been attempted.
+
+## RC package boundary repair (2026-09-18)
+
+- Master-only delivery is confirmed: `codex/openkill-device-validation` was
+  deleted locally and remotely; the only delivery branch is `master`.
+- Development CI run `35309191407` passed for exact commit
+  `770fee5373d3adf53afacbf7d9a3421b4321a51f` (static, v1.19.30 and latest).
+  The first RC run `35308420431` and second run `35309306971` were canceled
+  after fresh 25.12 SDK jobs expanded to Rust/LLVM host work (`3898` tasks)
+  even with `CONFIG_USE_APK=`. Logs are retained outside the repository at
+  `D:\\openkill-rc-build.log` and `D:\\openkill-rc-build2.log`.
+- The RC workflow is now being narrowed to the known-good SDK boundary:
+  serial `make CONFIG_USE_APK= package/luci-app-openkill/{clean,compile}`
+  without top-level `-j`, followed by the existing IPK audit. This is a
+  workflow-only change; it does not change production package dependencies.
+- The next evidence required is a completed RC run that produces exactly one
+  audited `luci-app-openkill_2026-1129_all.ipk` from the resulting master
+  commit. Until that exists, no device upload or installation is allowed.
 
 ## Exact-commit DNS contract repair (2026-09-18)
 
