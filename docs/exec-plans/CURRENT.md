@@ -1,13 +1,13 @@
 # Current status
 
-CURRENT_HEAD: `0ae5fb418514d609923a632a56250907d52a74bb` (released source commit; resolve the resulting master HEAD after this status-only update)
+CURRENT_HEAD: `556748e8fa0776ffac21a2399a5717852e77d395` (observed master HEAD after local optimization and device-preflight plan update)
 VERSION: `2026-1129`
-CURRENT_PHASE: `RELEASED_2026-1129`
-CURRENT_STATUS: `Formal Release v2026-1129-ipk completed from 0ae5fb4; the package and channel metadata were verified against the published SHA256`
-BLOCKER: `DEVICE_TYPED_PARITY_UNVERIFIED` — `.102` is a VMware test machine with limited IPv6 compatibility; historical R3B IPv6 continuity split remains deferred and is not a product defect conclusion
-DEVICE_STATE: `.102` was not contacted in this release work; prior R3B evidence remains historical, typed device parity is not claimed, and no service/package/UCI/dataplane/config change was made
-DEVICE_RETRY_READY: `NO` (device validation requires a separately approved, IPv6-capable environment)
-NEXT_ACTION: `use the published 2026-1129 IPK for approved installation testing; keep central dataplane and packet-path validation deferred`
+CURRENT_PHASE: `DEVICE_PREFLIGHT_OPENWRT_192.168.1.103`
+CURRENT_STATUS: `SSH-key setup and read-only OpenWrt preflight completed; OpenKill runtime is not installed on the target`
+BLOCKER: `OPENKILL_PACKAGE_NOT_PRESENT` — the approved target has no `/etc/init.d/openkill`, `/etc/config/openkill`, Mihomo, or Clash binary; installation requires a separately authorized package step and a candidate IPK
+DEVICE_STATE: `192.168.1.103` is Kwrt 25.12-SNAPSHOT x86/64 on VMware, dnsmasq 2.93 and firewall4 2025.03.17~b6e51575-r2 are present, PassWall is configured/enabled but its global runtime switch is `0` and no proxy listener is running; only read-only inspection and SSH public-key installation were performed
+DEVICE_RETRY_READY: `NO` (SSH is ready; OpenKill validation requires an authorized installation/restart step)
+NEXT_ACTION: `obtain explicit authorization and a matching OpenKill IPK for 192.168.1.103; then run a bounded pre-install compatibility check before any service/config mutation`
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
 REAL_PACKET_PATH: `NOT_TESTED`
@@ -47,6 +47,46 @@ REAL_PACKET_PATH: `NOT_TESTED`
 - Resume condition: after local gates, record the observed resulting HEAD and
   keep native takeover mappings, real DNS egress, anti-AD effectiveness and
   RustDesk relay/UDP behavior as device-validation items.
+
+## Approved OpenWrt device phase (2026-09-18)
+
+- Authorization: the user explicitly authorized testing the local OpenWrt
+  router at `192.168.1.103` and requested direct SSH-key access. This phase is
+  limited to that target; no other router or real device may be contacted.
+- Initial scope: establish a dedicated local ed25519 key, install only its
+  public key through the supplied administrator password, then perform
+  read-only inventory, package/config inspection, service status, generated
+  rule inspection, DNS listener/upstream inspection, and bounded synthetic
+  configuration checks. The password must not be stored in the repository,
+  command files, logs, or reports.
+- Explicitly forbidden in this phase: `CENTRAL_ACTIVE`, central nft apply,
+  packet-path tests, traffic capture, firewall/route/DNS mutation beyond the
+  requested SSH public-key installation, package installation, service
+  restart, WAN changes, and any broad bypass rule.
+- Contracts under observation: DNS listener split and privacy modes, one
+  transparent-proxy owner, Mark ABI, IPv4/IPv6 region-set generation and
+  fail-closed behavior, adblock last-valid fallback, RustDesk scoped rules,
+  and procd/legacy-writer continuity. Any mutation needed for a later test
+  requires a separate explicit device step and rollback record.
+- Resume condition: complete key setup and read-only preflight first; stop and
+  record `HUMAN_BLOCKER` if SSH is unavailable or the supplied credentials do
+  not authorize the requested key installation. Device effectiveness claims
+  remain `NOT_VERIFIED` until an explicitly approved mutation/traffic phase.
+- Key setup evidence: TCP/22 reachable from `192.168.1.125`; dedicated
+  `openkill-192.168.1.103-ed25519` key created outside the repository with
+  fingerprint `SHA256:f+jc02xQKTFS9LdSP7gtvkFF/X25W3mrEvqORuSFFjg`; Dropbear
+  public-key authentication succeeded in `BatchMode` as root. The supplied
+  password was used only for this one-time public-key installation and was not
+  persisted.
+- Device read-only evidence: `/etc/openwrt_release` reports Kwrt
+  `25.12-SNAPSHOT` x86/64 with Linux `6.12.103`; dnsmasq listens on LAN,
+  WAN-side, Docker and IPv6 addresses; its active resolv file contains WAN
+  resolver `192.168.10.2`; fw4 has only the dnsmasq UDP/53 redirect table and
+  no OpenKill/Mihomo chains. The target has `dnsmasq-full` nftset support, but
+  no OpenKill package, no Mihomo/Clash binary and no proxy listener.
+- Device mutation record: only the dedicated public key was added for
+  Dropbear access. No UCI value, route, firewall rule, package, service,
+  DNS setting, or runtime process was changed by the inspection.
 HOST_NETWORK_INCIDENT_CAUSE: `UNCONFIRMED`
 HOST_NETWORK_SETTINGS_CHANGED_BY_THIS_WORK: `0`
 TEST_PROCESS_CLEANUP: `PASS`
