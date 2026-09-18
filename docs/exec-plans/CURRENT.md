@@ -49,6 +49,20 @@ IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable se
   semantic manifest is temporarily normalized in an isolated gate copy and
   restored byte-for-byte; the manifest itself is unchanged. No package or
   OpenKill service has been installed on the device yet.
+- Pre-install backup completed on the authorized target only. Protected host
+  directory: `D:\\openkill-device-backups\\20260918-preinstall-1619f31`; archive
+  SHA-256: `0E49D13E3ED57D944EA09E7D4EB17778AEB710DE73D034480071A181CE0A227C`.
+  The archive contains selected UCI/configuration and network baseline files;
+  Dropbear host private keys were excluded. BatchMode SSH was rechecked after
+  backup and PassWall remains enabled at the service layer with no OpenKill or
+  Mihomo process present.
+- The bounded implementation commit is `1619f315397d287cd0f7b8a8fd6ed6c7c0c22820`.
+  Branch `codex/openkill-device-validation` exists locally but has not reached
+  origin because this host has no GitHub write credential. Anonymous
+  `git ls-remote` works; `git push` with terminal prompts disabled returns
+  `could not read Username for 'https://github.com'`. Development CI and the RC
+  workflow therefore remain pending on the exact commit, and no device package
+  installation has been attempted.
 
 ## Local optimization phase (2026-09-18)
 
