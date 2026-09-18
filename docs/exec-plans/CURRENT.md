@@ -90,6 +90,10 @@ REAL_PACKET_PATH: `NOT_TESTED`
 - Device mutation record: only the dedicated public key was added for
   Dropbear access. No UCI value, route, firewall rule, package, service,
   DNS setting, or runtime process was changed by the inspection.
+- Capability preflight: the target has `dnsmasq-full` nftset support, fw4/nft,
+  `nft_tproxy`, `nft_socket`, `tun`, IPv4/IPv6 netfilter modules, curl/wget,
+  about 789 MB free overlay space and about 978 MB RAM. These are readiness
+  observations only; they do not prove OpenKill or Mihomo protocol behavior.
 HOST_NETWORK_INCIDENT_CAUSE: `UNCONFIRMED`
 HOST_NETWORK_SETTINGS_CHANGED_BY_THIS_WORK: `0`
 TEST_PROCESS_CLEANUP: `PASS`
