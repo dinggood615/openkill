@@ -416,7 +416,12 @@ def _stub_header(values: Mapping[str, Any], sandbox: str, *, node_apply: bool = 
         "iptables(){ record iptables \"$@\"; return 1; }",
         "ip6tables(){ record ip6tables \"$@\"; return 1; }",
         "ipset(){ record ipset \"$@\"; return 0; }",
-        "uci(){ record uci \"$@\"; case \"$*\" in *'dhcp.@dnsmasq[0].port'*) printf '%s' \"$DNSPORT\";; *get*|*show*) return 1;; esac; return 0; }",
+        # The production writer resolves one stable dnsmasq section before it
+        # reads the listener port.  Keep the legacy anonymous selector in the
+        # harness as a compatibility fixture, but make both paths return the
+        # same observed port so the DNS redirect contract is exercised rather
+        # than falling through to an empty synthetic value.
+        "uci(){ record uci \"$@\"; case \"$*\" in *'dhcp.@dnsmasq[0].port'*|*'.port'*) printf '%s' \"$DNSPORT\";; *get*|*show*) return 1;; esac; return 0; }",
         "ip(){ record ip \"$@\"; return 0; }",
         "fw4(){ record fw4 \"$@\"; return 0; }",
         "logger(){ record logger \"$@\"; return 0; }",
