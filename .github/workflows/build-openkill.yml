@@ -119,6 +119,12 @@ jobs:
           rm -rf package/luci-app-openkill
           cp -a "$GITHUB_WORKSPACE/luci-app-openkill" package/luci-app-openkill
 
+          # Initialize a missing SDK configuration before invoking any package
+          # target.  Without this, make can fall through to interactive
+          # menuconfig in the non-interactive runner.
+          [ -f .config ] || : > .config
+          make defconfig
+
           # Prime the host-side LuCI helper from the SDK before its package
           # metadata is scrubbed.  The package has no source compile step,
           # but its translation build needs po2lmo in the host staging tree.
@@ -128,8 +134,6 @@ jobs:
           # feed metadata once, then scrub every package/all-build selector
           # without running defconfig again; a second defconfig can restore
           # the SDK's full kernel/module graph.
-          [ -f .config ] || : > .config
-          make defconfig
           sed -i \
             -e '/^CONFIG_PACKAGE_[^=]*=/d' \
             -e '/^# CONFIG_PACKAGE_[^ ]* is not set$/d' \
