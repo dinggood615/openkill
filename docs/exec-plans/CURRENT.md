@@ -1,13 +1,13 @@
 # Current status
 
-CURRENT_HEAD: `f70dee5e479d6a1f92270f6eed6934e2e1ae5001` (observed master HEAD before this status update)
+CURRENT_HEAD: `9f18c7bd2e7ac3c5a13ebde27f318f9b71ba0e44` (observed master HEAD before this status update)
 VERSION: `2026-1129`
 CURRENT_PHASE: `REVIEW_FIX_LOCAL_GATE_RC_DEVICE_STAGE_A`
-CURRENT_STATUS: `Master-only implementation re-review and exact-commit CI are green; direct RC package build succeeds and its runner-compatible audit is being repaired before the authorized 192.168.1.103 device phase`
-BLOCKER: `NONE_FOR_LOCAL_SCOPE` — the direct package build produced a matching IPK, while the RC audit failed because the runner has no rg binary; device installation remains gated on a completed audited RC IPK
+CURRENT_STATUS: `Master-only implementation re-review, exact-commit CI and non-published RC package audit are green; authorized 192.168.1.103 device installation can begin`
+BLOCKER: `NONE_FOR_LOCAL_SCOPE` — device phase is authorized and gated only by the recorded backup/hash/recovery preflight; proxy-dependent DNS strict mode and RustDesk live behavior remain unverified
 DEVICE_STATE: `192.168.1.103` is Kwrt 25.12-SNAPSHOT x86/64 on VMware, dnsmasq 2.93 and firewall4 2025.03.17~b6e51575-r2 are present, PassWall is configured/enabled but its global runtime switch is `0` and no proxy listener is running; only read-only inspection and SSH public-key installation were performed
 DEVICE_RETRY_READY: `YES_WITH_RC_IPK` (SSH BatchMode key access is ready; install only after package hash, backup and rollback checks)
-NEXT_ACTION: `commit the runner-compatible RC audit, verify exact-commit Development CI, trigger the non-published RC IPK workflow from master, then begin the recorded device backup/install gate`
+NEXT_ACTION: `recheck SSH/disk/memory/PassWall state, verify the protected backup and candidate SHA256, install the audited RC IPK on 192.168.1.103, then perform staged bounded service/DNS/UI tests with rollback ready`
 RESULTING_HEAD: resolve with `git rev-parse HEAD` after this status-only update; this status records the pre-commit observation above
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
@@ -32,7 +32,7 @@ IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable se
   `/tmp/etc/openkill` cleanup as a false positive caused by an overly broad
   substring match. Logs are retained at `D:\\openkill-rc-build6.log` and
   `D:\\openkill-rc-build7.log`.
-- The pending bounded fixes replace only undeclared `rg` calls in the RC input,
+- The bounded fixes replace only undeclared `rg` calls in the RC input,
   package and sensitive-content audits with recursive POSIX/GNU `grep` using
   equivalent file filters, and make the maintainer-script check require a
   path boundary so `/tmp/etc/openkill` remains a permitted runtime cleanup.
@@ -43,10 +43,19 @@ IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable se
    adjustment accepts that runtime key or the current literal version and
    requires both CSS assets. The autonomous workflow test asserts that this RC
    workflow has no `rg` dependency.
-- Local evidence before committing this fix: workflow contract `10/10`,
+- Local evidence before the final RC: workflow contract `10/10`,
   optimization/DNS/UCI focused suites pass, `git diff --check` passes and the
   WSL `scripts/local-gate.sh` passes. The resulting commit and its exact
   Development CI run must be recorded after Git resolves the new HEAD.
+- Final candidate evidence: Development CI `35314707749` passed for exact
+  source commit `9f18c7bd2e7ac3c5a13ebde27f318f9b71ba0e44`; RC run
+  `35314832624` passed all steps and uploaded artifact `10535040172`. The
+  candidate is `luci-app-openkill_2026-1129_all.ipk`, 7,646,752 bytes, with
+  SHA-256 `7cd0010c b688a449 b9f6134c dba20c72 d84b8f75 074923e1 390dadfd
+  34961e99` (spaces are formatting only). The audit report confirms package
+  metadata, conffile preservation, maintainer-script path safety, stale
+  development-reference and sensitive-content checks. The package has not
+  yet been installed on the device.
 
 ## Re-review and local behavior hardening (2026-09-18)
 
