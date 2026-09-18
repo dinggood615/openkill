@@ -59,6 +59,7 @@ class AutonomousWorkflowTests(unittest.TestCase):
         self.assertIn("# CONFIG_USE_APK is not set", source)
         self.assertIn('make -C "$SDK_DIR/package/luci-app-openkill" TOPDIR="$SDK_DIR" CONFIG_USE_APK= compile V=s', source)
         self.assertNotIn('make -j"$(nproc)" package/luci-app-openkill/compile', source)
+        self.assertNotIn("rg -n", source)
 
     def test_formal_release_has_no_push_trigger_and_requires_gate(self):
         source = self.read(".github/workflows/compile_new_ipk.yml")

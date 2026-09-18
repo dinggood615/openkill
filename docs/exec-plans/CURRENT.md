@@ -1,13 +1,13 @@
 # Current status
 
-CURRENT_HEAD: `770fee5373d3adf53afacbf7d9a3421b4321a51f` (observed master HEAD before this status update)
+CURRENT_HEAD: `f70dee5e479d6a1f92270f6eed6934e2e1ae5001` (observed master HEAD before this status update)
 VERSION: `2026-1129`
 CURRENT_PHASE: `REVIEW_FIX_LOCAL_GATE_RC_DEVICE_STAGE_A`
-CURRENT_STATUS: `Master-only implementation re-review and exact-commit CI are green; RC dependency expansion is being bounded before the authorized 192.168.1.103 device phase`
-BLOCKER: `NONE_FOR_LOCAL_SCOPE` — the two RC attempts were canceled after SDK LLVM expansion; device installation remains gated on a bounded matching RC IPK
+CURRENT_STATUS: `Master-only implementation re-review and exact-commit CI are green; direct RC package build succeeds and its runner-compatible audit is being repaired before the authorized 192.168.1.103 device phase`
+BLOCKER: `NONE_FOR_LOCAL_SCOPE` — the direct package build produced a matching IPK, while the RC audit failed because the runner has no rg binary; device installation remains gated on a completed audited RC IPK
 DEVICE_STATE: `192.168.1.103` is Kwrt 25.12-SNAPSHOT x86/64 on VMware, dnsmasq 2.93 and firewall4 2025.03.17~b6e51575-r2 are present, PassWall is configured/enabled but its global runtime switch is `0` and no proxy listener is running; only read-only inspection and SSH public-key installation were performed
 DEVICE_RETRY_READY: `YES_WITH_RC_IPK` (SSH BatchMode key access is ready; install only after package hash, backup and rollback checks)
-NEXT_ACTION: `commit and verify the serial single-package RC workflow, trigger the non-published RC IPK workflow from master, then begin the recorded device backup/install gate`
+NEXT_ACTION: `commit the runner-compatible RC audit, verify exact-commit Development CI, trigger the non-published RC IPK workflow from master, then begin the recorded device backup/install gate`
 RESULTING_HEAD: resolve with `git rev-parse HEAD` after this status-only update; this status records the pre-commit observation above
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
@@ -16,6 +16,28 @@ DEVICE_INSTALL_AUTHORIZATION: `APPROVED_FOR_192.168.1.103_ONLY`
 DEVICE_INSTALL_SCOPE: `backup, upload/install matching RC IPK, bounded OpenKill config/service tests, limited DNS/outbound observations; preserve PassWall and do not change WAN/VMware`
 DEVICE_ROLLBACK_CONTRACT: `restore backed-up UCI/files, remove candidate package, restore service enable/runtime state, verify SSH; never use broad bypass or firewall reset`
 IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable section identity; legacy writer continuity; route-set IPv4/IPv6 atomicity and empty-set fail-closed behavior; Mihomo DNS parser/strict bootstrap; adblock DNS/core same-generation and allow/block priority; RustDesk scoped domains; status only after validate/apply`
+
+## RC audit runner compatibility (2026-09-18)
+
+- Observed master baseline before this status update is
+  `f70dee5e479d6a1f92270f6eed6934e2e1ae5001`. Development CI run
+  `35312752594` passed for that exact commit after the direct package Makefile
+  boundary was added; the package build itself no longer expands the full
+  kernel/module graph.
+- RC run `35312882508` completed the direct build and produced exactly one
+  `luci-app-openkill_2026-1129_all.ipk` under the SDK package feed, but its
+  audit step exited 127 because the GitHub runner image does not provide
+  `rg`. The complete log is retained at `D:\\openkill-rc-build6.log`.
+- The pending bounded fix replaces only undeclared `rg` calls in the RC input,
+  package and sensitive-content audits with recursive POSIX/GNU `grep` using
+  equivalent file filters. It does not weaken metadata, conffile, stale
+  reference, maintainer-script, CSS cache-buster or sensitive-content checks.
+  The autonomous workflow test now asserts that this RC workflow has no `rg`
+  dependency.
+- Local evidence before committing this fix: workflow contract `10/10`,
+  optimization/DNS/UCI focused suites pass, `git diff --check` passes and the
+  WSL `scripts/local-gate.sh` passes. The resulting commit and its exact
+  Development CI run must be recorded after Git resolves the new HEAD.
 
 ## Re-review and local behavior hardening (2026-09-18)
 
