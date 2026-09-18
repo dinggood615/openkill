@@ -5,8 +5,8 @@ VERSION: `2026-1129`
 CURRENT_PHASE: `REAL_DEVICE_STAGE_A_INSTALLED_STAGE_B_WAITING_FOR_CORE`
 CURRENT_STATUS: `Master-only implementation, exact-commit CI, RC audit and bounded device install/cleanup are green; packet-path and proxy-dependent device validation is waiting for a test Mihomo core/profile and RustDesk client evidence`
 BLOCKER: `REAL_DEVICE_GATE` — 192.168.1.103 has no Mihomo/Clash binary, usable profile or test proxy, and no RustDesk client/service details were supplied; do not infer strict DNS, region routing, adblock traffic coverage or RustDesk recovery from the fail-closed startup test
-DEVICE_STATE: `192.168.1.103` is Kwrt 25.12-SNAPSHOT x86/64 on VMware, dnsmasq 2.93 and firewall4 2025.03.17~b6e51575-r2 are present, PassWall is configured/enabled but its global runtime switch is `0` and no proxy listener is running; only read-only inspection and SSH public-key installation were performed
-DEVICE_RETRY_READY: `YES_WITH_RC_IPK` (SSH BatchMode key access is ready; install only after package hash, backup and rollback checks)
+DEVICE_STATE: `192.168.1.103` is Kwrt 25.12-SNAPSHOT x86/64 on VMware with dnsmasq 2.93 and firewall4 2025.03.17~b6e51575-r2; audited OpenKill 2026-1129 is installed, PassWall remains configured with global runtime switch `0`, and OpenKill is stopped/not enabled because no Mihomo core/profile is present
+DEVICE_RETRY_READY: `STAGE_A_COMPLETE_STAGE_B_WAITING_FOR_CORE_PROFILE` (SSH BatchMode, protected backup, candidate hash and rollback path are recorded)
 NEXT_ACTION: `obtain the minimum test core/profile and RustDesk failure-stage evidence, then run only the scoped Stage-B dual-stack/DNS/adblock/RustDesk checks; until then keep OpenKill stopped and continue local fixture validation`
 RESULTING_HEAD: resolve with `git rev-parse HEAD` after this status-only update; this status records the pre-commit observation above
 CENTRAL_ACTIVE: `NOT_APPROVED`
@@ -54,8 +54,9 @@ IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable se
   SHA-256 `7cd0010c b688a449 b9f6134c dba20c72 d84b8f75 074923e1 390dadfd
   34961e99` (spaces are formatting only). The audit report confirms package
   metadata, conffile preservation, maintainer-script path safety, stale
-  development-reference and sensitive-content checks. The package has not
-  yet been installed on the device.
+   development-reference and sensitive-content checks. The package was
+   subsequently installed on the authorized device in Stage A after a fresh
+   SSH/resource/backup recheck.
 
 ## Authorized device Stage A (2026-09-18)
 
