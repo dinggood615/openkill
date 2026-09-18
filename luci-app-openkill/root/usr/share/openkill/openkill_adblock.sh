@@ -14,7 +14,13 @@ provider_file="$provider_dir/openkill-anti-ad.yaml"
 DNSMASQ_SECTION="$(uci -q show dhcp 2>/dev/null | sed -n 's/^dhcp\.\([^.=]*\)=dnsmasq$/\1/p' | head -n 1)"
 [ -n "$DNSMASQ_SECTION" ] || DNSMASQ_SECTION="@dnsmasq[0]"
 DNSMASQ_UCI="dhcp.${DNSMASQ_SECTION}"
-conf_dir="$(uci -q get "$DNSMASQ_UCI.confdir" 2>/dev/null)"
+DEFAULT_DNSMASQ_CFGID="$(uci -q show "$DNSMASQ_UCI" | awk 'NR==1 {split($0, conf, /[.=]/); print conf[2]}')"
+if [ -f "/tmp/etc/dnsmasq.conf.$DEFAULT_DNSMASQ_CFGID" ]; then
+   conf_dir="$(awk -F '=' '/^conf-dir=/ {print $2}' "/tmp/etc/dnsmasq.conf.$DEFAULT_DNSMASQ_CFGID")"
+else
+   conf_dir=""
+fi
+[ -n "$conf_dir" ] || conf_dir="$(uci -q get "$DNSMASQ_UCI.confdir" 2>/dev/null)"
 [ -n "$conf_dir" ] || conf_dir=/tmp/dnsmasq.d
 conf_dir=${conf_dir%/}
 conf_file="$conf_dir/dnsmasq_openkill_adblock.conf"

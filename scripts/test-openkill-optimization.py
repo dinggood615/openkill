@@ -74,6 +74,7 @@ def main() -> int:
     assert "strict DNS privacy requires at least one selectable proxy group" in yml
     assert "provider_effective=1" in adblock and "source_sha256=" in adblock
     assert "provider_file=\"$provider_dir/openkill-anti-ad.yaml\"" in adblock
+    assert "DEFAULT_DNSMASQ_CFGID" in adblock and "dnsmasq.conf.$DEFAULT_DNSMASQ_CFGID" in adblock
     print("OPENKILL_OPTIMIZATION_TEST=PASS")
     return 0
 
