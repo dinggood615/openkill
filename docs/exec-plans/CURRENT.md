@@ -1,6 +1,6 @@
 # Current status
 
-CURRENT_HEAD: `556748e8fa0776ffac21a2399a5717852e77d395` (observed master HEAD after local optimization and device-preflight plan update)
+CURRENT_HEAD: `4b1e05c1f4ae6b66569b12e9e21fc1f21b78c79a` (observed master HEAD after the OpenWrt device-preflight evidence commit)
 VERSION: `2026-1129`
 CURRENT_PHASE: `DEVICE_PREFLIGHT_OPENWRT_192.168.1.103`
 CURRENT_STATUS: `SSH-key setup and read-only OpenWrt preflight completed; OpenKill runtime is not installed on the target`
@@ -8,6 +8,7 @@ BLOCKER: `OPENKILL_PACKAGE_NOT_PRESENT` — the approved target has no `/etc/ini
 DEVICE_STATE: `192.168.1.103` is Kwrt 25.12-SNAPSHOT x86/64 on VMware, dnsmasq 2.93 and firewall4 2025.03.17~b6e51575-r2 are present, PassWall is configured/enabled but its global runtime switch is `0` and no proxy listener is running; only read-only inspection and SSH public-key installation were performed
 DEVICE_RETRY_READY: `NO` (SSH is ready; OpenKill validation requires an authorized installation/restart step)
 NEXT_ACTION: `obtain explicit authorization and a matching OpenKill IPK for 192.168.1.103; then run a bounded pre-install compatibility check before any service/config mutation`
+RESULTING_HEAD: resolve with `git rev-parse HEAD` after the next status-only update; this status records the pre-commit observation above
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
 REAL_PACKET_PATH: `NOT_TESTED`
