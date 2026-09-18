@@ -19,11 +19,11 @@ dns_privacy_mode=$(uci_get_config "dns_privacy_mode" || echo split)
 case "$dns_privacy_mode" in split|strict) ;; *) dns_privacy_mode=split ;; esac
 adblock_mode=$(uci_get_config "adblock_mode" || echo off)
 case "$adblock_mode" in off|standard|enhanced) ;; *) adblock_mode=off ;; esac
-adblock_rule_url=$(uci_get_config "adblock_rule_url" || echo https://anti-ad.net/clash.yaml)
+adblock_rule_url=$(uci_get_config "adblock_rule_url" || echo https://anti-ad.net/anti-ad-domains.txt)
 adblock_rule_url=$(printf '%s' "$adblock_rule_url" | sed 's/[^A-Za-z0-9:/.?&=%+,-]//g')
-case "$adblock_rule_url" in https://*) ;; *) adblock_rule_url=https://anti-ad.net/clash.yaml ;; esac
+case "$adblock_rule_url" in https://*) ;; *) adblock_rule_url=https://anti-ad.net/anti-ad-domains.txt ;; esac
 adblock_rule_format=$(uci_get_config "adblock_rule_format" || echo yaml)
-case "$adblock_rule_format" in yaml|mrs) ;; *) adblock_rule_format=yaml ;; esac
+case "$adblock_rule_format" in yaml) ;; *) adblock_rule_format=yaml ;; esac
 rustdesk_compatibility=$(uci_get_config "rustdesk_compatibility" || echo 0)
 case "$rustdesk_compatibility" in 1) ;; *) rustdesk_compatibility=0 ;; esac
 : > /tmp/openkill_rustdesk_domains
@@ -980,7 +980,9 @@ begin
       # strict mode additionally sends the ordinary nameserver through rules.
       # proxy-server-nameserver is handled separately as the documented node
       # bootstrap exception needed to avoid a proxy/DNS deadlock.
-      encrypted_server = lambda { |server| server.to_s.match?(/\A(?:https?|tls|quic):\/\//i) }
+      # Plain http:// is transport-unencrypted and must never qualify for a
+      # privacy profile. h3:// is included because it is HTTPS over QUIC.
+      encrypted_server = lambda { |server| server.to_s.match?(/\A(?:https|tls|quic|h3):\/\//i) }
       if dns_privacy_mode == 'split' || dns_privacy_mode == 'strict'
          Value['dns']['nameserver'] = Value['dns']['nameserver'].to_a.select { |server| encrypted_server.call(server) }
          Value['dns']['nameserver'] = ['https://doh.pub/dns-query'] if Value['dns']['nameserver'].empty?
@@ -1003,10 +1005,27 @@ begin
          end
       end
       if dns_privacy_mode == 'strict'
-         Value['dns']['nameserver'] = Value['dns']['nameserver'].map do |server|
+         proxy_path = Array(Value['proxy-groups']).any? do |group|
+            next false unless group.is_a?(Hash)
+            Array(group['proxies']).any? { |target| !%w[DIRECT REJECT REJECT-DROP].include?(target.to_s) }
+         end
+         raise 'strict DNS privacy requires at least one selectable proxy group' unless proxy_path
+         has_rules_suffix = lambda { |server| server.to_s.match?(/#RULES(?:&|\z)/i) }
+         with_rules_suffix = lambda do |server|
             text = server.to_s
-            text.include?('#') ? text : text + '#RULES'
+            has_rules_suffix.call(text) ? text : (text.include?('#') ? text.sub('#', '#RULES&') : text + '#RULES')
+         end
+         Value['dns']['nameserver'] = Value['dns']['nameserver'].map do |server|
+            with_rules_suffix.call(server)
          end.uniq
+         if Value['dns']['direct-nameserver'].is_a?(Array)
+            Value['dns']['direct-nameserver'] = Value['dns']['direct-nameserver'].map { |server| with_rules_suffix.call(server) }.uniq
+         end
+         if Value['dns']['nameserver-policy'].is_a?(Hash)
+            Value['dns']['nameserver-policy'].each do |key, value|
+               Value['dns']['nameserver-policy'][key] = value.is_a?(Array) ? value.map { |server| with_rules_suffix.call(server) }.uniq : with_rules_suffix.call(value)
+            end
+         end
          Value['dns']['respect-rules'] = true
          YAML.LOG_TIP('Strict DNS privacy removed plain public resolvers; proxy-server-nameserver remains the node bootstrap exception.')
       end
@@ -1020,7 +1039,7 @@ begin
       if Value.dig('dns', 'fallback').is_a?(Array)
          Value['dns']['fallback'] = Value['dns']['fallback'].map do |server|
             text = server.to_s
-            text.include?('#') ? text : text + '#RULES'
+            text.match?(/#RULES(?:&|\z)/i) ? text : (text.include?('#') ? text.sub('#', '#RULES&') : text + '#RULES')
          end.uniq
          Value['dns']['fallback-lazy-query'] = true unless Value['dns'].key?('fallback-lazy-query')
       end
@@ -1072,6 +1091,7 @@ begin
    # user allows, while PASS only skips this provider and continues to the
    # normal policy chain.  It therefore never turns an allow-list entry into
    # an implicit DIRECT route.
+   adblock_ok = true
    begin
       rules = Value['rules'].is_a?(Array) ? Value['rules'] : []
       providers = Value['rule-providers'].is_a?(Hash) ? Value['rule-providers'] : {}
@@ -1092,31 +1112,37 @@ begin
       elsif rustdesk_compatibility == '1'
          YAML.LOG_WARN('RustDesk compatibility is enabled but no server domains are configured; no broad port bypass was created.')
       end
-      if '$adblock_mode' != 'off'
+      # openkill_adblock.sh creates one local YAML provider from the same
+      # canonical domain cache used by dnsmasq.  Do not let Mihomo download a
+      # second list with a different generation or a different allow policy.
+      if '$adblock_mode' != 'off' && File.file?('/etc/openkill/rule_provider/openkill-anti-ad.yaml')
          providers['openkill-anti-ad'] = {
-            'type' => 'http',
+            'type' => 'file',
             'behavior' => 'domain',
-            'format' => '$adblock_rule_format',
-            'interval' => 86400,
-            'url' => '$adblock_rule_url',
-            'path' => './rule_provider/openkill-anti-ad.' + '$adblock_rule_format'
+            'format' => 'yaml',
+            'path' => './rule_provider/openkill-anti-ad.yaml'
          }
          rules.unshift('RULE-SET,openkill-anti-ad,REJECT')
-         YAML.LOG_TIP('Adblock provider enabled with %s format; DNS and core filters use the same profile.' % ['$adblock_rule_format'])
+         YAML.LOG_TIP('Adblock provider enabled from the same canonical generation as dnsmasq.')
       end
-      rules.unshift(*adblock_allow.map { |domain| "DOMAIN-SUFFIX,#{domain},PASS" })
+      # Allow-list domains are removed from the managed provider itself. A
+      # top-level PASS would continue into later rules and could still hit a
+      # subscription REJECT, so never emit a misleading PASS rule here.
       rules.unshift(*adblock_block.map { |domain| "DOMAIN-SUFFIX,#{domain},REJECT" })
       rules.uniq!
       Value['rules'] = rules
       Value['rule-providers'] = providers
    rescue Exception => e
+      adblock_ok = false
       YAML.LOG_ERROR('Set Adblock Rules Failed,【%s】' % [e.message])
    end
-   write_config = true
+   write_config = adblock_ok
    rescue Exception => e
+      write_config = false
       YAML.LOG_ERROR('Config File params checked Failed,【%s】' % [e.message])
    end
 rescue Exception => e
+   write_config = false
    YAML.LOG_ERROR('Config File Overwrite Failed,【%s】' % [e.message])
 ensure
    if write_config && defined?(Value) && Value.is_a?(Hash)

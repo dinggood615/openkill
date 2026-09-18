@@ -1,17 +1,54 @@
 # Current status
 
-CURRENT_HEAD: `4b1e05c1f4ae6b66569b12e9e21fc1f21b78c79a` (observed master HEAD after the OpenWrt device-preflight evidence commit)
+CURRENT_HEAD: `d481e444f87aa842a8893da81801ed71438d9689` (observed master HEAD before the bounded implementation re-review)
 VERSION: `2026-1129`
-CURRENT_PHASE: `DEVICE_PREFLIGHT_OPENWRT_192.168.1.103`
-CURRENT_STATUS: `SSH-key setup and read-only OpenWrt preflight completed; OpenKill runtime is not installed on the target`
-BLOCKER: `OPENKILL_PACKAGE_NOT_PRESENT` — the approved target has no `/etc/init.d/openkill`, `/etc/config/openkill`, Mihomo, or Clash binary; installation requires a separately authorized package step and a candidate IPK
+CURRENT_PHASE: `REVIEW_FIX_LOCAL_GATE_RC_DEVICE_STAGE_A`
+CURRENT_STATUS: `The user has now authorized bounded candidate installation and staged tests on 192.168.1.103; implementation re-review and exact-commit local delivery are in progress`
+BLOCKER: `NONE_FOR_LOCAL_SCOPE` — device installation remains gated on an exact-commit Development CI result and a matching RC IPK
 DEVICE_STATE: `192.168.1.103` is Kwrt 25.12-SNAPSHOT x86/64 on VMware, dnsmasq 2.93 and firewall4 2025.03.17~b6e51575-r2 are present, PassWall is configured/enabled but its global runtime switch is `0` and no proxy listener is running; only read-only inspection and SSH public-key installation were performed
-DEVICE_RETRY_READY: `NO` (SSH is ready; OpenKill validation requires an authorized installation/restart step)
-NEXT_ACTION: `obtain explicit authorization and a matching OpenKill IPK for 192.168.1.103; then run a bounded pre-install compatibility check before any service/config mutation`
+DEVICE_RETRY_READY: `YES_WITH_RC_IPK` (SSH BatchMode key access is ready; install only after package hash, backup and rollback checks)
+NEXT_ACTION: `re-review and repair the route-set/DNS/adblock contracts, run local behavior gates, push the exact commit for Development CI, then build and verify a non-published RC IPK`
 RESULTING_HEAD: resolve with `git rev-parse HEAD` after the next status-only update; this status records the pre-commit observation above
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
 REAL_PACKET_PATH: `NOT_TESTED`
+DEVICE_INSTALL_AUTHORIZATION: `APPROVED_FOR_192.168.1.103_ONLY`
+DEVICE_INSTALL_SCOPE: `backup, upload/install matching RC IPK, bounded OpenKill config/service tests, limited DNS/outbound observations; preserve PassWall and do not change WAN/VMware`
+DEVICE_ROLLBACK_CONTRACT: `restore backed-up UCI/files, remove candidate package, restore service enable/runtime state, verify SSH; never use broad bypass or firewall reset`
+IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable section identity; legacy writer continuity; route-set IPv4/IPv6 atomicity and empty-set fail-closed behavior; Mihomo DNS parser/strict bootstrap; adblock DNS/core same-generation and allow/block priority; RustDesk scoped domains; status only after validate/apply`
+
+## Re-review and local behavior hardening (2026-09-18)
+
+- Re-reviewed the actual `d481e444f87aa842a8893da81801ed71438d9689` source rather
+  than relying on the earlier `b3fa5b6` report baseline. The nft and legacy
+  region paths had separate flushes before loading the next set, and the nft
+  path used hard-coded `/etc/openkill` files even when small-flash mode selected
+  `/tmp`. Both are repaired. Existing sets now receive one checked nft batch or
+  one ipset restore stream; a failed update returns an error without replacing
+  an existing valid set. The initial missing-set case still fails closed.
+- The adblock path now canonicalizes anti-AD text/Clash YAML domain payloads
+  once, writes one local YAML rule-provider and one dnsmasq fragment from that
+  generation, and records a source SHA-256 in `/tmp/openkill-adblock.state`.
+  Allow-list domains are removed before both outputs are generated; user block
+  entries are inserted before the provider. A misleading Mihomo `PASS` rule and
+  the independent remote provider download were removed. MRS is not exposed as
+  an effective format until the target core binary-provider ABI is verified.
+- Strict DNS now rejects `http://`, appends `#RULES` by structured suffix
+  handling, applies the rule suffix to direct/policy resolvers, and aborts YAML
+  replacement when no selectable proxy group exists. DNS bootstrap remains the
+  documented direct node-resolution exception; no ordinary failure path adds
+  WAN DNS or silently downgrades to plaintext.
+- Added `scripts/test-openkill-optimization.py`, covering atomic update wiring,
+  allow/provider semantics, strict-DNS guards and exact route validator fixtures
+  for IPv4 `0/8/32`, IPv6 `::/0` and `/128`, malformed octets, and repeated
+  compression. The validator fixtures pass under WSL and BusyBox `awk` on the
+  authorized target (`busybox_v4=0 busybox_v6=0 bad4=1 bad6=1`). Changed
+  production scripts also pass target `sh -n`.
+- Focused UI/classifier suites remain green (`23/23`, `1/1`, `17/17`). The
+  local policy gate passes after the repository's pre-existing CRLF typed
+  semantic manifest is temporarily normalized in an isolated gate copy and
+  restored byte-for-byte; the manifest itself is unchanged. No package or
+  OpenKill service has been installed on the device yet.
 
 ## Local optimization phase (2026-09-18)
 

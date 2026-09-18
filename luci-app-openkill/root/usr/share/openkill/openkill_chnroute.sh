@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 . /usr/share/openkill/openkill_ps.sh
 . /usr/share/openkill/log.sh
 . /usr/share/openkill/openkill_curl.sh

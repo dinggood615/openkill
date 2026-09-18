@@ -27,7 +27,10 @@ case "$dns_privacy_mode" in split|strict) ;; *) uci -q set openkill.config.dns_p
 adblock_mode="$(uci -q get openkill.config.adblock_mode 2>/dev/null || true)"
 case "$adblock_mode" in off|standard|enhanced) ;; *) uci -q set openkill.config.adblock_mode=off; changed=1 ;; esac
 adblock_rule_format="$(uci -q get openkill.config.adblock_rule_format 2>/dev/null || true)"
-case "$adblock_rule_format" in yaml|mrs) ;; *) uci -q set openkill.config.adblock_rule_format=yaml; changed=1 ;; esac
+# The local same-generation provider is emitted as YAML. MRS remains a
+# documented future capability until the target core's binary-provider ABI is
+# verified; silently accepting it would create an option that is not effective.
+case "$adblock_rule_format" in yaml) ;; *) uci -q set openkill.config.adblock_rule_format=yaml; changed=1 ;; esac
 adblock_interval="$(uci -q get openkill.config.adblock_update_interval 2>/dev/null || true)"
 case "$adblock_interval" in ''|*[!0-9]*|0) uci -q set openkill.config.adblock_update_interval=86400; changed=1 ;; esac
 rustdesk_compatibility="$(uci -q get openkill.config.rustdesk_compatibility 2>/dev/null || true)"

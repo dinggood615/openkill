@@ -36,9 +36,9 @@ config openkill 'config'
 	option dns_privacy_mode 'split'
 	# Ad blocking is independent from DNS privacy and proxy routing.  The
 	# standard profile uses anti-AD domain filtering plus a Mihomo rule provider;
-	# enhanced permits a verified Mihomo MRS source or stricter user blocks.
+	# Both modes use one validated canonical domain generation for dnsmasq and Mihomo.
 	option adblock_mode 'off'
-	option adblock_rule_url 'https://anti-ad.net/clash.yaml'
+	option adblock_rule_url 'https://anti-ad.net/anti-ad-domains.txt'
 	option adblock_rule_format 'yaml'
 	option adblock_dns_url 'https://anti-ad.net/anti-ad-domains.txt'
 	option adblock_update_interval '86400'

@@ -217,6 +217,99 @@ render_nft_pass_set() {
    } > "$output"
    rm -f "$source_file" "$element_file"
 }
+
+# Apply a generated nft set without exposing a flush-then-load window.  When
+# the set already exists, nft receives one transaction containing the flush
+# and all elements; a parse or kernel failure therefore leaves the old set in
+# place.  A missing set is created from its complete definition in one
+# checked transaction.  The same helper is used for region and pass sets so
+# IPv4 and IPv6 have identical failure semantics.
+apply_nft_set_file() {
+   local family set_name source batch
+   family="$1"; set_name="$2"; source="$3"
+   [ -r "$source" ] || return 1
+   if nft list set inet fw4 "$set_name" >/dev/null 2>&1; then
+      batch="/tmp/openkill-${set_name}.batch.$$"
+      {
+         printf 'flush set inet fw4 %s\n' "$set_name"
+         awk -v set_name="$set_name" '
+            $0 ~ "^define " set_name " = \\{" { inside=1; next }
+            inside && /^}/ { inside=0; next }
+            inside {
+               gsub(/[[:space:],]/, "", $0)
+               if ($0 != "") printf "add element inet fw4 %s { %s }\n", set_name, $0
+            }
+         ' "$source"
+      } > "$batch" || { rm -f "$batch"; return 1; }
+      nft -c -f "$batch" >/dev/null 2>&1 && nft -f "$batch" >/dev/null 2>&1
+      local rc=$?
+      rm -f "$batch"
+      return "$rc"
+   fi
+   nft -c -f "$source" >/dev/null 2>&1 && nft -f "$source" >/dev/null 2>&1
+}
+
+# ipset restore is transactional only when the flush and additions are part
+# of the same restore stream.  Keep the old set until the complete stream is
+# accepted; never issue a standalone flush before reading a route file.
+apply_ipset_route_file() {
+   local set_name source batch family
+   set_name="$1"; source="$2"
+   [ -r "$source" ] || return 1
+   if grep -q 'family inet6' "$source" 2>/dev/null; then family=inet6; else family=inet; fi
+   ipset -exist create "$set_name" hash:net family "$family" hashsize 1024 maxelem 1000000 || return 1
+   batch="/tmp/openkill-${set_name}.restore.$$"
+   {
+      printf 'flush %s\n' "$set_name"
+      sed '/^[[:space:]]*create[[:space:]]/d' "$source"
+   } > "$batch" || { rm -f "$batch"; return 1; }
+   ipset restore < "$batch"
+   local rc=$?
+   rm -f "$batch"
+   return "$rc"
+}
+
+render_ipset_pass_file() {
+   local family set_name custom_file output source
+   family="$1"; set_name="$2"; custom_file="$3"; output="$4"
+   source="${output}.source.$$"
+   : > "$source" || return 1
+   [ -f "$custom_file" ] && cat "$custom_file" >> "$source"
+   if [ "$family" = 4 ]; then
+      printf '%s\n' $(uci_get_config china_ip_route_pass) >> "$source"
+      {
+         printf 'create %s hash:net family inet hashsize 1024 maxelem 1000000\n' "$set_name"
+         awk '
+            !/^([[:space:]]*#|[[:space:]]*$)/ {
+               gsub(/[[:space:]]/, "", $0); n=split($0,cidr,"/"); valid=(n<=2)
+               octets=split(cidr[1],part,"."); if (octets != 4) valid=0
+               for (i=1;i<=4;i++) if (part[i] !~ /^[0-9]+$/ || part[i] > 255) valid=0
+               if (n==2 && (cidr[2] !~ /^[0-9]+$/ || cidr[2] > 32)) valid=0
+               if (valid) print "add " set_name " " $0
+            }
+         ' "$source"
+      } > "$output"
+   else
+      printf '%s\n' $(uci_get_config china_ip6_route_pass) >> "$source"
+      {
+         printf 'create %s hash:net family inet6 hashsize 1024 maxelem 1000000\n' "$set_name"
+         awk -v set_name="$set_name" '
+            !/^([[:space:]]*#|[[:space:]]*$)/ {
+               gsub(/[[:space:]]/, "", $0); n=split($0,cidr,"/"); ip=cidr[1]
+               valid=(n<=2 && index(ip,":")>0 && ip ~ /^[0-9A-Fa-f:]+$/)
+               if (n==2 && (cidr[2] !~ /^[0-9]+$/ || cidr[2] > 128)) valid=0
+               marker=ip; dc=gsub(/::/,"X",marker)
+               if (dc>1 || (dc==0 && gsub(/:/,":",ip)!=7)) valid=0
+               if (dc==0) { groups=split(ip,part,":"); if (groups!=8) valid=0; for(i=1;i<=groups;i++) if(part[i] !~ /^[0-9A-Fa-f]{1,4}$/) valid=0 }
+               else { compressed=ip; gsub(/::/,":X:",compressed); groups=split(compressed,part,":"); nonempty=0; for(i=1;i<=groups;i++) if(part[i]!="" && part[i]!="X") { if(part[i] !~ /^[0-9A-Fa-f]{1,4}$/) valid=0; nonempty++ } if(nonempty>=8) valid=0 }
+               if (valid) print "add " set_name " " $0
+            }
+         ' "$source"
+      } > "$output"
+   fi
+   rm -f "$source"
+}
+
 change_dnsmasq() {
    if ! /etc/init.d/dnsmasq enabled; then
       return
@@ -1881,20 +1974,18 @@ if [ -n "$FW4" ]; then
 
    #china ip route
    if [ "$china_ip_route" != "0" ] || [ "$disable_udp_quic" = "1" ]; then
-      nft 'flush set inet fw4 china_ip_route'
-      nft -f '/etc/openkill/china_ip_route.ipset'
-      CHNROUTE_WAIT=0
-      while ( [ -z "$(nft list sets |grep "set china_ip_route {")" ] && [ "$CHNROUTE_WAIT" -le 3 ] )
-      do
-         sleep 3
-         nft -f '/etc/openkill/china_ip_route.ipset'
-         let CHNROUTE_WAIT++
-      done
+      apply_nft_set_file 4 china_ip_route "$route4_file" || {
+         LOG_ERROR "Unable to apply the IPv4 region set atomically; keeping the previous set."
+         return 1
+      }
 
       if [ "$enable_redirect_dns" != "2" ]; then
          render_nft_pass_set 4 china_ip_route_pass /etc/openkill/custom/openkill_custom_chnroute_pass.list /tmp/openkill_china_ip_route_pass.list china_ip_route_pass
-         nft 'flush set inet fw4 china_ip_route_pass'
-         nft -f '/tmp/openkill_china_ip_route_pass.list'
+         apply_nft_set_file 4 china_ip_route_pass /tmp/openkill_china_ip_route_pass.list || {
+            rm -f /tmp/openkill_china_ip_route_pass.list
+            LOG_ERROR "Unable to apply the IPv4 pass set atomically; keeping the previous set."
+            return 1
+         }
          rm -rf /tmp/openkill_china_ip_route_pass.list
       fi
    fi
@@ -2374,20 +2465,18 @@ if [ -n "$FW4" ]; then
    if [ "$ipv6_enable" -eq 1 ]; then
       #china ip route
       if [ "$china_ip6_route" != "0" ] || [ "$disable_udp_quic" = "1" ]; then
-         nft 'flush set inet fw4 china_ip6_route'
-         nft -f '/etc/openkill/china_ip6_route.ipset'
-         CHNROUTE_WAIT=0
-         while ( [ -z "$(nft list sets |grep "set china_ip6_route {")" ] && [ "$CHNROUTE_WAIT" -le 3 ] )
-         do
-            sleep 3
-            nft -f '/etc/openkill/china_ip6_route.ipset'
-            let CHNROUTE_WAIT++
-         done
+         apply_nft_set_file 6 china_ip6_route "$route6_file" || {
+            LOG_ERROR "Unable to apply the IPv6 region set atomically; keeping the previous set."
+            return 1
+         }
 
          if [ "$enable_redirect_dns" != "2" ]; then
             render_nft_pass_set 6 china_ip6_route_pass /etc/openkill/custom/openkill_custom_chnroute6_pass.list /tmp/openkill_china_ip6_route_pass.list china_ip6_route_pass
-            nft 'flush set inet fw4 china_ip6_route_pass'
-            nft -f '/tmp/openkill_china_ip6_route_pass.list'
+            apply_nft_set_file 6 china_ip6_route_pass /tmp/openkill_china_ip6_route_pass.list || {
+               rm -f /tmp/openkill_china_ip6_route_pass.list
+               LOG_ERROR "Unable to apply the IPv6 pass set atomically; keeping the previous set."
+               return 1
+            }
             rm -rf /tmp/openkill_china_ip6_route_pass.list
          fi
       fi
@@ -2770,18 +2859,11 @@ if [ -z "$FW4" ]; then
 
    #china ip route
    if [ "$china_ip_route" != "0" ] || [ "$disable_udp_quic" = "1" ]; then
-      ipset -! flush china_ip_route
-      ipset -! restore </etc/openkill/china_ip_route.ipset
+      apply_ipset_route_file china_ip_route "$route4_file" || return 1
 
       if [ "$enable_redirect_dns" != "2" ]; then
-         echo "create china_ip_route_pass hash:net family inet hashsize 1024 maxelem 1000000" >/tmp/openkill_china_ip_route_pass.list
-         awk '!/^$/&&!/^#/&&/(^([1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.)(([0-9]{1,2}|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){2}([1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])((\/[0-9][0-9])?)$/{printf("add china_ip_route_pass %s'" "'\n",$0)}' /etc/openkill/custom/openkill_custom_chnroute_pass.list >>/tmp/openkill_china_ip_route_pass.list
-         for ip in $(uci_get_config "china_ip_route_pass"); do
-            [ -z "$ip" ] && continue
-            echo "$ip" | awk '!/^$/&&!/^#/&&/(^([1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.)(([0-9]{1,2}|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){2}([1-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-4])((\/[0-9][0-9])?)$/{printf("add china_ip_route_pass %s'" "'\n",$0)}'
-         done >>/tmp/openkill_china_ip_route_pass.list 2>/dev/null
-         ipset -! flush china_ip_route_pass
-         ipset -! restore </tmp/openkill_china_ip_route_pass.list
+         render_ipset_pass_file 4 china_ip_route_pass /etc/openkill/custom/openkill_custom_chnroute_pass.list /tmp/openkill_china_ip_route_pass.list || return 1
+         apply_ipset_route_file china_ip_route_pass /tmp/openkill_china_ip_route_pass.list || { rm -f /tmp/openkill_china_ip_route_pass.list; return 1; }
          rm -rf /tmp/openkill_china_ip_route_pass.list
       fi
    fi
@@ -3236,17 +3318,10 @@ if [ -z "$FW4" ]; then
    if [ "$ipv6_enable" -eq 1 ] && [ -n "$(ip6tables -t mangle -L 2>&1 | grep -o 'Chain')" ]; then
       #china ip route
       if [ "$china_ip6_route" != "0" ] || [ "$disable_udp_quic" = "1" ]; then
-         ipset -! flush china_ip6_route
-         ipset -! restore </etc/openkill/china_ip6_route.ipset
+         apply_ipset_route_file china_ip6_route "$route6_file" || return 1
          if [ "$enable_redirect_dns" != "2" ]; then
-            echo "create china_ip6_route_pass hash:net family inet6 hashsize 1024 maxelem 1000000" >/tmp/openkill_china_ip6_route_pass.list
-            awk '!/^$/&&!/^#/&&!/([0-9a-zA-Z-]{1,}\.)+([a-zA-Z]{2,})/{printf("add china_ip6_route_pass %s'" "'\n",$0)}' /etc/openkill/custom/openkill_custom_chnroute6_pass.list >>/tmp/openkill_china_ip6_route_pass.list
-            for ip in $(uci_get_config "china_ip6_route_pass"); do
-               [ -z "$ip" ] && continue
-               echo "$ip" | awk '!/^$/&&!/^#/&&!/([0-9a-zA-Z-]{1,}\.)+([a-zA-Z]{2,})/{printf("add china_ip6_route_pass %s'" "'\n",$0)}'
-            done >>/tmp/openkill_china_ip6_route_pass.list 2>/dev/null
-            ipset -! flush china_ip6_route_pass
-            ipset -! restore </tmp/openkill_china_ip6_route_pass.list
+            render_ipset_pass_file 6 china_ip6_route_pass /etc/openkill/custom/openkill_custom_chnroute6_pass.list /tmp/openkill_china_ip6_route_pass.list || return 1
+            apply_ipset_route_file china_ip6_route_pass /tmp/openkill_china_ip6_route_pass.list || { rm -f /tmp/openkill_china_ip6_route_pass.list; return 1; }
             rm -rf /tmp/openkill_china_ip6_route_pass.list
          fi
       fi

@@ -320,20 +320,19 @@ o:depends{enable_redirect_dns = "1", enable_custom_domain_dns_server = "1"}
 o = s:taboption("dns", ListValue, "adblock_mode", "广告屏蔽档位")
 o:value("off", "关闭（保留 DNS 隐私与代理策略）")
 o:value("standard", "标准（推荐，anti-AD 域名规则）")
-o:value("enhanced", "增强（核心规则/MRS，误拦风险更高）")
+o:value("enhanced", "增强（同源核心规则，用户阻止更严格）")
 o.default = "off"
 o.rmempty = false
-o.description = "标准档已同时覆盖受控 DNS 与 Mihomo 连接路径；增强档允许使用官方 Mihomo MRS 或更严格的用户阻止列表，主要改善核心加载效率并提高拦截强度，不自动叠加重复大列表。硬编码 IP、自建 DoH、第一方共域名广告和 HTTPS 内容不会被此功能完整识别。"
+o.description = "两个档位都使用同一份经校验的 anti-AD 域名生成 DNS 与 Mihomo 规则；增强档只提高用户阻止策略的显示级别，不宣称额外来源或重复下载。硬编码 IP、自建 DoH、第一方共域名广告和 HTTPS 内容不会被此功能完整识别。"
 
 o = s:taboption("dns", Value, "adblock_rule_url", "广告规则源")
-o.default = "https://anti-ad.net/clash.yaml"
-o.description = "只接受 HTTPS。默认使用 anti-AD 原生 Mihomo/Clash YAML；若改用 MRS，必须确认来源实际提供 MRS 二进制。下载失败保留最后有效版本。"
+o.default = "https://anti-ad.net/anti-ad-domains.txt"
+o.description = "只接受 HTTPS。建议使用 anti-AD 域名列表；系统会把它规范化为 dnsmasq 与 Mihomo 共用的本地 YAML。下载失败保留最后有效版本。"
 o:depends("adblock_mode", "standard")
 o:depends("adblock_mode", "enhanced")
 
 o = s:taboption("dns", ListValue, "adblock_rule_format", "规则源格式")
 o:value("yaml", "YAML（anti-AD 默认）")
-o:value("mrs", "MRS（二进制来源）")
 o.default = "yaml"
 o:depends("adblock_mode", "standard")
 o:depends("adblock_mode", "enhanced")
