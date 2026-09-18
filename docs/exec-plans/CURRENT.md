@@ -1,13 +1,13 @@
 # Current status
 
-CURRENT_HEAD: `c7d9d7a5a0999a720df167f27acf8bb51aee16c7` (observed master HEAD before this main-branch status update)
+CURRENT_HEAD: `f65d4267d9ae0bbfe7aa046dc02d91b8ca2117f2` (observed master HEAD before this status update)
 VERSION: `2026-1129`
 CURRENT_PHASE: `REVIEW_FIX_LOCAL_GATE_RC_DEVICE_STAGE_A`
-CURRENT_STATUS: `The user has now authorized bounded candidate installation and staged tests on 192.168.1.103; implementation re-review and exact-commit local delivery are in progress`
+CURRENT_STATUS: `Master-only implementation re-review and exact-commit CI are green; candidate packaging and the authorized 192.168.1.103 device phase are next`
 BLOCKER: `NONE_FOR_LOCAL_SCOPE` — device installation remains gated on an exact-commit Development CI result and a matching RC IPK
 DEVICE_STATE: `192.168.1.103` is Kwrt 25.12-SNAPSHOT x86/64 on VMware, dnsmasq 2.93 and firewall4 2025.03.17~b6e51575-r2 are present, PassWall is configured/enabled but its global runtime switch is `0` and no proxy listener is running; only read-only inspection and SSH public-key installation were performed
 DEVICE_RETRY_READY: `YES_WITH_RC_IPK` (SSH BatchMode key access is ready; install only after package hash, backup and rollback checks)
-NEXT_ACTION: `verify Development CI for c7d9d7a, then trigger the non-published RC IPK workflow from master`
+NEXT_ACTION: `trigger the non-published RC IPK workflow from master, verify the artifact, then begin the recorded device backup/install gate`
 RESULTING_HEAD: resolve with `git rev-parse HEAD` after this status-only update; this status records the pre-commit observation above
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
@@ -61,11 +61,27 @@ IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable se
   Mihomo process present.
 - The bounded implementation commits are `1619f315397d287cd0f7b8a8fd6ed6c7c0c22820`,
   `f3409c644e7053db4de53b2578f74f691fe8f939`, and the documentation status
-  commit `c7d9d7a5a0999a720df167f27acf8bb51aee16c7`. They are now fast-forwarded
-  and pushed to `origin/master`; the disposable validation branch is not used
-  for CI or package construction. Development CI #108 is running for exact
-  commit `c7d9d7a`, and the RC workflow remains gated on its result. No device
-  package installation has been attempted.
+  commits through `f883b70a5eff618168e1bb5aac4169435f7ddc65`. The disposable
+  `codex/openkill-device-validation` branch was deleted locally and remotely;
+  all delivery now uses `master`. Development CI run `35308100055` passed for
+  exact commit `f65d4267d9ae0bbfe7aa046dc02d91b8ca2117f2`: static, v1.19.30,
+  and latest compatibility jobs all succeeded. No device package installation
+  has been attempted.
+
+## Exact-commit DNS contract repair (2026-09-18)
+
+- The first CI run for `f883b70` failed only in the static DNS contract suite.
+  The production code had already moved to a stable `DNSMASQ_UCI` section and
+  separate dnsmasq listener port, while the shadow UCI stub and lifecycle tests
+  still asserted anonymous `@dnsmasq[0]` selectors and an old redirect
+  placeholder. The fixture now models both selectors but returns the stable
+  listener, and the source contracts assert the stable section variable.
+- Local evidence after the repair: DNS intent `10/10`, UCI lifecycle `18/18`,
+  optimization `PASS`, changed-script BusyBox/POSIX syntax checks, isolated
+  LF local-gate `PASS`, and the full Development CI matrix `PASS` on
+  `f65d4267d9ae0bbfe7aa046dc02d91b8ca2117f2`.
+- This repair changes tests and the record-only harness only; production DNS
+  ownership, stable-section mapping, and listener split are unchanged.
 
 ## Local optimization phase (2026-09-18)
 
