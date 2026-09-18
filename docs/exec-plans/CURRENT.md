@@ -2,12 +2,12 @@
 
 CURRENT_HEAD: `9f18c7bd2e7ac3c5a13ebde27f318f9b71ba0e44` (observed master HEAD before this status update)
 VERSION: `2026-1129`
-CURRENT_PHASE: `REVIEW_FIX_LOCAL_GATE_RC_DEVICE_STAGE_A`
-CURRENT_STATUS: `Master-only implementation re-review, exact-commit CI and non-published RC package audit are green; authorized 192.168.1.103 device installation can begin`
-BLOCKER: `NONE_FOR_LOCAL_SCOPE` — device phase is authorized and gated only by the recorded backup/hash/recovery preflight; proxy-dependent DNS strict mode and RustDesk live behavior remain unverified
+CURRENT_PHASE: `REAL_DEVICE_STAGE_A_INSTALLED_STAGE_B_WAITING_FOR_CORE`
+CURRENT_STATUS: `Master-only implementation, exact-commit CI, RC audit and bounded device install/cleanup are green; packet-path and proxy-dependent device validation is waiting for a test Mihomo core/profile and RustDesk client evidence`
+BLOCKER: `REAL_DEVICE_GATE` — 192.168.1.103 has no Mihomo/Clash binary, usable profile or test proxy, and no RustDesk client/service details were supplied; do not infer strict DNS, region routing, adblock traffic coverage or RustDesk recovery from the fail-closed startup test
 DEVICE_STATE: `192.168.1.103` is Kwrt 25.12-SNAPSHOT x86/64 on VMware, dnsmasq 2.93 and firewall4 2025.03.17~b6e51575-r2 are present, PassWall is configured/enabled but its global runtime switch is `0` and no proxy listener is running; only read-only inspection and SSH public-key installation were performed
 DEVICE_RETRY_READY: `YES_WITH_RC_IPK` (SSH BatchMode key access is ready; install only after package hash, backup and rollback checks)
-NEXT_ACTION: `recheck SSH/disk/memory/PassWall state, verify the protected backup and candidate SHA256, install the audited RC IPK on 192.168.1.103, then perform staged bounded service/DNS/UI tests with rollback ready`
+NEXT_ACTION: `obtain the minimum test core/profile and RustDesk failure-stage evidence, then run only the scoped Stage-B dual-stack/DNS/adblock/RustDesk checks; until then keep OpenKill stopped and continue local fixture validation`
 RESULTING_HEAD: resolve with `git rev-parse HEAD` after this status-only update; this status records the pre-commit observation above
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
@@ -56,6 +56,45 @@ IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable se
   metadata, conffile preservation, maintainer-script path safety, stale
   development-reference and sensitive-content checks. The package has not
   yet been installed on the device.
+
+## Authorized device Stage A (2026-09-18)
+
+- The protected pre-install archive remains at
+  `D:\\openkill-device-backups\\20260918-preinstall-1619f31\\device-backup.tar.gz`
+  with SHA-256
+  `0E49D13E3ED57D944EA09E7D4EB17778AEB710DE73D034480071A181CE0A227C`.
+  SSH BatchMode access through `openkill-103` was rechecked before mutation.
+- Pre-install readiness was reconfirmed: Kwrt `25.12-SNAPSHOT` x86_64,
+  overlay about 789 MB free, available memory about 700 MB, PassWall global
+  switch `0`, no OpenKill/Mihomo/Clash process or rule, and the stock dnsmasq
+  listener on the LAN/WAN/IPv6 addresses. The candidate uploaded to `/tmp`
+  matched the RC SHA-256 before installation.
+- Standard `opkg install` completed for the candidate and its declared missing
+  Ruby dependencies (`ruby`, `ruby-yaml`, `ruby-digest` and related packages)
+  without force flags. The installed package reports version `2026-1129` and
+  the candidate conffile hash. The install used about 25 MB of overlay space;
+  the previous `passwall`, `dhcp`, `firewall` and `network` UCI file hashes are
+  unchanged from the protected backup, and PassWall remains at `enabled=0`.
+- Device shell syntax validation passed for `/etc/init.d/openkill` and all
+  installed `/usr/share/openkill/*.sh` files. The capability probe reports
+  `core=0` and all Mihomo protocol capabilities `unknown`; the bundled
+  `oc-cn-domain.mrs` is present at 556,732 bytes. These are packaging and
+  parser-readiness checks only.
+- A bounded start/stop test showed the service does not claim to be running:
+  the asynchronous start returned before the service reported `running`, the
+  log recorded `Config Not Found` because no Mihomo profile/core exists, and
+  the normal stop removed its transient service state. After cleanup there is
+  no OpenKill/Mihomo/TProxy nft or `ip rule` state, dnsmasq still owns the
+  stock port 53 listeners, and the OpenKill init service is not enabled at
+  boot. This is a verified fail-closed startup result, not a connectivity
+  recovery claim.
+- Device configuration still has the package defaults (`adblock_mode=off`,
+  `rustdesk_compatibility=0`, `ipv6_dns=1`). Adblock query behavior, DNS
+  privacy egress, IPv4/IPv6 region decisions, and RustDesk signaling/P2P/
+  relay behavior are **not verified** because no core/profile, test proxy or
+  client evidence is present. Rollback remains: stop/disable OpenKill, remove
+  only the candidate package, restore the protected UCI/files if needed,
+  verify SSH and dnsmasq, and leave PassWall unchanged.
 
 ## Re-review and local behavior hardening (2026-09-18)
 
