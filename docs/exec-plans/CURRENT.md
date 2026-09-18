@@ -33,6 +33,9 @@ IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable se
   entries are inserted before the provider. A misleading Mihomo `PASS` rule and
   the independent remote provider download were removed. MRS is not exposed as
   an effective format until the target core binary-provider ABI is verified.
+  The generator now resolves the same generated dnsmasq `conf-dir` section ID
+  used by the legacy writer before placing its fragment, so a second or
+  reordered dnsmasq instance cannot silently receive the policy.
 - Strict DNS now rejects `http://`, appends `#RULES` by structured suffix
   handling, applies the rule suffix to direct/policy resolvers, and aborts YAML
   replacement when no selectable proxy group exists. DNS bootstrap remains the
@@ -56,7 +59,9 @@ IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable se
   Dropbear host private keys were excluded. BatchMode SSH was rechecked after
   backup and PassWall remains enabled at the service layer with no OpenKill or
   Mihomo process present.
-- The bounded implementation commit is `1619f315397d287cd0f7b8a8fd6ed6c7c0c22820`.
+- The bounded implementation commits are `1619f315397d287cd0f7b8a8fd6ed6c7c0c22820`
+  and `f3409c644e7053db4de53b2578f74f691fe8f939` (the latter fixes the
+  generated dnsmasq section mapping).
   Branch `codex/openkill-device-validation` exists locally but has not reached
   origin because this host has no GitHub write credential. Anonymous
   `git ls-remote` works; `git push` with terminal prompts disabled returns
