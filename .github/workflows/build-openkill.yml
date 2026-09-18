@@ -249,7 +249,7 @@ jobs:
           grep -qx '/etc/config/openkill' "$GITHUB_WORKSPACE/ipk-audit/control/conffiles"
 
           postrm="$GITHUB_WORKSPACE/ipk-audit/control/postrm"
-          if test -f "$postrm" && grep -nE 'rm[[:space:]].*(/etc/config/openkill|/etc/openkill|/usr/share/openkill|/www/luci-static/resources/openkill)' "$postrm"; then
+          if test -f "$postrm" && grep -nE 'rm[[:space:]].*[[:space:]]/(etc/config/openkill|etc/openkill|usr/share/openkill|www/luci-static/resources/openkill)(/|[[:space:]]|$)' "$postrm"; then
             echo 'postrm contains destructive persistent-path removal.' >&2
             exit 1
           fi

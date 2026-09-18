@@ -27,13 +27,18 @@ IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable se
 - RC run `35312882508` completed the direct build and produced exactly one
   `luci-app-openkill_2026-1129_all.ipk` under the SDK package feed, but its
   audit step exited 127 because the GitHub runner image does not provide
-  `rg`. The complete log is retained at `D:\\openkill-rc-build6.log`.
-- The pending bounded fix replaces only undeclared `rg` calls in the RC input,
+  `rg`. RC retry `35313619098` reached the same package audit after the
+  runner-compatible change, then correctly rejected the package's
+  `/tmp/etc/openkill` cleanup as a false positive caused by an overly broad
+  substring match. Logs are retained at `D:\\openkill-rc-build6.log` and
+  `D:\\openkill-rc-build7.log`.
+- The pending bounded fixes replace only undeclared `rg` calls in the RC input,
   package and sensitive-content audits with recursive POSIX/GNU `grep` using
-  equivalent file filters. It does not weaken metadata, conffile, stale
-  reference, maintainer-script, CSS cache-buster or sensitive-content checks.
-  The autonomous workflow test now asserts that this RC workflow has no `rg`
-  dependency.
+  equivalent file filters, and make the maintainer-script check require a
+  path boundary so `/tmp/etc/openkill` remains a permitted runtime cleanup.
+  They do not weaken metadata, conffile, stale reference, maintainer-script,
+  CSS cache-buster or sensitive-content checks. The autonomous workflow test
+  asserts that this RC workflow has no `rg` dependency.
 - Local evidence before committing this fix: workflow contract `10/10`,
   optimization/DNS/UCI focused suites pass, `git diff --check` passes and the
   WSL `scripts/local-gate.sh` passes. The resulting commit and its exact
