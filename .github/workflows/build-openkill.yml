@@ -266,7 +266,8 @@ jobs:
             echo 'Stale development resource references found in the IPK.' >&2
             exit 1
           fi
-          grep -R -n -E "oc\.css\?v=$OPENKILL_VERSION|flat\.css\?v=$OPENKILL_VERSION" "$GITHUB_WORKSPACE/ipk-audit/data" >/dev/null
+          grep -R -n -E "oc\.css\?v=(<%=plugin_version%>|$OPENKILL_VERSION)" "$GITHUB_WORKSPACE/ipk-audit/data" >/dev/null
+          grep -R -n -E "flat\.css\?v=(<%=plugin_version%>|$OPENKILL_VERSION)" "$GITHUB_WORKSPACE/ipk-audit/data" >/dev/null
 
           mapfile -t sensitive_hits < <(
             grep -R -n -E \

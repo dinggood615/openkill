@@ -37,8 +37,12 @@ IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable se
   equivalent file filters, and make the maintainer-script check require a
   path boundary so `/tmp/etc/openkill` remains a permitted runtime cleanup.
   They do not weaken metadata, conffile, stale reference, maintainer-script,
-  CSS cache-buster or sensitive-content checks. The autonomous workflow test
-  asserts that this RC workflow has no `rg` dependency.
+   CSS cache-buster or sensitive-content checks. RC retry `35314125692` then
+   exposed a stale audit assumption: packaged LuCI templates use the runtime
+   `<%=plugin_version%>` cache key rather than a literal version. The pending
+   adjustment accepts that runtime key or the current literal version and
+   requires both CSS assets. The autonomous workflow test asserts that this RC
+   workflow has no `rg` dependency.
 - Local evidence before committing this fix: workflow contract `10/10`,
   optimization/DNS/UCI focused suites pass, `git diff --check` passes and the
   WSL `scripts/local-gate.sh` passes. The resulting commit and its exact
