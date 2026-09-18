@@ -188,8 +188,13 @@ jobs:
             echo "OpenWrt version: $OPENWRT_VERSION"
             echo "Target: $OPENWRT_TARGET/$OPENWRT_SUBTARGET"
             echo "SDK URL: $OPENWRT_SDK_URL"
-            make -j"$(nproc)" package/luci-app-openkill/clean V=s
-            make -j"$(nproc)" package/luci-app-openkill/compile V=s
+            # The 25.12 SDK defaults to APK mode and its package target can
+            # pull the full host LLVM/rust graph even when only one IPK is
+            # selected.  Keep the RC audit on the legacy IPK path so the
+            # single-package build remains bounded and matches the device
+            # package format.
+            make -j"$(nproc)" package/luci-app-openkill/clean CONFIG_USE_APK= V=s
+            make -j"$(nproc)" package/luci-app-openkill/compile CONFIG_USE_APK= V=s
           } 2>&1 | tee "$GITHUB_WORKSPACE/build-openkill.log"
 
       - name: Locate and audit the IPK
