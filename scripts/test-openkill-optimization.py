@@ -80,6 +80,14 @@ def main() -> int:
     assert "def openkill_insert_before_match(rules, additions)" in yml
     assert "openkill_insert_before_match(rules, rustdesk_rules)" in yml
     assert "rules.unshift(*rustdesk_rules)" not in yml
+    # These Ruby literals are embedded in an outer shell double-quoted -e
+    # program.  %Q keeps interpolation while preventing BusyBox ash from
+    # stripping the quotes before Ruby parses the program.
+    assert "%Q{DOMAIN-SUFFIX,#{domain},PASS}" in yml
+    assert "%Q{DOMAIN-SUFFIX,#{domain},REJECT}" in yml
+    assert "%Q{DOMAIN-SUFFIX,#{domain},DIRECT}" in yml
+    assert "generated=1\\napplied=0" in yml
+    assert "openkill_mark_rustdesk_applied" in init
     print("OPENKILL_OPTIMIZATION_TEST=PASS")
     return 0
 

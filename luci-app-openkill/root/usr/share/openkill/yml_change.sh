@@ -1104,10 +1104,10 @@ begin
       rules.reject! { |rule| rule.to_s.include?('RULE-SET,openkill-anti-ad,') }
       adblock_allow = openkill_adblock_domains('/etc/openkill/custom/openkill_adblock_allow.list')
       adblock_block = openkill_adblock_domains('/etc/openkill/custom/openkill_adblock_block.list')
-      generated_adblock_rules = adblock_allow.map { |domain| "DOMAIN-SUFFIX,#{domain},PASS" } + adblock_block.map { |domain| "DOMAIN-SUFFIX,#{domain},REJECT" }
+      generated_adblock_rules = adblock_allow.map { |domain| %Q{DOMAIN-SUFFIX,#{domain},PASS} } + adblock_block.map { |domain| %Q{DOMAIN-SUFFIX,#{domain},REJECT} }
       rules.reject! { |rule| generated_adblock_rules.include?(rule.to_s) }
       rustdesk_domains = openkill_adblock_domains('/tmp/openkill_rustdesk_domains')
-      rustdesk_rules = rustdesk_domains.map { |domain| "DOMAIN-SUFFIX,#{domain},DIRECT" }
+      rustdesk_rules = rustdesk_domains.map { |domain| %Q{DOMAIN-SUFFIX,#{domain},DIRECT} }
       rules.reject! { |rule| rustdesk_rules.include?(rule.to_s) }
       if rustdesk_compatibility == '1' && rustdesk_rules.any?
          # Keep user-specific rules ahead of the compatibility exception. A
@@ -1136,7 +1136,7 @@ begin
        # could still hit a subscription REJECT, so never emit a misleading PASS
        # rule here; the explicit block rules below retain block-over-allow
        # precedence.
-      rules.unshift(*adblock_block.map { |domain| "DOMAIN-SUFFIX,#{domain},REJECT" })
+      rules.unshift(*adblock_block.map { |domain| %Q{DOMAIN-SUFFIX,#{domain},REJECT} })
       rules.uniq!
       Value['rules'] = rules
       Value['rule-providers'] = providers
@@ -1156,11 +1156,17 @@ ensure
    if write_config && defined?(Value) && Value.is_a?(Hash)
       begin
          YAML.dump(Value, config_file)
+         if rustdesk_compatibility == '1' && defined?(rustdesk_rules) && rustdesk_rules.is_a?(Array) && rustdesk_rules.any?
+            File.write('/tmp/openkill-rustdesk.state', %Q{generated=1\napplied=0\nverified=0\nreason=generated\nupdated=#{Time.now.to_i}\n})
+         else
+            File.delete('/tmp/openkill-rustdesk.state') rescue nil
+         end
       rescue Exception => e
          YAML.LOG_ERROR('Write file failed:【%s】' % [e.message])
       end
    else
       YAML.LOG_ERROR('Config transaction aborted; generated file was not replaced.')
+      File.delete('/tmp/openkill-rustdesk.state') rescue nil
    end
    File.delete('/tmp/yaml_change_marshal') rescue nil
 end

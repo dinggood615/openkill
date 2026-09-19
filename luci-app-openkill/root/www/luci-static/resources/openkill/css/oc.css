@@ -10023,3 +10023,76 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
 }
 
 /* ===== OpenKill Configuration Management Visual Closeout End ===== */
+
+/* ===== Running status grid closeout ===== */
+.oc.openkill-status-page .dashboard-v1-layout {
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr);
+    align-items: start;
+}
+
+.oc.openkill-status-page .dashboard-v1-layout > .main-card {
+    grid-template-rows: none;
+    grid-auto-rows: minmax(min-content, auto);
+    align-content: start;
+    min-width: 0;
+}
+
+.oc.openkill-status-page .dashboard-v1-layout > .main-card > .card-row {
+    height: auto;
+    min-height: 0;
+    align-self: stretch;
+    min-width: 0;
+}
+
+.oc.openkill-status-page .dashboard-security-section {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.oc.openkill-status-page .dashboard-security-section .sub-card,
+.oc.openkill-status-page .dashboard-config-section .sub-card {
+    min-width: 0;
+}
+
+.oc.openkill-status-page .security-status-content {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.oc.openkill-status-page .security-status-value,
+.oc.openkill-status-page .security-status-detail {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.oc.openkill-status-page .security-status-detail {
+    line-height: 1.35;
+}
+
+@media (max-width: 1200px) {
+    .oc.openkill-status-page .dashboard-v1-layout {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 1024px) {
+    .oc.openkill-status-page .dashboard-v1-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .oc.openkill-status-page .dashboard-security-section {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 480px) {
+    .oc.openkill-status-page .dashboard-security-section {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* ===== Running status grid closeout End ===== */

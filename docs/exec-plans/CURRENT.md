@@ -1,5 +1,33 @@
 # Current status
 
+## Running status startup/UI continuation (2026-09-19)
+
+- Scope: authorized device `192.168.1.103`, source `master`, with no
+  CENTRAL_ACTIVE, central nft apply, WAN/VMware changes, or broad LAN tests.
+  Device changes must be backed up, reversible, and mirrored in source before
+  any candidate reinstall.
+- Startup contract under review: selected UCI config path must resolve to an
+  existing readable YAML; core path/architecture/execute permission must be
+  checked; generation and core validation must complete before procd marks the
+  service ready; every failure must clear stale runtime markers and persist a
+  bounded reason. `start` return code, `enabled`, and `running` remain
+  independent facts.
+- UI state contract: requested, starting, running, stopping, stopped,
+  disabled, startup-failed and unknown are distinct. DNS privacy, adblock,
+  RustDesk and OpenVPN cards expose configured/generated/applied/verified
+  independently. A state file or HTTP 200 never proves a connection.
+- Layout contract: status page remains scoped to `.openkill-status-page`, uses
+  content-sized grid tracks, a four-card compatibility row (DNS, adblock,
+  RustDesk, OpenVPN), and a config/metrics grid with shared boundaries at
+  1920/1366/1200/768/390 CSS px and 100%/125% zoom.
+- ABI/continuity: do not change legacy service-port writers, DNS listener
+  split, mark/routing ABI, parser grammar, or recovery semantics. RustDesk
+  compatibility must not synthesize global DIRECT/port/LAN bypasses.
+- Current device lead: package `2026-1130` is installed, config/core paths
+  exist, service is enabled but stopped, and a fresh bounded start returned
+  failure with `startup-failed`; the exact stage remains to be obtained from
+  sanitized startup/core diagnostics before a fix is chosen.
+
 CURRENT_HEAD: `ea474aeea866428d81dbde0b60d6ff0914a75009` (observed master HEAD before this post-release status update)
 VERSION: `2026-1130`
 CURRENT_PHASE: `FORMAL_RELEASE_PUBLISHED_STAGE_B_WAITING_FOR_TRAFFIC_EVIDENCE`

@@ -470,9 +470,23 @@ EOF
 
 } >/dev/null 2>&1
 
+openkill_mark_rustdesk_applied()
+{
+   # This marker is written only after the core, controller, DNS and firewall
+   # readiness checks pass.  A generated rule alone is not an applied rule.
+   [ -s /tmp/openkill-rustdesk.state ] || return 0
+   grep -q '^generated=1$' /tmp/openkill-rustdesk.state 2>/dev/null || return 0
+   local state_tmp="/tmp/openkill-rustdesk.state.$$"
+   sed 's/^applied=.*/applied=1/; s/^reason=.*/reason=applied/' \
+      /tmp/openkill-rustdesk.state > "$state_tmp" 2>/dev/null &&
+      mv -f "$state_tmp" /tmp/openkill-rustdesk.state
+   rm -f "$state_tmp"
+}
+
 start_fail()
 {
    openkill_current_start || exit 1
+   rm -f /tmp/openkill-rustdesk.state
    uci -q set openkill.config.last_start_failed=1
    uci -q set openkill.config.last_start_failed_reason="${OPENKILL_START_FAILURE_REASON:-startup-failed}"
    uci -q commit openkill
@@ -1238,6 +1252,7 @@ check_core_status()
       /usr/share/openkill/openkill_recovery.sh save "$CONFIG_FILE" ||
          LOG_WARN "Readiness passed, but saving the recovery checkpoint failed."
    fi
+   openkill_mark_rustdesk_applied
    LOG_TIP "OpenKill readiness passed: process, controller, TUN/DNS and firewall."
    if [ -n "${OPENKILL_NETWORK_DESIRED:-}" ] && [ -r "$OPENKILL_NETWORK_DESIRED" ]; then
       openkill_commit_applied_network_state "$OPENKILL_NETWORK_DESIRED" \
@@ -4560,10 +4575,13 @@ start_service()
          # Validate the rewritten controller context before starting Mihomo.
          # This catches a broken Shell/Ruby rewrite immediately instead of
          # waiting for the full readiness timeout with an unprobeable API.
-         if ! controller_context="$(ruby /usr/share/openkill/runtime_context.rb "$TMP_CONFIG_FILE" 2>/dev/null)"; then
-            LOG_ERROR "Generated OpenKill YAML has no valid external-controller; startup aborted before core launch."
+         controller_context_error=""
+         controller_context="$(ruby /usr/share/openkill/runtime_context.rb "$TMP_CONFIG_FILE" 2>&1)" || {
+            controller_context_error="$(printf '%s\n' "$controller_context" | sed -n '1p' | tr '\n' ' ' | cut -c1-160)"
+            controller_context=""
+            LOG_ERROR "Generated OpenKill YAML has no valid external-controller; startup aborted before core launch${controller_context_error:+: $controller_context_error}."
             start_fail
-         fi
+         }
          controller_endpoint="$(printf '%s\n' "$controller_context" | sed -n '1p')"
          [ -n "$controller_endpoint" ] || {
             LOG_ERROR "Generated OpenKill YAML controller endpoint is empty; startup aborted."
@@ -4727,7 +4745,7 @@ stop_service()
       # The OpenVPN state is runtime evidence, not persistent configuration.
       # Remove it with the firewall objects so a stopped or failed service
       # cannot keep showing a stale "rule applied" status in LuCI.
-      rm -rf /tmp/openkill-openvpn.state /tmp/openkill-openvpn
+      rm -rf /tmp/openkill-openvpn.state /tmp/openkill-openvpn /tmp/openkill-rustdesk.state
       LOG_TIP "OpenKill Already Stop!"
 
       if [ "$enable" != "1" ]; then

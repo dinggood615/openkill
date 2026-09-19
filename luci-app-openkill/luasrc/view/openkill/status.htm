@@ -182,6 +182,13 @@
                                     <span id="openvpn-detail" class="security-status-detail">隧道与业务尚未验证</span>
                                 </div>
                             </div>
+                            <div class="sub-card security-status-card" data-security-card="rustdesk">
+                                <div class="card-title">RustDesk<a href="javascript:void(0);" onclick="window.open('<%=luci.dispatcher.build_url('admin','services','openkill','settings')%>#compatibility', '_blank');" class="help-link" title="查看 RustDesk 兼容设置"><svg width="12" height="12"><use href="#oc-icon-help"/></svg></a></div>
+                                <div class="card-content security-status-content">
+                                    <span id="rustdesk-status" class="security-status-value">未验证</span>
+                                    <span id="rustdesk-detail" class="security-status-detail">连接未验证 · 规则独立于广告与出口策略</span>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Row 4: Config File -->
@@ -405,7 +412,9 @@
         adblock_status: document.getElementById('adblock-status'),
         adblock_detail: document.getElementById('adblock-detail'),
         openvpn_status: document.getElementById('openvpn-status'),
-        openvpn_detail: document.getElementById('openvpn-detail')
+        openvpn_detail: document.getElementById('openvpn-detail'),
+        rustdesk_status: document.getElementById('rustdesk-status'),
+        rustdesk_detail: document.getElementById('rustdesk-detail')
     };
 
     var openkillRuntimeState = 'loading';
@@ -597,6 +606,27 @@
                 (status.openvpn_endpoint4 || '0') + '/' + (status.openvpn_endpoint6 || '0') +
                 (status.openvpn_reason && status.openvpn_reason !== 'applied' ? ' · ' + status.openvpn_reason : ''));
         }
+
+        var rustLabel = DOMCache.rustdesk_status;
+        var rustDetail = DOMCache.rustdesk_detail;
+        var rustConfigured = !!(status && status.rustdesk_compatibility);
+        var rustGenerated = !!(status && (status.rustdesk_generated === '1' || status.rustdesk_generated === 1));
+        var rustApplied = !!(status && (status.rustdesk_applied === '1' || status.rustdesk_applied === 1));
+        var rustVerified = !!(status && (status.rustdesk_verified === '1' || status.rustdesk_verified === 1));
+        var rustFailed = !!(status && status.rustdesk_reason === 'failed');
+        if (rustLabel) {
+            rustLabel.textContent = !rustConfigured ? '已关闭' :
+                (rustFailed ? '应用失败' : (rustApplied ? (rustVerified ? '连接已验证' : '规则已应用 · 未验证') :
+                (rustGenerated ? '规则已生成 · 待应用' : '已配置 · 未应用')));
+            rustLabel.className = 'security-status-value ' + (!rustConfigured ? 'is-muted' :
+                (rustFailed ? 'is-error' : (rustApplied ? (rustVerified ? 'is-success' : 'is-pending') : 'is-pending')));
+        }
+        if (rustDetail) {
+            rustDetail.textContent = !rustConfigured ? '兼容开关关闭，未创建宽范围绕过' :
+                (rustFailed ? '兼容规则生成或应用失败 · 请查看诊断' :
+                (rustApplied ? '目标域名范围已应用 · real-IP、广告例外与出口策略独立' :
+                (rustGenerated ? '配置已生成 · 等待核心与防火墙就绪' : '未生成目标规则 · 连接未验证')));
+        }
     }
 
     function setRuntimeControlsAvailable(available) {
@@ -660,8 +690,7 @@
             DOMCache.mode, DOMCache.daip, DOMCache.mix_proxy,
             document.getElementById('upload_'), document.getElementById('download_'),
             document.getElementById('uploadtotal_'), document.getElementById('downloadtotal_'),
-            document.getElementById('connect_t'), document.getElementById('mem_t'),
-            document.getElementById('cpu_t'), document.getElementById('load_a')
+            document.getElementById('connect_t'), document.getElementById('mem_t')
         ];
         for (var i = 0; i < fields.length; i++) {
             if (!fields[i]) continue;
@@ -681,8 +710,8 @@
         setRuntimeControlsAvailable(false);
 
         if (typeof SystemStatusManager !== 'undefined' && SystemStatusManager) {
-            SystemStatusManager.stop();
-            SystemStatusManager.resetSysStats();
+            /* CPU/load are router metrics and remain useful while the core is stopped. */
+            if (typeof SystemStatusManager.start === 'function') SystemStatusManager.start();
         }
         if (typeof NetworkStatsManager !== 'undefined' && NetworkStatsManager) {
             NetworkStatsManager.stop();

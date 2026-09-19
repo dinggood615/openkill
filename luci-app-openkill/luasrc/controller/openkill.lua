@@ -1499,6 +1499,10 @@ function action_status()
 	local function adblock_value(name, fallback)
 		return adblock_state:match(name .. "=([^\n]+)") or fallback
 	end
+	local rustdesk_state = fs.readfile("/tmp/openkill-rustdesk.state") or ""
+	local function rustdesk_value(name, fallback)
+		return rustdesk_state:match(name .. "=([^\n]+)") or fallback
+	end
 
 	local result = {
 		-- status fields
@@ -1532,12 +1536,18 @@ function action_status()
 		dns_privacy_mode = fs.uci_get_config("config", "dns_privacy_mode") or "split",
 		adblock_mode = fs.uci_get_config("config", "adblock_mode") or "off",
 		adblock_rule_format = fs.uci_get_config("config", "adblock_rule_format") or "yaml",
-		adblock_dns_effective = (fs.readfile("/tmp/openkill-adblock.state") or ""):find("effective=1", 1, true) ~= nil,
+		adblock_dns_effective = adblock_state:match("^effective=1[\n$]") ~= nil or
+			adblock_state:match("\neffective=1[\n$]") ~= nil,
 		adblock_state = adblock_value("state", "unknown"),
 		adblock_reason = adblock_value("reason", "not-started"),
 		adblock_rule_generation = adblock_value("generation", "unknown"),
 		adblock_updated = adblock_value("updated", "unknown"),
 		rustdesk_compatibility = fs.uci_get_config("config", "rustdesk_compatibility") == "1",
+		rustdesk_generated = rustdesk_value("generated", "0"),
+		rustdesk_applied = rustdesk_value("applied", "0"),
+		rustdesk_verified = rustdesk_value("verified", "0"),
+		rustdesk_reason = rustdesk_value("reason", "not-started"),
+		rustdesk_updated = rustdesk_value("updated", "unknown"),
 		openvpn_compatibility = fs.uci_get_config("config", "openvpn_compatibility") == "1",
 		openvpn_transport_bypass = fs.uci_get_config("config", "openvpn_transport_bypass") == "1",
 		openvpn_role = fs.uci_get_config("config", "openvpn_role") or "router-client",
