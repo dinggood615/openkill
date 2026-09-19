@@ -3179,8 +3179,11 @@
                     SystemStatusManager.start();
                 }
             } else {
-                SystemStatusManager.stop();
-                SystemStatusManager.resetSysStats();
+                /* CPU/load are router metrics and remain useful while the
+                 * core is stopped; only NetworkStatsManager is core-scoped. */
+                if (!SystemStatusManager.isEnabled) {
+                    SystemStatusManager.start();
+                }
             }
 
             if (status.clash && status.daip) {
