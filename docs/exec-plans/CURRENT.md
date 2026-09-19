@@ -31,24 +31,31 @@
   YAML/runtime-context check. Commit `4996744` fixes those literals and adds
   truthful RustDesk generated/applied state; `b0cf756` normalizes RC source
   ownership to `root:root` before SDK packaging. Development CI passed for
-  both commits. The device remains on the previous package until the RC for
-  `b0cf756` is audited and installed.
+  both commits. The final RC from `e07a983` was audited and installed after
+  a protected backup; the device retained its user UCI configuration and
+  PassWall state.
 
 - Local evidence: WSL runtime 28/28 (two existing skips), optimization,
   UI-contract, UI-preview, UI-interaction and local-gate pass. Playwright is
   unavailable on this host, so no browser screenshot claim is made.
-- Device evidence pending: install the RC from run `35439580750`, verify the
-  generated YAML, controller readiness, procd running state, repeated stop/
-  start and page status. No packet-path, RustDesk client or proxy traffic
-  evidence is implied by startup success.
+- Device evidence: RC run `35440968449` passed; IPK SHA-256 is
+  `c99d2021ba7829f636b859416aa60c33f9b9a61fb0230769a92d16812aef4c48`.
+  The package archive and installed key files are `root/root` with init and
+  generator mode `755`, UI/CSS mode `644`. On `192.168.1.103`, generated YAML
+  reached a valid controller, Mihomo/TUN/DNS/firewall readiness passed,
+  `stop` cleared the running marker and RustDesk runtime marker, and a second
+  `start` returned to ready with the controller listening on `:9090`.
+  No packet-path, RustDesk client or proxy traffic evidence is implied by
+  startup success. Playwright is unavailable locally, so UI evidence is from
+  production-template contract/preview/interaction suites, not screenshots.
 
-CURRENT_HEAD: `ea474aeea866428d81dbde0b60d6ff0914a75009` (observed master HEAD before this post-release status update)
+CURRENT_HEAD: `e07a9838c1814e076fe22efa490136acec7f2b14` (observed master HEAD before this evidence update)
 VERSION: `2026-1130`
 CURRENT_PHASE: `FORMAL_RELEASE_PUBLISHED_STAGE_B_WAITING_FOR_TRAFFIC_EVIDENCE`
 CURRENT_STATUS: `2026-1130 is formally published from master after the release gate; the repaired candidate passed local/CI/RC/device fail-closed checks, while proxy-dependent DNS, region, adblock, RustDesk and OpenVPN traffic behavior remains unverified`
-BLOCKER: `REAL_DEVICE_GATE` — 192.168.1.103 has no Mihomo/Clash binary, usable profile or test proxy, no running OpenVPN tunnel/client, and no RustDesk client/service details; strict DNS, region routing, adblock traffic coverage, RustDesk recovery and OpenVPN handshake remain unverified
-DEVICE_STATE: `192.168.1.103` is Kwrt 25.12-SNAPSHOT x86/64 on VMware with dnsmasq 2.93, firewall4 2025.03.17~b6e51575-r2 and OpenVPN 2.7.6; the f936a3e RC package was installed with configuration/PassWall preserved, OpenKill/OpenVPN remain stopped, and the new candidate is not yet installed
-DEVICE_RETRY_READY: `RC_RUN_48_DEVICE_RECHECK_PASS_RELEASE_PUBLISHED` (SSH BatchMode, protected backup, candidate hash and rollback path are recorded)
+BLOCKER: `REAL_DEVICE_GATE` — 192.168.1.103 now has a usable Mihomo core/profile and startup evidence, but no test proxy traffic, running OpenVPN tunnel/client, or RustDesk client/service details; strict DNS, region routing, adblock traffic coverage, RustDesk recovery and OpenVPN handshake remain unverified
+DEVICE_STATE: `192.168.1.103` is Kwrt 25.12-SNAPSHOT x86/64 on VMware with dnsmasq 2.93, firewall4 2025.03.17~b6e51575-r2 and OpenVPN 2.7.6; the e07a983 RC is installed with configuration/PassWall preserved, OpenKill is running and OpenVPN remains untouched
+DEVICE_RETRY_READY: `RC_RUN_50_DEVICE_START_STOP_RESTART_PASS` (SSH BatchMode, protected backup, candidate hash and rollback path are recorded)
 NEXT_ACTION: `obtain a test Mihomo core/profile plus OpenVPN and RustDesk client/service evidence, then run only the scoped Stage-B traffic checks; do not infer packet-path behavior from the fail-closed startup result`
 RESULTING_HEAD: resolve with `git rev-parse HEAD` after this status-only update; this status records the pre-commit observation above
 CENTRAL_ACTIVE: `NOT_APPROVED`
