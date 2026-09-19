@@ -55,6 +55,24 @@
   follow-up evidence commit `8ae80f2ed03ece9c588748ae5632cc550560c332` also
   passed Development CI run `35445400459`:
   https://github.com/dinggood615/openkill/actions/runs/35445400459.
+- Formal Release run `35445726210` completed successfully:
+  https://github.com/dinggood615/openkill/actions/runs/35445726210. It
+  published tag `v2026-1131-ipk` at source commit
+  `09842b11518d9c8e61d9bca0af17cbe964fff39c` and release page
+  https://github.com/dinggood615/openkill/releases/tag/v2026-1131-ipk. The
+  package-channel `master/version` is `v2026-1131`; the package-channel and
+  release asset are both 9,185,445 bytes with SHA-256
+  `76152E9C05640E00EC29186791F7846A6478D2BA168D0437D1D53836C0D4D8B3`.
+- The formal asset was uploaded to the authorized device after a fresh
+  protected backup at
+  `D:\openkill-device-backups\20260919-213142-formal-2026-1131\openkill-before-formal.tgz`
+  (SHA-256 `B09379D801E77745275925667F12A57061389E93540CA364EE60C7EB9C3B033D`).
+  Remote and local package hashes matched. The device now reports package
+  `2026-1131`, preserves the existing UCI configuration (opkg staged the
+  package conffile as `openkill-opkg`), reaches Mihomo readiness, keeps the
+  maintained adblock list effective, and reports the corrected OpenVPN
+  disabled state. The previous release and both protected backups remain
+  available for rollback.
 - A non-public candidate was built from the master source, normalized to
   root-owned archive members, and audited. Candidate SHA-256 is
   `0C41597BEC8919330A1DD5A343BB8267A02E26100320D544725FA2B36894A237`.
