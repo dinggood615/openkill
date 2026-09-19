@@ -197,6 +197,10 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
+          # TAR_OPTIONS is used only while the SDK creates package archives;
+          # clear it before reading the resulting IPK so audit extraction
+          # follows the package's own compression/layout metadata.
+          unset TAR_OPTIONS
           mapfile -t ipks < <(find "$SDK_DIR/bin" -type f -name "luci-app-openkill_${OPENKILL_VERSION}_all.ipk" -print)
           if ((${#ipks[@]} != 1)); then
             printf 'Expected exactly one IPK, found %s:\n' "${#ipks[@]}"
