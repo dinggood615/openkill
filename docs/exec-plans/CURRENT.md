@@ -95,6 +95,15 @@
 5. Invoke Formal Release only if all repository release gates pass; retain the
    prior tag/assets and document any unverified traffic scenarios.
 
+### Release preparation (2026-09-19)
+
+- The previously published source/package version was `2026-1130`; the
+  repository's formal workflow requires a strictly newer source version.
+  After the functional and device checks above, release preparation advances
+  the synchronized Makefile, installer, README and preview version to
+  `2026-1131` and adds version-specific notes. This is a release-gate change,
+  not a claim that the unverified traffic scenarios have passed.
+
 ## Running status startup/UI continuation (2026-09-19)
 
 - Scope: authorized device `192.168.1.103`, source `master`, with no
