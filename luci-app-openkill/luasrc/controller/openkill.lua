@@ -1536,8 +1536,10 @@ function action_status()
 		dns_privacy_mode = fs.uci_get_config("config", "dns_privacy_mode") or "split",
 		adblock_mode = fs.uci_get_config("config", "adblock_mode") or "off",
 		adblock_rule_format = fs.uci_get_config("config", "adblock_rule_format") or "yaml",
-		adblock_dns_effective = adblock_state:match("^effective=1[\n$]") ~= nil or
-			adblock_state:match("\neffective=1[\n$]") ~= nil,
+		adblock_dns_effective = adblock_state:match("^effective=1$") ~= nil or
+			adblock_state:match("^effective=1\n") ~= nil or
+			adblock_state:match("\neffective=1$") ~= nil or
+			adblock_state:match("\neffective=1\n") ~= nil,
 		adblock_state = adblock_value("state", "unknown"),
 		adblock_reason = adblock_value("reason", "not-started"),
 		adblock_rule_generation = adblock_value("generation", "unknown"),
