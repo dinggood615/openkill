@@ -2064,6 +2064,20 @@ if [ -n "$FW4" ]; then
       done
    fi
 
+   # OpenVPN transport compatibility is independent from the legacy service
+   # port ABI below. Create dedicated family/client/port sets before the
+   # legacy writer so its isolated contract remains unchanged. Apply all
+   # five staged sets in one checked nft transaction. An invalid or
+   # unresolved optional configuration leaves the previous runtime sets
+   # untouched; an explicit disable clears only OpenKill-owned objects.
+   openkill_openvpn_prepare || LOG_WARN "OpenVPN compatibility preflight failed; keeping the previous scoped set."
+   nft 'add set inet fw4 openkill_openvpn_endpoints4 { type ipv4_addr; flags interval; auto-merge; }'
+   nft 'add set inet fw4 openkill_openvpn_endpoints6 { type ipv6_addr; flags interval; auto-merge; }'
+   nft 'add set inet fw4 openkill_openvpn_clients4 { type ipv4_addr; flags interval; auto-merge; }'
+   nft 'add set inet fw4 openkill_openvpn_clients6 { type ipv6_addr; flags interval; auto-merge; }'
+   nft 'add set inet fw4 openkill_openvpn_ports { type inet_service; flags interval; }'
+   openkill_openvpn_apply_runtime || LOG_WARN "OpenVPN scoped set transaction failed; retaining the last valid runtime state."
+
    # VPN/remote-access service ports. These are kept outside the proxy
    # interception chains only when the legacy compatibility switch is
    # explicitly enabled. RustDesk is handled by scoped domain rules in the
@@ -2081,19 +2095,6 @@ if [ -n "$FW4" ]; then
          nft add element inet fw4 openkill_service_ports "{ $service_port }"
       done
    fi
-
-   # OpenVPN transport compatibility is independent from the legacy service
-   # port ABI above.  Create dedicated family/client/port sets first, then
-   # apply all five staged sets in one checked nft transaction.  An invalid
-   # or unresolved optional configuration leaves the previous runtime sets
-   # untouched; an explicit disable clears only OpenKill-owned objects.
-   openkill_openvpn_prepare || LOG_WARN "OpenVPN compatibility preflight failed; keeping the previous scoped set."
-   nft 'add set inet fw4 openkill_openvpn_endpoints4 { type ipv4_addr; flags interval; auto-merge; }'
-   nft 'add set inet fw4 openkill_openvpn_endpoints6 { type ipv6_addr; flags interval; auto-merge; }'
-   nft 'add set inet fw4 openkill_openvpn_clients4 { type ipv4_addr; flags interval; auto-merge; }'
-   nft 'add set inet fw4 openkill_openvpn_clients6 { type ipv6_addr; flags interval; auto-merge; }'
-   nft 'add set inet fw4 openkill_openvpn_ports { type inet_service; flags interval; }'
-   openkill_openvpn_apply_runtime || LOG_WARN "OpenVPN scoped set transaction failed; retaining the last valid runtime state."
 
    #bypass gateway compatible
    if [ "$bypass_gateway_compatible" -eq 1 ]; then
