@@ -35,6 +35,16 @@ jobs:
         shell: bash
         run: mkdir -p "$GITHUB_WORKSPACE/artifact"
 
+      - name: Normalize package source ownership
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # The SDK copies source metadata into data.tar.  GitHub's runner
+          # uid (currently 1001) must never become the runtime owner of
+          # OpenWrt-installed scripts; package files are root-owned on the
+          # target and executable bits are set by the Makefile.
+          sudo chown -R 0:0 luci-app-openkill
+
       - name: Install SDK build dependencies
         shell: bash
         run: |
