@@ -190,6 +190,7 @@ jobs:
             exit 1
           fi
           ipk="${ipks[0]}"
+          python3 "$GITHUB_WORKSPACE/scripts/normalize-ipk-ownership.py" "$ipk"
           cp -f "$ipk" "$GITHUB_WORKSPACE/artifact/"
           printf '%s\n' "$(sha256sum "$ipk")" > "$GITHUB_WORKSPACE/artifact/SHA256SUMS"
 
