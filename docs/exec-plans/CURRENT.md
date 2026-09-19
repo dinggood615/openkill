@@ -1,13 +1,13 @@
 # Current status
 
-CURRENT_HEAD: `9f18c7bd2e7ac3c5a13ebde27f318f9b71ba0e44` (observed master HEAD before this status update)
+CURRENT_HEAD: `f936a3e44dfb9d0f793c23c12850908d428a1606` (observed master HEAD before this status update)
 VERSION: `2026-1129`
-CURRENT_PHASE: `REAL_DEVICE_STAGE_A_INSTALLED_STAGE_B_WAITING_FOR_CORE`
-CURRENT_STATUS: `Master-only implementation, exact-commit CI, RC audit and bounded device install/cleanup are green; packet-path and proxy-dependent device validation is waiting for a test Mihomo core/profile and RustDesk client evidence`
-BLOCKER: `REAL_DEVICE_GATE` — 192.168.1.103 has no Mihomo/Clash binary, usable profile or test proxy, and no RustDesk client/service details were supplied; do not infer strict DNS, region routing, adblock traffic coverage or RustDesk recovery from the fail-closed startup test
-DEVICE_STATE: `192.168.1.103` is Kwrt 25.12-SNAPSHOT x86/64 on VMware with dnsmasq 2.93 and firewall4 2025.03.17~b6e51575-r2; audited OpenKill 2026-1129 is installed, PassWall remains configured with global runtime switch `0`, and OpenKill is stopped/not enabled because no Mihomo core/profile is present
-DEVICE_RETRY_READY: `STAGE_A_COMPLETE_STAGE_B_WAITING_FOR_CORE_PROFILE` (SSH BatchMode, protected backup, candidate hash and rollback path are recorded)
-NEXT_ACTION: `obtain the minimum test core/profile and RustDesk failure-stage evidence, then run only the scoped Stage-B dual-stack/DNS/adblock/RustDesk checks; until then keep OpenKill stopped and continue local fixture validation`
+CURRENT_PHASE: `RC_DEVICE_RECHECK_REQUIRES_REBUILD_AFTER_DEVICE_FOUND_HELPER_BUG`
+CURRENT_STATUS: `Master-only implementation, exact-commit CI and RC audit are green; the authorized device installed the RC candidate and passed fail-closed startup/stop continuity, then exposed an untested disabled-state writer typo that must be rebuilt and reinstalled before device evidence is accepted`
+BLOCKER: `REAL_DEVICE_GATE` — 192.168.1.103 has no Mihomo/Clash binary, usable profile or test proxy, no running OpenVPN tunnel/client, and no RustDesk client/service details; strict DNS, region routing, adblock traffic coverage, RustDesk recovery and OpenVPN handshake remain unverified
+DEVICE_STATE: `192.168.1.103` is Kwrt 25.12-SNAPSHOT x86/64 on VMware with dnsmasq 2.93, firewall4 2025.03.17~b6e51575-r2 and OpenVPN 2.7.6; the f936a3e RC package was installed with configuration/PassWall preserved, OpenKill/OpenVPN remain stopped, and the new candidate is not yet installed
+DEVICE_RETRY_READY: `REBUILD_RC_AFTER_HELPER_STATE_FIX` (SSH BatchMode, protected backup, candidate hash and rollback path are recorded)
+NEXT_ACTION: `commit the helper-state fix, pass exact Development CI, rebuild/audit a new RC from master, reinstall it with the existing protected backup, then run only scoped device checks; request a test core/profile and OpenVPN/RustDesk client evidence before packet-path claims`
 RESULTING_HEAD: resolve with `git rev-parse HEAD` after this status-only update; this status records the pre-commit observation above
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
@@ -16,6 +16,13 @@ DEVICE_INSTALL_AUTHORIZATION: `APPROVED_FOR_192.168.1.103_ONLY`
 DEVICE_INSTALL_SCOPE: `backup, upload/install matching RC IPK, bounded OpenKill config/service tests, limited DNS/outbound observations; preserve PassWall and do not change WAN/VMware`
 DEVICE_ROLLBACK_CONTRACT: `restore backed-up UCI/files, remove candidate package, restore service enable/runtime state, verify SSH; never use broad bypass or firewall reset`
 IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable section identity; legacy writer continuity; route-set IPv4/IPv6 atomicity and empty-set fail-closed behavior; Mihomo DNS parser/strict bootstrap; adblock DNS/core same-generation and allow/block priority; RustDesk scoped domains; OpenVPN endpoint/protocol/client-scoped transport exception; status only after validate/apply`
+
+## Device RC evidence and follow-up (2026-09-19)
+
+- RC Run 47 (`35436168995`) built from master `f936a3e44dfb9d0f793c23c12850908d428a1606` and passed the SDK package audit. The artifact archive is `D:\openkill-rc-candidate-f936a3e\unpack\artifact.zip`, archive SHA-256 `6932bedc7af84188b259081b0b5468943fcc4d98763706164b7c3639e8b823c7`, and the IPK SHA-256 is `88985dd1cd8fc8dc4b76bc4f93e5edfce59364663d9a1b09af35cc5f2ba1c67b`. The package audit reports metadata, dependencies, conffile preservation, maintainer-script safety, stale-reference and sensitive-content checks as passing. SDK tar entries use the normal build uid/gid `1001:1001`; device installation resolves ownership as root, so the archive owner is not treated as runtime ownership.
+- A fresh protected device backup was captured at `D:\openkill-device-backups\20260919-preinstall-f936a3e\device-backup.tar.gz` with SHA-256 `B19F44160C6F3179FD1BC624C2907BD71EF16030320E94CF388C399BAA91E50A`. The candidate upload matched the local IPK hash. Standard install skipped the equal version; the explicitly authorized `--force-reinstall` installed the matching candidate without ignore-dependency or overwrite flags. PassWall configuration hash remained unchanged, and OpenKill/OpenVPN stayed stopped.
+- The bounded device start/stop test returned `start_rc=0` with `last_start_failed=1` and `failure_reason=config-missing`, `running_after_start=no`; stop returned zero. nft ruleset SHA-256 was identical before/after (`6df593927d022fb66d1872e31e5b1e4f2be4f3d496437e4a6b49fd78984b5dbe`), and the OpenVPN runtime state file was removed on stop. This validates fail-closed lifecycle behavior only; no packet path was exercised.
+- The installed RC helper exposed a real disabled-state defect: several branches called the uppercase symbol `OPENKILL_OPENVPN_write_state` although the function is lowercase, so state writes were silently skipped. The source is repaired and the isolated contract test now checks that every prepare fixture writes a state file. The repaired source requires a new RC build and device reinstall before the previous device result can be used as final candidate evidence.
 
 ## OpenVPN and UI continuation contract (2026-09-19)
 

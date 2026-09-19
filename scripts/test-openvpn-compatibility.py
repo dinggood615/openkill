@@ -30,6 +30,9 @@ def prepare_fixture(config: dict[str, str]) -> str:
     return run(
         f"""
         set -eu
+        OPENKILL_OPENVPN_DIR=$(mktemp -d)
+        OPENKILL_OPENVPN_STATE="$OPENKILL_OPENVPN_DIR/state"
+        trap 'rm -rf "$OPENKILL_OPENVPN_DIR"' EXIT
         uci_get_config() {{
             case "$1" in
                 openvpn_compatibility) printf '%s' {config.get('openvpn_compatibility', '0')!r} ;;
@@ -45,6 +48,7 @@ def prepare_fixture(config: dict[str, str]) -> str:
         }}
         . '{HELPER.as_posix()}'
         openkill_openvpn_prepare
+        test -s "$OPENKILL_OPENVPN_STATE"
         printf 'generated=%s reason=%s endpoint4=%s endpoint6=%s client4=%s client6=%s ports=%s clear=%s\\n' \\
           "$OPENKILL_OPENVPN_generated" "$OPENKILL_OPENVPN_reason" \\
           "$OPENKILL_OPENVPN_endpoint4" "$OPENKILL_OPENVPN_endpoint6" \\

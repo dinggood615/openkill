@@ -192,20 +192,20 @@ openkill_openvpn_prepare()
       : > "$OPENKILL_OPENVPN_DIR/clients4.next"
       : > "$OPENKILL_OPENVPN_DIR/clients6.next"
       : > "$OPENKILL_OPENVPN_DIR/ports.next"
-      OPENKILL_OPENVPN_write_state || true
+      openkill_openvpn_write_state || true
       rm -f "$v4_tmp" "$v6_tmp" "$clients4_tmp" "$clients6_tmp" "$ports_tmp"
       return 0
    fi
    if [ "$role" = server ]; then
       OPENKILL_OPENVPN_reason=server-role-no-transport
-      OPENKILL_OPENVPN_write_state || true
+      openkill_openvpn_write_state || true
       rm -f "$v4_tmp" "$v6_tmp" "$clients4_tmp" "$clients6_tmp" "$ports_tmp"
       return 0
    fi
    if [ "$protocol" = invalid ]; then
       OPENKILL_OPENVPN_reason=invalid-protocol
       openkill_openvpn_use_last_valid || true
-      OPENKILL_OPENVPN_write_state || true
+      openkill_openvpn_write_state || true
       rm -f "$v4_tmp" "$v6_tmp" "$clients4_tmp" "$clients6_tmp" "$ports_tmp"
       return 0
    fi
@@ -220,7 +220,7 @@ openkill_openvpn_prepare()
    [ -s "$ports_tmp" ] || {
       OPENKILL_OPENVPN_reason=missing-valid-port
       openkill_openvpn_use_last_valid || true
-      OPENKILL_OPENVPN_write_state || true
+      openkill_openvpn_write_state || true
       rm -f "$v4_tmp" "$v6_tmp" "$clients4_tmp" "$clients6_tmp" "$ports_tmp"
       return 0
    }
@@ -242,7 +242,7 @@ openkill_openvpn_prepare()
    [ "$endpoint_count" -gt 0 ] || {
       OPENKILL_OPENVPN_reason=endpoint-resolution-failed
       openkill_openvpn_use_last_valid || true
-      OPENKILL_OPENVPN_write_state || true
+      openkill_openvpn_write_state || true
       rm -f "$v4_tmp" "$v6_tmp" "$clients4_tmp" "$clients6_tmp" "$ports_tmp"
       return 0
    }
@@ -258,7 +258,7 @@ openkill_openvpn_prepare()
       [ "$client_count" -gt 0 ] || {
          OPENKILL_OPENVPN_reason=missing-client-scope
          openkill_openvpn_use_last_valid || true
-         OPENKILL_OPENVPN_write_state || true
+         openkill_openvpn_write_state || true
          rm -f "$v4_tmp" "$v6_tmp" "$clients4_tmp" "$clients6_tmp" "$ports_tmp"
          return 0
       }
@@ -452,7 +452,7 @@ openkill_openvpn_mark_unsupported()
    OPENKILL_OPENVPN_generated=0
    OPENKILL_OPENVPN_applied=0
    OPENKILL_OPENVPN_reason="$1"
-   OPENKILL_OPENVPN_write_state || true
+   openkill_openvpn_write_state || true
 }
 
 openkill_openvpn_add_nft_rules()
