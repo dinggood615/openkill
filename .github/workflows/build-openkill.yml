@@ -180,6 +180,10 @@ jobs:
             echo "OpenWrt version: $OPENWRT_VERSION"
             echo "Target: $OPENWRT_TARGET/$OPENWRT_SUBTARGET"
             echo "SDK URL: $OPENWRT_SDK_URL"
+            # Do not carry the hosted runner uid/gid into data.tar.*.  The
+            # package is installed as root on OpenWrt and the archive must
+            # describe that ownership explicitly for audit/reproducibility.
+            export TAR_OPTIONS='--owner=0 --group=0 --numeric-owner'
             # The top-level package/compile aggregate can expand the full
             # target kernel/module graph even when one package is selected.
             # Invoke this package's package.mk directly with an explicit

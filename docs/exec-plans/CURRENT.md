@@ -24,9 +24,23 @@
   split, mark/routing ABI, parser grammar, or recovery semantics. RustDesk
   compatibility must not synthesize global DIRECT/port/LAN bypasses.
 - Current device lead: package `2026-1130` is installed, config/core paths
-  exist, service is enabled but stopped, and a fresh bounded start returned
-  failure with `startup-failed`; the exact stage remains to be obtained from
-  sanitized startup/core diagnostics before a fix is chosen.
+  exist, service is enabled but stopped. The fresh start reached generation
+  and failed before core launch because the BusyBox `ash`-embedded Ruby in
+  `yml_change.sh` lost three inner double quotes, leaving no valid
+  `external-controller`; this was reproduced with `sh -x` and the generated
+  YAML/runtime-context check. Commit `4996744` fixes those literals and adds
+  truthful RustDesk generated/applied state; `b0cf756` normalizes RC source
+  ownership to `root:root` before SDK packaging. Development CI passed for
+  both commits. The device remains on the previous package until the RC for
+  `b0cf756` is audited and installed.
+
+- Local evidence: WSL runtime 28/28 (two existing skips), optimization,
+  UI-contract, UI-preview, UI-interaction and local-gate pass. Playwright is
+  unavailable on this host, so no browser screenshot claim is made.
+- Device evidence pending: install the RC from run `35439580750`, verify the
+  generated YAML, controller readiness, procd running state, repeated stop/
+  start and page status. No packet-path, RustDesk client or proxy traffic
+  evidence is implied by startup success.
 
 CURRENT_HEAD: `ea474aeea866428d81dbde0b60d6ff0914a75009` (observed master HEAD before this post-release status update)
 VERSION: `2026-1130`
