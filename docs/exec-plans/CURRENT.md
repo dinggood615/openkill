@@ -1,13 +1,13 @@
 # Current status
 
-CURRENT_HEAD: `b75d76da21003e906d060ce4ee030109a4b9a5da` (observed master HEAD before this release-preparation update)
+CURRENT_HEAD: `ea474aeea866428d81dbde0b60d6ff0914a75009` (observed master HEAD before this post-release status update)
 VERSION: `2026-1130`
-CURRENT_PHASE: `FORMAL_RELEASE_PREP_AFTER_RC_DEVICE_RECHECK`
-CURRENT_STATUS: `OpenVPN state persistence is repaired, exact Development CI and RC Run 48 are green, and the repaired candidate passed the authorized device fail-closed checks; formal release is now gated on the reviewed 2026-1130 version commit and its exact CI`
+CURRENT_PHASE: `FORMAL_RELEASE_PUBLISHED_STAGE_B_WAITING_FOR_TRAFFIC_EVIDENCE`
+CURRENT_STATUS: `2026-1130 is formally published from master after the release gate; the repaired candidate passed local/CI/RC/device fail-closed checks, while proxy-dependent DNS, region, adblock, RustDesk and OpenVPN traffic behavior remains unverified`
 BLOCKER: `REAL_DEVICE_GATE` — 192.168.1.103 has no Mihomo/Clash binary, usable profile or test proxy, no running OpenVPN tunnel/client, and no RustDesk client/service details; strict DNS, region routing, adblock traffic coverage, RustDesk recovery and OpenVPN handshake remain unverified
 DEVICE_STATE: `192.168.1.103` is Kwrt 25.12-SNAPSHOT x86/64 on VMware with dnsmasq 2.93, firewall4 2025.03.17~b6e51575-r2 and OpenVPN 2.7.6; the f936a3e RC package was installed with configuration/PassWall preserved, OpenKill/OpenVPN remain stopped, and the new candidate is not yet installed
-DEVICE_RETRY_READY: `RC_RUN_48_DEVICE_RECHECK_PASS_WAITING_FOR_RELEASE_SOURCE` (SSH BatchMode, protected backup, candidate hash and rollback path are recorded)
-NEXT_ACTION: `commit the reviewed 2026-1130 version/notes, verify exact Development CI, then dispatch Formal Release with release_gate=true and publish=true; request a test core/profile and OpenVPN/RustDesk client evidence before packet-path claims`
+DEVICE_RETRY_READY: `RC_RUN_48_DEVICE_RECHECK_PASS_RELEASE_PUBLISHED` (SSH BatchMode, protected backup, candidate hash and rollback path are recorded)
+NEXT_ACTION: `obtain a test Mihomo core/profile plus OpenVPN and RustDesk client/service evidence, then run only the scoped Stage-B traffic checks; do not infer packet-path behavior from the fail-closed startup result`
 RESULTING_HEAD: resolve with `git rev-parse HEAD` after this status-only update; this status records the pre-commit observation above
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
@@ -24,6 +24,12 @@ IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable se
 - The bounded device start/stop test returned `start_rc=0` with `last_start_failed=1` and `failure_reason=config-missing`, `running_after_start=no`; stop returned zero. nft ruleset SHA-256 was identical before/after (`6df593927d022fb66d1872e31e5b1e4f2be4f3d496437e4a6b49fd78984b5dbe`), and the OpenVPN runtime state file was removed on stop. This validates fail-closed lifecycle behavior only; no packet path was exercised.
 - The installed RC helper exposed a real disabled-state defect: several branches called the uppercase symbol `OPENKILL_OPENVPN_write_state` although the function is lowercase, so state writes were silently skipped. The source is repaired and the isolated contract test now checks that every prepare fixture writes a state file. The repaired source requires a new RC build and device reinstall before the previous device result can be used as final candidate evidence.
 - RC Run 48 (`35436712808`) rebuilt the repaired `b75d76da21003e906d060ce4ee030109a4b9a5da` source. Its artifact archive is `D:\openkill-rc-candidate-b75d76d\unpack\artifact.zip`, archive SHA-256 `f8dec8f742061f2e74b8216ae0472086152aec5775391b3d0a4f40a8b4fe6918`, and IPK SHA-256 `d2811e7adbd37038862ce4179abb421a22b3a0093933cd04ef124ab12e70ca07`. The repaired candidate was installed with the same controlled reinstall path; the helper hash matches, PassWall is unchanged, disabled OpenVPN preparation writes state, and the bounded start/stop check again returned `config-missing` with unchanged nft state.
+
+## Formal release evidence (2026-09-19)
+
+- The reviewed version commit is `ea474aeea866428d81dbde0b60d6ff0914a75009`; its exact Development CI is Run 136 (`35437049127`) and completed successfully: https://github.com/dinggood615/openkill/actions/runs/35437049127.
+- Formal Release Run 153 (`35437145461`) completed successfully with `release_gate=true`, `publish=true`, and APK disabled: https://github.com/dinggood615/openkill/actions/runs/35437145461. Tag `v2026-1130-ipk` points to the version commit and the published release is https://github.com/dinggood615/openkill/releases/tag/v2026-1130-ipk.
+- Published asset `luci-app-openkill_2026-1130_all.ipk` is 9,182,177 bytes with SHA-256 `c81acf2d644fa079f593e8f81f3ee0700743378d6cdf9c05efdff0676b895ea2`; package channel `master/latest-ipk.json` records version `2026-1130`, format `ipk`, architecture `all`, the same source commit and digest. The prior release remains available for rollback.
 
 ## OpenVPN and UI continuation contract (2026-09-19)
 
