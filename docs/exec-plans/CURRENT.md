@@ -76,7 +76,16 @@
    recovery. Packet-path, RustDesk/OpenVPN client and strict DNS traffic
    claims remain separate device gates. The candidate install and restart
    have now completed; a stop/start recovery check and final page refresh are
-   still required before a release decision.
+  still required before a release decision.
+- Device revalidation also reproduced a stale OpenVPN status field when the
+  compatibility toggle was on but transport bypass was off: `generated=0`,
+  `reason=disabled` was paired with `applied=1`. Commit `88707d3` changes the
+  writer to report `applied=0` in that branch and adds a focused contract
+  assertion. Its follow-up candidate (same package version, SHA-256
+  `90574A95246D969A60C7708E8F0E84468BFFB6FD42FD89E0CCF32F0AB42254ED`) was
+  uploaded after an independent local hash check. The device now reports
+  `generated=0`, `applied=0`, `reason=disabled` while its core and readiness
+  checks remain healthy.
 5. Invoke Formal Release only if all repository release gates pass; retain the
    prior tag/assets and document any unverified traffic scenarios.
 
