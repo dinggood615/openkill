@@ -49,6 +49,12 @@
 - Source commit `6defd705704a109770dc2e2d7b605ba4fbf5833b` was pushed to
   `master`; the exact OpenKill Development CI run `35443784718` completed
   successfully: https://github.com/dinggood615/openkill/actions/runs/35443784718.
+- The OpenVPN status correction commit `88707d37a911781eb17582175c19c59939c8885c`
+  passed its exact Development CI run `35444963099`:
+  https://github.com/dinggood615/openkill/actions/runs/35444963099. The
+  follow-up evidence commit `8ae80f2ed03ece9c588748ae5632cc550560c332` also
+  passed Development CI run `35445400459`:
+  https://github.com/dinggood615/openkill/actions/runs/35445400459.
 - A non-public candidate was built from the master source, normalized to
   root-owned archive members, and audited. Candidate SHA-256 is
   `0C41597BEC8919330A1DD5A343BB8267A02E26100320D544725FA2B36894A237`.
