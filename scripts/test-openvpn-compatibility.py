@@ -132,6 +132,10 @@ def main() -> None:
 
     disabled = prepare_fixture({"openvpn_compatibility": "0", "openvpn_transport_bypass": "0"})
     assert "generated=0" in disabled and "reason=disabled" in disabled and "clear=1" in disabled
+    # A disabled transport policy may clear old runtime sets, but it must not
+    # report that a new bypass rule was applied.
+    assert "OPENKILL_OPENVPN_applied=0" in text
+    assert "OPENKILL_OPENVPN_applied=1\n      OPENKILL_OPENVPN_reason=disabled" not in text
 
     retained = run(
         f"""

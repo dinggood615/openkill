@@ -42,14 +42,24 @@
   (`anti-ad-domains.txt`). The source now uses the maintained
   `https://anti-ad.net/domains.txt` default and retries that source only for
   the current generation when a user source fails. Both failures retain the
-  last valid cache and keep DNS privacy independent. No device file has been
-  changed in this source iteration yet.
+  last valid cache and keep DNS privacy independent. This fallback was
+  exercised after the candidate reinstall: the device state reported
+  `effective=1`, `provider_effective=1` and 107600 domains, while the log
+  retained a generic source-fallback warning.
 - Source commit `6defd705704a109770dc2e2d7b605ba4fbf5833b` was pushed to
   `master`; the exact OpenKill Development CI run `35443784718` completed
   successfully: https://github.com/dinggood615/openkill/actions/runs/35443784718.
-- The device remains on the previously installed release until a new RC is
-  built. A fresh candidate backup/install and adblock regeneration are still
-  required before claiming the source fallback fixes the device state.
+- A non-public candidate was built from the master source, normalized to
+  root-owned archive members, and audited. Candidate SHA-256 is
+  `0C41597BEC8919330A1DD5A343BB8267A02E26100320D544725FA2B36894A237`.
+  The protected pre-install backup is outside the repository at
+  `D:\openkill-device-backups\20260919-210229-ui-adblock\openkill-before-rc.tgz`
+  (SHA-256 `ADC2AE1A89F4129F72EA778F21343BBB1806DC979F43D0FB66E7DE640AACE563`).
+  Upload and device SHA-256 matched. After reinstall and restart, the core,
+  controller, TUN/DNS, proxy listeners, firewall readiness and watchdog were
+  observed; the configured user adblock URL remained unchanged. This verifies
+  the source fallback and lifecycle on this device, not strict DNS traffic,
+  RustDesk connectivity, OpenVPN tunnel traffic or public IPv6.
 
 ### Planned order
 
@@ -64,7 +74,9 @@
 4. Build and audit a non-public RC from that commit, install only after a new
    device backup, and verify page rendering, service lifecycle and state
    recovery. Packet-path, RustDesk/OpenVPN client and strict DNS traffic
-   claims remain separate device gates.
+   claims remain separate device gates. The candidate install and restart
+   have now completed; a stop/start recovery check and final page refresh are
+   still required before a release decision.
 5. Invoke Formal Release only if all repository release gates pass; retain the
    prior tag/assets and document any unverified traffic scenarios.
 

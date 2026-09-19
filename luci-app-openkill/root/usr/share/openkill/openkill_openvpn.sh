@@ -425,7 +425,7 @@ openkill_openvpn_apply_runtime()
       openkill_openvpn_mark_applied
    else
       OPENKILL_OPENVPN_APPLIED=0
-      OPENKILL_OPENVPN_applied=1
+      OPENKILL_OPENVPN_applied=0
       OPENKILL_OPENVPN_reason=disabled
       openkill_openvpn_write_state || true
    fi
