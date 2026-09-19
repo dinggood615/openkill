@@ -44,6 +44,12 @@
   the current generation when a user source fails. Both failures retain the
   last valid cache and keep DNS privacy independent. No device file has been
   changed in this source iteration yet.
+- Source commit `6defd705704a109770dc2e2d7b605ba4fbf5833b` was pushed to
+  `master`; the exact OpenKill Development CI run `35443784718` completed
+  successfully: https://github.com/dinggood615/openkill/actions/runs/35443784718.
+- The device remains on the previously installed release until a new RC is
+  built. A fresh candidate backup/install and adblock regeneration are still
+  required before claiming the source fallback fixes the device state.
 
 ### Planned order
 
