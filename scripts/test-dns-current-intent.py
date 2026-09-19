@@ -139,12 +139,17 @@ class CurrentDnsIntentTests(unittest.TestCase):
         config = (ROOT / "luci-app-openkill/root/etc/config/openkill").read_text(encoding="utf-8")
         settings = (ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua").read_text(encoding="utf-8")
         shadow = (ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_nft_shadow.sh").read_text(encoding="utf-8")
+        watchdog = (ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_watchdog.sh").read_text(encoding="utf-8")
         self.assertIn('option dns_port \'7874\'', config)
         self.assertIn('add_list "$DNSMASQ_UCI.server"=127.0.0.1#"$dns_port"', init)
         self.assertIn('redirect to ${DNSPORT}', init)
         self.assertIn('DNSPORT=$(uci -q get "$DNSMASQ_UCI.port")', init)
         self.assertIn("firewall intercepts LAN DNS on port 53", settings)
         self.assertIn("DNS_PORT) openkill_shadow_auto_value", shadow)
+        self.assertIn('DNSMASQ_UCI="dhcp.${DNSMASQ_SECTION}"', watchdog)
+        self.assertIn("uci -q -X show dhcp", watchdog)
+        self.assertNotIn("dhcp.@dnsmasq[0]", watchdog)
+        self.assertNotIn("dhcp.@dnsmasq[-1]", watchdog)
 
     def test_reconciled_frozen_102_fixture_is_a_match_without_equivalence(self):
         actual = self.semantic_fixture["dns_actual"]

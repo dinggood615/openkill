@@ -329,9 +329,13 @@ class UciLifecycleContractTests(unittest.TestCase):
         # The watchdog has one bounded, idempotent repair path.  It must keep
         # the same package ownership as change_dnsmasq rather than becoming an
         # untracked mutation.
-        self.assertIn("uci -q del dhcp.@dnsmasq[-1].server", self.watchdog)
-        self.assertIn('uci -q add_list dhcp.@dnsmasq[0].server=127.0.0.1#"$dns_port"', self.watchdog)
-        self.assertIn("uci -q set dhcp.@dnsmasq[0].noresolv=1", self.watchdog)
+        self.assertIn('DNSMASQ_UCI="dhcp.${DNSMASQ_SECTION}"', self.watchdog)
+        self.assertIn("uci -q -X show dhcp", self.watchdog)
+        self.assertIn('uci -q del "$DNSMASQ_UCI.server"', self.watchdog)
+        self.assertIn('uci -q add_list "$DNSMASQ_UCI.server"=127.0.0.1#"$dns_port"', self.watchdog)
+        self.assertIn('uci -q set "$DNSMASQ_UCI.noresolv=1"', self.watchdog)
+        self.assertNotIn("dhcp.@dnsmasq[0]", self.watchdog)
+        self.assertNotIn("dhcp.@dnsmasq[-1]", self.watchdog)
         self.assertIn("uci -q commit dhcp", self.watchdog)
         self.assertIn("/etc/init.d/dnsmasq restart", self.watchdog)
 

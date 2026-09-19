@@ -55,6 +55,7 @@ TRANSLATIONS = {
     "Disabled": "已禁用",
     "Unknown": "未知",
     "Error": "错误",
+    "Start Failed": "启动失败",
     "Not Available": "暂无数据",
     "Running": "运行中",
     "Stable": "稳定",
@@ -105,6 +106,7 @@ TRANSLATIONS = {
     "Show IP": "显示 IP",
     "Browser Mode": "浏览器模式",
     "Timeout": "超时",
+    "Unavailable": "不可用",
     "Router Mode": "路由模式",
     "Refresh": "刷新",
     "Hide IP": "隐藏 IP",
@@ -270,7 +272,7 @@ PREVIEW_SCRIPT = r"""
             var page = document.querySelector('.openkill-status-page');
             var states = {
                 loading: '加载中…', running: 'Meta&nbsp;运行中', stopped: '未运行',
-                disabled: '已禁用', unknown: '暂无数据', error: '状态读取失败'
+                disabled: '已禁用', startup_failed: '启动失败', unknown: '暂无数据', error: '状态读取失败'
             };
             var values = {
                 '_daip': '192.0.2.1:9090', '_mix_proxy': '198.51.100.2:7893',
@@ -484,8 +486,8 @@ def build_preview(output: Path) -> Path:
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" href="data:,">
   <title>OpenKill 运行状态 · 本地模拟</title>
-  <link rel="stylesheet" href="/luci-app-openkill/root/www/luci-static/resources/openkill/css/oc.css">
-  <link rel="stylesheet" href="/luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css">
+  <link rel="stylesheet" href="/luci-app-openkill/root/www/luci-static/resources/openkill/css/oc.css?v=local-preview">
+  <link rel="stylesheet" href="/luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css?v=local-preview">
   <style>__PREVIEW_STYLE__</style>
 </head>
 <body data-page="admin-services-openkill-client">
@@ -495,6 +497,7 @@ def build_preview(output: Path) -> Path:
       <button type="button" data-preview-state="running">运行中</button>
       <button type="button" data-preview-state="stopped">已停止</button>
       <button type="button" data-preview-state="disabled">已禁用</button>
+      <button type="button" data-preview-state="startup_failed">启动失败</button>
       <button type="button" data-preview-state="loading">加载中</button>
       <button type="button" data-preview-state="unknown">未知</button>
       <button type="button" data-preview-state="error">错误</button>

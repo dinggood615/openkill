@@ -11,7 +11,7 @@ state_file=/tmp/openkill-adblock.state
 provider_dir=/etc/openkill/rule_provider
 provider_file="$provider_dir/openkill-anti-ad.yaml"
 
-DNSMASQ_SECTION="$(uci -q show dhcp 2>/dev/null | sed -n 's/^dhcp\.\([^.=]*\)=dnsmasq$/\1/p' | head -n 1)"
+DNSMASQ_SECTION="$(uci -q -X show dhcp 2>/dev/null | sed -n 's/^dhcp\.\([^.=]*\)=dnsmasq$/\1/p' | head -n 1)"
 [ -n "$DNSMASQ_SECTION" ] || DNSMASQ_SECTION="@dnsmasq[0]"
 DNSMASQ_UCI="dhcp.${DNSMASQ_SECTION}"
 DEFAULT_DNSMASQ_CFGID="$(uci -q show "$DNSMASQ_UCI" | awk 'NR==1 {split($0, conf, /[.=]/); print conf[2]}')"
@@ -121,10 +121,17 @@ awk -v allow="$policy_allow" -v block="$policy_block" '
       while ((getline line < file) > 0) { gsub(/[[:space:]]/, "", line); line=tolower(line); if (line ~ /^([a-z0-9_-]+\.)+[a-z]{2,}$/) target[line]=1 }
       close(file)
    }
+   function under(domain, parent) {
+      return domain == parent || (length(domain) > length(parent) && substr(domain, length(domain) - length(parent), length(parent) + 1) == "." parent)
+   }
+   function listed(domain, set, key) {
+      for (key in set) if (under(domain, key)) return 1
+      return 0
+   }
    BEGIN { read_list(allow, ok); read_list(block, deny) }
-   { domain=tolower($0); if (domain ~ /^([a-z0-9_-]+\.)+[a-z]{2,}$/ && !ok[domain] && !deny[domain] && !seen[domain]) { print "local=/" domain "/"; seen[domain]=1 } }
+   { domain=tolower($0); if (domain ~ /^([a-z0-9_-]+\.)+[a-z]{2,}$/ && !listed(domain, ok) && !listed(domain, deny) && !seen[domain]) { print "local=/" domain "/"; seen[domain]=1 } }
 ' "$cache_file" > "$tmp_conf" || exit 1
-awk '!/^([[:space:]]*#|[[:space:]]*$)/ { gsub(/[[:space:]]/, "", $0); if ($0 ~ /^([A-Za-z0-9_-]+\.)+[A-Za-z]{2,}$/) print "local=/" tolower($0) "/" }' "$policy_block" >> "$tmp_conf"
+awk '!/^([[:space:]]*#|[[:space:]]*$)/ { gsub(/[[:space:]]/, "", $0); if ($0 ~ /^([A-Za-z0-9_-]+\.)+[A-Za-z]{2,}$/) print "local=/" tolower($0) "/" }' "$policy_block" | sort -u >> "$tmp_conf"
 
 if [ -s "$tmp_conf" ]; then
    mv -f "$tmp_conf" "$conf_file"
@@ -134,9 +141,20 @@ fi
 
 {
    printf 'payload:\n'
-   awk -v allow="$policy_allow" '
-      BEGIN { while ((getline line < allow) > 0) { gsub(/[[:space:]]/, "", line); ok[tolower(line)]=1 }; close(allow) }
-      { domain=tolower($0); if (domain ~ /^([a-z0-9_-]+\.)+[a-z]{2,}$/ && !ok[domain]) printf "  - %s\n", domain }
+   awk -v allow="$policy_allow" -v block="$policy_block" '
+      function read_list(file, target, line) {
+         while ((getline line < file) > 0) { gsub(/[[:space:]]/, "", line); line=tolower(line); if (line ~ /^([a-z0-9_-]+\.)+[a-z]{2,}$/) target[line]=1 }
+         close(file)
+      }
+      function under(domain, parent) {
+         return domain == parent || (length(domain) > length(parent) && substr(domain, length(domain) - length(parent), length(parent) + 1) == "." parent)
+      }
+      function listed(domain, set, key) {
+         for (key in set) if (under(domain, key)) return 1
+         return 0
+      }
+      BEGIN { read_list(allow, ok); read_list(block, deny) }
+      { domain=tolower($0); if (domain ~ /^([a-z0-9_-]+\.)+[a-z]{2,}$/ && !listed(domain, ok) && !listed(domain, deny)) printf "  - %s\n", domain }
    ' "$cache_file"
 } > "$tmp_provider" || exit 1
 mv -f "$tmp_provider" "$provider_file"

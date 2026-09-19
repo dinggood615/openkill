@@ -1497,6 +1497,8 @@ function action_status()
 		clash = status_data.clash,
 		core_ready = status_data.clash,
 		service_enabled = status_data.service_enabled,
+		last_start_failed = fs.uci_get_config("config", "last_start_failed") or "",
+		last_start_failed_reason = fs.uci_get_config("config", "last_start_failed_reason") or "",
 		daip = status_data.daip,
 		dase = status_data.dase,
 		db_foward_port = status_data.db_foward_port,

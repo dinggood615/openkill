@@ -404,6 +404,65 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-se
 
 /* ===== OpenKill Stage 3: Runtime Dashboard Layout End ===== */
 
+/* ===== OpenKill UI defect fix: content-sized dashboard rows =====
+ * The base theme gives .main-card four fixed tracks for an older desktop
+ * layout.  The status page contains live badges, action labels and a config
+ * selector whose height can legitimately exceed those tracks.  Let the page
+ * content determine each row so headings and controls cannot be clipped or
+ * overlap at non-default zoom levels. */
+.oc.openkill-status-page .dashboard-v1-layout > .main-card {
+    grid-template-rows: none;
+    grid-auto-rows: max-content;
+    align-content: start;
+}
+
+.oc.openkill-status-page .dashboard-v1-layout > .main-card > .card-row {
+    height: auto;
+    min-height: 0;
+    align-self: start;
+}
+
+.oc.openkill-status-page .dashboard-v1-layout .sub-card,
+.oc.openkill-status-page .dashboard-v1-layout .card-content,
+.oc.openkill-status-page .dashboard-v1-layout .card-controls {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.oc.openkill-status-page .dashboard-v1-layout .card-title {
+    height: auto;
+    min-height: 24px;
+    line-height: 1.35;
+    overflow: visible;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.oc.openkill-status-page .dashboard-v1-layout .version-display {
+    height: auto;
+    min-height: 24px;
+    line-height: 1.3;
+}
+
+.oc.openkill-status-page .dashboard-metrics-section .stat-label {
+    line-height: 1.35;
+    min-height: 1.35em;
+}
+
+.oc.openkill-status-page #data-refresh-icon.is-loading {
+    cursor: wait;
+    opacity: .65;
+    animation: openkill-status-spin 1s linear infinite;
+}
+
+.oc.openkill-status-page #data-refresh-icon[aria-disabled="true"] {
+    pointer-events: none;
+}
+
+@keyframes openkill-status-spin {
+    to { transform: rotate(360deg); }
+}
+
 /* ===== OpenKill Stage 4: Settings Card Layout Start =====
  * Layout and responsive behavior only. Component appearance remains in
  * oc.css; native CBI controls are moved, never cloned. */

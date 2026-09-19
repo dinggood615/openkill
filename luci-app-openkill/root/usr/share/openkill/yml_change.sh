@@ -1086,11 +1086,9 @@ begin
       end
    end
 
-   # Ad filtering is a separate routing decision.  The downloaded anti-AD
-   # provider is placed before ordinary business rules; user blocks win over
-   # user allows, while PASS only skips this provider and continues to the
-   # normal policy chain.  It therefore never turns an allow-list entry into
-   # an implicit DIRECT route.
+      # Ad filtering is a separate routing decision. User blocks win over user
+      # allows; allow entries are applied while generating the shared provider
+      # and dnsmasq views, so an allow never becomes an implicit DIRECT route.
    adblock_ok = true
    begin
       rules = Value['rules'].is_a?(Array) ? Value['rules'] : []
@@ -1125,9 +1123,11 @@ begin
          rules.unshift('RULE-SET,openkill-anti-ad,REJECT')
          YAML.LOG_TIP('Adblock provider enabled from the same canonical generation as dnsmasq.')
       end
-      # Allow-list domains are removed from the managed provider itself. A
-      # top-level PASS would continue into later rules and could still hit a
-      # subscription REJECT, so never emit a misleading PASS rule here.
+       # Allow-list domains and explicit blocks are removed from the managed
+       # provider itself. A top-level PASS would continue into later rules and
+       # could still hit a subscription REJECT, so never emit a misleading PASS
+       # rule here; the explicit block rules below retain block-over-allow
+       # precedence.
       rules.unshift(*adblock_block.map { |domain| "DOMAIN-SUFFIX,#{domain},REJECT" })
       rules.uniq!
       Value['rules'] = rules

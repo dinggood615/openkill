@@ -26,7 +26,7 @@ openkill_shadow_stable_boundary()
 # Resolve one stable dnsmasq section once and use the same section for every
 # backup, mutation and restore.  Anonymous index selectors can point at a
 # different instance after another dnsmasq section is added or reordered.
-DNSMASQ_SECTION="$(uci -q show dhcp 2>/dev/null | sed -n 's/^dhcp\.\([^.=]*\)=dnsmasq$/\1/p' | head -n 1)"
+DNSMASQ_SECTION="$(uci -q -X show dhcp 2>/dev/null | sed -n 's/^dhcp\.\([^.=]*\)=dnsmasq$/\1/p' | head -n 1)"
 [ -n "$DNSMASQ_SECTION" ] || DNSMASQ_SECTION="@dnsmasq[0]"
 DNSMASQ_UCI="dhcp.${DNSMASQ_SECTION}"
 
@@ -473,6 +473,7 @@ start_fail()
 {
    openkill_current_start || exit 1
    uci -q set openkill.config.last_start_failed=1
+   uci -q set openkill.config.last_start_failed_reason="${OPENKILL_START_FAILURE_REASON:-startup-failed}"
    uci -q commit openkill
    if [ "${OPENKILL_RECOVERY:-0}" != 1 ] && [ -s /etc/openkill/.last-good/config.yaml ]; then
       LOG_WARN "Startup failed; scheduling one verified checkpoint recovery."
@@ -570,6 +571,9 @@ fi
 
 if [ ! -f "$RAW_CONFIG_FILE" ]; then
    LOG_ERROR "Config Not Found"
+   uci -q set openkill.config.last_start_failed=1
+   uci -q set openkill.config.last_start_failed_reason=config-missing
+   uci -q commit openkill
    exit 0
 fi
 
@@ -1227,6 +1231,7 @@ check_core_status()
    fi
    openkill_current_start || return 0
    uci -q delete openkill.config.last_start_failed
+   uci -q delete openkill.config.last_start_failed_reason
    uci -q commit openkill
    if [ "$1" = start ]; then
       /usr/share/openkill/openkill_recovery.sh save "$CONFIG_FILE" ||

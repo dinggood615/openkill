@@ -1428,6 +1428,12 @@ msgstr "查询中..."
 msgid "Testing..."
 msgstr "检测中..."
 
+msgid "Unavailable"
+msgstr "不可用"
+
+msgid "Start Failed"
+msgstr "启动失败"
+
 msgid "Access Timed Out"
 msgstr "连接超时"
 

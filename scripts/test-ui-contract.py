@@ -122,6 +122,7 @@ class LuCIContractTests(unittest.TestCase):
         self.assertIn("<%:Collecting data...%>", source)
         self.assertIn("<%:Not Running%>", source)
         self.assertIn("<%:Disabled%>", source)
+        self.assertIn("<%:Start Failed%>", source)
         self.assertIn("<%:Unknown%>", source)
         self.assertIn("<%:Error%>", source)
         self.assertIn("<%:Not Available%>", source)
@@ -133,6 +134,7 @@ class LuCIContractTests(unittest.TestCase):
         self.assertIn("typeof status.clash !== 'boolean'", source)
         self.assertIn("typeof status.service_enabled !== 'boolean'", source)
         self.assertIn("return status.service_enabled ? 'stopped' : 'disabled';", source)
+        self.assertIn("status.last_start_failed === true || status.last_start_failed === '1'", source)
         self.assertIn("function setRuntimeState(status, forcedState)", source)
         self.assertIn("setRuntimeState(null, 'error');", source)
         self.assertIn("updateRuntimeProfile(null);", source)
@@ -151,6 +153,8 @@ class LuCIContractTests(unittest.TestCase):
                 self.assertRegex(myip, rf'id="{element_id}"[^>]+aria-label=')
         self.assertIn('body[data-page="admin-services-openkill-client"] .myip-main-card', css)
         self.assertIn('grid-template-columns: repeat(2, minmax(0, 1fr));', css)
+        self.assertIn('grid-template-rows: none;', css)
+        self.assertIn('content-sized dashboard rows', css)
 
     def test_status_settings_are_scoped_and_generation_guarded(self) -> None:
         source = STATUS.read_text(encoding="utf-8")
@@ -289,6 +293,11 @@ class LuCIContractTests(unittest.TestCase):
         eye_markup = source[source.index('id="eye-icon"') : source.index("</svg>", source.index('id="eye-icon"'))]
         self.assertIn('aria-pressed="false"', eye_markup)
         for hook in (
+            "function updateIpInfoState(provider, state)",
+            "function setIpInfoError(state)",
+            "IP.get(`http://myip.ipip.net?z=${random}`, 'text', 10000)",
+            "xhr.ontimeout = function()",
+            "setIpRefreshState(true);",
             "function setMyIpVisibility(element, visible)",
             "setMyIpVisibility(eyeOpen, true);",
             "setMyIpVisibility(eyeClosed, false);",

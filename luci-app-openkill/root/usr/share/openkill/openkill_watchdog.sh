@@ -74,6 +74,12 @@ DNS_RELOAD_LAST=0
 DNS_RELOAD_COOLDOWN=300
 FW4=$(command -v fw4)
 
+# Resolve the selected dnsmasq instance once. Positional UCI selectors can
+# point at a different instance after sections are added or reordered.
+DNSMASQ_SECTION="$(uci -q -X show dhcp 2>/dev/null | sed -n 's/^dhcp\.\([^.=]*\)=dnsmasq$/\1/p' | head -n 1)"
+[ -n "$DNSMASQ_SECTION" ] || DNSMASQ_SECTION="@dnsmasq[0]"
+DNSMASQ_UCI="dhcp.${DNSMASQ_SECTION}"
+
 # Values are expressed in watchdog cycles.  Keeping the defaults conservative
 # avoids a full interface/firewall scan on every heartbeat while still
 # allowing advanced users to tune the maintenance cadence in UCI.
@@ -511,16 +517,16 @@ if [ "$tun_owner" = "openkill" ]; then
 
 ## DNS转发劫持
    if [ "$tun_owner" = "openkill" ] && [ "$enable_redirect_dns" = "1" ]; then
-      if [ -z "$(uci -q get dhcp.@dnsmasq[0].server |grep "$dns_port")" ] || [ ! -z "$(uci -q get dhcp.@dnsmasq[0].server |awk -F ' ' '{print $2}')" ]; then
+       if [ -z "$(uci -q get "$DNSMASQ_UCI.server" |grep "$dns_port")" ] || [ ! -z "$(uci -q get "$DNSMASQ_UCI.server" |awk -F ' ' '{print $2}')" ]; then
          dns_now=$(date +%s 2>/dev/null || echo 0)
          if [ "$DNS_RELOAD_LAST" -eq 0 ] || [ "$dns_now" -ge $((DNS_RELOAD_LAST + DNS_RELOAD_COOLDOWN)) ]; then
             LOG_WATCHDOG "Force Reset DNS Hijack..."
-            uci -q del dhcp.@dnsmasq[-1].server
-            uci -q add_list dhcp.@dnsmasq[0].server=127.0.0.1#"$dns_port"
-            uci -q delete dhcp.@dnsmasq[0].resolvfile
-            uci -q set dhcp.@dnsmasq[0].noresolv=1
-            [ "$disable_masq_cache" -eq 1 ] && {
-              uci -q set dhcp.@dnsmasq[0].cachesize=0
+             uci -q del "$DNSMASQ_UCI.server"
+             uci -q add_list "$DNSMASQ_UCI.server"=127.0.0.1#"$dns_port"
+             uci -q delete "$DNSMASQ_UCI.resolvfile"
+             uci -q set "$DNSMASQ_UCI.noresolv=1"
+             [ "$disable_masq_cache" -eq 1 ] && {
+               uci -q set "$DNSMASQ_UCI.cachesize=0"
             }
             uci -q commit dhcp
             /etc/init.d/dnsmasq restart >/dev/null 2>&1

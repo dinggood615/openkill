@@ -193,6 +193,22 @@
     var refresh_ip;
     var ipCheckXHR = null;
     var httpCheckXHR = null;
+    var ipRefreshTimer = null;
+
+    function setIpRefreshState(busy) {
+        var refresh = document.getElementById('data-refresh-icon');
+        if (!refresh) return;
+        refresh.classList.toggle('is-loading', !!busy);
+        refresh.setAttribute('aria-busy', busy ? 'true' : 'false');
+        refresh.setAttribute('aria-disabled', busy ? 'true' : 'false');
+        refresh.setAttribute('title', busy ? '<%:Testing...%>' : '<%:Refresh%>');
+        if (ipRefreshTimer) clearTimeout(ipRefreshTimer);
+        if (busy) {
+            ipRefreshTimer = setTimeout(function() {
+                setIpRefreshState(false);
+            }, 12000);
+        }
+    }
     $$.getElementById('ip-ipip').innerHTML = '<%:Querying...%>';
     $$.getElementById('ip-ipify').innerHTML = '<%:Querying...%>';
     $$.getElementById('ip-pcol').innerHTML = '<%:Querying...%>';
@@ -423,30 +439,68 @@
         }
     }
 
+    var ipInfoFields = {
+        pcol: { id: 'ip-pcol', geo: 'ip-pcol-geo' },
+        ipip: { id: 'ip-ipip', geo: 'ip-ipip-geo' },
+        ipsb: { id: 'ip-ipsb', geo: 'ip-ipsb-geo' },
+        ipify: { id: 'ip-ipify', geo: 'ip-ipify-geo' }
+    };
+
+    function updateIpInfoState(provider, state) {
+        var fields = ipInfoFields[provider];
+        if (!fields) return;
+        var ip = document.getElementById(fields.id);
+        var geo = document.getElementById(fields.geo);
+        if (!ip || !geo) return;
+        if (localStorage.getItem('privacy_my_ip') === 'true') {
+            ip.textContent = '***.***.***.***';
+            geo.textContent = '';
+            return;
+        }
+        if (state === 'loading') {
+            ip.textContent = '<%:Querying...%>';
+            geo.textContent = '';
+        } else if (state === 'timeout') {
+            ip.textContent = '<%:Timeout%>';
+            geo.textContent = '<%:Timeout%>';
+        } else {
+            ip.textContent = '<%:Unavailable%>';
+            geo.textContent = '<%:Unavailable%>';
+        }
+        ip.setAttribute('title', ip.textContent);
+        geo.setAttribute('title', geo.textContent);
+    }
+
+    function setIpInfoLoading() {
+        Object.keys(ipInfoFields).forEach(function(provider) {
+            updateIpInfoState(provider, 'loading');
+        });
+    }
+
+    function setIpInfoError(state) {
+        Object.keys(ipInfoFields).forEach(function(provider) {
+            updateIpInfoState(provider, state || 'unavailable');
+        });
+    }
+
     let random = parseInt(Math.random() * 100000000);
     let IP = {
-        get: (url, type) =>
-            fetch(url, { method: 'GET' }).then((resp) => {
+        get: (url, type, timeoutMs) => {
+            var timer;
+            var limit = timeoutMs || 10000;
+            var request = fetch(url, { method: 'GET' }).then((resp) => {
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
                 if (type === 'text')
                     return Promise.all([resp.ok, resp.status, resp.text(), resp.headers]);
-                else {
-                    return Promise.all([resp.ok, resp.status, resp.json(), resp.headers]);
-                }
-            }).then(([ok, status, data, headers]) => {
-                if (ok) {
-                    let json = {
-                        ok,
-                        status,
-                        data,
-                        headers
-                    }
-                    return json;
-                } else {
-                    throw new Error(JSON.stringify(json.error));
-                }
-            }).catch(error => {
-                throw error;
-            }),
+                return Promise.all([resp.ok, resp.status, resp.json(), resp.headers]);
+            }).then(([ok, status, data, headers]) => ({ ok, status, data, headers }));
+            var timeout = new Promise(function(_, reject) {
+                timer = setTimeout(function() { reject(new Error('timeout')); }, limit);
+            });
+            return Promise.race([request, timeout]).finally(function() {
+                if (timer) clearTimeout(timer);
+            });
+        },
         parseIPIpip: (ip, elID) => {
             const v4 = '(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]\\d|\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]\\d|\\d)){3}';
             const v4Exact = new RegExp(`^${v4}$`);
@@ -458,17 +512,13 @@
                 return ip;
             })();
 
-            fetch(`https://api.ip.sb/geoip/${anonymizedIp}`, {
-            referrerPolicy: 'no-referrer-when-downgrade',
-            }).then(r => r.json())
+            IP.get(`https://api.ip.sb/geoip/${anonymizedIp}`, 'json', 10000).then(resp => resp.data)
             .then(resp => {
                 if ( resp.country && resp.country != '' && resp.isp && resp.isp != '' ) {
                     $$.getElementById(elID).innerHTML = resp.country + ' ' + resp.isp;
                 }
                 else {
-                    fetch(`https://qqwry.api.skk.moe/${anonymizedIp}`, {
-                    referrerPolicy: 'no-referrer-when-downgrade',
-                    }).then(r => r.json())
+                    IP.get(`https://qqwry.api.skk.moe/${anonymizedIp}`, 'json', 10000).then(r => r.data)
                     .then(resp => {
                         if ( resp.geo.indexOf('skk.moe') == -1 ) {
                             $$.getElementById(elID).innerHTML = resp.geo;
@@ -476,9 +526,15 @@
                         else {
                             $$.getElementById(elID).innerHTML = 'Unknown';
                         }
-                    })
+                    }).catch(function() {
+                        var geo = $$.getElementById(elID);
+                        if (geo) geo.textContent = '<%:Unavailable%>';
+                    });
                 }
-            })
+            }).catch(function() {
+                var geo = $$.getElementById(elID);
+                if (geo) geo.textContent = '<%:Unavailable%>';
+            });
         },
         getPcolIP: () => {
             document.querySelectorAll('script[data-pcol]').forEach(function(el) {
@@ -487,9 +543,20 @@
             window.IPCallBack = null;
 
             var script = document.createElement('script');
+            var settled = false;
+            var timer = setTimeout(function() {
+                if (settled) return;
+                settled = true;
+                if (script.parentNode) script.parentNode.removeChild(script);
+                window.IPCallBack = null;
+                updateIpInfoState('pcol', 'timeout');
+            }, 10000);
             script.setAttribute('data-pcol', '');
             script.src = 'https://whois.pconline.com.cn/ipJson.jsp?z=' + random;
             window.IPCallBack = function(data) {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
                 if (data && data.ip) {
                     if (localStorage.getItem('privacy_my_ip') != 'true') {
                         $$.getElementById('ip-pcol').innerHTML = data.ip;
@@ -502,13 +569,15 @@
                         if (ispMatch) geo.push(ispMatch[1]);
                     }
                     $$.getElementById('ip-pcol-geo').innerHTML = geo.join(' ');
+                } else {
+                    updateIpInfoState('pcol', 'unavailable');
                 }
                 addTitleOnOverflow();
             };
             document.head.appendChild(script);
         },
         getIpipIP: () => {
-            IP.get(`http://myip.ipip.net?z=${random}`, 'text')
+            IP.get(`http://myip.ipip.net?z=${random}`, 'text', 10000)
             .then(resp => {
                 const ipMatch = resp.data.match(/当前 IP：([0-9A-Fa-f:.]+)/);
                 const geoMatch = resp.data.match(/来自于：(.+)/);
@@ -520,31 +589,36 @@
                     $$.getElementById('ip-ipip-geo').innerHTML = geoMatch[1].trim();
                     addTitleOnOverflow();
                 }
-            })
+            }).catch(function(error) {
+                updateIpInfoState('ipip', error && error.message === 'timeout' ? 'timeout' : 'unavailable');
+            });
         },
         getIpifyIP: () => {
-            IP.get(`https://api.ipify.org/?format=json&z=${random}`, 'json')
+            IP.get(`https://api.ipify.org/?format=json&z=${random}`, 'json', 10000)
             .then(resp => {
+                var ip = resp.data && resp.data.ip;
+                if (!ip) throw new Error('missing-ip');
                 if (localStorage.getItem('privacy_my_ip') != 'true') {
-                    $$.getElementById('ip-ipify').innerHTML = resp.data.ip;
+                    $$.getElementById('ip-ipify').innerHTML = ip;
                 };
-                return resp.data.ip;
-            })
-            .then(ip => {
                 IP.parseIPIpip(ip, 'ip-ipify-geo');
                 addTitleOnOverflow();
-            })
+            }).catch(function(error) {
+                updateIpInfoState('ipify', error && error.message === 'timeout' ? 'timeout' : 'unavailable');
+            });
         },
         getIpsbIP: () => {
-            fetch(`https://api.ip.sb/geoip?z=${random}`)
-                .then(response => response.json())
+            IP.get(`https://api.ip.sb/geoip?z=${random}`, 'json', 10000)
+                .then(response => response.data)
                 .then(data => {
                     if (localStorage.getItem('privacy_my_ip') != 'true') {
                         $$.getElementById('ip-ipsb').innerHTML = data.ip;
                     };
                     $$.getElementById('ip-ipsb-geo').innerHTML = `${data.country} ${data.isp}`;
                     addTitleOnOverflow();
-                })
+                }).catch(function(error) {
+                    updateIpInfoState('ipsb', error && error.message === 'timeout' ? 'timeout' : 'unavailable');
+                });
         }
     };
 
@@ -814,6 +888,8 @@
 
     function get_router_ip_info() {
         if (ipCheckXHR) { try { ipCheckXHR.abort(); } catch(e) {} ipCheckXHR = null; }
+        setIpInfoLoading();
+        setIpRefreshState(true);
         var xhr = new XMLHttpRequest();
         xhr.open('GET', '/cgi-bin/luci/admin/services/openkill/myip_check', true);
         xhr.timeout = 35000;
@@ -842,20 +918,23 @@
 
         xhr.onload = function() {
             if (xhr.status !== 200) {
-                if (!has_ip_cache()) show_querying_state();
+                setIpInfoError('unavailable');
             }
             addTitleOnOverflow();
         };
 
         xhr.ontimeout = function() {
-            if (!has_ip_cache()) show_querying_state();
+            setIpInfoError('timeout');
         };
 
         xhr.onerror = function() {
-            if (!has_ip_cache()) show_querying_state();
+            setIpInfoError('unavailable');
         };
 
-        xhr.onloadend = function() { if (ipCheckXHR === xhr) ipCheckXHR = null; };
+        xhr.onloadend = function() {
+            if (ipCheckXHR === xhr) ipCheckXHR = null;
+            setIpRefreshState(false);
+        };
         xhr.send();
         ipCheckXHR = xhr;
     }
@@ -876,11 +955,7 @@
         if (!el) return;
 
         if (obj.error) {
-            var curIp = $$.getElementById(el.id).innerHTML;
-            if (!curIp || curIp === '<%:Querying...%>' || curIp === '***.***.***.***') {
-                $$.getElementById(el.id).innerHTML = (obj.error === 'timeout') ? '<%:Timeout%>' : '<%:Querying...%>';
-            }
-            $$.getElementById(el.geo).innerHTML = '';
+            updateIpInfoState(key, obj.error === 'timeout' ? 'timeout' : 'unavailable');
             return;
         }
 
@@ -920,37 +995,16 @@
     }
 
     function show_querying_state() {
-        if (localStorage.getItem('privacy_my_ip') === 'true') {
-            $$.getElementById('ip-ipip').innerHTML = '***.***.***.***';
-            $$.getElementById('ip-ipsb').innerHTML = '***.***.***.***';
-            $$.getElementById('ip-pcol').innerHTML = '***.***.***.***';
-            $$.getElementById('ip-ipify').innerHTML = '***.***.***.***';
-        } else {
-            $$.getElementById('ip-ipip').innerHTML = '<%:Querying...%>';
-            $$.getElementById('ip-ipsb').innerHTML = '<%:Querying...%>';
-            $$.getElementById('ip-pcol').innerHTML = '<%:Querying...%>';
-            $$.getElementById('ip-ipify').innerHTML = '<%:Querying...%>';
-        }
-        $$.getElementById('ip-ipip-geo').innerHTML = '';
-        $$.getElementById('ip-ipsb-geo').innerHTML = '';
-        $$.getElementById('ip-pcol-geo').innerHTML = '';
-        $$.getElementById('ip-ipify-geo').innerHTML = '';
+        setIpInfoLoading();
     }
 
     function reset_display() {
-        $$.getElementById('ip-ipip').innerHTML = '<%:Querying...%>';
-        $$.getElementById('ip-ipify').innerHTML = '<%:Querying...%>';
-        $$.getElementById('ip-pcol').innerHTML = '<%:Querying...%>';
-        $$.getElementById('ip-ipsb').innerHTML = '<%:Querying...%>';
-
-        $$.getElementById('ip-ipip-geo').innerHTML = '';
-        $$.getElementById('ip-ipify-geo').innerHTML = '';
-        $$.getElementById('ip-pcol-geo').innerHTML = '';
-        $$.getElementById('ip-ipsb-geo').innerHTML = '';
+        setIpInfoLoading();
     }
 
     function refresh_myip(svgElement) {
         clearAllIntervals();
+        setIpRefreshState(true);
 
         if (use_router_mode) {
             get_router_ip_info();

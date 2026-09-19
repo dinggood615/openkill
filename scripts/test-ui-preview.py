@@ -34,6 +34,7 @@ class LocalUIPreviewTests(unittest.TestCase):
         self.assertIn('data-preview-fixture="local-only"', html)
         self.assertIn('data-preview-state="running"', html)
         self.assertIn('data-preview-state="disabled"', html)
+        self.assertIn('data-preview-state="startup_failed"', html)
         self.assertIn('data-preview-state="error"', html)
         self.assertIn('oc-icons.js', html)
         self.assertIn('aria-busy="true"', html)

@@ -388,6 +388,7 @@
         running: '<%:Running%>',
         stopped: '<%:Not Running%>',
         disabled: '<%:Disabled%>',
+        startup_failed: '<%:Start Failed%>',
         unknown: '<%:Unknown%>',
         error: '<%:Error%>'
     };
@@ -399,6 +400,7 @@
             return 'unknown';
         }
         if (status.clash) return 'running';
+        if (status.last_start_failed === true || status.last_start_failed === '1') return 'startup_failed';
         return status.service_enabled ? 'stopped' : 'disabled';
     }
 
@@ -417,6 +419,11 @@
             indicator.setAttribute('aria-live', 'polite');
             indicator.textContent = runtimeStateLabels[state] || runtimeStateLabels.unknown;
             indicator.setAttribute('aria-label', runtimeStateLabels[state] || runtimeStateLabels.unknown);
+            if (state === 'startup_failed' && status && status.last_start_failed_reason) {
+                indicator.setAttribute('title', '启动失败：' + status.last_start_failed_reason);
+            } else {
+                indicator.removeAttribute('title');
+            }
             if (state === 'loading' || state === 'unknown' || state === 'error') {
                 indicator.classList.add('runtime-unavailable');
             } else {
