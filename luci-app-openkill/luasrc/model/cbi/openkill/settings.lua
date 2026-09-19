@@ -126,12 +126,17 @@ o.rmempty = false
 o:depends("openvpn_compatibility", "1")
 o.description = "仅匹配下方服务端地址/域名解析结果、TCP/UDP 协议和端口。不会绕过整个 VPN 网段、所有 LAN、全部 443/1194，也不会自动让隧道业务 DIRECT。"
 
-o = s:taboption("compatibility", ListValue, "openvpn_transport_protocol", "OpenVPN 传输协议")
-o:value("udp", "UDP")
-o:value("tcp", "TCP")
-o.default = "udp"
-o.rmempty = false
-o:depends("openvpn_transport_bypass", "1")
+  o = s:taboption("compatibility", ListValue, "openvpn_transport_protocol", "OpenVPN 传输协议")
+  o:value("udp", "UDP")
+  o:value("tcp", "TCP")
+  o:value("udp4", "UDP IPv4")
+  o:value("udp6", "UDP IPv6")
+  o:value("tcp4", "TCP IPv4")
+  o:value("tcp6", "TCP IPv6")
+  o.default = "udp"
+  o.rmempty = false
+  o:depends("openvpn_transport_bypass", "1")
+  o.description = "可按 OpenVPN proto 的地址族精确限制；tcp-client/tcp-server 会按 TCP 处理，未支持或冲突值不会生成规则。"
 
 o = s:taboption("compatibility", DynamicList, "openvpn_server_ports", "OpenVPN 服务端口")
 o.datatype = "port"

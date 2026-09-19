@@ -4724,6 +4724,10 @@ stop_service()
       revert_dnsmasq
 
       LOG_OUT "Step 5: Delete OpenKill Residue File..."
+      # The OpenVPN state is runtime evidence, not persistent configuration.
+      # Remove it with the firewall objects so a stopped or failed service
+      # cannot keep showing a stale "rule applied" status in LuCI.
+      rm -rf /tmp/openkill-openvpn.state /tmp/openkill-openvpn
       LOG_TIP "OpenKill Already Stop!"
 
       if [ "$enable" != "1" ]; then

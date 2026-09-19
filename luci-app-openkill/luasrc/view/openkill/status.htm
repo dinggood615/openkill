@@ -592,7 +592,10 @@
             vpnDetail.textContent = !vpnConfigured ? '兼容开关关闭' :
                 ('角色 ' + (status.openvpn_role || 'router-client') + ' · 隧道 ' +
                 (tunnelState === 'established' ? '已建立' : '未验证') +
-                ' · IPv4/IPv6 ' + (status.openvpn_endpoint4 || '0') + '/' + (status.openvpn_endpoint6 || '0'));
+                ' · ' + (status.openvpn_transport_protocol || 'udp') + '/' +
+                (status.openvpn_protocol_family || 'all') + ' · IPv4/IPv6 ' +
+                (status.openvpn_endpoint4 || '0') + '/' + (status.openvpn_endpoint6 || '0') +
+                (status.openvpn_reason && status.openvpn_reason !== 'applied' ? ' · ' + status.openvpn_reason : ''));
         }
     }
 

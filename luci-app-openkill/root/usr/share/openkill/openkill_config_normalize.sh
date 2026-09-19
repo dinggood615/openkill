@@ -42,7 +42,7 @@ case "$openvpn_transport_bypass" in 0|1) ;; *) uci -q set openkill.config.openvp
 openvpn_role="$(uci -q get openkill.config.openvpn_role 2>/dev/null || true)"
 case "$openvpn_role" in router-client|lan-client|server) ;; *) uci -q set openkill.config.openvpn_role=router-client; changed=1 ;; esac
 openvpn_transport_protocol="$(uci -q get openkill.config.openvpn_transport_protocol 2>/dev/null || true)"
-case "$openvpn_transport_protocol" in tcp|udp) ;; *) uci -q set openkill.config.openvpn_transport_protocol=udp; changed=1 ;; esac
+case "$openvpn_transport_protocol" in tcp|udp|tcp4|tcp6|udp4|udp6|tcp-client|tcp-server) ;; *) uci -q set openkill.config.openvpn_transport_protocol=udp; changed=1 ;; esac
 openvpn_tunnel_policy="$(uci -q get openkill.config.openvpn_tunnel_policy 2>/dev/null || true)"
 case "$openvpn_tunnel_policy" in inherit|force-proxy|direct) ;; *) uci -q set openkill.config.openvpn_tunnel_policy=inherit; changed=1 ;; esac
 openvpn_real_ip="$(uci -q get openkill.config.openvpn_real_ip 2>/dev/null || true)"

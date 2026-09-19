@@ -17,9 +17,9 @@ def run(script: str) -> str:
     if os.name == "nt":
         script = script.replace("D:/openkill", "/mnt/d/openkill")
         command = ["wsl.exe", "--cd", "/mnt/d/openkill", "--exec", "sh", "-c", script]
-        result = subprocess.run(command, text=True, capture_output=True)
+        result = subprocess.run(command, text=True, capture_output=True, encoding="utf-8", errors="replace")
     else:
-        result = subprocess.run(["sh", "-c", script], cwd=ROOT, text=True, capture_output=True)
+        result = subprocess.run(["sh", "-c", script], cwd=ROOT, text=True, capture_output=True, encoding="utf-8", errors="replace")
     if result.returncode:
         raise AssertionError(f"shell fixture failed ({result.returncode}):\n{result.stdout}\n{result.stderr}")
     return result.stdout
@@ -114,8 +114,53 @@ def main() -> None:
     )
     assert "generated=0" in bad_protocol and "reason=invalid-protocol" in bad_protocol
 
+    family_protocol = prepare_fixture(
+        {
+            "openvpn_compatibility": "1",
+            "openvpn_transport_bypass": "1",
+            "openvpn_role": "router-client",
+            "openvpn_transport_protocol": "udp6",
+            "openvpn_server_ports": "1194",
+            "openvpn_server_ips": "2001:db8::1",
+        }
+    )
+    assert "generated=1" in family_protocol and "endpoint6=1" in family_protocol
+
     disabled = prepare_fixture({"openvpn_compatibility": "0", "openvpn_transport_bypass": "0"})
     assert "generated=0" in disabled and "reason=disabled" in disabled and "clear=1" in disabled
+
+    retained = run(
+        f"""
+        set -eu
+        tmp=$(mktemp -d)
+        trap 'rm -rf "$tmp"' EXIT
+        uci_get_config() {{
+            case "$1" in
+                openvpn_compatibility) printf '1' ;;
+                openvpn_transport_bypass) printf '1' ;;
+                openvpn_role) printf 'router-client' ;;
+                openvpn_transport_protocol) printf 'udp' ;;
+                openvpn_server_ports) printf 'bad-port' ;;
+                openvpn_server_ips) printf 'bad-address' ;;
+                *) printf '' ;;
+            esac
+        }}
+        . '{HELPER.as_posix()}'
+        OPENKILL_OPENVPN_DIR="$tmp"
+        printf '198.51.100.10\n' > "$tmp/endpoints4.new"
+        : > "$tmp/endpoints6.new"
+        : > "$tmp/clients4.new"
+        : > "$tmp/clients6.new"
+        printf '1194\n' > "$tmp/ports.new"
+        printf '%s\n' 'role=router-client' 'protocol=udp' > "$OPENKILL_OPENVPN_STATE"
+        openkill_openvpn_prepare
+        test "$OPENKILL_OPENVPN_generated" = 1
+        test "$OPENKILL_OPENVPN_retained" = 1
+        test "$OPENKILL_OPENVPN_reason" = invalid-retained-last-valid
+        test "$OPENKILL_OPENVPN_endpoint4" = 1
+        test "$OPENKILL_OPENVPN_ports" = 1194
+        """
+    )
 
     # The writer uses dedicated objects, a single checked nft transaction and
     # never converts the legacy global service-port set into OpenVPN policy.
@@ -128,11 +173,15 @@ def main() -> None:
     ):
         assert name in text
     assert "nft -f \"$batch\"" in text
+    assert "ipset swap" in text
+    assert "okov4n.$$" in text
+    assert 'meta l4proto $l4proto' in text
+    assert 'case "${OPENKILL_OPENVPN_PROTOCOL_FAMILY:-all}"' in text
     assert "openkill_service_ports" not in text
     assert "openkill_openvpn_add_nft_rules" in init
     assert "openkill_openvpn_add_legacy_rules" in init
     assert "CENTRAL_ACTIVE" not in text
-    print("openvpn compatibility contract: 14 checks passed")
+    print("openvpn compatibility contract: checks passed")
 
 
 if __name__ == "__main__":
