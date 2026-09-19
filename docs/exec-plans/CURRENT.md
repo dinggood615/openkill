@@ -1,5 +1,15 @@
 # Current status
 
+## Dashboard lower-right alignment and status evidence recheck (2026-09-19)
+
+- Baseline rechecked before changes: master `e4a61dd5113776bdde3b8d9f8db30803de5c0b98`; working tree clean; device `192.168.1.103` reports OpenKill `2026-1131`, core `RUNNING/READY`.
+- Scope for this iteration is limited to the runtime dashboard layout and status evidence. DNS, adblock routing policy, region bypass, RustDesk/OpenVPN policy, startup recovery, legacy writers, parser grammar, ABI and continuity contracts remain unchanged.
+- Observed layout defect: `status.htm` promotes the legacy columns into independent `.dashboard-primary-column` and `.dashboard-secondary-column` grids. The secondary metrics row is four columns by two rows, so its intrinsic height ends before the primary configuration card and leaves an unowned lower-right area.
+- Layout contract: keep the existing controls and event IDs, use one shared two-column content grid, render the eight real metrics as two columns by four rows on desktop, stretch only the existing metric rows to the shared content height, and let narrow layouts collapse naturally without fixed-height placeholders or negative offsets.
+- Observed status defect: the controller exposes only `adblock_dns_effective`; the state file also contains `provider_effective`, but the page cannot distinguish generated state, DNS/Core loading evidence, and actual interception verification. The adblock contract will expose both backend fields and render conservative wording when loading or verification is unknown.
+- OpenVPN status wording will keep transport bypass independent: a configured compatibility switch with transport bypass disabled must state that bypass is disabled, rather than implying an applied rule.
+- Planned evidence: local UI contract/preview tests, final CSS/template inspection, headless browser screenshots at supported desktop/narrow viewports, device resource/hash and status recheck after candidate install, exact-commit Development CI, RC artifact audit, and Formal Release gate.
+
 ## Runtime dashboard/layout recheck (2026-09-19)
 
 - Rechecked `master` at the current observed HEAD before this iteration and

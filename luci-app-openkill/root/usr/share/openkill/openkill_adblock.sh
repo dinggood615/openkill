@@ -116,7 +116,7 @@ fi
 
 [ -s "$cache_file" ] || {
    rm -f "$conf_file" "$provider_file"
-   printf '%s\n' "mode=$mode" "effective=0" "provider_effective=0" "reason=no-valid-list" > "$state_file"
+   printf '%s\n' "mode=$mode" "state=failed" "generated=0" "effective=0" "provider_effective=0" "dns_loaded=unknown" "core_loaded=unknown" "verified=0" "reason=no-valid-list" > "$state_file"
    exit 0
 }
 
@@ -182,5 +182,5 @@ mv -f "$tmp_provider" "$provider_file"
 chmod 0644 "$provider_file" "$conf_file" 2>/dev/null || true
 
 source_hash="$(sha256sum "$cache_file" 2>/dev/null | awk '{print $1}')"
-printf '%s\n' "mode=$mode" "effective=1" "provider_effective=1" "domains=$(wc -l < "$cache_file" 2>/dev/null || echo 0)" "source_sha256=$source_hash" "updated=$(date +%s 2>/dev/null || echo 0)" > "$state_file"
+printf '%s\n' "mode=$mode" "state=generated" "generated=1" "effective=1" "provider_effective=1" "dns_loaded=unknown" "core_loaded=unknown" "verified=0" "domains=$(wc -l < "$cache_file" 2>/dev/null || echo 0)" "source_sha256=$source_hash" "updated=$(date +%s 2>/dev/null || echo 0)" > "$state_file"
 exit 0

@@ -173,6 +173,25 @@ class LuCIContractTests(unittest.TestCase):
         self.assertIn('[id="container.openkill.config.network"] .openkill-settings-card-stack', css)
         self.assertIn('[id="container.openkill.config.network"] .openkill-settings-card-body', css)
 
+    def test_dashboard_status_labels_require_backend_evidence(self) -> None:
+        source = STATUS.read_text(encoding="utf-8")
+        controller = (ROOT / "luci-app-openkill/luasrc/controller/openkill.lua").read_text(encoding="utf-8")
+        adblock = (ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_adblock.sh").read_text(encoding="utf-8")
+        css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css").read_text(encoding="utf-8")
+        for hook in (
+            "adblock_provider_effective",
+            "adblock_dns_loaded",
+            "adblock_core_loaded",
+            "adblock_verified",
+            "规则已生成 · 加载待验证",
+            "传输绕过已关闭",
+        ):
+            with self.subTest(hook=hook):
+                self.assertIn(hook, source if hook not in ("adblock_provider_effective", "adblock_dns_loaded", "adblock_core_loaded", "adblock_verified") else controller)
+        self.assertIn('"state=generated"', adblock)
+        self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", css)
+        self.assertIn("grid-template-rows: repeat(4, minmax(0, 1fr));", css)
+
     def test_status_settings_are_scoped_and_generation_guarded(self) -> None:
         source = STATUS.read_text(encoding="utf-8")
         for hook in (

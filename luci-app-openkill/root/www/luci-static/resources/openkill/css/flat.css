@@ -1392,6 +1392,60 @@ body[data-page="admin-services-openkill-config"] #cbi-openkill > .cbi-section-ca
 
 /* ===== Runtime dashboard equal-width closeout End ===== */
 
+/* ===== Runtime dashboard shared lower grid (2026-09-19) =====
+ * The content columns share one grid row.  The right side uses the existing
+ * eight metric cards as a two-by-four matrix, allowing the real metrics to
+ * occupy the same vertical rhythm as the left configuration card without
+ * introducing a filler panel or a fixed-height spacer. */
+@media (min-width: 1101px) {
+    .oc.openkill-status-page .dashboard-content-layout {
+        align-items: stretch;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    }
+
+    .oc.openkill-status-page .dashboard-content-layout > .dashboard-primary-column,
+    .oc.openkill-status-page .dashboard-content-layout > .dashboard-secondary-column {
+        align-self: stretch;
+        min-height: 0;
+    }
+
+    .oc.openkill-status-page .dashboard-content-layout > .dashboard-secondary-column {
+        display: grid;
+        grid-template-rows: max-content max-content minmax(0, 1fr);
+        align-content: stretch;
+    }
+
+    .oc.openkill-status-page .dashboard-content-layout > .dashboard-secondary-column > .dashboard-metrics-section {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-rows: repeat(4, minmax(0, 1fr));
+        align-self: stretch;
+        align-content: stretch;
+        align-items: stretch;
+        min-height: 0;
+    }
+
+    .oc.openkill-status-page .dashboard-content-layout > .dashboard-secondary-column > .dashboard-metrics-section > .stat-item {
+        min-height: 0;
+        height: auto;
+    }
+}
+
+@media (max-width: 1100px) {
+    .oc.openkill-status-page .dashboard-content-layout > .dashboard-secondary-column > .dashboard-metrics-section {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 480px) {
+    .oc.openkill-status-page .dashboard-content-layout > .dashboard-secondary-column > .dashboard-metrics-section {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: none;
+    }
+}
+
+/* ===== Runtime dashboard shared lower grid End ===== */
+
 /* Wide settings alignment: use the full LuCI content column on desktop. */
 @media (min-width: 901px) {
     #cbi-openkill.openkill-settings,

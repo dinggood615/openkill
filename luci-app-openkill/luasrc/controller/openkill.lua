@@ -1499,6 +1499,11 @@ function action_status()
 	local function adblock_value(name, fallback)
 		return adblock_state:match(name .. "=([^\n]+)") or fallback
 	end
+	local adblock_effective = adblock_value("effective", "0")
+	local adblock_provider_effective = adblock_value("provider_effective", "0")
+	local adblock_generated = adblock_value("generated",
+		(adblock_effective == "1" or adblock_provider_effective == "1") and "1" or "0")
+	local adblock_state_name = adblock_value("state", adblock_generated == "1" and "generated" or "unknown")
 	local rustdesk_state = fs.readfile("/tmp/openkill-rustdesk.state") or ""
 	local function rustdesk_value(name, fallback)
 		return rustdesk_state:match(name .. "=([^\n]+)") or fallback
@@ -1536,11 +1541,13 @@ function action_status()
 		dns_privacy_mode = fs.uci_get_config("config", "dns_privacy_mode") or "split",
 		adblock_mode = fs.uci_get_config("config", "adblock_mode") or "off",
 		adblock_rule_format = fs.uci_get_config("config", "adblock_rule_format") or "yaml",
-		adblock_dns_effective = adblock_state:match("^effective=1$") ~= nil or
-			adblock_state:match("^effective=1\n") ~= nil or
-			adblock_state:match("\neffective=1$") ~= nil or
-			adblock_state:match("\neffective=1\n") ~= nil,
-		adblock_state = adblock_value("state", "unknown"),
+		adblock_dns_effective = adblock_effective == "1",
+		adblock_provider_effective = adblock_provider_effective == "1",
+		adblock_generated = adblock_generated == "1",
+		adblock_dns_loaded = adblock_value("dns_loaded", "unknown"),
+		adblock_core_loaded = adblock_value("core_loaded", "unknown"),
+		adblock_verified = adblock_value("verified", "0") == "1",
+		adblock_state = adblock_state_name,
 		adblock_reason = adblock_value("reason", "not-started"),
 		adblock_rule_generation = adblock_value("generation", "unknown"),
 		adblock_updated = adblock_value("updated", "unknown"),

@@ -618,15 +618,32 @@
         var adblockLabel = DOMCache.adblock_status;
         var adblockDetail = DOMCache.adblock_detail;
         var adMode = status && status.adblock_mode ? status.adblock_mode : 'off';
-        var adEffective = !!(status && status.adblock_dns_effective);
+        var adDnsEffective = !!(status && status.adblock_dns_effective);
+        var adCoreEffective = !!(status && status.adblock_provider_effective);
+        var adGenerated = !!(status && status.adblock_generated) || adDnsEffective || adCoreEffective;
+        var adState = status && status.adblock_state ? status.adblock_state : 'unknown';
+        var adDnsLoaded = status && (status.adblock_dns_loaded === '1' || status.adblock_dns_loaded === true);
+        var adCoreLoaded = status && (status.adblock_core_loaded === '1' || status.adblock_core_loaded === true);
+        var adVerified = !!(status && status.adblock_verified);
+        var adReason = status && status.adblock_reason ? status.adblock_reason : 'unknown';
+        var adDnsSummary = adDnsLoaded ? '已加载' : (adDnsEffective ? '已生成·未验证' : '未知');
+        var adCoreSummary = adCoreLoaded ? '已加载' : (adCoreEffective ? '已生成·未验证' : '未知');
         if (adblockLabel) {
-            adblockLabel.textContent = adMode === 'off' ? '已关闭' : (adEffective ? '规则已生效' : '已配置 · 未生效');
-            adblockLabel.className = 'security-status-value ' + (adMode === 'off' ? 'is-muted' : (adEffective ? 'is-success' : 'is-pending'));
+            var adLabel = '已配置 · 加载状态未知';
+            if (adMode === 'off') adLabel = '已关闭';
+            else if (adState === 'failed') adLabel = '规则生成失败';
+            else if (adVerified) adLabel = '拦截已验证';
+            else if (adDnsLoaded || adCoreLoaded) adLabel = '规则已加载 · 拦截未验证';
+            else if (adGenerated) adLabel = '规则已生成 · 加载待验证';
+            adblockLabel.textContent = adLabel;
+            adblockLabel.className = 'security-status-value ' + (adMode === 'off' ? 'is-muted' :
+                (adVerified ? 'is-success' : (adState === 'failed' ? 'is-error' : 'is-pending')));
         }
         if (adblockDetail) {
             adblockDetail.textContent = adMode === 'off' ? 'DNS 隐私仍独立运行' :
-                ((status && status.adblock_state === 'unknown') ? '规则加载状态未知' :
-                ('DNS ' + (adEffective ? '过滤' : '未加载') + ' · 核心规则需分别验证'));
+                (adState === 'failed' ? ('规则未生成 · ' + adReason) :
+                ('DNS 后端 ' + adDnsSummary + ' · 核心规则 ' + adCoreSummary +
+                (adVerified ? ' · 实际拦截已验证' : ' · 实际拦截未验证')));
         }
 
         var vpnLabel = DOMCache.openvpn_status;
@@ -635,13 +652,18 @@
         var vpnApplied = !!(status && (status.openvpn_applied === '1' || status.openvpn_applied === 1));
         var vpnGenerated = !!(status && (status.openvpn_generated === '1' || status.openvpn_generated === 1));
         var tunnelState = status && status.openvpn_tunnel_state ? status.openvpn_tunnel_state : 'unknown';
+        var vpnTransportBypass = !!(status && status.openvpn_transport_bypass);
         if (vpnLabel) {
-            vpnLabel.textContent = !vpnConfigured ? '未配置' : (vpnApplied ? '规则已应用' : (vpnGenerated ? '规则已生成' : '待配置'));
+            var vpnLabelText = !vpnConfigured ? '未配置' :
+                (vpnApplied ? '规则已应用' : (vpnGenerated ? '规则已生成' :
+                (!vpnTransportBypass ? '已配置 · 传输绕过已关闭' : '已配置 · 待生成')));
+            vpnLabel.textContent = vpnLabelText;
             vpnLabel.className = 'security-status-value ' + (!vpnConfigured ? 'is-muted' : (vpnApplied ? 'is-success' : 'is-pending'));
         }
         if (vpnDetail) {
             vpnDetail.textContent = !vpnConfigured ? '兼容开关关闭' :
-                ('角色 ' + (status.openvpn_role || 'router-client') + ' · 隧道 ' +
+                ('传输绕过 ' + (vpnTransportBypass ? '已开启' : '已关闭') + ' · 角色 ' +
+                (status.openvpn_role || 'router-client') + ' · 隧道 ' +
                 (tunnelState === 'established' ? '已建立' : '未验证') +
                 ' · ' + (status.openvpn_transport_protocol || 'udp') + '/' +
                 (status.openvpn_protocol_family || 'all') + ' · IPv4/IPv6 ' +
