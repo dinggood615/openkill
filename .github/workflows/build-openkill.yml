@@ -35,16 +35,6 @@ jobs:
         shell: bash
         run: mkdir -p "$GITHUB_WORKSPACE/artifact"
 
-      - name: Normalize package source ownership
-        shell: bash
-        run: |
-          set -Eeuo pipefail
-          # The SDK copies source metadata into data.tar.  GitHub's runner
-          # uid (currently 1001) must never become the runtime owner of
-          # OpenWrt-installed scripts; package files are root-owned on the
-          # target and executable bits are set by the Makefile.
-          sudo chown -R 0:0 luci-app-openkill
-
       - name: Install SDK build dependencies
         shell: bash
         run: |
@@ -180,10 +170,6 @@ jobs:
             echo "OpenWrt version: $OPENWRT_VERSION"
             echo "Target: $OPENWRT_TARGET/$OPENWRT_SUBTARGET"
             echo "SDK URL: $OPENWRT_SDK_URL"
-            # Do not carry the hosted runner uid/gid into data.tar.*.  The
-            # package is installed as root on OpenWrt and the archive must
-            # describe that ownership explicitly for audit/reproducibility.
-            export TAR_OPTIONS='--owner=0 --group=0 --numeric-owner'
             # The top-level package/compile aggregate can expand the full
             # target kernel/module graph even when one package is selected.
             # Invoke this package's package.mk directly with an explicit
@@ -197,10 +183,6 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          # TAR_OPTIONS is used only while the SDK creates package archives;
-          # clear it before reading the resulting IPK so audit extraction
-          # follows the package's own compression/layout metadata.
-          unset TAR_OPTIONS
           mapfile -t ipks < <(find "$SDK_DIR/bin" -type f -name "luci-app-openkill_${OPENKILL_VERSION}_all.ipk" -print)
           if ((${#ipks[@]} != 1)); then
             printf 'Expected exactly one IPK, found %s:\n' "${#ipks[@]}"
