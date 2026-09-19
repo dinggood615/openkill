@@ -393,6 +393,13 @@ rescue
    []
 end
 
+def openkill_insert_before_match(rules, additions)
+   return if additions.empty?
+   match_index = rules.index { |rule| rule.to_s.match?(/\A\s*(?:MATCH|FINAL),/i) }
+   match_index ||= rules.length
+   rules.insert(match_index, *additions)
+end
+
 
 begin
    config_file = '$5'
@@ -1103,9 +1110,10 @@ begin
       rustdesk_rules = rustdesk_domains.map { |domain| "DOMAIN-SUFFIX,#{domain},DIRECT" }
       rules.reject! { |rule| rustdesk_rules.include?(rule.to_s) }
       if rustdesk_compatibility == '1' && rustdesk_rules.any?
-         # Insert before the subscription provider; user block/allow rules are
-         # unshifted below and therefore retain higher priority.
-         rules.unshift(*rustdesk_rules)
+         # Keep user-specific rules ahead of the compatibility exception. A
+         # user proxy rule for the same domain must win; the scoped DIRECT
+         # exception is inserted immediately before the final catch-all.
+         openkill_insert_before_match(rules, rustdesk_rules)
          YAML.LOG_TIP('RustDesk compatibility is limited to the user-specified ID/relay domains; dynamic peer traffic remains under normal policy.')
       elsif rustdesk_compatibility == '1'
          YAML.LOG_WARN('RustDesk compatibility is enabled but no server domains are configured; no broad port bypass was created.')

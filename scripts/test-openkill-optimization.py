@@ -77,6 +77,9 @@ def main() -> int:
     assert "DEFAULT_DNSMASQ_CFGID" in adblock and "dnsmasq.conf.$DEFAULT_DNSMASQ_CFGID" in adblock
     assert "function under(domain, parent)" in adblock
     assert "!listed(domain, ok) && !listed(domain, deny)" in adblock
+    assert "def openkill_insert_before_match(rules, additions)" in yml
+    assert "openkill_insert_before_match(rules, rustdesk_rules)" in yml
+    assert "rules.unshift(*rustdesk_rules)" not in yml
     print("OPENKILL_OPTIMIZATION_TEST=PASS")
     return 0
 
