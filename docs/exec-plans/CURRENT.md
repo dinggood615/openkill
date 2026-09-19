@@ -1,13 +1,13 @@
 # Current status
 
-CURRENT_HEAD: `f936a3e44dfb9d0f793c23c12850908d428a1606` (observed master HEAD before this status update)
-VERSION: `2026-1129`
-CURRENT_PHASE: `RC_DEVICE_RECHECK_REQUIRES_REBUILD_AFTER_DEVICE_FOUND_HELPER_BUG`
-CURRENT_STATUS: `Master-only implementation, exact-commit CI and RC audit are green; the authorized device installed the RC candidate and passed fail-closed startup/stop continuity, then exposed an untested disabled-state writer typo that must be rebuilt and reinstalled before device evidence is accepted`
+CURRENT_HEAD: `b75d76da21003e906d060ce4ee030109a4b9a5da` (observed master HEAD before this release-preparation update)
+VERSION: `2026-1130`
+CURRENT_PHASE: `FORMAL_RELEASE_PREP_AFTER_RC_DEVICE_RECHECK`
+CURRENT_STATUS: `OpenVPN state persistence is repaired, exact Development CI and RC Run 48 are green, and the repaired candidate passed the authorized device fail-closed checks; formal release is now gated on the reviewed 2026-1130 version commit and its exact CI`
 BLOCKER: `REAL_DEVICE_GATE` — 192.168.1.103 has no Mihomo/Clash binary, usable profile or test proxy, no running OpenVPN tunnel/client, and no RustDesk client/service details; strict DNS, region routing, adblock traffic coverage, RustDesk recovery and OpenVPN handshake remain unverified
 DEVICE_STATE: `192.168.1.103` is Kwrt 25.12-SNAPSHOT x86/64 on VMware with dnsmasq 2.93, firewall4 2025.03.17~b6e51575-r2 and OpenVPN 2.7.6; the f936a3e RC package was installed with configuration/PassWall preserved, OpenKill/OpenVPN remain stopped, and the new candidate is not yet installed
-DEVICE_RETRY_READY: `REBUILD_RC_AFTER_HELPER_STATE_FIX` (SSH BatchMode, protected backup, candidate hash and rollback path are recorded)
-NEXT_ACTION: `commit the helper-state fix, pass exact Development CI, rebuild/audit a new RC from master, reinstall it with the existing protected backup, then run only scoped device checks; request a test core/profile and OpenVPN/RustDesk client evidence before packet-path claims`
+DEVICE_RETRY_READY: `RC_RUN_48_DEVICE_RECHECK_PASS_WAITING_FOR_RELEASE_SOURCE` (SSH BatchMode, protected backup, candidate hash and rollback path are recorded)
+NEXT_ACTION: `commit the reviewed 2026-1130 version/notes, verify exact Development CI, then dispatch Formal Release with release_gate=true and publish=true; request a test core/profile and OpenVPN/RustDesk client evidence before packet-path claims`
 RESULTING_HEAD: resolve with `git rev-parse HEAD` after this status-only update; this status records the pre-commit observation above
 CENTRAL_ACTIVE: `NOT_APPROVED`
 CENTRAL_NFT_APPLY: `NOT_APPROVED`
@@ -23,6 +23,7 @@ IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable se
 - A fresh protected device backup was captured at `D:\openkill-device-backups\20260919-preinstall-f936a3e\device-backup.tar.gz` with SHA-256 `B19F44160C6F3179FD1BC624C2907BD71EF16030320E94CF388C399BAA91E50A`. The candidate upload matched the local IPK hash. Standard install skipped the equal version; the explicitly authorized `--force-reinstall` installed the matching candidate without ignore-dependency or overwrite flags. PassWall configuration hash remained unchanged, and OpenKill/OpenVPN stayed stopped.
 - The bounded device start/stop test returned `start_rc=0` with `last_start_failed=1` and `failure_reason=config-missing`, `running_after_start=no`; stop returned zero. nft ruleset SHA-256 was identical before/after (`6df593927d022fb66d1872e31e5b1e4f2be4f3d496437e4a6b49fd78984b5dbe`), and the OpenVPN runtime state file was removed on stop. This validates fail-closed lifecycle behavior only; no packet path was exercised.
 - The installed RC helper exposed a real disabled-state defect: several branches called the uppercase symbol `OPENKILL_OPENVPN_write_state` although the function is lowercase, so state writes were silently skipped. The source is repaired and the isolated contract test now checks that every prepare fixture writes a state file. The repaired source requires a new RC build and device reinstall before the previous device result can be used as final candidate evidence.
+- RC Run 48 (`35436712808`) rebuilt the repaired `b75d76da21003e906d060ce4ee030109a4b9a5da` source. Its artifact archive is `D:\openkill-rc-candidate-b75d76d\unpack\artifact.zip`, archive SHA-256 `f8dec8f742061f2e74b8216ae0472086152aec5775391b3d0a4f40a8b4fe6918`, and IPK SHA-256 `d2811e7adbd37038862ce4179abb421a22b3a0093933cd04ef124ab12e70ca07`. The repaired candidate was installed with the same controlled reinstall path; the helper hash matches, PassWall is unchanged, disabled OpenVPN preparation writes state, and the bounded start/stop check again returned `config-missing` with unchanged nft state.
 
 ## OpenVPN and UI continuation contract (2026-09-19)
 
