@@ -30,6 +30,7 @@ IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable se
 - The reviewed version commit is `ea474aeea866428d81dbde0b60d6ff0914a75009`; its exact Development CI is Run 136 (`35437049127`) and completed successfully: https://github.com/dinggood615/openkill/actions/runs/35437049127.
 - Formal Release Run 153 (`35437145461`) completed successfully with `release_gate=true`, `publish=true`, and APK disabled: https://github.com/dinggood615/openkill/actions/runs/35437145461. Tag `v2026-1130-ipk` points to the version commit and the published release is https://github.com/dinggood615/openkill/releases/tag/v2026-1130-ipk.
 - Published asset `luci-app-openkill_2026-1130_all.ipk` is 9,182,177 bytes with SHA-256 `c81acf2d644fa079f593e8f81f3ee0700743378d6cdf9c05efdff0676b895ea2`; package channel `master/latest-ipk.json` records version `2026-1130`, format `ipk`, architecture `all`, the same source commit and digest. The prior release remains available for rollback.
+- Documentation follow-up `d0ad12b95e28adee178db8a57363141f2acec970` passed exact Development CI Run 137 (`35437486310`): https://github.com/dinggood615/openkill/actions/runs/35437486310.
 
 ## OpenVPN and UI continuation contract (2026-09-19)
 
