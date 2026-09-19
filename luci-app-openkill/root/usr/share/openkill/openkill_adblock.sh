@@ -114,6 +114,12 @@ if [ "$(uci_get_config rustdesk_compatibility 2>/dev/null || echo 0)" = 1 ]; the
       printf '%s\n' "$domain" >> "$policy_allow"
    done
 fi
+if [ "$(uci_get_config openvpn_compatibility 2>/dev/null || echo 0)" = 1 ] &&
+   [ "$(uci_get_config openvpn_adblock_exception 2>/dev/null || echo 0)" = 1 ]; then
+   for domain in $(uci_get_config openvpn_server_domains 2>/dev/null); do
+      printf '%s\n' "$domain" >> "$policy_allow"
+   done
+fi
 cat "$block_file" 2>/dev/null > "$policy_block" || :
 
 awk -v allow="$policy_allow" -v block="$policy_block" '

@@ -106,6 +106,88 @@ o.datatype = "or(host, string)"
 o:depends("rustdesk_compatibility", "1")
 o.description = "只填写实际使用的 hbbs/hbbr 域名，例如自建服务域名；官方文档中的 21114-21119 端口由服务端用途决定，本选项不会创建通用端口绕过。动态点对点地址仍按正常区域、DNS 和代理策略处理。"
 
+o = s:taboption("compatibility", Flag, "openvpn_compatibility", "OpenVPN 兼容策略")
+o.default = "0"
+o.rmempty = false
+o.description = "默认关闭。只处理 OpenVPN 控制/加密传输的精确端点例外；隧道内部业务、DNS、区域绕过和广告过滤仍由各自策略决定。没有实际端点和协议/端口时不会生成规则。"
+
+o = s:taboption("compatibility", ListValue, "openvpn_role", "OpenVPN 部署角色")
+o:value("router-client", "路由器作为客户端")
+o:value("lan-client", "指定 LAN 客户端")
+o:value("server", "路由器作为服务端（不自动绕过）")
+o.default = "router-client"
+o.rmempty = false
+o:depends("openvpn_compatibility", "1")
+o.description = "服务端角色只提供诊断状态，不把监听端口变成全网放行；LAN 客户端角色必须填写来源地址。"
+
+o = s:taboption("compatibility", Flag, "openvpn_transport_bypass", "OpenVPN 传输精确绕过")
+o.default = "0"
+o.rmempty = false
+o:depends("openvpn_compatibility", "1")
+o.description = "仅匹配下方服务端地址/域名解析结果、TCP/UDP 协议和端口。不会绕过整个 VPN 网段、所有 LAN、全部 443/1194，也不会自动让隧道业务 DIRECT。"
+
+o = s:taboption("compatibility", ListValue, "openvpn_transport_protocol", "OpenVPN 传输协议")
+o:value("udp", "UDP")
+o:value("tcp", "TCP")
+o.default = "udp"
+o.rmempty = false
+o:depends("openvpn_transport_bypass", "1")
+
+o = s:taboption("compatibility", DynamicList, "openvpn_server_ports", "OpenVPN 服务端口")
+o.datatype = "port"
+o:depends("openvpn_transport_bypass", "1")
+o.description = "只填写实际配置端口；不会默认填入 1194。"
+
+o = s:taboption("compatibility", DynamicList, "openvpn_server_ips", "OpenVPN 服务端 IP")
+o.datatype = "or(ipaddr, ip6addr)"
+o:depends("openvpn_transport_bypass", "1")
+o.description = "可同时填写 IPv4 和 IPv6；地址族分别进入独立集合。"
+
+o = s:taboption("compatibility", DynamicList, "openvpn_server_domains", "OpenVPN 服务端域名")
+o.datatype = "host"
+o:depends("openvpn_transport_bypass", "1")
+o.description = "仅解析并缓存这些端点的 A/AAAA 结果；TTL、地址变化和解析失败会显示在状态中，失败不会清空最后有效集合。"
+
+o = s:taboption("compatibility", DynamicList, "openvpn_client_ips", "指定 LAN 客户端地址")
+o.datatype = "or(ipaddr, ip6addr)"
+o:depends("openvpn_role", "lan-client")
+o:depends("openvpn_transport_bypass", "1")
+o.description = "LAN 客户端角色的必填来源范围；不填写时保持关闭，其他设备和端口不受影响。"
+
+o = s:taboption("compatibility", ListValue, "openvpn_tunnel_policy", "OpenVPN 隧道内部业务")
+o:value("inherit", "沿用 OpenKill 现有分流（推荐）")
+o:value("force-proxy", "强制进入代理策略")
+o:value("direct", "按现有规则允许直连（需确认）")
+o.default = "inherit"
+o.rmempty = false
+o:depends("openvpn_compatibility", "1")
+o.description = "传输绕过不改变隧道内部业务；此项只是生成/显示策略请求，尚未把 tun 接口整体加入绕过。"
+
+o = s:taboption("compatibility", Flag, "openvpn_real_ip", "OpenVPN 端点 real-IP")
+o.default = "0"
+o.rmempty = false
+o:depends("openvpn_compatibility", "1")
+o.description = "仅控制已配置端点的地址策略，不等于 DIRECT，不覆盖用户强制代理。"
+
+o = s:taboption("compatibility", Flag, "openvpn_adblock_exception", "OpenVPN 域名广告例外")
+o.default = "0"
+o.rmempty = false
+o:depends("openvpn_compatibility", "1")
+o.description = "默认关闭；开启后只对已配置 OpenVPN 服务域名跳过广告域名过滤，仍遵循 DNS 隐私和代理出口。"
+
+o = s:taboption("compatibility", ListValue, "openvpn_dns_mode", "OpenVPN DNS/内部域名")
+o:value("inherit", "沿用当前 DNS 隐私策略（推荐）")
+o:value("conditional", "仅配置的内部域名条件转发")
+o.default = "inherit"
+o.rmempty = false
+o:depends("openvpn_compatibility", "1")
+o.description = "不会自动接受 OpenVPN 推送的全局 DNS；内部域名条件转发接口仍需明确配置。"
+
+o = s:taboption("compatibility", DummyValue, "_openvpn_status_contract", "OpenVPN 验证状态")
+o.default = "请求 → 端点集合 → 规则应用 → 隧道 → 隧道业务 → DNS/IPv6"
+o:depends("openvpn_compatibility", "1")
+o.description = "状态页会分别显示配置、规则生成/应用、端点更新时间和未验证原因；不会用进程存在或状态文件存在推断握手、隧道业务或 DNS 已成功。"
+
 o = s:taboption("compatibility", DynamicList, "remote_service_ports", "服务端口绕过列表")
 o.datatype = "port"
 o:depends("remote_service_bypass", "1")

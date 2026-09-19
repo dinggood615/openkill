@@ -15,7 +15,32 @@ REAL_PACKET_PATH: `NOT_TESTED`
 DEVICE_INSTALL_AUTHORIZATION: `APPROVED_FOR_192.168.1.103_ONLY`
 DEVICE_INSTALL_SCOPE: `backup, upload/install matching RC IPK, bounded OpenKill config/service tests, limited DNS/outbound observations; preserve PassWall and do not change WAN/VMware`
 DEVICE_ROLLBACK_CONTRACT: `restore backed-up UCI/files, remove candidate package, restore service enable/runtime state, verify SSH; never use broad bypass or firewall reset`
-IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable section identity; legacy writer continuity; route-set IPv4/IPv6 atomicity and empty-set fail-closed behavior; Mihomo DNS parser/strict bootstrap; adblock DNS/core same-generation and allow/block priority; RustDesk scoped domains; status only after validate/apply`
+IMPLEMENTATION_CONTRACTS_UNDER_REVIEW: `DNS listener split and dnsmasq stable section identity; legacy writer continuity; route-set IPv4/IPv6 atomicity and empty-set fail-closed behavior; Mihomo DNS parser/strict bootstrap; adblock DNS/core same-generation and allow/block priority; RustDesk scoped domains; OpenVPN endpoint/protocol/client-scoped transport exception; status only after validate/apply`
+
+## OpenVPN and UI continuation contract (2026-09-19)
+
+- Observed source baseline before this iteration is `5725b49c7805d067fee89eb8a4e2a1becca0564f` on `master`; the worktree was clean. This section is the pre-change contract, not evidence that device behavior is verified.
+- OpenVPN compatibility is opt-in and defaults off. Transport bypass is independent from tunnel-internal traffic and DNS handling.
+- A transport exception is valid only when enabled and supplied with a valid endpoint set (explicit IPv4/IPv6 addresses and/or configured names), an explicit TCP/UDP protocol, and valid ports. Empty, malformed, mixed-family, or failed updates fail closed and retain the last valid runtime set.
+- Router-client mode matches configured destination endpoints and ports. LAN-client mode additionally requires configured source client addresses. Server mode does not synthesize a network-wide bypass. No rule is keyed only by a global source/target port, the whole VPN subnet, all LAN devices, or all `443`/`1194` traffic.
+- IPv4 and IPv6 endpoint/client sets are generated separately with staged files and runtime-safe replacement. IPv6 remains enabled; RA/ND/DHCPv6/PMTU are outside this exception. User force-proxy policy remains higher priority than this compatibility exception.
+- `remote_service_bypass` and `openkill_service_ports` remain a legacy ABI. OpenVPN uses dedicated objects and cleanup only removes objects created by OpenKill. Real-IP, adblock allow-listing, DNS policy, and tunnel policy stay independent.
+- Dashboard cards and compatibility settings must distinguish requested, generated, applied, tunnel-established, business-verified, and unknown states. A status file or HTTP 200 alone never proves network success. Styles remain page-scoped and content-sized.
+
+### Planned order
+
+1. Perform read-only OpenVPN inventory on the authorized device and recheck current source/UI state.
+2. Implement the bounded endpoint generator/writer and status contract; add isolated validation, family split, atomic failure retention, priority, and cleanup tests.
+3. Add compatibility settings and independent DNS/adblock/OpenVPN dashboard summaries; exercise generated DOM/state fixtures.
+4. Run local-gate, diff/diff-check, commit and push the exact `master` commit, then verify Development CI.
+5. Only after local and CI gates pass, build/audit an RC package and perform the previously authorized bounded device phase. Formal release still requires actual package/device evidence and the repository workflow.
+
+### Iteration evidence (pre-commit)
+
+- Read-only device check on `192.168.1.103` completed over the authorized SSH alias. Current facts: OpenVPN 2.7.6 (`openvpn-openssl 2.7.6-r1`) is installed; UCI contains one server and two client sections with sensitive values redacted; no OpenVPN process or `tun` interface is running; IPv4 has a WAN default route and IPv6 currently exposes ULA/link-local routes but public IPv6 was not tested. No device configuration was changed.
+- The first local implementation adds `openkill_openvpn.sh`, dedicated nft/ipset endpoint/client/port objects, bounded resolver input, staged family-separated files, one checked runtime transaction, scoped rules, cleanup, UCI defaults/normalization, compatibility-page fields, dashboard summaries, and the OpenVPN adblock-domain exception. It does not enable the feature by default and does not change the legacy service-port writer.
+- Isolated OpenVPN contract test passes (`14 checks`), UI contract passes (`23/23`), UI preview passes (`2/2`), and changed shell files pass `sh -n`. `scripts/local-gate.sh` passes at the observed baseline; the unified fast runner correctly refuses to report a result while the working tree is dirty and will be rerun after the bounded commit.
+- Known device gate remains: there is no running OpenVPN tunnel, test client, Mihomo core/profile or usable proxy on the authorized device, so endpoint handshake, tunnel business, DNS-outbound, RustDesk and transparent packet-path behavior remain unverified.
 
 ## UI recheck and status convergence (2026-09-19)
 

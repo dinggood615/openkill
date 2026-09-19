@@ -14,6 +14,7 @@ USE_PROCD=1
 . $IPKG_INSTROOT/usr/share/openkill/openkill_wan.sh
 . $IPKG_INSTROOT/usr/share/openkill/openkill_network.sh
 . $IPKG_INSTROOT/usr/share/openkill/openkill_nft_shadow.sh
+. $IPKG_INSTROOT/usr/share/openkill/openkill_openvpn.sh
 
 # A single observer entry point is shared by apply-success and stable
 # NO_ACTION reconcile boundaries.  It is deliberately read-only and its
@@ -1900,6 +1901,7 @@ set_firewall()
    # Mihomo-native mode owns all TUN routing and redirect rules.  OpenKill
    # must not add a second set of nftables/iptables rules in that mode.
    if [ "$tun_owner" = "mihomo" ]; then
+      openkill_openvpn_mark_unsupported native-owner-unsupported
       openkill_remove_proxy_runtime
       printf '%s\n' "requested_ipv4=$(uci_get_config china_ip_route || echo 0)" "effective_ipv4=0" "requested_ipv6=$(uci_get_config china_ip6_route || echo 0)" "effective_ipv6=0" "reason=native-owner" > /tmp/openkill-region-effective.state.$$
       mv -f /tmp/openkill-region-effective.state.$$ /tmp/openkill-region-effective.state
@@ -2079,6 +2081,19 @@ if [ -n "$FW4" ]; then
          nft add element inet fw4 openkill_service_ports "{ $service_port }"
       done
    fi
+
+   # OpenVPN transport compatibility is independent from the legacy service
+   # port ABI above.  Create dedicated family/client/port sets first, then
+   # apply all five staged sets in one checked nft transaction.  An invalid
+   # or unresolved optional configuration leaves the previous runtime sets
+   # untouched; an explicit disable clears only OpenKill-owned objects.
+   openkill_openvpn_prepare || LOG_WARN "OpenVPN compatibility preflight failed; keeping the previous scoped set."
+   nft 'add set inet fw4 openkill_openvpn_endpoints4 { type ipv4_addr; flags interval; auto-merge; }'
+   nft 'add set inet fw4 openkill_openvpn_endpoints6 { type ipv6_addr; flags interval; auto-merge; }'
+   nft 'add set inet fw4 openkill_openvpn_clients4 { type ipv4_addr; flags interval; auto-merge; }'
+   nft 'add set inet fw4 openkill_openvpn_clients6 { type ipv6_addr; flags interval; auto-merge; }'
+   nft 'add set inet fw4 openkill_openvpn_ports { type inet_service; flags interval; }'
+   openkill_openvpn_apply_runtime || LOG_WARN "OpenVPN scoped set transaction failed; retaining the last valid runtime state."
 
    #bypass gateway compatible
    if [ "$bypass_gateway_compatible" -eq 1 ]; then
@@ -2847,10 +2862,16 @@ if [ -n "$FW4" ]; then
          fi
       fi
    fi
+
+   # Install the scoped OpenVPN transport return rules only after every
+   # endpoint/client/port set has been validated and applied.  These rules
+   # intentionally do not match tunnel interfaces or internal VPN subnets.
+   openkill_openvpn_add_nft_rules
 fi
 
 #IPTABLES
 if [ -z "$FW4" ]; then
+   openkill_openvpn_prepare || LOG_WARN "OpenVPN compatibility preflight failed; keeping the previous scoped set."
    #iptables owner module
    if [ "$iptables_compat" -eq 0 ]; then
       owner="-m mark --mark 0x1a0a"
@@ -2946,6 +2967,13 @@ if [ -z "$FW4" ]; then
          ipset add common_ports $i
       done
    fi
+
+   ipset -! create openkill_openvpn_endpoints4 hash:ip family inet hashsize 64 maxelem 4096
+   ipset -! create openkill_openvpn_endpoints6 hash:ip family inet6 hashsize 64 maxelem 4096
+   ipset -! create openkill_openvpn_clients4 hash:ip family inet hashsize 64 maxelem 4096
+   ipset -! create openkill_openvpn_clients6 hash:ip family inet6 hashsize 64 maxelem 4096
+   ipset -! create openkill_openvpn_ports bitmap:port range 1-65535
+   openkill_openvpn_apply_runtime || LOG_WARN "OpenVPN scoped ipset transaction failed; retaining the last valid runtime state."
 
    #bypass gateway compatible
    if [ "$bypass_gateway_compatible" -eq 1 ]; then
@@ -3686,6 +3714,7 @@ if [ -z "$FW4" ]; then
          fi
       fi
    fi
+   openkill_openvpn_add_legacy_rules
 fi
 
 # Keep proxy node underlay outside the transparent classifier.  This is the
@@ -3743,7 +3772,7 @@ revert_firewall()
          nft delete chain inet fw4 handle ${handle}
       done
 
-      for handle in $(nft -a list sets |grep -E "set localnetwork|set openkill_node|china_ip|lan_ac_|wan_ac_black_|common_ports|set openkill_service_ports" |awk -F '# handle ' '{print$2}'); do
+      for handle in $(nft -a list sets |grep -E "set localnetwork|set openkill_node|china_ip|lan_ac_|wan_ac_black_|common_ports|set openkill_service_ports|set openkill_openvpn_" |awk -F '# handle ' '{print$2}'); do
          nft delete set inet fw4 handle ${handle}
       done
    else
@@ -3791,6 +3820,11 @@ revert_firewall()
       ipset destroy wan_ac_black_ips
       ipset destroy wan_ac_black_ports
       ipset destroy common_ports
+      ipset destroy openkill_openvpn_endpoints4
+      ipset destroy openkill_openvpn_endpoints6
+      ipset destroy openkill_openvpn_clients4
+      ipset destroy openkill_openvpn_clients6
+      ipset destroy openkill_openvpn_ports
    fi
 } >/dev/null 2>&1
 

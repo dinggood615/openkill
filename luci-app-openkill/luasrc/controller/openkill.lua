@@ -1491,6 +1491,14 @@ function action_status()
 	local function state_value(name, fallback)
 		return region_state:match(name .. "=([^\n]+)") or fallback
 	end
+	local openvpn_state = fs.readfile("/tmp/openkill-openvpn.state") or ""
+	local function openvpn_value(name, fallback)
+		return openvpn_state:match(name .. "=([^\n]+)") or fallback
+	end
+	local adblock_state = fs.readfile("/tmp/openkill-adblock.state") or ""
+	local function adblock_value(name, fallback)
+		return adblock_state:match(name .. "=([^\n]+)") or fallback
+	end
 
 	local result = {
 		-- status fields
@@ -1525,7 +1533,28 @@ function action_status()
 		adblock_mode = fs.uci_get_config("config", "adblock_mode") or "off",
 		adblock_rule_format = fs.uci_get_config("config", "adblock_rule_format") or "yaml",
 		adblock_dns_effective = (fs.readfile("/tmp/openkill-adblock.state") or ""):find("effective=1", 1, true) ~= nil,
+		adblock_state = adblock_value("state", "unknown"),
+		adblock_reason = adblock_value("reason", "not-started"),
+		adblock_rule_generation = adblock_value("generation", "unknown"),
+		adblock_updated = adblock_value("updated", "unknown"),
 		rustdesk_compatibility = fs.uci_get_config("config", "rustdesk_compatibility") == "1",
+		openvpn_compatibility = fs.uci_get_config("config", "openvpn_compatibility") == "1",
+		openvpn_transport_bypass = fs.uci_get_config("config", "openvpn_transport_bypass") == "1",
+		openvpn_role = fs.uci_get_config("config", "openvpn_role") or "router-client",
+		openvpn_transport_protocol = fs.uci_get_config("config", "openvpn_transport_protocol") or "udp",
+		openvpn_requested = openvpn_value("requested", "0"),
+		openvpn_generated = openvpn_value("generated", "0"),
+		openvpn_applied = openvpn_value("applied", "0"),
+		openvpn_reason = openvpn_value("reason", "not-started"),
+		openvpn_endpoint4 = openvpn_value("endpoint4", "0"),
+		openvpn_endpoint6 = openvpn_value("endpoint6", "0"),
+		openvpn_client4 = openvpn_value("client4", "0"),
+		openvpn_client6 = openvpn_value("client6", "0"),
+		openvpn_ports = openvpn_value("ports", ""),
+		openvpn_updated = openvpn_value("updated", "unknown"),
+		openvpn_tunnel_state = openvpn_value("tunnel", "unknown"),
+		openvpn_business_state = openvpn_value("business", "unknown"),
+		openvpn_dns_state = openvpn_value("dns", "unknown"),
 		china_ip_route_requested = fs.uci_get_config("config", "china_ip_route") or "0",
 		china_ip6_route_requested = fs.uci_get_config("config", "china_ip6_route") or "0",
 		china_ip_route_effective = state_value("effective_ipv4", "0"),

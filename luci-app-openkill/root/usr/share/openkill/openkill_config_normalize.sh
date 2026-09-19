@@ -35,6 +35,22 @@ adblock_interval="$(uci -q get openkill.config.adblock_update_interval 2>/dev/nu
 case "$adblock_interval" in ''|*[!0-9]*|0) uci -q set openkill.config.adblock_update_interval=86400; changed=1 ;; esac
 rustdesk_compatibility="$(uci -q get openkill.config.rustdesk_compatibility 2>/dev/null || true)"
 case "$rustdesk_compatibility" in 0|1) ;; *) uci -q set openkill.config.rustdesk_compatibility=0; changed=1 ;; esac
+openvpn_compatibility="$(uci -q get openkill.config.openvpn_compatibility 2>/dev/null || true)"
+case "$openvpn_compatibility" in 0|1) ;; *) uci -q set openkill.config.openvpn_compatibility=0; changed=1 ;; esac
+openvpn_transport_bypass="$(uci -q get openkill.config.openvpn_transport_bypass 2>/dev/null || true)"
+case "$openvpn_transport_bypass" in 0|1) ;; *) uci -q set openkill.config.openvpn_transport_bypass=0; changed=1 ;; esac
+openvpn_role="$(uci -q get openkill.config.openvpn_role 2>/dev/null || true)"
+case "$openvpn_role" in router-client|lan-client|server) ;; *) uci -q set openkill.config.openvpn_role=router-client; changed=1 ;; esac
+openvpn_transport_protocol="$(uci -q get openkill.config.openvpn_transport_protocol 2>/dev/null || true)"
+case "$openvpn_transport_protocol" in tcp|udp) ;; *) uci -q set openkill.config.openvpn_transport_protocol=udp; changed=1 ;; esac
+openvpn_tunnel_policy="$(uci -q get openkill.config.openvpn_tunnel_policy 2>/dev/null || true)"
+case "$openvpn_tunnel_policy" in inherit|force-proxy|direct) ;; *) uci -q set openkill.config.openvpn_tunnel_policy=inherit; changed=1 ;; esac
+openvpn_real_ip="$(uci -q get openkill.config.openvpn_real_ip 2>/dev/null || true)"
+case "$openvpn_real_ip" in 0|1) ;; *) uci -q set openkill.config.openvpn_real_ip=0; changed=1 ;; esac
+openvpn_adblock_exception="$(uci -q get openkill.config.openvpn_adblock_exception 2>/dev/null || true)"
+case "$openvpn_adblock_exception" in 0|1) ;; *) uci -q set openkill.config.openvpn_adblock_exception=0; changed=1 ;; esac
+openvpn_dns_mode="$(uci -q get openkill.config.openvpn_dns_mode 2>/dev/null || true)"
+case "$openvpn_dns_mode" in inherit|conditional) ;; *) uci -q set openkill.config.openvpn_dns_mode=inherit; changed=1 ;; esac
 set_default enable_unified_delay 1
 set_default disable_udp_quic 0
 
@@ -79,6 +95,18 @@ set_default dns_listen_address 127.0.0.1
 set_default cn_port 9090
 set_default wan_interface_mode auto
 set_default remote_service_bypass 0
+set_default openvpn_compatibility 0
+set_default openvpn_transport_bypass 0
+set_default openvpn_role router-client
+set_default openvpn_transport_protocol udp
+set_default openvpn_server_ports ''
+set_default openvpn_server_ips ''
+set_default openvpn_server_domains ''
+set_default openvpn_client_ips ''
+set_default openvpn_tunnel_policy inherit
+set_default openvpn_real_ip 0
+set_default openvpn_adblock_exception 0
+set_default openvpn_dns_mode inherit
 set_default compatibility_fallback 0
 
 compatibility_profile="$(uci -q get openkill.config.compatibility_profile 2>/dev/null || true)"

@@ -96,6 +96,47 @@
     grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
+.openkill-status-page .dashboard-security-section {
+    align-items: stretch;
+}
+
+.openkill-status-page .security-status-card {
+    min-height: 76px;
+}
+
+.openkill-status-page .security-status-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: flex-start;
+    justify-content: center;
+}
+
+.openkill-status-page .security-status-value {
+    color: var(--ok-flat-text, #263247);
+    font-weight: 600;
+    line-height: 1.35;
+}
+
+.openkill-status-page .security-status-detail {
+    color: var(--ok-flat-muted, #69758a);
+    font-size: 11px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+}
+
+.openkill-status-page .security-status-value.is-success {
+    color: var(--ok-flat-success, #1e9b68);
+}
+
+.openkill-status-page .security-status-value.is-pending {
+    color: var(--ok-flat-warning, #a66a00);
+}
+
+.openkill-status-page .security-status-value.is-muted {
+    color: var(--ok-flat-muted, #69758a);
+}
+
 .openkill-status-page .core-status-row .sub-card,
 .openkill-status-page .config-file-content,
 .openkill-status-page .dashboard-container {
