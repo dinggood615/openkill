@@ -413,7 +413,7 @@ o.rmempty = false
 o.description = "两个档位都使用同一份经校验的 anti-AD 域名生成 DNS 与 Mihomo 规则；增强档只提高用户阻止策略的显示级别，不宣称额外来源或重复下载。硬编码 IP、自建 DoH、第一方共域名广告和 HTTPS 内容不会被此功能完整识别。"
 
 o = s:taboption("dns", Value, "adblock_rule_url", "广告规则源")
-o.default = "https://anti-ad.net/anti-ad-domains.txt"
+o.default = "https://anti-ad.net/domains.txt"
 o.description = "只接受 HTTPS。建议使用 anti-AD 域名列表；系统会把它规范化为 dnsmasq 与 Mihomo 共用的本地 YAML。下载失败保留最后有效版本。"
 o:depends("adblock_mode", "standard")
 o:depends("adblock_mode", "enhanced")

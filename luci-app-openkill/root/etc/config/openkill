@@ -38,9 +38,9 @@ config openkill 'config'
 	# standard profile uses anti-AD domain filtering plus a Mihomo rule provider;
 	# Both modes use one validated canonical domain generation for dnsmasq and Mihomo.
 	option adblock_mode 'off'
-	option adblock_rule_url 'https://anti-ad.net/anti-ad-domains.txt'
+	option adblock_rule_url 'https://anti-ad.net/domains.txt'
 	option adblock_rule_format 'yaml'
-	option adblock_dns_url 'https://anti-ad.net/anti-ad-domains.txt'
+	option adblock_dns_url 'https://anti-ad.net/domains.txt'
 	option adblock_update_interval '86400'
 	# Keep RustDesk compatibility explicitly scoped to configured ID/relay
 	# domains. This does not identify dynamic peers or force all traffic DIRECT.

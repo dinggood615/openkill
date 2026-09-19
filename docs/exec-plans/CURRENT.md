@@ -1,5 +1,67 @@
 # Current status
 
+## Runtime dashboard/layout recheck (2026-09-19)
+
+- Rechecked `master` at the current observed HEAD before this iteration and
+  confirmed the working tree is clean. The authorized device is reachable;
+  `luci-app-openkill` is installed at `2026-1130`, the OpenKill init service is
+  enabled and running, Mihomo is listening on the configured controller/DNS
+  sockets, and the health/watchdog processes are present. Historical startup
+  failures are not treated as current evidence.
+- The device log review found no new OpenKill/Mihomo error in the bounded
+  recent window. Older stop artifacts contain an expected `ubus service delete
+  ... Not found` message from an already-absent transient object; this remains
+  a lifecycle/logging item to reproduce against the current source before
+  changing it. Sensitive configuration and credentials are not copied into
+  this plan.
+- This iteration changes only page presentation and state evidence plumbing:
+  runtime dashboard DOM/grid grouping, settings-card row stretching for the
+  Network & Routing tab, and any narrowly reproduced log/status defect. DNS,
+  legacy writers, category priority, parser grammar, ABI, and recovery
+  contracts remain unchanged unless a reproduced defect requires an explicit
+  contract update here.
+- Layout contract: the top Running Status, Control Panel and Mix Proxy cards
+  share one three-column equal-width grid; the content/configuration and
+  metrics areas use one bounded two-column grid; settings cards remain
+  content-sized and stretch only within their active row, including when
+  conditional fields are revealed. The page remains scoped to OpenKill and
+  responsive at 1920/1366/1200/768/390 CSS px and 100%/125% zoom.
+- State contract: requested, generated, applied, verified, failed and unknown
+  remain independent for DNS privacy, adblock, OpenVPN and RustDesk. A state
+  file, process, HTTP 200 or saved UCI value never proves network validation.
+- Browser-capable local evidence: the production preview was served over a
+  local HTTP origin and rendered through installed headless Chrome. At the
+  1920 CSS-px capture the three top cards are equal-width and aligned, the
+  content/configuration and metrics columns share a two-column boundary, and
+  DNS/adblock/OpenVPN/RustDesk cards are visible. The 768 capture naturally
+  uses two columns; the 390 capture has no document horizontal overflow in
+  the available desktop emulation. Playwright remains unavailable, so this is
+  Chrome-headless evidence rather than a Playwright run.
+- Device log root cause: the configured adblock source returned HTTP 404;
+  the existing script correctly failed closed but had a stale built-in URL
+  (`anti-ad-domains.txt`). The source now uses the maintained
+  `https://anti-ad.net/domains.txt` default and retries that source only for
+  the current generation when a user source fails. Both failures retain the
+  last valid cache and keep DNS privacy independent. No device file has been
+  changed in this source iteration yet.
+
+### Planned order
+
+1. Reproduce any current device log/status defect with a protected backup and
+   sanitized output; classify code, configuration, upstream or environment.
+2. Rework the production status DOM/grid and settings-card layout without
+   changing control IDs or CBI persistence; add/adjust focused layout and
+   state-contract tests.
+3. Run local UI contracts/previews/browser capability checks, shell syntax,
+   local-gate, diff/diff-check, commit and push `master`, then verify the exact
+   Development CI run.
+4. Build and audit a non-public RC from that commit, install only after a new
+   device backup, and verify page rendering, service lifecycle and state
+   recovery. Packet-path, RustDesk/OpenVPN client and strict DNS traffic
+   claims remain separate device gates.
+5. Invoke Formal Release only if all repository release gates pass; retain the
+   prior tag/assets and document any unverified traffic scenarios.
+
 ## Running status startup/UI continuation (2026-09-19)
 
 - Scope: authorized device `192.168.1.103`, source `master`, with no

@@ -156,6 +156,23 @@ class LuCIContractTests(unittest.TestCase):
         self.assertIn('grid-template-rows: none;', css)
         self.assertIn('content-sized dashboard rows', css)
 
+    def test_dashboard_promotes_equal_width_entry_row_and_settings_grid(self) -> None:
+        source = STATUS.read_text(encoding="utf-8")
+        css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css").read_text(encoding="utf-8")
+        for hook in (
+            "function arrangeDashboard()",
+            "dashboard-top-row",
+            "dashboard-content-layout",
+            "data-dashboard-layout-ready",
+            "dashboard-endpoint-card",
+        ):
+            with self.subTest(hook=hook):
+                self.assertIn(hook, source)
+        self.assertIn("grid-template-columns: repeat(3, minmax(0, 1fr));", css)
+        self.assertIn(".dashboard-content-layout > .main-card", css)
+        self.assertIn('[id="container.openkill.config.network"] .openkill-settings-card-stack', css)
+        self.assertIn('[id="container.openkill.config.network"] .openkill-settings-card-body', css)
+
     def test_status_settings_are_scoped_and_generation_guarded(self) -> None:
         source = STATUS.read_text(encoding="utf-8")
         for hook in (

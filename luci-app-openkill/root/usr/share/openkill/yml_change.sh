@@ -19,9 +19,9 @@ dns_privacy_mode=$(uci_get_config "dns_privacy_mode" || echo split)
 case "$dns_privacy_mode" in split|strict) ;; *) dns_privacy_mode=split ;; esac
 adblock_mode=$(uci_get_config "adblock_mode" || echo off)
 case "$adblock_mode" in off|standard|enhanced) ;; *) adblock_mode=off ;; esac
-adblock_rule_url=$(uci_get_config "adblock_rule_url" || echo https://anti-ad.net/anti-ad-domains.txt)
+adblock_rule_url=$(uci_get_config "adblock_rule_url" || echo https://anti-ad.net/domains.txt)
 adblock_rule_url=$(printf '%s' "$adblock_rule_url" | sed 's/[^A-Za-z0-9:/.?&=%+,-]//g')
-case "$adblock_rule_url" in https://*) ;; *) adblock_rule_url=https://anti-ad.net/anti-ad-domains.txt ;; esac
+case "$adblock_rule_url" in https://*) ;; *) adblock_rule_url=https://anti-ad.net/domains.txt ;; esac
 adblock_rule_format=$(uci_get_config "adblock_rule_format" || echo yaml)
 case "$adblock_rule_format" in yaml) ;; *) adblock_rule_format=yaml ;; esac
 rustdesk_compatibility=$(uci_get_config "rustdesk_compatibility" || echo 0)

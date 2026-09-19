@@ -331,11 +331,53 @@
                     </div>
                 </div>
 
+<script type="text/javascript">
+/* Keep the status dashboard's presentation structure independent from the
+ * legacy two-column source order. The controls themselves stay in place
+ * with the same IDs and handlers; only their visual grid owners change. */
+(function() {
+    function arrangeDashboard() {
+        var shell = document.querySelector('.openkill-status-page .dashboard-v1-layout');
+        if (!shell || shell.getAttribute('data-dashboard-layout-ready') === '1') return;
+        var primary = shell.querySelector('.dashboard-primary-column');
+        var secondary = shell.querySelector('.dashboard-secondary-column');
+        var core = primary && primary.querySelector('.dashboard-core-section');
+        var endpoints = secondary && secondary.querySelector('.dashboard-endpoints-section');
+        if (!primary || !secondary || !core || !endpoints) return;
+
+        var top = document.createElement('div');
+        top.className = 'dashboard-top-row';
+        top.setAttribute('aria-label', '运行状态与入口');
+        core.classList.add('dashboard-top-card', 'dashboard-top-status');
+        top.appendChild(core);
+
+        while (endpoints.firstElementChild) {
+            var endpoint = endpoints.firstElementChild;
+            endpoint.classList.add('dashboard-top-card', 'dashboard-endpoint-card');
+            top.appendChild(endpoint);
+        }
+        endpoints.parentNode.removeChild(endpoints);
+
+        var content = document.createElement('div');
+        content.className = 'dashboard-content-layout';
+        content.setAttribute('aria-label', 'OpenKill 运行内容');
+        shell.insertBefore(top, shell.firstElementChild);
+        shell.appendChild(content);
+        content.appendChild(primary);
+        content.appendChild(secondary);
+        shell.setAttribute('data-dashboard-layout-ready', '1');
+    }
+
+    arrangeDashboard();
+})();
+</script>
+
                 </div>
 
 <script type="text/javascript">
-// The status view is rendered inside LuCI's SimpleSection.  Mark that
-// generated wrapper so the shared OpenKill shell can remove the default CBI
+// The status view is rendered inside LuCI's SimpleSection.  Keep this marker
+// first because the offline preview extracts the presentation fragment here.
+// Mark the generated wrapper so the shared OpenKill shell can remove the default CBI
 // fieldset padding without changing any runtime controls.
 (function() {
     function markStatusSection() {

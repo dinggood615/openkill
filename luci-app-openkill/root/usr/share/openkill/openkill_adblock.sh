@@ -10,6 +10,7 @@ mode="$(uci_get_config adblock_mode 2>/dev/null || echo off)"
 state_file=/tmp/openkill-adblock.state
 provider_dir=/etc/openkill/rule_provider
 provider_file="$provider_dir/openkill-anti-ad.yaml"
+DEFAULT_ADBLOCK_URL="https://anti-ad.net/domains.txt"
 
 DNSMASQ_SECTION="$(uci -q -X show dhcp 2>/dev/null | sed -n 's/^dhcp\.\([^.=]*\)=dnsmasq$/\1/p' | head -n 1)"
 [ -n "$DNSMASQ_SECTION" ] || DNSMASQ_SECTION="@dnsmasq[0]"
@@ -48,7 +49,7 @@ trap cleanup 0 1 2 3 15
 
 url="$(uci_get_config adblock_rule_url 2>/dev/null || true)"
 [ -n "$url" ] || url="$(uci_get_config adblock_dns_url 2>/dev/null || true)"
-[ -n "$url" ] || url=https://anti-ad.net/anti-ad-domains.txt
+[ -n "$url" ] || url="$DEFAULT_ADBLOCK_URL"
 case "$url" in https://*) ;; *) LOG_WARN "Adblock URL is not HTTPS; keeping the last valid list."; url="" ;; esac
 
 mkdir -p "$cache_dir" "$conf_dir" "$provider_dir" 2>/dev/null || exit 1
@@ -87,15 +88,29 @@ normalize_domains() {
    ' "$1" | sort -u
 }
 
+validate_download() {
+   local candidate="$1"
+   [ -n "$candidate" ] || return 1
+   rm -f "$raw_file" "$normalized_file"
+   DOWNLOAD_FILE_CURL "$candidate" "$raw_file" "$cache_file" >/dev/null 2>&1 || return 1
+   ! grep -Eiq '<html|<!doctype|^[[:space:]]*error([[:space:]]|$)' "$raw_file" 2>/dev/null || return 1
+   normalize_domains "$raw_file" > "$normalized_file" 2>/dev/null || return 1
+   [ "$(wc -l < "$normalized_file" 2>/dev/null || echo 0)" -ge 10 ] || return 1
+   mv -f "$normalized_file" "$cache_file"
+}
+
 if [ "$refresh" -eq 1 ] && [ -n "$url" ]; then
-   if DOWNLOAD_FILE_CURL "$url" "$raw_file" "$cache_file" >/dev/null 2>&1 &&
-      ! grep -Eiq '<html|<!doctype|^[[:space:]]*error([[:space:]]|$)' "$raw_file" 2>/dev/null &&
-      normalize_domains "$raw_file" > "$normalized_file" 2>/dev/null &&
-      [ "$(wc -l < "$normalized_file" 2>/dev/null || echo 0)" -ge 10 ]; then
-      mv -f "$normalized_file" "$cache_file"
-   else
+   if ! validate_download "$url"; then
       rm -f "$normalized_file"
-      LOG_WARN "Adblock list validation failed; keeping the last valid list."
+      # A stale user URL must not disable filtering when the maintained
+      # built-in source is reachable. Keep the user's value unchanged and
+      # fall back only for this generation; if both sources fail the previous
+      # valid cache remains authoritative.
+      if [ "$url" != "$DEFAULT_ADBLOCK_URL" ] && validate_download "$DEFAULT_ADBLOCK_URL"; then
+         LOG_WARN "Configured adblock source failed; used the maintained built-in source."
+      else
+         LOG_WARN "Adblock list validation failed; keeping the last valid list."
+      fi
    fi
 fi
 

@@ -1244,6 +1244,154 @@ body[data-page="admin-services-openkill-config"] #cbi-openkill > .cbi-section-ca
 
 /* ===== OpenKill Configuration Management Visual Closeout Layout End ===== */
 
+/* ===== Runtime dashboard equal-width closeout =====
+ * status.htm keeps legacy control hooks but promotes the three entry cards
+ * into one visual row at runtime. Content sizing is intentional: a longer
+ * translated label or a failed-state explanation may grow the row without
+ * clipping neighbouring controls. */
+.oc.openkill-status-page .dashboard-v1-layout {
+    display: block;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    overflow: visible;
+}
+
+.oc.openkill-status-page .dashboard-top-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: stretch;
+    gap: var(--ok-layout-card-gap, 12px);
+    width: 100%;
+    min-width: 0;
+    margin-bottom: var(--ok-layout-card-gap, 12px);
+}
+
+.oc.openkill-status-page .dashboard-top-row > .dashboard-top-card,
+.oc.openkill-status-page .dashboard-top-row > .dashboard-top-status {
+    min-width: 0;
+    width: 100%;
+    height: 100%;
+    align-self: stretch;
+}
+
+.oc.openkill-status-page .dashboard-top-row > .dashboard-top-status {
+    display: flex;
+}
+
+.oc.openkill-status-page .dashboard-top-row > .dashboard-top-status > .sub-card,
+.oc.openkill-status-page .dashboard-top-row > .dashboard-endpoint-card {
+    width: 100%;
+    min-width: 0;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+.oc.openkill-status-page .dashboard-top-row .dashboard-endpoint-card {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.oc.openkill-status-page .dashboard-top-row .dashboard-endpoint-card .card-content {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.oc.openkill-status-page .dashboard-content-layout {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: var(--ok-layout-card-gap, 12px);
+    width: 100%;
+    min-width: 0;
+}
+
+.oc.openkill-status-page .dashboard-content-layout > .main-card {
+    display: grid;
+    grid-auto-rows: max-content;
+    align-content: start;
+    gap: var(--ok-layout-card-gap, 12px);
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+}
+
+.oc.openkill-status-page .dashboard-content-layout .card-row {
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+}
+
+.oc.openkill-status-page .dashboard-content-layout .dashboard-security-section {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* Network settings use the same two-column card rhythm as Runtime &
+ * Services. Stretching is limited to the active grid row and does not
+ * impose a fixed height on collapsed or narrow layouts. */
+@media (min-width: 901px) {
+    #cbi-openkill.openkill-settings
+    [id="container.openkill.config.network"] .openkill-settings-card-stack {
+        align-items: stretch;
+        grid-auto-rows: max-content;
+    }
+
+    #cbi-openkill.openkill-settings
+    [id="container.openkill.config.network"] .openkill-settings-card {
+        display: flex;
+        flex-direction: column;
+    }
+
+    #cbi-openkill.openkill-settings
+    [id="container.openkill.config.network"] .openkill-settings-card-body {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+}
+
+@media (max-width: 1100px) {
+    .oc.openkill-status-page .dashboard-content-layout {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (max-width: 900px) {
+    .oc.openkill-status-page .dashboard-top-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .oc.openkill-status-page .dashboard-top-row > .dashboard-top-status {
+        grid-column: 1 / -1;
+    }
+
+    .oc.openkill-status-page .dashboard-content-layout .dashboard-security-section {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 640px) {
+    .oc.openkill-status-page .dashboard-top-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .oc.openkill-status-page .dashboard-top-row > .dashboard-top-status {
+        grid-column: auto;
+    }
+
+    .oc.openkill-status-page .dashboard-content-layout {
+        gap: var(--ok-space-3, 12px);
+    }
+}
+
+@media (max-width: 480px) {
+    .oc.openkill-status-page .dashboard-content-layout .dashboard-security-section {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* ===== Runtime dashboard equal-width closeout End ===== */
+
 /* Wide settings alignment: use the full LuCI content column on desktop. */
 @media (min-width: 901px) {
     #cbi-openkill.openkill-settings,

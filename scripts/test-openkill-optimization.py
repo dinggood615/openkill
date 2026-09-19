@@ -73,6 +73,10 @@ def main() -> int:
     assert "(?:https|tls|quic|h3)" in yml and "https?" not in yml[yml.index("encrypted_server") : yml.index("encrypted_server") + 180]
     assert "strict DNS privacy requires at least one selectable proxy group" in yml
     assert "provider_effective=1" in adblock and "source_sha256=" in adblock
+    assert 'DEFAULT_ADBLOCK_URL="https://anti-ad.net/domains.txt"' in adblock
+    assert "validate_download \"$DEFAULT_ADBLOCK_URL\"" in adblock
+    assert "Configured adblock source failed; used the maintained built-in source." in adblock
+    assert "https://anti-ad.net/domains.txt" in yml
     assert "provider_file=\"$provider_dir/openkill-anti-ad.yaml\"" in adblock
     assert "DEFAULT_DNSMASQ_CFGID" in adblock and "dnsmasq.conf.$DEFAULT_DNSMASQ_CFGID" in adblock
     assert "function under(domain, parent)" in adblock
