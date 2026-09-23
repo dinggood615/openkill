@@ -61,6 +61,20 @@
   pass for this follow-up. Because this is a post-release production fix, it
   must be versioned as `2026-1135` and pass the same Development CI, RC audit
   and Formal Release gates; `v2026-1134-ipk` remains a rollback point.
+- Delivery evidence: fix commit `e83415783f028f46fcbc63d243836f0b28f7bf40`
+  and version commit `e4408a3f5cb477fcc1bfd7695e4c2bd2a3e7bb56` passed
+  Development CI
+  ([35813424031](https://github.com/dinggood615/openkill/actions/runs/35813424031)).
+  RC Build
+  ([35813533691](https://github.com/dinggood615/openkill/actions/runs/35813533691))
+  produced `luci-app-openkill_2026-1135_all.ipk`, SHA256
+  `c523565482e38538ef2260091fc8edca26d52f0d35b2d2f5e12b9240ef3d2e3f`.
+  Formal Release with both gates enabled succeeded
+  ([35814129021](https://github.com/dinggood615/openkill/actions/runs/35814129021));
+  [v2026-1135-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1135-ipk)
+  points to the version commit and its downloaded package SHA256 is
+  `8abbfdd89bd0f572bd0bfb8a68e54e7ad90d76f29fa6bc5cf4e40dddb55e09a0`.
+  No device installation or remote NaiveProxy authentication was performed.
 
 ## Optional NaiveProxy bridge integration (2026-09-23)
 
