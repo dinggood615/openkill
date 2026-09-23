@@ -46,6 +46,7 @@ def main() -> None:
     require(helper, 'chmod 600 "$tmp"')
     require(helper, "sha256sum")
     require(helper, "naive_arch_ok")
+    require(helper, "naive_binary_probe")
     require(helper, "tar -tf")
     require(helper, "component-not-installed")
     require(init, ". $IPKG_INSTROOT/usr/share/openkill/openkill_naive.sh")

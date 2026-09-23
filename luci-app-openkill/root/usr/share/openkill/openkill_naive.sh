@@ -173,6 +173,12 @@ naive_arch_ok() {
     [ "$em" -eq "$expected" ]
 }
 
+naive_binary_probe() {
+    # A version probe verifies the selected OpenWrt libc/loader combination
+    # without opening a listener or contacting a remote server.
+    "$1" --version >/dev/null 2>&1
+}
+
 naive_component_install() {
     local url="$1" expected="$2" tmp actual size extract candidate
     case "$url" in https://github.com/klzgrad/naiveproxy/*|https://github.com/klzgrad/naiveproxy/releases/*|https://raw.githubusercontent.com/klzgrad/naiveproxy/*) ;; *) return 2 ;; esac
@@ -203,6 +209,7 @@ naive_component_install() {
     rm -f "$tmp"; chmod 755 "$NAIVE_BIN.new" || return 1
     [ "$(dd if="$NAIVE_BIN.new" bs=4 count=1 2>/dev/null)" = "ELF" ] || { rm -f "$NAIVE_BIN.new"; return 1; }
     naive_arch_ok "$NAIVE_BIN.new" || { rm -f "$NAIVE_BIN.new"; return 1; }
+    naive_binary_probe "$NAIVE_BIN.new" || { rm -f "$NAIVE_BIN.new"; return 1; }
     [ -x "$NAIVE_BIN" ] && mv -f "$NAIVE_BIN" "$NAIVE_BIN.previous" 2>/dev/null || true
     mv -f "$NAIVE_BIN.new" "$NAIVE_BIN" || return 1
     chown root:root "$NAIVE_BIN" 2>/dev/null || true; chmod 755 "$NAIVE_BIN"

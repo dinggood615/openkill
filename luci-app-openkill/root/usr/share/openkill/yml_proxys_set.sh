@@ -261,6 +261,7 @@ yml_servers_set()
     # only the helper's loopback SOCKS5 endpoint to Mihomo.
     if [ "$type" = "naiveproxy" ]; then
         [ "$(uci -q get openkill.config.naive_enabled 2>/dev/null || echo 0)" = "1" ] || return
+        [ "$(uci -q get openkill.config.naive_auto_start 2>/dev/null || echo 1)" = "1" ] || return
         naive_component_path="$(uci -q get openkill.config.naive_component_path 2>/dev/null || echo /etc/openkill/core/naive)"
         case "$naive_component_path" in /etc/openkill/core/*) ;; *) return ;; esac
         [ -x "$naive_component_path" ] || return
