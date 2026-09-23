@@ -360,7 +360,7 @@ PREVIEW_SCRIPT = r"""
             });
             var pluginVersion = document.getElementById('plugin-version-text');
             var coreVersion = document.getElementById('core-version-text');
-            if (pluginVersion) pluginVersion.textContent = 'v2026-1140';
+            if (pluginVersion) pluginVersion.textContent = 'v2026-1141';
             if (coreVersion) coreVersion.textContent = 'v1.19.31';
             var mode = document.getElementById('_mode');
             if (mode) mode.innerHTML = '<b>TUN</b>';

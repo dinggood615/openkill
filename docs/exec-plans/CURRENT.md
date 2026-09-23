@@ -31,10 +31,16 @@
   probe reports `PLAYWRIGHT_UNAVAILABLE` on this host; no rendered screenshot
   is claimed from that unavailable dependency. No device or packet-path test
   was used.
-- Delivery status: presentation commit `47c726c` is created locally. GitHub
-  push is pending a transient TLS handshake failure; the next action is to
-  retry the push, verify the exact Development CI, and only then evaluate the
-  repository release gate.
+- Delivery status: presentation commit
+  `7ec43075375a8a69ec57a60bff8e88c89b2729a8` is on `master`. Its exact
+  Development CI passed ([35847220504](https://github.com/dinggood615/openkill/actions/runs/35847220504));
+  the clean jsDelivr check passed ([35847220219](https://github.com/dinggood615/openkill/actions/runs/35847220219)).
+  The 2026-1140 RC Build passed ([35847382643](https://github.com/dinggood615/openkill/actions/runs/35847382643));
+  its audited package SHA256 is
+  `4ddba320ab058ca84a99d5012447a4dd40665a48c43b76ec569bfaf48cc3ef3f`.
+  Version metadata and release notes for 2026-1141 are now prepared; the
+  next action is to run the exact-commit Development CI and Formal Release
+  gate for that version.
 
 ## NaiveProxy installer archive compatibility (2026-09-23)
 
