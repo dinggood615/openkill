@@ -192,7 +192,7 @@ naive_binary_probe() {
 }
 
 naive_component_install() {
-    local url="$1" expected="$2" tmp actual size extract candidate
+    local url="$1" expected="$2" tmp archive actual size extract candidate
     case "$url" in https://github.com/klzgrad/naiveproxy/*|https://github.com/klzgrad/naiveproxy/releases/*|https://raw.githubusercontent.com/klzgrad/naiveproxy/*) ;; *) return 2 ;; esac
     case "$expected" in ''|*[!0-9A-Fa-f]*) return 2 ;; esac
     [ "${#expected}" -eq 64 ] || return 2
@@ -210,16 +210,27 @@ naive_component_install() {
     [ "$size" -gt 0 ] && [ "$size" -le 209715200 ] || { rm -f "$tmp"; return 1; }
     actual=$(sha256sum "$tmp" 2>/dev/null | awk '{print tolower($1)}')
     [ "$actual" = "$(printf '%s' "$expected" | tr 'A-F' 'a-f')" ] || { rm -f "$tmp"; return 1; }
-    if tar -tf "$tmp" >/dev/null 2>&1; then
-        extract="$NAIVE_ROOT/.extract.$$"; rm -rf "$extract"; mkdir -p "$extract" || { rm -f "$tmp"; return 1; }
-        if tar -tf "$tmp" | grep -Eq '(^/|(^|/)\.\.(\/|$))'; then rm -rf "$extract" "$tmp"; return 1; fi
-        tar -xf "$tmp" -C "$extract" || { rm -rf "$extract" "$tmp"; return 1; }
+    archive="$tmp"
+    case "$url" in
+        *.tar.xz)
+            # BusyBox tar on supported OpenWrt targets does not necessarily
+            # include xz support.  Decode to a private temporary archive so
+            # member validation and extraction use the same bytes.
+            command -v xz >/dev/null 2>&1 || { rm -f "$tmp"; return 1; }
+            archive="$tmp.tar"
+            xz -dc "$tmp" > "$archive" 2>/dev/null || { rm -f "$tmp" "$archive"; return 1; }
+            ;;
+    esac
+    if tar -tf "$archive" >/dev/null 2>&1; then
+        extract="$NAIVE_ROOT/.extract.$$"; rm -rf "$extract"; mkdir -p "$extract" || { rm -f "$tmp" "$archive"; return 1; }
+        if tar -tf "$archive" | grep -Eq '(^/|(^|/)\.\.(\/|$))'; then rm -rf "$extract" "$tmp" "$archive"; return 1; fi
+        tar -xf "$archive" -C "$extract" || { rm -rf "$extract" "$tmp" "$archive"; return 1; }
         candidate=$(find "$extract" -type f -name naive -perm -u=x 2>/dev/null | head -n 1)
         [ -n "$candidate" ] || candidate=$(find "$extract" -type f -name naive 2>/dev/null | head -n 1)
-        [ -n "$candidate" ] || { rm -rf "$extract" "$tmp"; return 1; }
-        cp "$candidate" "$NAIVE_BIN.new" || { rm -rf "$extract" "$tmp"; return 1; }; rm -rf "$extract"
-    else cp "$tmp" "$NAIVE_BIN.new" || { rm -f "$tmp"; return 1; }; fi
-    rm -f "$tmp"; chmod 755 "$NAIVE_BIN.new" || return 1
+        [ -n "$candidate" ] || { rm -rf "$extract" "$tmp" "$archive"; return 1; }
+        cp "$candidate" "$NAIVE_BIN.new" || { rm -rf "$extract" "$tmp" "$archive"; return 1; }; rm -rf "$extract"
+    else cp "$tmp" "$NAIVE_BIN.new" || { rm -f "$tmp" "$archive"; return 1; }; fi
+    rm -f "$tmp" "$archive"; chmod 755 "$NAIVE_BIN.new" || return 1
     [ "$(dd if="$NAIVE_BIN.new" bs=4 count=1 2>/dev/null)" = "ELF" ] || { rm -f "$NAIVE_BIN.new"; return 1; }
     naive_arch_ok "$NAIVE_BIN.new" || { rm -f "$NAIVE_BIN.new"; return 1; }
     naive_binary_probe "$NAIVE_BIN.new" || { rm -f "$NAIVE_BIN.new"; return 1; }

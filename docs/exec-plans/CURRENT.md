@@ -1,5 +1,29 @@
 # Current status
 
+## NaiveProxy installer archive compatibility (2026-09-23)
+
+- Device recheck found the configured official x86_64 asset downloads
+  successfully and matches the configured SHA256, but the Kwrt image has
+  BusyBox `tar` without xz support and has no `xz` executable. The installer
+  therefore failed while reading the `.tar.xz` archive before extracting the
+  `naive` ELF. The OpenKill package did not previously declare an xz runtime
+  dependency, so the UI surfaced only a generic install failure.
+- Contract: the package now depends on OpenWrt `xz`; the installer decodes
+  `.tar.xz` into a private temporary archive, validates member paths, extracts
+  only the expected executable, then applies the existing ELF, architecture,
+  loader/version probe and atomic replacement checks. Download and digest
+  semantics remain unchanged, and decompressor absence is a hard failure that
+  preserves the previous component.
+- Device evidence before the fix: package `2026-1137` was installed and
+  `naive_enabled=1`, but all approved component paths were absent and the
+  helper reported `component_installed=0`, `reason=component-not-installed`.
+  A direct download measured 3,397,604 bytes and matched the configured digest;
+  BusyBox reported `tar: invalid tar magic` for the xz archive. No node
+  credentials or packet-path tests were used.
+- Next action: run local and POSIX gates, build a candidate containing the xz
+  dependency, install it with dependency resolution on the authorized device,
+  then verify component detection, executable probe and rollback behavior.
+
 ## NaiveProxy device detection and share-link import (2026-09-23)
 
 - Device phase is authorized for `192.168.1.103` with a protected backup at

@@ -24,6 +24,7 @@ SETTINGS = ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua"
 SETTINGS_THEME = ROOT / "luci-app-openkill/luasrc/view/openkill/settings_theme.htm"
 NAIVE_VIEW = ROOT / "luci-app-openkill/luasrc/view/openkill/naive_compatibility.htm"
 CONFIG = ROOT / "luci-app-openkill/root/etc/config/openkill"
+MAKEFILE = ROOT / "luci-app-openkill/Makefile"
 
 
 def require(path: Path | str, text: str) -> None:
@@ -37,6 +38,7 @@ def main() -> None:
     generator = GENERATOR.read_text(encoding="utf-8")
     init = INIT.read_text(encoding="utf-8")
     status = STATUS.read_text(encoding="utf-8")
+    makefile = MAKEFILE.read_text(encoding="utf-8")
 
     require(CONFIG, "option naive_enabled '0'")
     require(SERVERS, 'o:value("naiveproxy", "NaiveProxy")')
@@ -55,6 +57,10 @@ def main() -> None:
     require(helper, "component-not-installed")
     require(helper, "NAIVE_CONFIGURED_BIN")
     require(helper, "/usr/bin/naiveproxy")
+    require(helper, "*.tar.xz)")
+    require(helper, "command -v xz")
+    require(helper, 'xz -dc "$tmp"')
+    require(makefile, "+unzip +xz")
     require(metadata, "https://api.github.com/repos/klzgrad/naiveproxy/releases/latest")
     require(metadata, "official-github-release-asset")
     require(metadata, "jsonfilter")
