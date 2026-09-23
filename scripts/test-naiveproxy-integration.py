@@ -53,6 +53,7 @@ def main() -> None:
     require(helper, "sha256sum")
     require(helper, "naive_arch_ok")
     require(helper, "naive_read_byte")
+    require(helper, "naive_refresh_status")
     require(helper, "command -v hexdump")
     require(helper, "naive_binary_probe")
     require(helper, "tar -tf")

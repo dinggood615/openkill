@@ -87,6 +87,55 @@ naive_port_for_section() {
 
 naive_component_available() { [ -x "$NAIVE_BIN" ]; }
 
+naive_state_value() {
+    local name="$1" fallback="$2" state
+    state=$(grep -m1 "^${name}=" "$NAIVE_STATE" 2>/dev/null || true)
+    [ -n "$state" ] || { printf '%s\n' "$fallback"; return; }
+    state=${state#*=}
+    [ -n "$state" ] && printf '%s\n' "$state" || printf '%s\n' "$fallback"
+}
+
+naive_refresh_status() {
+    local configured generated local_ready remote_verified state reason updated
+    configured=$(naive_state_value configured 0)
+    generated=$(naive_state_value generated 0)
+    local_ready=$(naive_state_value local_ready 0)
+    remote_verified=$(naive_state_value remote_verified 0)
+    updated=$(date +%s)
+    if naive_component_available; then
+        if [ "$configured" -eq 0 ] 2>/dev/null; then
+            configured=0; generated=0; state=disabled; reason=no-enabled-nodes
+        elif [ "$generated" -lt "$configured" ] 2>/dev/null; then
+            state=installed; reason=component-installed-needs-prepare
+        else
+            state=$(naive_state_value state prepared)
+            reason=$(naive_state_value reason prepared)
+        fi
+        cat > "$NAIVE_STATE" <<EOF
+configured=$configured
+generated=$generated
+component_installed=1
+local_ready=$local_ready
+remote_verified=$remote_verified
+state=$state
+reason=$reason
+updated=$updated
+EOF
+    else
+        cat > "$NAIVE_STATE" <<EOF
+configured=$configured
+generated=0
+component_installed=0
+local_ready=0
+remote_verified=0
+state=unavailable
+reason=component-not-installed
+updated=$updated
+EOF
+    fi
+    chmod 600 "$NAIVE_STATE" 2>/dev/null || true
+}
+
 naive_json_prepare() {
     local sid="$1" server="$2" port="$3" user="$4" pass="$5" transport="$6" listen_port="$7"
     local encoded_user encoded_pass host proxy tmp
@@ -255,9 +304,9 @@ case "${0##*/}" in
         case "$1" in
             prepare) naive_prepare_all ;;
             port) naive_port_for_section "$2" ;;
-            status) [ -r "$NAIVE_STATE" ] && cat "$NAIVE_STATE" || printf '%s\n' 'state=not-started' 'reason=not-started' ;;
-            install) naive_component_install "$2" "$3" ;;
-            remove) rm -f "$NAIVE_CONFIGURED_BIN" "$NAIVE_CONFIGURED_BIN.previous"; naive_stop_configs ;;
+            status) naive_refresh_status; cat "$NAIVE_STATE" ;;
+            install) naive_component_install "$2" "$3"; rc=$?; [ "$rc" -eq 0 ] && naive_refresh_status; exit "$rc" ;;
+            remove) rm -f "$NAIVE_CONFIGURED_BIN" "$NAIVE_CONFIGURED_BIN.previous"; naive_stop_configs; naive_refresh_status ;;
             *) printf '%s\n' 'usage: openkill_naive.sh {prepare|port SID|status|install URL SHA256|remove}' >&2; exit 2 ;;
         esac
         ;;

@@ -25,9 +25,25 @@
   packet-path tests were used. The corrected helper was then run in an
   isolated device directory and completed the full install path successfully,
   producing an executable whose version probe returned `150.0.7871.63`.
-- Next action: publish the 2026-1139 candidate containing both compatibility
-  fixes, install it with dependency resolution on the authorized device, and
-  verify the configured path and status reporting before formal release.
+- A follow-up device check after installing the binary found a stale-state
+  defect: the file and version probe succeeded, but `/tmp/openkill-naive.state`
+  still contained the pre-install `component_installed=0` record because the
+  helper's `status` action only printed the old file. This could make the UI
+  report “组件未安装” after a valid manual or page-driven installation.
+- The helper now refreshes the state file from the configured executable on
+  every `status`, refreshes it after successful `install`, and records a
+  separate `component-installed-needs-prepare` state when enabled nodes still
+  require generation. Missing binaries reset only the component availability
+  fields; node configuration is retained. This keeps installation, local
+  entry readiness and remote verification independent.
+- Local evidence after the change: `NAIVEPROXY_INTEGRATION_CONTRACT=PASS`,
+  POSIX syntax, `git diff --check`, and `scripts/local-gate.sh` pass. The
+  device's manually installed component remains executable at the configured
+  path and reports `naive 150.0.7871.63`; its previous stale state will be
+  refreshed by the updated helper.
+- Next action: commit and push the status-refresh fix, run exact-commit
+  Development CI, then prepare the 2026-1140 formal candidate, install it on
+  the authorized device, and verify the refreshed state before release.
 
 ## NaiveProxy device detection and share-link import (2026-09-23)
 
