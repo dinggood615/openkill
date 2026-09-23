@@ -34,6 +34,22 @@
   `scripts/local-gate.sh` pass. A WSL fixture run matched the official latest
   x86_64 asset and GitHub digest; unknown/missing parser paths remain
   fail-closed. No device or remote NaiveProxy session was used.
+- Delivery evidence: implementation commit `b98bd34db2ccc9707976d1cb29b9423ba4ad2333`
+  passed Development CI
+  ([35812016741](https://github.com/dinggood615/openkill/actions/runs/35812016741));
+  version/release commit `27257f5c0c28068a93ec5945b81e1a7fd09acb44` passed
+  Development CI
+  ([35812222147](https://github.com/dinggood615/openkill/actions/runs/35812222147)).
+  RC Build
+  ([35812353895](https://github.com/dinggood615/openkill/actions/runs/35812353895))
+  produced `luci-app-openkill_2026-1134_all.ipk`, SHA256
+  `a428acb1ba44ef9233ab02abff12583aa92fe42766fd58854fb105c13df2dc8`.
+  Formal Release with both gates enabled succeeded
+  ([35812770176](https://github.com/dinggood615/openkill/actions/runs/35812770176));
+  published tag `v2026-1134-ipk` and package SHA256
+  `6d7e61a77024722b33566651d0a62de5825341148ff916f2ddbe48738b340a2a`. No
+  device installation or remote
+  NaiveProxy authentication was performed; retain `v2026-1133-ipk` for rollback.
 
 ## Optional NaiveProxy bridge integration (2026-09-23)
 
