@@ -20,9 +20,10 @@
   A direct download measured 3,397,604 bytes and matched the configured digest;
   BusyBox reported `tar: invalid tar magic` for the xz archive. No node
   credentials or packet-path tests were used.
-- Next action: run local and POSIX gates, build a candidate containing the xz
-  dependency, install it with dependency resolution on the authorized device,
-  then verify component detection, executable probe and rollback behavior.
+- Next action: run local and POSIX gates, publish the 2026-1138 candidate from
+  the corrected source, install it with the xz dependency on the authorized
+  device, then verify component detection, executable probe and rollback
+  behavior.
 
 ## NaiveProxy device detection and share-link import (2026-09-23)
 
