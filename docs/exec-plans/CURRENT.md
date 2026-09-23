@@ -37,9 +37,24 @@
   local gate pass. The importer accepts the supported share-link schemes,
   maps IPv4/IPv6, TLS/TCP/QUIC and percent-encoded credentials, and escapes
   parameter warnings before rendering them.
-- Next action: commit the bounded status wording update, verify its exact
-  Development CI, rebuild the 2026-1137 RC from the final source, then run
-  the Formal Release gate and recheck the device package/status.
+- Delivery evidence: status wording commit
+  `c331488644ce56e0791163bbf02135e8ae9b761e` is on `master` and its exact
+  Development CI passed ([35823101717](https://github.com/dinggood615/openkill/actions/runs/35823101717)).
+  The final 2026-1137 RC Build passed ([35823202127](https://github.com/dinggood615/openkill/actions/runs/35823202127)).
+  Formal Release passed with the release gate and publish enabled
+  ([35823541381](https://github.com/dinggood615/openkill/actions/runs/35823541381));
+  it published [v2026-1137-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1137-ipk).
+  The formal package `luci-app-openkill_2026-1137_all.ipk` has SHA256
+  `941bbc21a9fdfc79ab91828dd65ed474384a6a28ea06c5cae0f8edcdc7ceed9e`.
+  The package audit confirms version 2026-1137 and includes the status view,
+  compatibility view and share-link importer. The device was upgraded to
+  2026-1137 with its OpenKill configuration hash unchanged; no optional Naive
+  binary or remote authentication was started.
+- Next action: if the optional NaiveProxy binary is installed on the device,
+  use the new re-detect action, import a node through the existing editor,
+  and separately verify the loopback bridge and remote authentication. Those
+  runtime and packet-path checks remain device-scoped and are not claimed by
+  this release.
 
 ## NaiveProxy compatibility unified entry and installation flow (2026-09-23)
 
