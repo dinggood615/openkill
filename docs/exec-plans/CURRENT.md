@@ -66,6 +66,22 @@
   `100744b67216c9100649340be106920fc63b9326` is on `master`; Development CI
   run `35807708689`
   (https://github.com/dinggood615/openkill/actions/runs/35807708689) passed.
+- Release preparation advanced the synchronized source metadata to
+  `2026-1133` and added version-specific NaiveProxy notes. Commit
+  `ed4486d0bcb23bca7e738e5191c7c5fd2f6e8b33` is on `master`; its exact
+  Development CI run `35808776516`
+  (https://github.com/dinggood615/openkill/actions/runs/35808776516) passed.
+  Formal Release run `35808885468`
+  (https://github.com/dinggood615/openkill/actions/runs/35808885468)
+  completed successfully with `release_gate=true` and `publish=true`.
+  Tag/release `v2026-1133-ipk`
+  (https://github.com/dinggood615/openkill/releases/tag/v2026-1133-ipk)
+  points to that source commit and publishes
+  `luci-app-openkill_2026-1133_all.ipk` (9,215,921 bytes, SHA256
+  `E5899857D6BD3A33465F147BE62FE4A53ECC7513C426D240A9D675644D4CBBC5`).
+  Existing `2026-1132` release assets remain available for rollback. No
+  device installation or live NaiveProxy server test was performed in this
+  local-only iteration; those runtime paths remain unverified.
 
 
 ## Dashboard lower-right alignment and status evidence recheck (2026-09-19)
