@@ -39,6 +39,26 @@
   Version metadata and release notes for 2026-1142 are prepared; the next
   action is its exact Development CI, Formal Release, and device candidate
   installation.
+- 2026-1142 metadata commit `a219b1f848d4a16051d69563c8448d8f65b99e3b`
+  passed exact Development CI
+  ([35856793818](https://github.com/dinggood615/openkill/actions/runs/35856793818)).
+  Formal Release passed with both gates enabled
+  ([35857008078](https://github.com/dinggood615/openkill/actions/runs/35857008078));
+  [v2026-1142-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1142-ipk)
+  is published. The downloaded formal package is 9,226,016 bytes with SHA256
+  `f6a65639935a5b336161cf80a0102b954c3a423e449d86c5c4937a2f23e1cc48`, and
+  its packaged helper contains the task and polling commands.
+- Device evidence after the protected backup: OpenKill 2026-1142 installed,
+  the configured URL and digest remained present, and the real device task
+  completed `queued → succeeded/completed`. The installed component is
+  root-owned, executable, and reports `naive 150.0.7871.63`; the refreshed
+  state reports `component_installed=1`, `state=disabled`,
+  `reason=no-enabled-nodes`, `local_ready=0`, `remote_verified=0`. The
+  OpenKill service is currently inactive because its selected `openkill`
+  configuration file is absent; start attempts record `Config Not Found`.
+  No node was enabled and no packet-path or remote-authentication test ran.
+  The pre-install backup remains at
+  `D:\openkill-device-backup-20260923-naive-task\openkill-naive-task.tgz`.
 
 ## Settings navigation and network card layout (2026-09-23)
 
