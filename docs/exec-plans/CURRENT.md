@@ -23,8 +23,10 @@
 - Network contract: bootstrap resolution follows the existing DNS/privacy
   policy with an explicit no-loop exception when required. The bridge emits
   `udp: false` until UDP forwarding is separately verified. Fake-IP values are
-  not sent as ordinary real addresses to the helper, and no broad port or
-  firewall bypass is added.
+  not sent as ordinary real addresses to the helper. The procd instance uses
+  the existing `nogroup` (GID 65534) owner return contract so helper OUTPUT is
+  excluded from OpenKill's own transparent rules; no broad port or firewall
+  bypass is added.
 - UI contract: reuse the existing node editor, component/settings patterns and
   status cards. NaiveProxy is shown as an optional component with responsive
   two-column forms and conservative lifecycle wording; existing users remain
