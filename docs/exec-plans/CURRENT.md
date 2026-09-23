@@ -53,6 +53,11 @@
   successfully. No RC or Formal Release was dispatched in this local-only
   iteration because the optional binary, remote Naive server and device phase
   were not available for the required runtime evidence.
+- A follow-up source fix gates generated Naive nodes on `naive_auto_start` and
+  probes the staged binary with both ELF architecture and `--version` loader
+  checks before activation. Commit `02e0343861b1e186f2b39adc3a7c7a0a47faba19`
+  is on `master`; Development CI run `35807460581`
+  (https://github.com/dinggood615/openkill/actions/runs/35807460581) passed.
 
 
 ## Dashboard lower-right alignment and status evidence recheck (2026-09-19)
