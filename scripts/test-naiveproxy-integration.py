@@ -64,11 +64,15 @@ def main() -> None:
     require(CONTROLLER, 'entry({"admin", "services", "openkill", "naive_component"}')
     require(CONTROLLER, 'entry({"admin", "services", "openkill", "naive_metadata"}')
     require(CONTROLLER, "action_naive_redirect")
+    assert 'action_naive_redirect"),"NaiveProxy"' not in CONTROLLER.read_text(encoding="utf-8"), "legacy NaiveProxy route must stay hidden from the menu"
+    assert 'uci_cursor:commit("openkill")' not in CONTROLLER.read_text(encoding="utf-8").split("function action_naive_metadata()", 1)[1].split("function action_naive_component()", 1)[0], "metadata discovery must not commit UCI"
     require(SETTINGS, '"naive_enabled"')
     require(SETTINGS, 'template = "openkill/naive_compatibility"')
     require(SETTINGS_THEME, "naiveproxy-compatibility")
     require(SETTINGS_THEME, "openkill-naive-component-info")
     require(NAIVE_VIEW, "检测并填写空缺")
+    require(NAIVE_VIEW, "自动匹配并安装")
+    require(NAIVE_VIEW, "添加 NaiveProxy 节点")
     require(NAIVE_VIEW, "credentials: 'same-origin'")
     require(NAIVE_VIEW, "远端连接未验证")
 

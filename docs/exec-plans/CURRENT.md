@@ -1,5 +1,39 @@
 # Current status
 
+## NaiveProxy compatibility unified entry and installation flow (2026-09-23)
+
+- Rechecked baseline `452a950610a326c9bbd305845974b0fd83cc2e63` with a clean
+  worktree before this change. Device access and packet-path tests remain out
+  of scope for this local iteration.
+- Navigation contract: the legacy `/naive` route remains a bookmark redirect,
+  but no longer has a LuCI menu title. Compatibility settings is the only
+  visible owner of `naive_*` fields.
+- Settings/UI contract: OpenVPN exact compatibility and the NaiveProxy helper
+  are ordinary cards in the same responsive two-column grid. The cards stretch
+  within their active desktop row and collapse to one column on narrow layouts;
+  no fixed-height or placeholder layout is introduced.
+- Metadata contract: discovery is draft-only and never commits UCI. URL and
+  SHA256 are treated as an inseparable asset pair; automatic fill only occurs
+  when both fields are empty, preserving manual values and preventing a mixed
+  URL/digest installation.
+- Component contract: the compatibility card provides explicit detect, refresh,
+  automatic match-and-install, install-current and remove actions. Installation
+  continues through the existing HTTPS allow-list, digest/size/archive/ELF/
+  loader checks and atomic replacement boundary.
+- Node/bridge contract: the compatibility card links to the existing NaiveProxy
+  node editor and strategy-group manager. Existing stable-section-ID port
+  allocation and loopback-only SOCKS5 generation remain the source of truth;
+  no native `type: naiveproxy` is sent to Mihomo and UDP remains disabled until
+  separately verified.
+- Local evidence: NaiveProxy integration contract, UI contract, UI preview,
+  extracted JavaScript syntax check, `git diff --check`, POSIX metadata/helper
+  syntax and `scripts/local-gate.sh` pass. Browser rendering, actual component
+  installation, remote authentication and device behavior remain unverified.
+- Next action: commit and push the bounded source change, verify exact-commit
+  Development CI, then run RC audit and Formal Release only after all required
+  gates pass. Read the latest release/version from the workflow instead of
+  assuming a tag number.
+
 ## NaiveProxy compatibility settings and metadata discovery (2026-09-23)
 
 - Scope: move the existing NaiveProxy component controls and status actions

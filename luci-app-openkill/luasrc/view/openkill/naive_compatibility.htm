@@ -5,7 +5,7 @@
   <div class="openkill-naive-compatibility-head">
     <div>
       <strong>官方组件检测</strong>
-      <p>按当前 OpenWrt CPU 匹配官方 OpenWrt 制品。检测只读取发布信息；安装仍需单独点击。</p>
+     <p>按当前 OpenWrt 架构匹配官方 OpenWrt 制品。自动安装会先校验 URL、摘要和组件格式，再安全替换旧版本。</p>
     </div>
     <span class="openkill-naive-compatibility-badge" data-naive-meta-state aria-live="polite">待检测</span>
   </div>
@@ -23,9 +23,14 @@
   <div class="openkill-naive-compatibility-actions">
     <button type="button" class="cbi-button cbi-button-apply" data-naive-meta-action="detect">检测并填写空缺</button>
     <button type="button" class="cbi-button" data-naive-meta-action="refresh">只刷新检测</button>
+    <button type="button" class="cbi-button cbi-button-apply" data-naive-auto-install="1">自动匹配并安装</button>
     <button type="button" class="cbi-button cbi-button-apply" data-naive-component-action="install">安装当前组件</button>
     <button type="button" class="cbi-button cbi-button-reset" data-naive-component-action="remove">移除组件</button>
   </div>
+  <p class="openkill-naive-compatibility-links">
+    <a class="cbi-button" href="<%=dispatcher.build_url('admin','services','openkill','servers')%>?add=naiveproxy">添加 NaiveProxy 节点</a>
+    <a class="cbi-button" href="<%=dispatcher.build_url('admin','services','openkill','servers')%>">管理节点与策略组</a>
+  </p>
   <div class="openkill-naive-compatibility-status" data-naive-component-status aria-live="polite">组件状态尚未读取。</div>
 </div>
 <script>
@@ -98,17 +103,17 @@
     setBusy('[data-naive-meta-action]', true);
     var urlField = field('naive_component_url');
     var shaField = field('naive_component_sha256');
+    var bothEmpty = urlField && shaField && !String(urlField.value || '').trim() && !String(shaField.value || '').trim();
     var body = new URLSearchParams({ operation: mode, apply: apply ? '1' : '0',
-      fill_url: urlField && !String(urlField.value || '').trim() ? '1' : '0',
-      fill_sha256: shaField && !String(shaField.value || '').trim() ? '1' : '0' });
-    fetchJson(metadataUrl, {method: 'POST', credentials: 'same-origin',
+      fill_url: bothEmpty ? '1' : '0', fill_sha256: bothEmpty ? '1' : '0' });
+    return fetchJson(metadataUrl, {method: 'POST', credentials: 'same-origin',
       headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
       .then(function (data) {
         renderMeta(data);
         if (data.ok === '1' && apply) {
           if (urlField && !String(urlField.value || '').trim() && data.url) urlField.value = data.url;
           if (shaField && !String(shaField.value || '').trim() && data.sha256) shaField.value = data.sha256;
-          reason.textContent = data.applied ? '空缺字段已填入，请保存并应用设置后再安装组件。' : '已有输入已保留，未覆盖用户填写值。';
+          reason.textContent = data.applied ? '匹配的 URL 和 SHA256 已填入当前表单草稿；保存设置后会保留。' : '已有输入未成对为空，已保留手动组件 URL/SHA256，未混用不同资产。';
         }
       })
       .catch(function (error) {
@@ -132,27 +137,50 @@
       .then(renderComponent)
       .catch(function (error) { componentState.textContent = error && error.message === 'timeout' ? '组件状态读取超时，请重试' : '组件状态读取失败，请重试'; });
   }
+  function runComponentAction(componentAction, urlField, shaField) {
+    if (componentAction === 'remove' && !window.confirm('确认移除 NaiveProxy 组件？节点配置会保留。')) return Promise.resolve();
+    if (componentAction === 'install' && (!urlField || !shaField || !String(urlField.value || '').trim() || !String(shaField.value || '').trim())) {
+      componentState.textContent = '请先检测并填写官方 URL 和 SHA256';
+      return Promise.resolve();
+    }
+    componentState.textContent = componentAction === 'install' ? '正在校验并安装…' : '正在移除组件…';
+    setBusy('[data-naive-component-action], [data-naive-auto-install]', true);
+    var body = new URLSearchParams({operation: componentAction});
+    if (componentAction === 'install') { body.set('url', urlField.value); body.set('sha256', shaField.value); }
+    return fetchJson(componentUrl, {method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
+      .then(function (data) {
+        componentState.textContent = data.ok ? '组件操作完成；请保存并应用设置，远端连接仍未验证。' : '操作失败：' + (data.error || '请检查组件信息');
+        refreshComponent();
+        return data;
+      })
+      .catch(function (error) {
+        componentState.textContent = error && error.message === 'timeout' ? '操作超时，请检查日志后重试' : '操作请求失败，请重试';
+        throw error;
+      })
+      .then(function (data) { setBusy('[data-naive-component-action], [data-naive-auto-install]', false); return data; }, function (error) { setBusy('[data-naive-component-action], [data-naive-auto-install]', false); throw error; });
+  }
+  function autoInstall() {
+    setBusy('[data-naive-meta-action], [data-naive-component-action], [data-naive-auto-install]', true);
+    return requestMetadata('detect', true).then(function (data) {
+      var urlField = field('naive_component_url');
+      var shaField = field('naive_component_sha256');
+      if (!data || data.ok !== '1' || !urlField || !shaField || !String(urlField.value || '').trim() || !String(shaField.value || '').trim()) {
+        componentState.textContent = '未找到可核验的匹配组件，未执行安装';
+        return null;
+      }
+      return runComponentAction('install', urlField, shaField);
+    }).catch(function () { return null; }).then(function () { setBusy('[data-naive-meta-action], [data-naive-component-action], [data-naive-auto-install]', false); });
+  }
   root.addEventListener('click', function (event) {
     var metadataAction = event.target.getAttribute('data-naive-meta-action');
     var componentAction = event.target.getAttribute('data-naive-component-action');
+    if (event.target.getAttribute('data-naive-auto-install')) return autoInstall();
     if (metadataAction) return requestMetadata(metadataAction === 'detect' ? 'detect' : 'cached', metadataAction === 'detect');
     if (!componentAction) return;
-    if (componentAction === 'remove' && !window.confirm('确认移除 NaiveProxy 组件？节点配置会保留。')) return;
     var urlField = field('naive_component_url');
     var shaField = field('naive_component_sha256');
-    if (componentAction === 'install' && (!urlField || !shaField || !String(urlField.value || '').trim() || !String(shaField.value || '').trim())) {
-      componentState.textContent = '请先检测并填写官方 URL 和 SHA256';
-      return;
-    }
-    componentState.textContent = componentAction === 'install' ? '正在校验并安装…' : '正在移除组件…';
-    setBusy('[data-naive-component-action]', true);
-    var body = new URLSearchParams({operation: componentAction});
-    if (componentAction === 'install') { body.set('url', urlField.value); body.set('sha256', shaField.value); }
-    fetchJson(componentUrl, {method: 'POST', credentials: 'same-origin',
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
-      .then(function (data) { componentState.textContent = data.ok ? '操作完成，请保存并应用设置；远端连接仍未验证。' : '操作失败：' + (data.error || '请检查组件信息'); refreshComponent(); })
-      .catch(function (error) { componentState.textContent = error && error.message === 'timeout' ? '操作超时，请检查日志后重试' : '操作请求失败，请重试'; })
-      .then(function () { setBusy('[data-naive-component-action]', false); });
+    return runComponentAction(componentAction, urlField, shaField);
   });
   requestMetadata('cached', false);
   refreshComponent();

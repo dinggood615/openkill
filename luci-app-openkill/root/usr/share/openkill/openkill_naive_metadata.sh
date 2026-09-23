@@ -122,7 +122,12 @@ metadata_main() {
         return 0
     }
     case "$tag" in
-        v[0-9A-Za-z._-]* ) ;;
+        v?*[!0-9A-Za-z._-]* )
+            printf '%s\n' "$arch_info"
+            printf 'ok=0\nreason=invalid-release-tag\n'
+            return 0
+            ;;
+        v?*) ;;
         * )
             printf '%s\n' "$arch_info"
             printf 'ok=0\nreason=invalid-release-tag\n'
@@ -134,7 +139,7 @@ metadata_main() {
     digest=$(jsonfilter -i "$NAIVE_METADATA_CACHE" -e "@.assets[@.name='$asset'].digest" 2>/dev/null | sed -n '1p' | sed 's/^sha256://' | tr -d '\r\n')
     size=$(jsonfilter -i "$NAIVE_METADATA_CACHE" -e "@.assets[@.name='$asset'].size" 2>/dev/null | sed -n '1p' | tr -d '\r\n')
     case "$url" in https://github.com/klzgrad/naiveproxy/releases/download/*) ;; *) url= ;; esac
-    case "$digest" in [0-9a-fA-F][0-9a-fA-F]*) ;; *) digest= ;; esac
+    case "$digest" in ''|*[!0-9a-fA-F]*) digest= ;; esac
     [ "${#digest}" -eq 64 ] 2>/dev/null || digest=
     case "$size" in ''|*[!0-9]*) size= ;; esac
     printf '%s\n' "$arch_info"

@@ -68,7 +68,10 @@ function index()
 	entry({"admin", "services", "openkill", "settings"},cbi("openkill/settings"),_("Plugin Settings"), 30).leaf = true
 	-- Keep the former dedicated URL as a migration redirect.  There must be
 	-- only one CBI editor for naive_* so saves cannot diverge between pages.
-	entry({"admin", "services", "openkill", "naive"},call("action_naive_redirect"),"NaiveProxy", 35).leaf = true
+	-- Keep the former dedicated URL as a migration redirect, but do not expose
+	-- it as a second visible LuCI menu item.  The compatibility tab is the
+	-- single owner of all naive_* settings.
+	entry({"admin", "services", "openkill", "naive"},call("action_naive_redirect")).leaf = true
 	entry({"admin", "services", "openkill", "config-overwrite"},cbi("openkill/config-overwrite"),_("Overwrite Settings"), 40).leaf = true
 	entry({"admin", "services", "openkill", "config-subscribe"},cbi("openkill/config-subscribe"),_("Config Subscribe"), 60).leaf = true
 	entry({"admin", "services", "openkill", "servers"},cbi("openkill/servers"),nil).leaf = true
@@ -1669,30 +1672,18 @@ function action_naive_metadata()
 		if key then result[key] = value end
 	end
 	if result.ok == "1" and result.url and result.sha256 and #result.sha256 == 64 and apply then
-		local uci_cursor = require "luci.model.uci".cursor()
-		local current_url = uci_cursor:get("openkill", "config", "naive_component_url") or ""
-		local current_sha = uci_cursor:get("openkill", "config", "naive_component_sha256") or ""
-		local changed = false
-		if (replace or (current_url == "" and fill_url)) then
-			uci_cursor:set("openkill", "config", "naive_component_url", result.url)
-			result.applied_url = true
-			changed = true
-		else
-			result.applied_url = false
-			result.preserved_url = true
-		end
-		if (replace or (current_sha == "" and fill_sha256)) then
-			uci_cursor:set("openkill", "config", "naive_component_sha256", result.sha256)
-			result.applied_sha256 = true
-			changed = true
-		else
-			result.applied_sha256 = false
-			result.preserved_sha256 = true
-		end
-		if changed then
-			uci_cursor:commit("openkill")
-		end
-		result.applied = changed
+		-- Metadata discovery is a draft operation.  Never commit UCI from a
+		-- read/auto-fill request: the browser fills the two fields together and
+		-- the normal CBI Save & Apply remains the only persistence boundary.
+		-- This also prevents a URL and digest from different asset generations
+		-- being silently mixed by an intermediate request.
+		-- Treat URL and digest as one immutable asset tuple.  If only one field
+		-- is empty, leave both untouched so a manual URL cannot be paired with a
+		-- digest from another release.
+		result.applied = (fill_url and fill_sha256) or replace
+		result.applied_url = result.applied
+		result.applied_sha256 = result.applied
+		if not result.applied then result.reason = "manual-asset-pair-preserved" end
 		-- Keep the wire type stable: the shell contract is key=value and the
 		-- browser treats ok="1" as a successful metadata result.
 		result.ok = "1"
