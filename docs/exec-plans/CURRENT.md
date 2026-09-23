@@ -29,6 +29,16 @@
   invalid digest. A protected pre-change backup is at
   `D:\openkill-device-backup-20260923-naive-task\openkill-naive-task.tgz`
   (SHA256 `ea3e089b354dcb30d1dd77af7e5a1a376e9a120556e6628a11f8a6b4c2adc43d`).
+- Implementation commit `fab25321e11b3519283df033ef4a1d59da044f01` is on
+  `master`; its exact Development CI passed
+  ([35855847226](https://github.com/dinggood615/openkill/actions/runs/35855847226)).
+  The 2026-1141 RC audit also passed
+  ([35856086037](https://github.com/dinggood615/openkill/actions/runs/35856086037));
+  the audited IPK SHA256 is
+  `06b300390d72bf9a79f8744d3a0ce153001b86372cdb1f36fd937e468c3e6cbb`.
+  Version metadata and release notes for 2026-1142 are prepared; the next
+  action is its exact Development CI, Formal Release, and device candidate
+  installation.
 
 ## Settings navigation and network card layout (2026-09-23)
 
