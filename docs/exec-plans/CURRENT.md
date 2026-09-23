@@ -60,6 +60,12 @@
   checks before activation. Commit `02e0343861b1e186f2b39adc3a7c7a0a47faba19`
   is on `master`; Development CI run `35807460581`
   (https://github.com/dinggood615/openkill/actions/runs/35807460581) passed.
+- The anti-loop contract is confirmed against the existing OpenKill owner rule:
+  helper instances run in `nogroup` (GID 65534), which the fw4 and legacy
+  OUTPUT chains already return before interception. Commit
+  `100744b67216c9100649340be106920fc63b9326` is on `master`; Development CI
+  run `35807708689`
+  (https://github.com/dinggood615/openkill/actions/runs/35807708689) passed.
 
 
 ## Dashboard lower-right alignment and status evidence recheck (2026-09-19)
