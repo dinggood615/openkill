@@ -1521,11 +1521,34 @@ function action_status()
 	local function naive_value(name, fallback)
 		return naive_state:match(name .. "=([^\n]+)") or fallback
 	end
+	local function naive_probe(path)
+		if not path or path == "" or not fs.access(path) then
+			return false, "missing", "unknown"
+		end
+		if SYS.call(string.format("test -x %q", path)) ~= 0 then
+			return false, "not-executable", "unknown"
+		end
+		local version = (SYS.exec(string.format("%q --version 2>/dev/null | head -c 96", path)) or "")
+		version = version:gsub("[\r\n]+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+		if version == "" then
+			return true, "version-probe-failed", "unknown"
+		end
+		return true, "executable", version
+	end
 	local naive_component_path = fs.uci_get_config("config", "naive_component_path") or "/etc/openkill/core/naive"
-	local naive_component_version = "unknown"
-	if fs.access(naive_component_path) then
-		naive_component_version = (SYS.exec(string.format("%q --version 2>/dev/null | head -c 96", naive_component_path)) or ""):gsub("[\r\n]+", " ")
-		if naive_component_version == "" then naive_component_version = "unknown" end
+	local naive_component_installed, naive_component_reason, naive_component_version = naive_probe(naive_component_path)
+	if not naive_component_installed then
+		for _, candidate in ipairs({"/etc/openkill/core/naiveproxy", "/usr/bin/naive", "/usr/bin/naiveproxy", "/usr/local/bin/naive"}) do
+			local ok, reason, version = naive_probe(candidate)
+			if ok then
+				naive_component_path = candidate
+				naive_component_installed = true
+				naive_component_reason = "fallback-path"
+				naive_component_version = version
+				break
+			end
+			if naive_component_reason == "missing" then naive_component_reason = reason end
+		end
 	end
 
 	local result = {
@@ -1580,7 +1603,8 @@ function action_status()
 		naive_auto_start = fs.uci_get_config("config", "naive_auto_start") == "1",
 		naive_component_path = naive_component_path,
 		naive_component_version = naive_component_version,
-		naive_component_installed = naive_value("component_installed", "0") == "1" or fs.access(naive_component_path),
+		naive_component_installed = naive_component_installed,
+		naive_component_reason = naive_component_installed and naive_component_reason or naive_value("reason", naive_component_reason),
 		naive_configured = tonumber(naive_value("configured", "0")) or 0,
 		naive_generated = tonumber(naive_value("generated", "0")) or 0,
 		naive_local_ready = naive_value("local_ready", "0"),
@@ -1636,16 +1660,27 @@ end
 
 function action_naive_status()
 	local component_path = fs.uci_get_config("config", "naive_component_path") or "/etc/openkill/core/naive"
-	local version = "unknown"
-	if fs.access(component_path) then
-		version = (SYS.exec(string.format("%q --version 2>/dev/null | head -c 96", component_path)) or ""):gsub("[\r\n]+", " ")
-		if version == "" then version = "unknown" end
+	local function probe(path)
+		if not path or path == "" or not fs.access(path) then return false, "missing", "unknown" end
+		if SYS.call(string.format("test -x %q", path)) ~= 0 then return false, "not-executable", "unknown" end
+		local version = (SYS.exec(string.format("%q --version 2>/dev/null | head -c 96", path)) or ""):gsub("[\r\n]+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+		if version == "" then return true, "version-probe-failed", "unknown" end
+		return true, "executable", version
+	end
+	local installed, reason, version = probe(component_path)
+	if not installed then
+		for _, candidate in ipairs({"/etc/openkill/core/naiveproxy", "/usr/bin/naive", "/usr/bin/naiveproxy", "/usr/local/bin/naive"}) do
+			local ok, candidate_reason, candidate_version = probe(candidate)
+			if ok then component_path, installed, reason, version = candidate, true, "fallback-path", candidate_version; break end
+			if reason == "missing" then reason = candidate_reason end
+		end
 	end
 	local payload = {
 		enabled = fs.uci_get_config("config", "naive_enabled") == "1",
 		component = component_path,
 		version = version,
-		installed = fs.access(component_path),
+		installed = installed,
+		component_reason = reason,
 		state = fs.readfile("/tmp/openkill-naive.state") or "",
 	}
 	HTTP.prepare_content("application/json")
@@ -1699,7 +1734,20 @@ function action_naive_component()
 	local result = { ok = false, operation = operation }
 	if operation == "status" then
 		result.ok = true
-		result.installed = fs.access(fs.uci_get_config("config", "naive_component_path") or "/etc/openkill/core/naive")
+		local configured_path = fs.uci_get_config("config", "naive_component_path") or "/etc/openkill/core/naive"
+		result.installed = fs.access(configured_path) and SYS.call(string.format("test -x %q", configured_path)) == 0
+		result.component = configured_path
+		result.component_reason = result.installed and "configured-path" or "missing"
+		if not result.installed then
+			for _, candidate in ipairs({"/etc/openkill/core/naiveproxy", "/usr/bin/naive", "/usr/bin/naiveproxy", "/usr/local/bin/naive"}) do
+				if fs.access(candidate) and SYS.call(string.format("test -x %q", candidate)) == 0 then
+					result.installed = true
+					result.component = candidate
+					result.component_reason = "fallback-path"
+					break
+				end
+			end
+		end
 		result.state = fs.readfile("/tmp/openkill-naive.state") or ""
 	elseif operation == "install" then
 		local url = HTTP.formvalue("url") or ""

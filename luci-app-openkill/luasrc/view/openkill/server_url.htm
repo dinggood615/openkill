@@ -1732,6 +1732,7 @@ function import_url(btn, urlname, sid) {
     event.initEvent("change", true, true);
 
     beginImportOtherParameters(sid);
+    naiveImportWarnings = [];
 
     try {
         switch (scheme) {
@@ -1797,6 +1798,17 @@ function import_url(btn, urlname, sid) {
                     s.innerHTML = "<font style=\"color:green\"><%:Import configuration information successfully%></font>";
                 } else {
                     s.innerHTML = "<font style=\"color:red\"><%:Invalid format%></font>";
+                }
+                break;
+
+            case "naive+https":
+            case "naive+quic":
+            case "naiveproxy":
+                if (parseNaiveProxy(ssrurl, sid)) {
+                    s.innerHTML = "<font style=\"color:green\">NaiveProxy 节点已填入，请保存后生成本地 SOCKS5 入口。</font>" +
+                        (naiveImportWarnings.length ? "<br><font color=\"#b45309\">提示：" + naiveImportWarnings.map(naiveEscapeHtml).join("；") + "</font>" : "");
+                } else {
+                    s.innerHTML = "<font style=\"color:red\">NaiveProxy 链接格式无效或缺少凭据。</font>";
                 }
                 break;
 
@@ -2715,6 +2727,76 @@ function parseTuic(url, sid) {
         'skip-cert-verify': true
     }));
 
+    return true;
+}
+
+// Sing-box-style Naive links use naive+https:// while OpenKill runs the
+// optional helper bridge and stores a normal naiveproxy node. Keep this
+// parser in the existing URL importer so import remains a single, familiar
+// action and credentials never leave the form.
+var naiveImportWarnings = [];
+function naiveEscapeHtml(value) {
+    return String(value == null ? '' : value).replace(/[&<>"']/g, function (ch) {
+        return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch];
+    });
+}
+
+function parseNaiveProxy(url, sid) {
+    var marker = url.indexOf('://');
+    if (marker <= 0) return false;
+    var scheme = url.substring(0, marker).toLowerCase();
+    var transport = scheme === 'naive+quic' ? 'quic' : 'https';
+    if (scheme !== 'naive+https' && scheme !== 'naive+quic' && scheme !== 'naiveproxy') return false;
+
+    var normalized = 'https://' + url.substring(marker + 3);
+    var parsed;
+    try {
+        var nativeUrl = new URL(normalized);
+        parsed = {
+            hostname: String(nativeUrl.hostname || '').replace(/^\[|\]$/g, ''),
+            port: nativeUrl.port || '',
+            username: nativeUrl.username || '',
+            password: nativeUrl.password || '',
+            search: nativeUrl.search || '',
+            hash: nativeUrl.hash || ''
+        };
+    } catch (e) {
+        return false;
+    }
+    if (!parsed.hostname || !parsed.username || !parsed.password) return false;
+
+    var port = parsed.port || '443';
+    if (!/^([1-9][0-9]{0,4})$/.test(port) || Number(port) > 65535) return false;
+    var query = parseQuery(parsed.search);
+    var security = query.security ? decodeURIComponentSafe(query.security).toLowerCase() : 'tls';
+    var type = query.type ? decodeURIComponentSafe(query.type).toLowerCase() : 'tcp';
+    var headerType = query.headerType ? decodeURIComponentSafe(query.headerType).toLowerCase() : 'none';
+    if (security !== 'tls') {
+        naiveImportWarnings.push('security=' + security + ' 未映射，NaiveProxy 保持 TLS');
+    }
+    if (type !== 'tcp' && type !== 'quic') {
+        naiveImportWarnings.push('type=' + type + ' 未验证');
+    } else if (type === 'quic' && scheme === 'naiveproxy') {
+        transport = 'quic';
+    }
+    if (headerType !== 'none') naiveImportWarnings.push('headerType=' + headerType + ' 未映射');
+
+    setFormValue(sid, 'type', 'naiveproxy');
+    setFormValue(sid, 'server', decodeURIComponentSafe(parsed.hostname));
+    setFormValue(sid, 'port', port);
+    setFormValue(sid, 'naive_username', decodeURIComponentSafe(parsed.username));
+    setFormValue(sid, 'naive_password', decodeURIComponentSafe(parsed.password));
+    setFormValue(sid, 'naive_transport', transport);
+    if (parsed.hash) {
+        setFormValue(sid, 'name', decodeFragment(parsed.hash.substr(1)));
+    } else {
+        setFormValue(sid, 'name', parsed.hostname + ':' + port);
+    }
+
+    var known = {security: true, type: true, headerType: true};
+    for (var key in query) {
+        if (query.hasOwnProperty(key) && !known[key]) naiveImportWarnings.push('参数 ' + key + ' 未映射');
+    }
     return true;
 }
 

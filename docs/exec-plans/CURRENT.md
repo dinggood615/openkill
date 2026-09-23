@@ -1,5 +1,33 @@
 # Current status
 
+## NaiveProxy device detection and share-link import (2026-09-23)
+
+- Device phase is authorized for `192.168.1.103` with a protected backup at
+  `D:\openkill-device-backup-20260923\openkill-naive-backup.tgz`. The first
+  read-only check found OpenKill `2026-1136` installed and its Mihomo process
+  running, but no executable at the configured `/etc/openkill/core/naive` or
+  the approved fallback locations. `naive_enabled=0`; no Naive helper was
+  started and no packet-path test was performed.
+- Detection contract: distinguish the OpenKill package, the NaiveProxy
+  executable, node configuration, generated bridge, local listener and remote
+  authentication. A missing executable must not be represented as a stale
+  status-file failure, and a locally installed binary must still be marked
+  unverified until its executable/version probe succeeds.
+- Import contract: reuse the existing server URL importer and add only
+  `naive+https://`, `naive+quic://`, and `naiveproxy://` forms. Parse with the
+  existing structured URL helper, decode credentials once, map only supported
+  transport fields, warn about unknown parameters, and never log or return
+  credentials. Stable UCI section identity and the existing loopback SOCKS5
+  bridge remain authoritative; generated Mihomo entries keep `udp: false`.
+- Persistence contract: importing fills the current node editor and requires
+  the normal CBI save/apply. It must not enable the helper, install a binary,
+  select DIRECT, or overwrite a user policy automatically. Component
+  installation remains explicit and uses the existing HTTPS/digest/ELF/
+  loader/atomic replacement checks.
+- Next action: implement the detector and importer, add offline fixtures and
+  UI/JavaScript contract coverage, then run the local gate before a bounded
+  master commit and device recheck.
+
 ## NaiveProxy compatibility unified entry and installation flow (2026-09-23)
 
 - Rechecked baseline `452a950610a326c9bbd305845974b0fd83cc2e63` with a clean

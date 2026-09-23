@@ -53,6 +53,8 @@ def main() -> None:
     require(helper, "naive_binary_probe")
     require(helper, "tar -tf")
     require(helper, "component-not-installed")
+    require(helper, "NAIVE_CONFIGURED_BIN")
+    require(helper, "/usr/bin/naiveproxy")
     require(metadata, "https://api.github.com/repos/klzgrad/naiveproxy/releases/latest")
     require(metadata, "official-github-release-asset")
     require(metadata, "jsonfilter")
@@ -72,9 +74,20 @@ def main() -> None:
     require(SETTINGS_THEME, "openkill-naive-component-info")
     require(NAIVE_VIEW, "检测并填写空缺")
     require(NAIVE_VIEW, "自动匹配并安装")
-    require(NAIVE_VIEW, "添加 NaiveProxy 节点")
+    require(NAIVE_VIEW, "添加或导入 NaiveProxy 节点")
     require(NAIVE_VIEW, "credentials: 'same-origin'")
     require(NAIVE_VIEW, "远端连接未验证")
+    require(NAIVE_VIEW, "辅助组件未安装（OpenKill 插件本体可独立运行）")
+    require(NAIVE_VIEW, "requestMetadata('detect', true)")
+
+    server_url = ROOT / "luci-app-openkill/luasrc/view/openkill/server_url.htm"
+    server_url_text = server_url.read_text(encoding="utf-8")
+    require(server_url_text, "function parseNaiveProxy(url, sid)")
+    require(server_url_text, 'case "naive+https":')
+    require(server_url_text, 'case "naive+quic":')
+    require(server_url_text, 'case "naiveproxy":')
+    require(server_url_text, "naive_username")
+    require(server_url_text, "naiveImportWarnings")
 
     if shutil.which("wsl.exe"):
         for path in (HELPER, METADATA, GENERATOR, INIT):

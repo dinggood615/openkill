@@ -11,9 +11,21 @@ NAIVE_STATE="${OPENKILL_NAIVE_STATE:-/tmp/openkill-naive.state}"
 NAIVE_PORT_MAP="$NAIVE_ROOT/ports"
 NAIVE_PORT_BASE="${OPENKILL_NAIVE_PORT_BASE:-11080}"
 [ "$NAIVE_PORT_BASE" = 11080 ] && command -v uci >/dev/null 2>&1 && NAIVE_PORT_BASE="$(uci -q get openkill.config.naive_port_base 2>/dev/null || echo 11080)"
+NAIVE_CONFIGURED_BIN="$NAIVE_BIN"
 if [ "$NAIVE_BIN" = /etc/openkill/core/naive ] && command -v uci >/dev/null 2>&1; then
     naive_configured_path="$(uci -q get openkill.config.naive_component_path 2>/dev/null || true)"
     case "$naive_configured_path" in /etc/openkill/core/*) NAIVE_BIN="$naive_configured_path" ;; esac
+fi
+NAIVE_CONFIGURED_BIN="$NAIVE_BIN"
+# Runtime detection may use a documented manual-install fallback, while
+# install/remove continue to target only the configured OpenKill path.
+if [ ! -x "$NAIVE_BIN" ]; then
+    for naive_candidate in /etc/openkill/core/naiveproxy /usr/bin/naive /usr/bin/naiveproxy /usr/local/bin/naive; do
+        if [ -x "$naive_candidate" ]; then
+            NAIVE_BIN="$naive_candidate"
+            break
+        fi
+    done
 fi
 NAIVE_PORT_LIMIT=100
 
@@ -185,6 +197,7 @@ naive_component_install() {
     case "$expected" in ''|*[!0-9A-Fa-f]*) return 2 ;; esac
     [ "${#expected}" -eq 64 ] || return 2
     mkdir -p "$NAIVE_ROOT" || return 1
+    NAIVE_BIN="$NAIVE_CONFIGURED_BIN"
     mkdir -p "$(dirname "$NAIVE_BIN")" || return 1
     tmp="$NAIVE_ROOT/.download.$$"
     rm -f "$tmp"
@@ -222,7 +235,7 @@ case "${0##*/}" in
             port) naive_port_for_section "$2" ;;
             status) [ -r "$NAIVE_STATE" ] && cat "$NAIVE_STATE" || printf '%s\n' 'state=not-started' 'reason=not-started' ;;
             install) naive_component_install "$2" "$3" ;;
-            remove) rm -f "$NAIVE_BIN" "$NAIVE_BIN.previous"; naive_stop_configs ;;
+            remove) rm -f "$NAIVE_CONFIGURED_BIN" "$NAIVE_CONFIGURED_BIN.previous"; naive_stop_configs ;;
             *) printf '%s\n' 'usage: openkill_naive.sh {prepare|port SID|status|install URL SHA256|remove}' >&2; exit 2 ;;
         esac
         ;;
