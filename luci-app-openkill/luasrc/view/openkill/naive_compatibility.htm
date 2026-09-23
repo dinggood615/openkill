@@ -115,6 +115,7 @@
           if (shaField && !String(shaField.value || '').trim() && data.sha256) shaField.value = data.sha256;
           reason.textContent = data.applied ? '匹配的 URL 和 SHA256 已填入当前表单草稿；保存设置后会保留。' : '已有输入未成对为空，已保留手动组件 URL/SHA256，未混用不同资产。';
         }
+        return data;
       })
       .catch(function (error) {
         metaState.textContent = error && error.message === 'timeout' ? '读取超时' : '读取失败';
@@ -138,6 +139,23 @@
       .then(renderComponent)
       .catch(function (error) { componentState.textContent = error && error.message === 'timeout' ? '组件状态读取超时，请重试' : '组件状态读取失败，请重试'; });
   }
+  function pollTask(taskId) {
+    var started = Date.now();
+    function read() {
+      if (Date.now() - started > 240000) {
+        throw new Error('task-timeout');
+      }
+      return fetchJson(componentUrl + '?operation=task-status&task_id=' + encodeURIComponent(taskId), {credentials: 'same-origin', cache: 'no-store'})
+        .then(function (data) {
+          var stage = data && data.stage ? data.stage : 'processing';
+          var labels = {queued: '排队中', starting: '准备安装', validating: '校验输入', downloading: '下载组件', verifying: '核对摘要', extracting: '解包组件', probing: '检查架构与加载器', replacing: '安全替换组件', completed: '安装完成'};
+          componentState.textContent = '安装任务 ' + taskId + '：' + (labels[stage] || stage);
+          if (data && (data.state === 'succeeded' || data.state === 'failed')) return data;
+          return new Promise(function (resolve) { window.setTimeout(function () { read().then(resolve, function (error) { resolve(Promise.reject(error)); }); }, 1000); });
+        });
+    }
+    return read();
+  }
   function runComponentAction(componentAction, urlField, shaField) {
     if (componentAction === 'remove' && !window.confirm('确认移除 NaiveProxy 组件？节点配置会保留。')) return Promise.resolve();
     if (componentAction === 'install' && (!urlField || !shaField || !String(urlField.value || '').trim() || !String(shaField.value || '').trim())) {
@@ -151,12 +169,19 @@
     return fetchJson(componentUrl, {method: 'POST', credentials: 'same-origin',
       headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
       .then(function (data) {
-        componentState.textContent = data.ok ? '组件操作完成；请保存并应用设置，远端连接仍未验证。' : '操作失败：' + (data.error || '请检查组件信息');
+        if (componentAction === 'install' && data && data.ok && data.task_id) return pollTask(data.task_id);
+        return data;
+      })
+      .then(function (data) {
+        if (data && data.state === 'succeeded') componentState.textContent = '组件安装完成；请保存并应用设置，远端连接仍未验证。';
+        else if (data && data.state === 'failed') componentState.textContent = '组件安装失败：' + (data.error || '请查看诊断日志');
+        else if (data && !data.ok) componentState.textContent = '操作失败：' + (data.error || '请检查组件信息');
+        else if (data && data.ok) componentState.textContent = '组件操作完成；远端连接仍未验证。';
         refreshComponent();
         return data;
       })
       .catch(function (error) {
-        componentState.textContent = error && error.message === 'timeout' ? '操作超时，请检查日志后重试' : '操作请求失败，请重试';
+        componentState.textContent = error && (error.message === 'timeout' || error.message === 'task-timeout') ? '安装任务超时，请检查日志后重试' : '操作请求失败，请重试';
         throw error;
       })
       .then(function (data) { setBusy('[data-naive-component-action], [data-naive-auto-install]', false); return data; }, function (error) { setBusy('[data-naive-component-action], [data-naive-auto-install]', false); throw error; });

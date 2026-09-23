@@ -61,6 +61,10 @@ def main() -> None:
     require(helper, "NAIVE_CONFIGURED_BIN")
     require(helper, "/usr/bin/naiveproxy")
     require(helper, "*.tar.xz)")
+    require(helper, "install-task")
+    require(helper, "task-status")
+    require(helper, "NAIVE_TASK_LOCK")
+    require(helper, "naive_task_stage")
     require(helper, "command -v xz")
     require(helper, 'xz -dc "$tmp"')
     require(makefile, "+unzip +xz")
@@ -88,6 +92,11 @@ def main() -> None:
     require(NAIVE_VIEW, "远端连接未验证")
     require(NAIVE_VIEW, "辅助组件未安装（OpenKill 插件本体可独立运行）")
     require(NAIVE_VIEW, "requestMetadata('detect', true)")
+    require(NAIVE_VIEW, "return data;")
+    require(NAIVE_VIEW, "operation=task-status")
+    require(NAIVE_VIEW, "function pollTask(taskId)")
+    require(CONTROLLER, 'operation == "task-status"')
+    require(CONTROLLER, 'openkill_naive.sh install-task')
 
     server_url = ROOT / "luci-app-openkill/luasrc/view/openkill/server_url.htm"
     server_url_text = server_url.read_text(encoding="utf-8")

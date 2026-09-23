@@ -1,5 +1,35 @@
 # Current status
 
+## NaiveProxy page installation task flow (2026-09-23)
+
+- Scope: fix the NaiveProxy component installation request chain and expose
+  truthful progress. The change affects only metadata-to-install UI wiring,
+  the NaiveProxy helper task state, and its LuCI endpoint; it does not change
+  DNS, transparent interception, node credentials, legacy writers, or ABI.
+- Contract: metadata detection remains read-only and returns a complete result
+  to the caller. Installation is a single locked background task with a
+  random task identifier, stage/result state, bounded log text, and polling.
+  A second install request returns the existing task instead of starting a
+  duplicate download. A failed replacement preserves the previous component.
+- Device gate: the authorized SSH target currently timed out during the first
+  recheck; package/path/dependency evidence must be refreshed before any
+  device change. No device configuration or packet-path test is permitted in
+  this local implementation step.
+- Next action: implement the task contract, add offline behavior tests, run
+  local-gate, then push the bounded change and verify its exact Development CI
+  before RC and Formal Release.
+- Recheck evidence: SSH access is available again. The device is running
+  OpenKill 2026-1141 with `xz`, `xz-utils`, `jsonfilter`, and `curl` present;
+  URL and SHA256 fields are configured, but `/etc/openkill/core/naive` is
+  absent and the state file reports `component_installed=0`. The recent
+  install log records a `Trace/breakpoint trap` while probing `naive.new`.
+  The same configured asset and digest install successfully in an isolated
+  `/tmp` directory and reports `naive 150.0.7871.63`, so the failure is in the
+  synchronous request/probe path or its target attempt, not missing xz or an
+  invalid digest. A protected pre-change backup is at
+  `D:\openkill-device-backup-20260923-naive-task\openkill-naive-task.tgz`
+  (SHA256 `ea3e089b354dcb30d1dd77af7e5a1a376e9a120556e6628a11f8a6b4c2adc43d`).
+
 ## Settings navigation and network card layout (2026-09-23)
 
 - Scope: presentation-only changes to the LuCI settings navigation, card

@@ -1756,14 +1756,38 @@ function action_naive_component()
 		-- these checks and performs HTTPS, size, archive and digest validation.
 		if url:match("^https://github%.com/klzgrad/naiveproxy/") or url:match("^https://raw%.githubusercontent%.com/klzgrad/naiveproxy/") then
 			if sha:match("^[0-9A-Fa-f]+$") and #sha == 64 then
-				local command = string.format("/usr/share/openkill/openkill_naive.sh install %q %q >/tmp/openkill-naive-install.log 2>&1", url, sha)
-				result.exit = SYS.call(command)
-				result.ok = result.exit == 0
+				-- Installation is deliberately detached from the LuCI request.  A
+				-- download or archive probe can take longer than a browser request;
+				-- the returned task id is polled by the compatibility card.
+				local output = SYS.exec(string.format("/usr/share/openkill/openkill_naive.sh install-task %q %q 2>/dev/null", url, sha)) or ""
+				for line in output:gmatch("[^\r\n]+") do
+					local key, value = line:match("^([%w_]+)=(.*)$")
+					if key == "task_id" or key == "state" then result[key] = value end
+				end
+				if result.task_id and result.task_id:match("^task%-[A-Za-z0-9%-]+$") then
+					result.ok = true
+				else
+					result.error = "task-start-failed"
+				end
 			else
 				result.error = "invalid-sha256"
 			end
 		else
 			result.error = "untrusted-source"
+		end
+	elseif operation == "task-status" then
+		local task_id = HTTP.formvalue("task_id") or ""
+		if task_id:match("^task%-[A-Za-z0-9%-]+$") then
+			local output = SYS.exec(string.format("/usr/share/openkill/openkill_naive.sh task-status %q 2>/dev/null", task_id)) or ""
+			result.task_id = task_id
+			for line in output:gmatch("[^\r\n]+") do
+				local key, value = line:match("^([%w_]+)=(.*)$")
+				if key == "state" or key == "stage" or key == "error" or key == "updated" then result[key] = value end
+			end
+			result.ok = result.state ~= nil
+			if not result.ok then result.error = "task-not-found" end
+		else
+			result.error = "invalid-task-id"
 		end
 	elseif operation == "remove" then
 		result.exit = SYS.call("/usr/share/openkill/openkill_naive.sh remove >/dev/null 2>&1")

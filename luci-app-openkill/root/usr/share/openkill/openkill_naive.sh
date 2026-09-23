@@ -8,6 +8,8 @@ NAIVE_ROOT="${OPENKILL_NAIVE_ROOT:-/etc/openkill/naive}"
 NAIVE_BIN="${OPENKILL_NAIVE_BIN:-/etc/openkill/core/naive}"
 NAIVE_RUNTIME="${OPENKILL_NAIVE_RUNTIME:-/tmp/openkill-naive}"
 NAIVE_STATE="${OPENKILL_NAIVE_STATE:-/tmp/openkill-naive.state}"
+NAIVE_TASK_ROOT="${OPENKILL_NAIVE_TASK_ROOT:-/tmp/openkill-naive-tasks}"
+NAIVE_TASK_LOCK="$NAIVE_TASK_ROOT/install.lock.d"
 NAIVE_PORT_MAP="$NAIVE_ROOT/ports"
 NAIVE_PORT_BASE="${OPENKILL_NAIVE_PORT_BASE:-11080}"
 [ "$NAIVE_PORT_BASE" = 11080 ] && command -v uci >/dev/null 2>&1 && NAIVE_PORT_BASE="$(uci -q get openkill.config.naive_port_base 2>/dev/null || echo 11080)"
@@ -253,50 +255,130 @@ naive_binary_probe() {
 
 naive_component_install() {
     local url="$1" expected="$2" tmp archive actual size extract candidate
-    case "$url" in https://github.com/klzgrad/naiveproxy/*|https://github.com/klzgrad/naiveproxy/releases/*|https://raw.githubusercontent.com/klzgrad/naiveproxy/*) ;; *) return 2 ;; esac
-    case "$expected" in ''|*[!0-9A-Fa-f]*) return 2 ;; esac
-    [ "${#expected}" -eq 64 ] || return 2
+    naive_task_stage validating
+    case "$url" in https://github.com/klzgrad/naiveproxy/*|https://github.com/klzgrad/naiveproxy/releases/*|https://raw.githubusercontent.com/klzgrad/naiveproxy/*) ;; *) NAIVE_INSTALL_ERROR=untrusted-source; return 2 ;; esac
+    case "$expected" in ''|*[!0-9A-Fa-f]*) NAIVE_INSTALL_ERROR=invalid-sha256; return 2 ;; esac
+    [ "${#expected}" -eq 64 ] || { NAIVE_INSTALL_ERROR=invalid-sha256; return 2; }
     mkdir -p "$NAIVE_ROOT" || return 1
     NAIVE_BIN="$NAIVE_CONFIGURED_BIN"
     mkdir -p "$(dirname "$NAIVE_BIN")" || return 1
     tmp="$NAIVE_ROOT/.download.$$"
     rm -f "$tmp"
+    naive_task_stage downloading
     if command -v curl >/dev/null 2>&1; then
-        curl -fsSL --connect-timeout 10 --max-time 180 --max-filesize 209715200 "$url" -o "$tmp" || { rm -f "$tmp"; return 1; }
+        curl -fsSL --connect-timeout 10 --max-time 180 --max-filesize 209715200 "$url" -o "$tmp" || { NAIVE_INSTALL_ERROR=download-failed; rm -f "$tmp"; return 3; }
     elif command -v wget >/dev/null 2>&1; then
-        wget -q -O "$tmp" "$url" || { rm -f "$tmp"; return 1; }
-    else rm -f "$tmp"; return 1; fi
+        wget -q -O "$tmp" "$url" || { NAIVE_INSTALL_ERROR=download-failed; rm -f "$tmp"; return 3; }
+    else NAIVE_INSTALL_ERROR=downloader-missing; rm -f "$tmp"; return 3; fi
     size=$(wc -c < "$tmp" 2>/dev/null || echo 0)
-    [ "$size" -gt 0 ] && [ "$size" -le 209715200 ] || { rm -f "$tmp"; return 1; }
+    [ "$size" -gt 0 ] && [ "$size" -le 209715200 ] || { NAIVE_INSTALL_ERROR=invalid-size; rm -f "$tmp"; return 4; }
+    naive_task_stage verifying
     actual=$(sha256sum "$tmp" 2>/dev/null | awk '{print tolower($1)}')
-    [ "$actual" = "$(printf '%s' "$expected" | tr 'A-F' 'a-f')" ] || { rm -f "$tmp"; return 1; }
+    [ "$actual" = "$(printf '%s' "$expected" | tr 'A-F' 'a-f')" ] || { NAIVE_INSTALL_ERROR=digest-mismatch; rm -f "$tmp"; return 4; }
     archive="$tmp"
     case "$url" in
         *.tar.xz)
             # BusyBox tar on supported OpenWrt targets does not necessarily
             # include xz support.  Decode to a private temporary archive so
             # member validation and extraction use the same bytes.
-            command -v xz >/dev/null 2>&1 || { rm -f "$tmp"; return 1; }
+            command -v xz >/dev/null 2>&1 || { NAIVE_INSTALL_ERROR=xz-missing; rm -f "$tmp"; return 5; }
             archive="$tmp.tar"
-            xz -dc "$tmp" > "$archive" 2>/dev/null || { rm -f "$tmp" "$archive"; return 1; }
+            xz -dc "$tmp" > "$archive" 2>/dev/null || { NAIVE_INSTALL_ERROR=decompress-failed; rm -f "$tmp" "$archive"; return 5; }
             ;;
     esac
+    naive_task_stage extracting
     if tar -tf "$archive" >/dev/null 2>&1; then
         extract="$NAIVE_ROOT/.extract.$$"; rm -rf "$extract"; mkdir -p "$extract" || { rm -f "$tmp" "$archive"; return 1; }
-        if tar -tf "$archive" | grep -Eq '(^/|(^|/)\.\.(\/|$))'; then rm -rf "$extract" "$tmp" "$archive"; return 1; fi
-        tar -xf "$archive" -C "$extract" || { rm -rf "$extract" "$tmp" "$archive"; return 1; }
+        if tar -tf "$archive" | grep -Eq '(^/|(^|/)\.\.(\/|$))'; then NAIVE_INSTALL_ERROR=unsafe-archive; rm -rf "$extract" "$tmp" "$archive"; return 5; fi
+        tar -xf "$archive" -C "$extract" || { NAIVE_INSTALL_ERROR=extract-failed; rm -rf "$extract" "$tmp" "$archive"; return 5; }
         candidate=$(find "$extract" -type f -name naive -perm -u=x 2>/dev/null | head -n 1)
         [ -n "$candidate" ] || candidate=$(find "$extract" -type f -name naive 2>/dev/null | head -n 1)
-        [ -n "$candidate" ] || { rm -rf "$extract" "$tmp" "$archive"; return 1; }
-        cp "$candidate" "$NAIVE_BIN.new" || { rm -rf "$extract" "$tmp" "$archive"; return 1; }; rm -rf "$extract"
-    else cp "$tmp" "$NAIVE_BIN.new" || { rm -f "$tmp" "$archive"; return 1; }; fi
+        [ -n "$candidate" ] || { NAIVE_INSTALL_ERROR=component-missing-in-archive; rm -rf "$extract" "$tmp" "$archive"; return 5; }
+        cp "$candidate" "$NAIVE_BIN.new" || { NAIVE_INSTALL_ERROR=stage-copy-failed; rm -rf "$extract" "$tmp" "$archive"; return 5; }; rm -rf "$extract"
+    else cp "$tmp" "$NAIVE_BIN.new" || { NAIVE_INSTALL_ERROR=stage-copy-failed; rm -f "$tmp" "$archive"; return 5; }; fi
     rm -f "$tmp" "$archive"; chmod 755 "$NAIVE_BIN.new" || return 1
-    [ "$(dd if="$NAIVE_BIN.new" bs=4 count=1 2>/dev/null)" = "ELF" ] || { rm -f "$NAIVE_BIN.new"; return 1; }
-    naive_arch_ok "$NAIVE_BIN.new" || { rm -f "$NAIVE_BIN.new"; return 1; }
-    naive_binary_probe "$NAIVE_BIN.new" || { rm -f "$NAIVE_BIN.new"; return 1; }
+    naive_task_stage probing
+    [ "$(dd if="$NAIVE_BIN.new" bs=4 count=1 2>/dev/null)" = "ELF" ] || { NAIVE_INSTALL_ERROR=not-elf; rm -f "$NAIVE_BIN.new"; return 6; }
+    naive_arch_ok "$NAIVE_BIN.new" || { NAIVE_INSTALL_ERROR=wrong-architecture; rm -f "$NAIVE_BIN.new"; return 6; }
+    naive_binary_probe "$NAIVE_BIN.new" || { NAIVE_INSTALL_ERROR=loader-or-version-probe-failed; rm -f "$NAIVE_BIN.new"; return 6; }
+    naive_task_stage replacing
     [ -x "$NAIVE_BIN" ] && mv -f "$NAIVE_BIN" "$NAIVE_BIN.previous" 2>/dev/null || true
-    mv -f "$NAIVE_BIN.new" "$NAIVE_BIN" || return 1
+    mv -f "$NAIVE_BIN.new" "$NAIVE_BIN" || { NAIVE_INSTALL_ERROR=replace-failed; return 7; }
     chown root:root "$NAIVE_BIN" 2>/dev/null || true; chmod 755 "$NAIVE_BIN"
+}
+
+NAIVE_TASK_ID="${OPENKILL_NAIVE_TASK_ID:-}"
+NAIVE_INSTALL_ERROR=""
+naive_task_file() { naive_valid_id "$1" || return 1; printf '%s/%s.state\n' "$NAIVE_TASK_ROOT" "$1"; }
+naive_task_stage() {
+    local stage="$1" file tmp
+    NAIVE_INSTALL_STAGE="$stage"
+    [ -n "$NAIVE_TASK_ID" ] || return 0
+    file=$(naive_task_file "$NAIVE_TASK_ID") || return 0
+    tmp="$file.new.$$"
+    awk -F= -v stage="$stage" -v now="$(date +%s)" '
+      BEGIN { OFS="=" }
+      $1 == "stage" { print "stage", stage; seen=1; next }
+      $1 == "updated" { print "updated", now; updated=1; next }
+      { print }
+      END { if (!seen) print "stage", stage; if (!updated) print "updated", now }
+    ' "$file" > "$tmp" 2>/dev/null && mv -f "$tmp" "$file"
+}
+naive_task_write() {
+    local id="$1" state="$2" stage="$3" error="$4" file tmp
+    file=$(naive_task_file "$id") || return 1
+    tmp="$file.new.$$"
+    mkdir -p "$NAIVE_TASK_ROOT" || return 1
+    printf 'task_id=%s\nstate=%s\nstage=%s\nerror=%s\nupdated=%s\n' "$id" "$state" "$stage" "$error" "$(date +%s)" > "$tmp" || return 1
+    chmod 600 "$tmp" 2>/dev/null || true
+    mv -f "$tmp" "$file"
+}
+naive_task_new_id() {
+    local random
+    random=$(head -c 4 /dev/urandom 2>/dev/null | hexdump -v -e '1/1 "%02x"' 2>/dev/null || true)
+    [ -n "$random" ] || random="$$"
+    printf 'task-%s-%s\n' "$(date +%s)" "$random"
+}
+naive_task_start() {
+    local url="$1" expected="$2" id old state old_file
+    mkdir -p "$NAIVE_TASK_ROOT" || return 1
+    if [ -s "$NAIVE_TASK_LOCK/id" ] || [ -d "$NAIVE_TASK_LOCK" ]; then
+        old=$(cat "$NAIVE_TASK_LOCK/id" 2>/dev/null || true)
+        old_file=$(naive_task_file "$old" 2>/dev/null || true)
+        state=$(grep -m1 '^state=' "$old_file" 2>/dev/null | cut -d= -f2- || true)
+        case "$state" in queued|running) printf 'task_id=%s\nstate=%s\n' "$old" "$state"; return 0 ;; esac
+        rm -rf "$NAIVE_TASK_LOCK"
+    fi
+    mkdir "$NAIVE_TASK_LOCK" 2>/dev/null || return 1
+    id=$(naive_task_new_id)
+    printf '%s\n' "$id" > "$NAIVE_TASK_LOCK/id" || { rmdir "$NAIVE_TASK_LOCK"; return 1; }
+    chmod 600 "$NAIVE_TASK_LOCK/id" 2>/dev/null || true
+    naive_task_write "$id" queued queued "" || { rm -rf "$NAIVE_TASK_LOCK"; return 1; }
+    ( nohup env OPENKILL_NAIVE_TASK_ID="$id" OPENKILL_NAIVE_TASK_ROOT="$NAIVE_TASK_ROOT" "$0" install-worker "$id" "$url" "$expected" >> "$NAIVE_TASK_ROOT/$id.log" 2>&1 </dev/null ) >/dev/null 2>&1 &
+    printf 'task_id=%s\nstate=queued\n' "$id"
+}
+naive_task_worker() {
+    local id="$1" url="$2" expected="$3" rc error
+    NAIVE_TASK_ID="$id"
+    naive_task_write "$id" running starting "" || exit 1
+    naive_task_stage starting
+    naive_component_install "$url" "$expected"
+    rc=$?
+    if [ "$rc" -eq 0 ]; then
+        naive_refresh_status
+        naive_task_write "$id" succeeded completed ""
+    else
+        error=${NAIVE_INSTALL_ERROR:-install-failed}
+        naive_task_write "$id" failed "${NAIVE_INSTALL_STAGE:-failed}" "$error"
+    fi
+    rm -rf "$NAIVE_TASK_LOCK"
+    exit "$rc"
+}
+naive_task_status() {
+    local id="$1" file
+    file=$(naive_task_file "$id") || return 2
+    [ -r "$file" ] || return 1
+    cat "$file"
 }
 
 case "${0##*/}" in
@@ -306,8 +388,11 @@ case "${0##*/}" in
             port) naive_port_for_section "$2" ;;
             status) naive_refresh_status; cat "$NAIVE_STATE" ;;
             install) naive_component_install "$2" "$3"; rc=$?; [ "$rc" -eq 0 ] && naive_refresh_status; exit "$rc" ;;
+            install-task) naive_task_start "$2" "$3" ;;
+            install-worker) naive_task_worker "$2" "$3" "$4" ;;
+            task-status) naive_task_status "$2" ;;
             remove) rm -f "$NAIVE_CONFIGURED_BIN" "$NAIVE_CONFIGURED_BIN.previous"; naive_stop_configs; naive_refresh_status ;;
-            *) printf '%s\n' 'usage: openkill_naive.sh {prepare|port SID|status|install URL SHA256|remove}' >&2; exit 2 ;;
+            *) printf '%s\n' 'usage: openkill_naive.sh {prepare|port SID|status|install URL SHA256|install-task URL SHA256|task-status ID|remove}' >&2; exit 2 ;;
         esac
         ;;
 esac
