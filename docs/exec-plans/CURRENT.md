@@ -24,9 +24,22 @@
   select DIRECT, or overwrite a user policy automatically. Component
   installation remains explicit and uses the existing HTTPS/digest/ELF/
   loader/atomic replacement checks.
-- Next action: implement the detector and importer, add offline fixtures and
-  UI/JavaScript contract coverage, then run the local gate before a bounded
-  master commit and device recheck.
+- Device evidence: the authorized candidate install upgraded the device from
+  OpenKill `2026-1136` to `2026-1137`; the protected `/etc/config/openkill`
+  hash remained unchanged, the service stayed enabled/running, and the
+  configured/fallback Naive paths were absent. The helper therefore reports
+  `component_installed=0`, `state=unavailable`,
+  `reason=component-not-installed`; this is the expected distinction between
+  the OpenKill package and the optional NaiveProxy binary. No node process or
+  remote authentication was started.
+- Local evidence: `NAIVEPROXY_IMPORT_BEHAVIOR=PASS`, the NaiveProxy contract,
+  UI contract, UI preview, POSIX syntax checks, `git diff --check` and the
+  local gate pass. The importer accepts the supported share-link schemes,
+  maps IPv4/IPv6, TLS/TCP/QUIC and percent-encoded credentials, and escapes
+  parameter warnings before rendering them.
+- Next action: commit the bounded status wording update, verify its exact
+  Development CI, rebuild the 2026-1137 RC from the final source, then run
+  the Formal Release gate and recheck the device package/status.
 
 ## NaiveProxy compatibility unified entry and installation flow (2026-09-23)
 

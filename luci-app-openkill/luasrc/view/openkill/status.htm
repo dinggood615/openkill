@@ -704,6 +704,8 @@
         var naiveLabel = DOMCache.naiveproxy_status;
         var naiveDetail = DOMCache.naiveproxy_detail;
         var naiveInstalled = !!(status && status.naive_component_installed);
+        var naiveComponentReason = status && status.naive_component_reason ? status.naive_component_reason : 'unknown';
+        var naiveComponentVersion = status && status.naive_component_version ? status.naive_component_version : 'unknown';
         var naiveEnabled = !!(status && status.naive_enabled);
         var naiveConfigured = Number(status && status.naive_configured || 0);
         var naiveGenerated = Number(status && status.naive_generated || 0);
@@ -712,7 +714,7 @@
         var naiveState = status && status.naive_state ? status.naive_state : 'unknown';
         var naiveReason = status && status.naive_reason ? status.naive_reason : 'unknown';
         if (naiveLabel) {
-            var naiveText = !naiveInstalled ? '组件未安装' :
+            var naiveText = !naiveInstalled ? 'NaiveProxy 辅助组件未安装' :
                 (!naiveEnabled ? '已关闭' :
                 (!naiveConfigured ? '已安装 · 未配置节点' :
                 (naiveState === 'failed' ? '启动失败' :
@@ -726,10 +728,11 @@
                 (naiveRemote ? 'is-success' : 'is-pending')));
         }
         if (naiveDetail) {
-            naiveDetail.textContent = !naiveInstalled ? '安装可选组件后才能使用 NaiveProxy 节点' :
+            naiveDetail.textContent = !naiveInstalled ? 'OpenKill 插件本体已安装；请单独安装 NaiveProxy 辅助组件' :
+                (naiveComponentReason === 'version-probe-failed' ? '组件可执行但版本探测失败 · 版本未知' :
                 (!naiveEnabled ? '未创建辅助进程 · 现有节点行为不变' :
                 (naiveConfigured ? ('已生成 ' + naiveGenerated + '/' + naiveConfigured + ' 个回环 SOCKS5 入口 · ' + naiveReason) :
-                '组件可用 · 未配置 NaiveProxy 节点'));
+                '组件可用 · ' + naiveComponentVersion + ' · 未配置 NaiveProxy 节点')));
         }
     }
 
