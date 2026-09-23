@@ -50,6 +50,9 @@
   compatibility view and share-link importer. The device was upgraded to
   2026-1137 with its OpenKill configuration hash unchanged; no optional Naive
   binary or remote authentication was started.
+  The follow-up evidence commit `39b9964c6902d89f165bd86e3e421322f213c722`
+  is now the master tip and its exact Development CI also passed
+  ([35824176728](https://github.com/dinggood615/openkill/actions/runs/35824176728)).
 - Next action: if the optional NaiveProxy binary is installed on the device,
   use the new re-detect action, import a node through the existing editor,
   and separately verify the loopback bridge and remote authentication. Those
