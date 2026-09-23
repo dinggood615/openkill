@@ -52,6 +52,8 @@ def main() -> None:
     require(helper, 'chmod 600 "$tmp"')
     require(helper, "sha256sum")
     require(helper, "naive_arch_ok")
+    require(helper, "naive_read_byte")
+    require(helper, "command -v hexdump")
     require(helper, "naive_binary_probe")
     require(helper, "tar -tf")
     require(helper, "component-not-installed")

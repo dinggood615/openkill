@@ -18,12 +18,14 @@
   `naive_enabled=1`, but all approved component paths were absent and the
   helper reported `component_installed=0`, `reason=component-not-installed`.
   A direct download measured 3,397,604 bytes and matched the configured digest;
-  BusyBox reported `tar: invalid tar magic` for the xz archive. No node
-  credentials or packet-path tests were used.
-- Next action: run local and POSIX gates, publish the 2026-1138 candidate from
-  the corrected source, install it with the xz dependency on the authorized
-  device, then verify component detection, executable probe and rollback
-  behavior.
+  BusyBox reported `tar: invalid tar magic` for the xz archive. The first
+  2026-1138 candidate added xz and extracted the archive, but then exposed a
+  second BusyBox gap: `od` is absent although `hexdump` is available, so the
+  ELF architecture probe rejected the valid binary. No node credentials or
+  packet-path tests were used.
+- Next action: add the hexdump fallback, run local and POSIX gates, rebuild
+  the 2026-1138 candidate from the corrected source, then recheck installation
+  and rollback behavior on the authorized device.
 
 ## NaiveProxy device detection and share-link import (2026-09-23)
 

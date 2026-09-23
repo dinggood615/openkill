@@ -165,12 +165,23 @@ EOF
 naive_instance_name() { naive_valid_id "$1" || return 1; printf 'openkill-naive-%s\n' "$1"; }
 naive_stop_configs() { rm -f "$NAIVE_RUNTIME"/*.json "$NAIVE_RUNTIME"/*.json.new "$NAIVE_STATE" 2>/dev/null || true; }
 
+naive_read_byte() {
+    local file="$1" offset="$2"
+    if command -v od >/dev/null 2>&1; then
+        od -An -j"$offset" -N1 -tu1 "$file" 2>/dev/null | tr -d ' '
+    elif command -v hexdump >/dev/null 2>&1; then
+        dd if="$file" bs=1 skip="$offset" count=1 2>/dev/null | hexdump -v -e '1/1 "%u"'
+    else
+        return 1
+    fi
+}
+
 naive_arch_ok() {
     local file="$1" machine class data b0 b1 em expected
-    class=$(od -An -j4 -N1 -tu1 "$file" 2>/dev/null | tr -d ' ')
-    data=$(od -An -j5 -N1 -tu1 "$file" 2>/dev/null | tr -d ' ')
-    b0=$(od -An -j18 -N1 -tu1 "$file" 2>/dev/null | tr -d ' ')
-    b1=$(od -An -j19 -N1 -tu1 "$file" 2>/dev/null | tr -d ' ')
+    class=$(naive_read_byte "$file" 4)
+    data=$(naive_read_byte "$file" 5)
+    b0=$(naive_read_byte "$file" 18)
+    b1=$(naive_read_byte "$file" 19)
     [ -n "$class" ] && [ -n "$data" ] && [ -n "$b0" ] && [ -n "$b1" ] || return 1
     if [ "$data" = 1 ]; then em=$((b0 + b1 * 256)); else em=$((b1 + b0 * 256)); fi
     machine=$(uname -m 2>/dev/null || echo unknown)
