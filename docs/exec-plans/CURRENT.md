@@ -41,9 +41,42 @@
   device's manually installed component remains executable at the configured
   path and reports `naive 150.0.7871.63`; its previous stale state will be
   refreshed by the updated helper.
-- Next action: commit and push the status-refresh fix, run exact-commit
-  Development CI, then prepare the 2026-1140 formal candidate, install it on
-  the authorized device, and verify the refreshed state before release.
+- Delivery evidence for this fix: status-refresh commit
+  `6fad2ba7ebce25fc0484a7c4517895c4d120fb9c` reached `master` and its exact
+  Development CI passed ([35829223609](https://github.com/dinggood615/openkill/actions/runs/35829223609)).
+  The version metadata commit `5f773dd42e0f84c50f2a3641b399b11a5344013b`
+  prepared 2026-1140 and its exact Development CI passed
+  ([35829445974](https://github.com/dinggood615/openkill/actions/runs/35829445974)).
+- The 2026-1140 RC Build passed ([35829622739](https://github.com/dinggood615/openkill/actions/runs/35829622739));
+  `luci-app-openkill_2026-1140_all.ipk` is 7,652,311 bytes with SHA256
+  `c12f4724e22ab6b5fb610224c067712849322b935310e2aace98b49edbdb187d`.
+  The RC audit reported package metadata, conffile preservation, maintainer
+  script deletion, stale-reference and sensitive-content checks as OK.
+- The authorized device was upgraded from 2026-1139 to 2026-1140 after an
+  upload SHA256 match. It remains enabled and running; the configured
+  `/etc/openkill/core/naive` is root-owned, executable, and reports
+  `150.0.7871.63`. The updated helper reports
+  `component_installed=1`, `configured=0`, `generated=0`,
+  `state=disabled`, `reason=no-enabled-nodes`, `local_ready=0` and
+  `remote_verified=0`. The protected `/etc/config/openkill` hash stayed
+  `0bf7be81c9f5d8b959722978e8ee40c66392a2a5ee3165b2f14ed229a0dca52c`; no
+  node was enabled and no packet-path or remote-authentication test ran.
+- Formal Release #162 passed with both release gate and publish enabled
+  ([35830055217](https://github.com/dinggood615/openkill/actions/runs/35830055217))
+  and published [v2026-1140-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1140-ipk).
+  The downloaded formal asset `luci-app-openkill_2026-1140_all.ipk` is
+  9,224,693 bytes with SHA256
+  `281bfe4204fe3744a27740c8842168a26908e29055f5e966e970f9d8cc8b8e907`;
+  its packaged helper contains the xz decoder, BusyBox hexdump fallback and
+  status refresh fix. The formal asset is retained separately from the
+  25.12 RC package used for device validation.
+- Classification: component installation and truthful status refresh are
+  repaired and device-verified; share-link parsing and isolated bridge
+  generation remain locally verified; a real Naive node's remote login,
+  local SOCKS5 readiness and business traffic remain device-unverified.
+- Next action: keep the 2026-1140 release and rollback package, and only
+  begin a new versioned batch when a separately scoped defect or feature is
+  authorized.
 
 ## NaiveProxy device detection and share-link import (2026-09-23)
 
