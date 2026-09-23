@@ -1640,3 +1640,53 @@ This proves local readiness only.  `DEVICE_RETRY_READY=YES` means the exact
 candidate may be considered for an explicitly approved `.102` phase; it does
 not claim device verification, package release, central apply, or packet-path
 validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
+
+## NaiveProxy installer current device recheck (2026-09-23)
+
+- User authorized reconnecting to `192.168.1.103` to diagnose and repair the
+  optional component installer. This bounded device phase permits diagnostic
+  downloads and the component's own installation only; it does not permit
+  changing OpenKill traffic policy, CENTRAL_ACTIVE, firewall ownership, WAN,
+  or other nodes/subscriptions.
+- Current recheck from SSH: package is `luci-app-openkill 2026-1142` and the
+  OpenKill service is running. Three earlier tasks failed at `probing` with
+  `loader-or-version-probe-failed` and a kernel `Trace/breakpoint trap` while
+  executing `naive.new --version`. The configured official OpenWrt x86_64
+  asset was fetched in a private temporary directory; its SHA256 matched, and
+  the binary's version and help probes succeeded. The exact installed helper
+  then succeeded in both isolated synchronous and worker modes. A fresh run
+  through the helper's locked asynchronous install task also succeeded; the
+  configured `/etc/openkill/core/naive` is now root-owned, executable, and
+  reports `150.0.7871.63`. Refreshed state reports `component_installed=1`,
+  `state=disabled`, `reason=no-enabled-nodes`, `local_ready=0`, and
+  `remote_verified=0`. The old probe trap was not reproducible; no source
+  installer defect was confirmed. No Naive node was enabled and no remote
+  authentication or packet-path test ran.
+- Navigation root cause: the compatibility template linked to `servers` with
+  `add=naiveproxy` but omitted the required selected YAML `file` parameter.
+  The `servers` model therefore followed its designed no-file redirect to
+  Config Manage, exactly matching the screenshot. The node editor, share-link
+  parser, and NaiveProxy CBI type already exist.
+- Implementation: the compatibility view now uses the selected, existing
+  YAML path from the OpenKill UCI accessor, validates that it is under the
+  configuration directory and a YAML file, URL-encodes it, and opens the
+  server/group manager with the Naive add hint. With no valid selection it
+  links to Config Manage and says a configuration must be selected. Creating
+  a proxy from that explicit flow carries the NaiveProxy type hint into the
+  editor; existing node types remain authoritative. Related edit links retain
+  encoded file paths. Network policies, node credentials, DNS, firewall,
+  legacy writers, ABI, and start/restore behavior are unchanged.
+- Device backup: `/etc/config/openkill` is preserved outside the repository at
+  `D:\openkill-device-backup-20260923-current\openkill.config`; local SHA256
+  `0bf7be81c9f5d8b959722978e8ee40c66392a2a5ee3165b2f14ed229a0dca52c`,
+  matching the device before component installation. The repeat component
+  install did not modify UCI or restart OpenKill; service remains running.
+- Local checks: NaiveProxy integration contract, UI contract (25), UI preview
+  (2), POSIX shell syntax, `git diff --check`, and `scripts/local-gate.sh`
+  pass. Browser automation is unavailable in this session, so no rendered
+  screenshot is claimed.
+- Next action: commit/push this source fix to master and verify its exact
+  Development CI. Build and audit the RC, install it to the backed-up device,
+  and verify the rendered navigation path and new-node editor if LuCI access
+  is available. Then run Formal Release with both required inputs. Preserve
+  existing releases and disclose that remote node login has not been verified.

@@ -88,6 +88,12 @@ def main() -> None:
     require(NAIVE_VIEW, "检测并填写空缺")
     require(NAIVE_VIEW, "自动匹配并安装")
     require(NAIVE_VIEW, "添加或导入 NaiveProxy 节点")
+    require(NAIVE_VIEW, 'fs.uci_get_config("config", "config_path")')
+    require(NAIVE_VIEW, 'current_config:sub(1, #config_prefix) == config_prefix')
+    require(NAIVE_VIEW, 'fs.access(current_config) and fs.IsYamlExt(fs.basename(current_config))')
+    require(NAIVE_VIEW, 'http.urlencode(current_config)')
+    require(NAIVE_VIEW, '"&add=naiveproxy"')
+    require(NAIVE_VIEW, '先选择配置文件以添加 NaiveProxy 节点')
     require(NAIVE_VIEW, "credentials: 'same-origin'")
     require(NAIVE_VIEW, "远端连接未验证")
     require(NAIVE_VIEW, "辅助组件未安装（OpenKill 插件本体可独立运行）")
@@ -106,6 +112,12 @@ def main() -> None:
     require(server_url_text, 'case "naiveproxy":')
     require(server_url_text, "naive_username")
     require(server_url_text, "naiveImportWarnings")
+    server_manager = ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers.lua"
+    require(server_manager, 'HTTP.formvalue("add") == "naiveproxy"')
+    require(server_manager, 'HTTP.redirect(DISP.build_url("admin", "services", "openkill", "config"))')
+    require(ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers.lua", 'edit_url .. "&type=naiveproxy"')
+    require(ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua", 'HTTP.formvalue("type") == "naiveproxy"')
+    require(ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua", 'o.default = "naiveproxy"')
 
     if shutil.which("wsl.exe"):
         for path in (HELPER, METADATA, GENERATOR, INIT):

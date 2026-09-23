@@ -28,7 +28,7 @@ gs.anonymous = true
 gs.addremove = true
 gs.sortable = true
 gs.template = "openkill/tblsection"
-gs.extedit = DISP.build_url("admin/services/openkill/groups-config/%s").."?file="..file_path
+gs.extedit = DISP.build_url("admin/services/openkill/groups-config/%s").."?file="..HTTP.urlencode(file_path)
 function gs.create(self, section)
 	local sid = TypedSection.create(self, section)
 	if sid then
@@ -70,7 +70,7 @@ ps.anonymous = true
 ps.addremove = true
 ps.sortable = true
 ps.template = "openkill/tblsection"
-ps.extedit = DISP.build_url("admin/services/openkill/proxy-provider-config/%s").."?file="..file_path
+ps.extedit = DISP.build_url("admin/services/openkill/proxy-provider-config/%s").."?file="..HTTP.urlencode(file_path)
 function ps.create(self, section)
 	local sid = TypedSection.create(self, section)
 	if sid then
@@ -111,7 +111,7 @@ ss.anonymous = true
 ss.addremove = true
 ss.sortable = true
 ss.template = "openkill/tblsection"
-ss.extedit = DISP.build_url("admin/services/openkill/servers-config/%s").."?file="..file_path
+ss.extedit = DISP.build_url("admin/services/openkill/servers-config/%s").."?file="..HTTP.urlencode(file_path)
 function ss.create(self, section)
 	local sid = TypedSection.create(self, section)
 	if sid then
@@ -119,7 +119,11 @@ function ss.create(self, section)
 		if name and #name > 0 then
 			self.map.uci:set("openkill", sid, "config", name)
 		end
-		HTTP.redirect(ss.extedit % sid)
+		local edit_url = ss.extedit % sid
+		if HTTP.formvalue("add") == "naiveproxy" then
+			edit_url = edit_url .. "&type=naiveproxy"
+		end
+		HTTP.redirect(edit_url)
 		return
 	end
 end

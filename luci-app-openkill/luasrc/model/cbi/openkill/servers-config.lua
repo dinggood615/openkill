@@ -153,6 +153,11 @@ o:value("ssh", translate("SSH"))
 o:value("masque", translate("MASQUE"))
 o:value("zerotier", translate("ZeroTier"))
 o:value("trusttunnel", translate("TrustTunnel"))
+-- The compatibility page passes this hint only through the explicit
+-- "add NaiveProxy" flow. Existing node values always remain authoritative.
+if not m.uci:get(openkill, sid, "type") and HTTP.formvalue("type") == "naiveproxy" then
+	o.default = "naiveproxy"
+end
 
 o.description = translate("Using incorrect encryption mothod may causes service fail to start")
 

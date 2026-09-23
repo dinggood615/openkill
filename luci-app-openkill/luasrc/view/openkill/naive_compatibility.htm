@@ -1,4 +1,22 @@
-<% local dispatcher = require "luci.dispatcher" %>
+<%
+local dispatcher = require "luci.dispatcher"
+local http = require "luci.http"
+local fs = require "luci.openkill"
+local current_config = fs.uci_get_config("config", "config_path") or ""
+local config_prefix = "/etc/openkill/config/"
+local has_current_config = current_config:sub(1, #config_prefix) == config_prefix and
+  fs.access(current_config) and fs.IsYamlExt(fs.basename(current_config))
+local node_manage_url = dispatcher.build_url("admin", "services", "openkill", "servers")
+local node_add_url = node_manage_url
+if has_current_config then
+  local file_query = "?file=" .. http.urlencode(current_config)
+  node_manage_url = node_manage_url .. file_query
+  node_add_url = node_manage_url .. "&add=naiveproxy"
+else
+  node_manage_url = dispatcher.build_url("admin", "services", "openkill", "config")
+  node_add_url = node_manage_url
+end
+%>
 <div id="openkill-naive-component-info" class="openkill-naive-compatibility"
      data-naive-metadata-url="<%=dispatcher.build_url('admin','services','openkill','naive_metadata')%>"
      data-naive-component-url="<%=dispatcher.build_url('admin','services','openkill','naive_component')%>">
@@ -28,8 +46,8 @@
     <button type="button" class="cbi-button cbi-button-reset" data-naive-component-action="remove">移除组件</button>
   </div>
   <p class="openkill-naive-compatibility-links">
-    <a class="cbi-button" href="<%=dispatcher.build_url('admin','services','openkill','servers')%>?add=naiveproxy">添加或导入 NaiveProxy 节点</a>
-    <a class="cbi-button" href="<%=dispatcher.build_url('admin','services','openkill','servers')%>">管理节点与策略组</a>
+    <a class="cbi-button" href="<%=node_add_url%>"><% if has_current_config then %>添加或导入 NaiveProxy 节点<% else %>先选择配置文件以添加 NaiveProxy 节点<% end %></a>
+    <a class="cbi-button" href="<%=node_manage_url%>">管理节点与策略组</a>
   </p>
   <div class="openkill-naive-compatibility-status" data-naive-component-status aria-live="polite">组件状态尚未读取。</div>
 </div>
