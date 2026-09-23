@@ -22,10 +22,12 @@
   2026-1138 candidate added xz and extracted the archive, but then exposed a
   second BusyBox gap: `od` is absent although `hexdump` is available, so the
   ELF architecture probe rejected the valid binary. No node credentials or
-  packet-path tests were used.
-- Next action: add the hexdump fallback, run local and POSIX gates, rebuild
-  the 2026-1138 candidate from the corrected source, then recheck installation
-  and rollback behavior on the authorized device.
+  packet-path tests were used. The corrected helper was then run in an
+  isolated device directory and completed the full install path successfully,
+  producing an executable whose version probe returned `150.0.7871.63`.
+- Next action: publish the 2026-1139 candidate containing both compatibility
+  fixes, install it with dependency resolution on the authorized device, and
+  verify the configured path and status reporting before formal release.
 
 ## NaiveProxy device detection and share-link import (2026-09-23)
 
