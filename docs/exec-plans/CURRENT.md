@@ -29,10 +29,25 @@
   extracted JavaScript syntax check, `git diff --check`, POSIX metadata/helper
   syntax and `scripts/local-gate.sh` pass. Browser rendering, actual component
   installation, remote authentication and device behavior remain unverified.
-- Next action: commit and push the bounded source change, verify exact-commit
-  Development CI, then run RC audit and Formal Release only after all required
-  gates pass. Read the latest release/version from the workflow instead of
-  assuming a tag number.
+- Delivery evidence: implementation commit
+  `cdf2b6b011f26f1d520dba0a5d411c7de68f1898` and version commit
+  `ba7684eadaf87aabb12beddafa758abf83054ff3` were pushed to `master`.
+  Development CI passed for the implementation commit
+  ([35818160394](https://github.com/dinggood615/openkill/actions/runs/35818160394))
+  and the version commit
+  ([35818333176](https://github.com/dinggood615/openkill/actions/runs/35818333176)).
+  RC Build run 59 succeeded
+  ([35818559036](https://github.com/dinggood615/openkill/actions/runs/35818559036));
+  its audited candidate was `luci-app-openkill_2026-1136_all.ipk` with SHA256
+  `519a0b9c42e8026c193fcff5b757078ef1f273afe0961099953e8d8a1f977292`.
+  Formal Release run 160 succeeded with `release_gate=true` and
+  `publish=true`
+  ([35818895168](https://github.com/dinggood615/openkill/actions/runs/35818895168));
+  it published `v2026-1136-ipk` and
+  `luci-app-openkill_2026-1136_all.ipk` with SHA256
+  `0cc3278d006027c7e67a68ee4ae3b067cb96123a9c8c1b62728df5262e3bc8ac`.
+  No device installation, browser rendering or remote NaiveProxy
+  authentication was performed; keep `v2026-1135-ipk` as the rollback point.
 
 ## NaiveProxy compatibility settings and metadata discovery (2026-09-23)
 
