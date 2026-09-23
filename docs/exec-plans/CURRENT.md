@@ -1685,8 +1685,35 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   (2), POSIX shell syntax, `git diff --check`, and `scripts/local-gate.sh`
   pass. Browser automation is unavailable in this session, so no rendered
   screenshot is claimed.
-- Next action: commit/push this source fix to master and verify its exact
-  Development CI. Build and audit the RC, install it to the backed-up device,
-  and verify the rendered navigation path and new-node editor if LuCI access
-  is available. Then run Formal Release with both required inputs. Preserve
-  existing releases and disclose that remote node login has not been verified.
+- Source implementation commit `a1e39bf7b7c79f9ec2fe47a6847455e78e82cceb`
+  is on master. Its exact Development CI passed
+  ([35879368818](https://github.com/dinggood615/openkill/actions/runs/35879368818)).
+- RC Build from that commit passed
+  ([35879571748](https://github.com/dinggood615/openkill/actions/runs/35879571748)).
+  The candidate package is
+  `luci-app-openkill_2026-1142_all.ipk`, SHA256
+  `4e979f1e3e2c7c5eafdb57713f0b2b3356c1fa9e901d0fb56620187efd5214a5`.
+  The archived view and both node-management models match source hashes;
+  package ownership is root:root and the workflow audit passed metadata,
+  conffile, maintainer-script, stale-reference, and sensitive-content checks.
+- Device candidate upload hash matched. `opkg install` correctly treated the
+  same-version package as already current; the authorized retry with the
+  device-supported `--force-reinstall` installed the candidate. The installed
+  compatibility view hash matches the RC/source, and marker checks found the
+  path and Naive type hint. Current selected config is
+  `openkill.optimized.yaml`. Device `/etc/config/openkill` remains at the
+  pre-install SHA256; OpenKill is running and enabled; Naive reports
+  `150.0.7871.63`; component state is installed, with no enabled node and no
+  local/remote verification. The package manager kept the modified conffile
+  and placed its packaged default alongside it as `/etc/config/openkill-opkg`.
+  The protected backup remains at
+  `D:\openkill-device-backup-20260923-current\openkill.config`.
+- No browser surface was available in this session, so a rendered click-through
+  was not captured. The deployed view and route inputs were verified over SSH;
+  remote Naive authentication and business traffic remain untested.
+- Version metadata and release notes for 2026-1143 are now prepared; the
+  release bump check, NaiveProxy integration contract, UI contract (25), UI
+  preview (2), `git diff --check`, and local gate pass. Next action: commit and
+  push this versioned source state, verify exact Development CI, build/audit
+  its RC, then invoke Formal Release with both required inputs. Preserve
+  v2026-1142 and its package for rollback.
