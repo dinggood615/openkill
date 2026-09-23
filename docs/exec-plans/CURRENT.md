@@ -51,6 +51,17 @@
   device installation or remote
   NaiveProxy authentication was performed; retain `v2026-1133-ipk` for rollback.
 
+## NaiveProxy metadata tag validation follow-up (2026-09-23)
+
+- The metadata reader now rejects release tags containing characters outside
+  the safe release-name alphabet before interpolating an asset selector into
+  `jsonfilter`. A malformed upstream tag therefore remains unavailable and
+  cannot alter the selector expression.
+- `test-naiveproxy-integration.py`, WSL POSIX syntax and `git diff --check`
+  pass for this follow-up. Because this is a post-release production fix, it
+  must be versioned as `2026-1135` and pass the same Development CI, RC audit
+  and Formal Release gates; `v2026-1134-ipk` remains a rollback point.
+
 ## Optional NaiveProxy bridge integration (2026-09-23)
 
 - Scope: add an opt-in official NaiveProxy helper process that exposes one

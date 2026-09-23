@@ -121,6 +121,14 @@ metadata_main() {
         printf 'ok=0\nreason=invalid-release-metadata\n'
         return 0
     }
+    case "$tag" in
+        v[0-9A-Za-z._-]* ) ;;
+        * )
+            printf '%s\n' "$arch_info"
+            printf 'ok=0\nreason=invalid-release-tag\n'
+            return 0
+            ;;
+    esac
     asset="naiveproxy-${tag}-openwrt-${target}.tar.xz"
     url=$(jsonfilter -i "$NAIVE_METADATA_CACHE" -e "@.assets[@.name='$asset'].browser_download_url" 2>/dev/null | sed -n '1p' | tr -d '\r\n')
     digest=$(jsonfilter -i "$NAIVE_METADATA_CACHE" -e "@.assets[@.name='$asset'].digest" 2>/dev/null | sed -n '1p' | sed 's/^sha256://' | tr -d '\r\n')
