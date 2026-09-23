@@ -51,6 +51,12 @@
   `luci-app-openkill_2026-1141_all.ipk` has SHA256
   `e24c2d1922673402994fa5acc93853cd5a7b55f08f21af1bcad9ac3b0dbbe5f3`.
   The package channel manifest points to commit `7100fa8b43bf448a4cace58f28b58ca189a2e935`.
+  A post-release RC audit from the current master evidence commit also passed
+  ([35849483187](https://github.com/dinggood615/openkill/actions/runs/35849483187));
+  its 25.12 SDK package SHA256 is
+  `1600bb2f23ef3d0085271d9d9c26e2d52b94aa0c63361f15f32cb7837483318d`,
+  with package metadata, conffile, deletion, stale-reference and sensitive
+  content audits all OK.
 
 ## NaiveProxy installer archive compatibility (2026-09-23)
 
