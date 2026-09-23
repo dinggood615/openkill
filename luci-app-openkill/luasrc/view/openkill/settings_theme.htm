@@ -87,6 +87,11 @@
                 'openvpn_real_ip', 'openvpn_adblock_exception', 'openvpn_dns_mode',
                 '_openvpn_status_contract'
             ]},
+            {id: 'naiveproxy-compatibility', title: 'NaiveProxy 辅助组件', fullWidth: true, keys: [
+                'naive_enabled', 'naive_auto_start', 'naive_component_path',
+                'naive_component_url', 'naive_component_sha256', 'naive_port_base',
+                '_naive_status_contract', '_naive_component_info'
+            ]},
             {id: 'device-compatibility', title: '<%:Device Compatibility%>', keys: [
                 'disable_quic_go_gso', 'small_flash_memory'
             ]},
@@ -537,6 +542,29 @@
         for (var i = 0; i < menu.children.length; i++) {
             if (menu.children[i].tagName && menu.children[i].tagName.toLowerCase() === 'li') {
                 tabItems.push(menu.children[i]);
+            }
+        }
+
+        /* The legacy /naive bookmark redirects here with a stable query/hash.
+         * Resolve it through the real LuCI tab link instead of duplicating a
+         * second editor or relying on an implementation-specific panel id. */
+        var requestedCategory = null;
+        var queryMatch = String(window.location.search || '').match(/[?&]tab=([^&#]+)/i);
+        if (queryMatch && queryMatch[1]) {
+            try { requestedCategory = decodeURIComponent(queryMatch[1]); } catch (ignoreQuery) {}
+        }
+        if (!requestedCategory) {
+            var requestedHash = String(window.location.hash || '').toLowerCase();
+            if (requestedHash.indexOf('#openkill-naive-component-info') === 0 ||
+                requestedHash === '#compatibility') requestedCategory = 'compatibility';
+        }
+        if (requestedCategory) {
+            requestedCategory = requestedCategory.toLowerCase();
+            for (var requestedIndex = 0; requestedIndex < tabItems.length; requestedIndex++) {
+                if (tabCategory(tabItems[requestedIndex]) !== requestedCategory) continue;
+                var requestedLink = tabItems[requestedIndex].querySelector('a');
+                if (requestedLink && !tabIsActive(tabItems[requestedIndex])) requestedLink.click();
+                break;
             }
         }
         moveExplicitFieldsToCategory(map, tabItems, 'compatibility', DEVICE_COMPATIBILITY_KEYS);

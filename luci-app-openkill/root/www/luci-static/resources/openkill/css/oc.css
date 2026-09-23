@@ -10095,4 +10095,114 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
     }
 }
 
+/* NaiveProxy compatibility card.  Keep all selectors inside the OpenKill
+ * settings scope so LuCI's other CBI pages retain their native layout. */
+#cbi-openkill.openkill-settings .openkill-naive-compatibility {
+    display: grid;
+    gap: 10px;
+    padding: 12px 0 4px;
+    min-width: 0;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-compatibility-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-compatibility-head strong {
+    color: var(--ok-text);
+    font-size: 13px;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-compatibility-head p,
+#cbi-openkill.openkill-settings .openkill-naive-compatibility-reason,
+#cbi-openkill.openkill-settings .openkill-naive-compatibility-url,
+#cbi-openkill.openkill-settings .openkill-naive-compatibility-digest {
+    margin: 4px 0 0;
+    color: var(--ok-muted);
+    font-size: 12px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-compatibility-badge {
+    flex: 0 0 auto;
+    padding: 3px 8px;
+    border: 1px solid var(--ok-border);
+    border-radius: 999px;
+    color: var(--ok-muted);
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-compatibility-facts {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-compatibility-facts > div {
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--ok-border);
+    border-radius: 6px;
+    background: var(--ok-surface-muted);
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-compatibility-facts dt {
+    color: var(--ok-muted);
+    font-size: 11px;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-compatibility-facts dd {
+    margin: 3px 0 0;
+    color: var(--ok-text);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-compatibility-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-compatibility-actions .cbi-button {
+    margin: 0;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-compatibility-status {
+    padding: 8px 10px;
+    border: 1px solid var(--ok-border);
+    border-radius: 6px;
+    background: var(--ok-surface-muted);
+    color: var(--ok-text);
+    font-size: 12px;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 768px) {
+    #cbi-openkill.openkill-settings .openkill-naive-compatibility-facts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 480px) {
+    #cbi-openkill.openkill-settings .openkill-naive-compatibility-head {
+        display: block;
+    }
+
+    #cbi-openkill.openkill-settings .openkill-naive-compatibility-badge {
+        display: inline-block;
+        margin-top: 8px;
+    }
+
+    #cbi-openkill.openkill-settings .openkill-naive-compatibility-facts {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
 /* ===== Running status grid closeout End ===== */

@@ -1,0 +1,160 @@
+<% local dispatcher = require "luci.dispatcher" %>
+<div id="openkill-naive-component-info" class="openkill-naive-compatibility"
+     data-naive-metadata-url="<%=dispatcher.build_url('admin','services','openkill','naive_metadata')%>"
+     data-naive-component-url="<%=dispatcher.build_url('admin','services','openkill','naive_component')%>">
+  <div class="openkill-naive-compatibility-head">
+    <div>
+      <strong>官方组件检测</strong>
+      <p>按当前 OpenWrt CPU 匹配官方 OpenWrt 制品。检测只读取发布信息；安装仍需单独点击。</p>
+    </div>
+    <span class="openkill-naive-compatibility-badge" data-naive-meta-state aria-live="polite">待检测</span>
+  </div>
+  <dl class="openkill-naive-compatibility-facts" data-naive-meta-facts>
+    <div><dt>架构</dt><dd data-naive-meta="architecture">—</dd></div>
+    <div><dt>版本</dt><dd data-naive-meta="release">—</dd></div>
+    <div><dt>制品</dt><dd data-naive-meta="asset">—</dd></div>
+    <div><dt>大小</dt><dd data-naive-meta="size">—</dd></div>
+    <div><dt>摘要来源</dt><dd data-naive-meta="source">—</dd></div>
+    <div><dt>检查时间</dt><dd data-naive-meta="checked_at">—</dd></div>
+  </dl>
+  <p class="openkill-naive-compatibility-url" data-naive-meta="url">官方 URL：—</p>
+  <p class="openkill-naive-compatibility-digest" data-naive-meta="sha256">SHA256：—</p>
+  <p class="openkill-naive-compatibility-reason" data-naive-meta-reason aria-live="polite">尚未读取官方发布信息。</p>
+  <div class="openkill-naive-compatibility-actions">
+    <button type="button" class="cbi-button cbi-button-apply" data-naive-meta-action="detect">检测并填写空缺</button>
+    <button type="button" class="cbi-button" data-naive-meta-action="refresh">只刷新检测</button>
+    <button type="button" class="cbi-button cbi-button-apply" data-naive-component-action="install">安装当前组件</button>
+    <button type="button" class="cbi-button cbi-button-reset" data-naive-component-action="remove">移除组件</button>
+  </div>
+  <div class="openkill-naive-compatibility-status" data-naive-component-status aria-live="polite">组件状态尚未读取。</div>
+</div>
+<script>
+(function () {
+  var root = document.getElementById('openkill-naive-component-info');
+  if (!root || root.getAttribute('data-naive-ready') === '1') return;
+  root.setAttribute('data-naive-ready', '1');
+  var metadataUrl = root.getAttribute('data-naive-metadata-url');
+  var componentUrl = root.getAttribute('data-naive-component-url');
+  var metaState = root.querySelector('[data-naive-meta-state]');
+  var reason = root.querySelector('[data-naive-meta-reason]');
+  var componentState = root.querySelector('[data-naive-component-status]');
+  var metaFields = root.querySelectorAll('[data-naive-meta]');
+
+  function field(name) {
+    return document.querySelector('[name="cbid.openkill.config.' + name + '"]');
+  }
+  function setText(name, value) {
+    for (var i = 0; i < metaFields.length; i++) {
+      if (metaFields[i].getAttribute('data-naive-meta') === name) {
+        metaFields[i].textContent = value || '—';
+      }
+    }
+  }
+  function setBusy(selector, busy) {
+    var buttons = root.querySelectorAll(selector);
+    for (var i = 0; i < buttons.length; i++) buttons[i].disabled = !!busy;
+  }
+  function fetchJson(url, options) {
+    options = options || {};
+    var controller = window.AbortController ? new AbortController() : null;
+    var timer;
+    if (controller) options.signal = controller.signal;
+    var request = new Promise(function (resolve, reject) {
+      timer = window.setTimeout(function () {
+        if (controller) controller.abort();
+        reject(new Error('timeout'));
+      }, 20000);
+      fetch(url, options).then(resolve, reject);
+    });
+    return request.then(function (value) {
+      window.clearTimeout(timer);
+      return value;
+    }, function (error) {
+      window.clearTimeout(timer);
+      throw error;
+    }).then(function (response) {
+      if (!response.ok) throw new Error('http-' + response.status);
+      return response.json();
+    });
+  }
+  function renderMeta(data) {
+    data = data || {};
+    setText('architecture', data.architecture);
+    setText('release', data.release);
+    setText('asset', data.asset);
+    setText('size', data.size ? String(data.size) + ' bytes' : '—');
+    setText('source', data.source || (data.reason === 'official-api-unavailable' ? '官方接口不可用' : '—'));
+    setText('checked_at', data.checked_at ? new Date(Number(data.checked_at) * 1000).toLocaleString() : '—');
+    setText('url', data.url ? '官方 URL：' + data.url : '官方 URL：—');
+    setText('sha256', data.sha256 ? 'SHA256：' + data.sha256 : 'SHA256：—');
+    metaState.textContent = data.ok === '1' ? '可核对' : (data.reason === 'unsupported-architecture' ? '架构不支持' : '待核实');
+    reason.textContent = data.reason === 'ready-to-review' ?
+      '已找到匹配制品和 GitHub asset digest。点击“检测并填写空缺”后只补齐空字段。' :
+      ('当前状态：' + (data.reason || 'unknown'));
+  }
+  function requestMetadata(mode, apply) {
+    metaState.textContent = '读取中…';
+    reason.textContent = '正在访问官方发布 API，页面会复用短期缓存。';
+    setBusy('[data-naive-meta-action]', true);
+    var urlField = field('naive_component_url');
+    var shaField = field('naive_component_sha256');
+    var body = new URLSearchParams({ operation: mode, apply: apply ? '1' : '0',
+      fill_url: urlField && !String(urlField.value || '').trim() ? '1' : '0',
+      fill_sha256: shaField && !String(shaField.value || '').trim() ? '1' : '0' });
+    fetchJson(metadataUrl, {method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
+      .then(function (data) {
+        renderMeta(data);
+        if (data.ok === '1' && apply) {
+          if (urlField && !String(urlField.value || '').trim() && data.url) urlField.value = data.url;
+          if (shaField && !String(shaField.value || '').trim() && data.sha256) shaField.value = data.sha256;
+          reason.textContent = data.applied ? '空缺字段已填入，请保存并应用设置后再安装组件。' : '已有输入已保留，未覆盖用户填写值。';
+        }
+      })
+      .catch(function (error) {
+        metaState.textContent = error && error.message === 'timeout' ? '读取超时' : '读取失败';
+        reason.textContent = '官方发布信息读取失败，请稍后重试；现有字段未修改。';
+      })
+      .then(function () { setBusy('[data-naive-meta-action]', false); });
+  }
+  function renderComponent(data) {
+    var lines = String(data && data.state || '').split('\n').filter(Boolean);
+    var map = {};
+    lines.forEach(function (line) { var p = line.indexOf('='); if (p > 0) map[line.slice(0, p)] = line.slice(p + 1); });
+    if (data && data.installed) {
+      componentState.textContent = '组件已安装 · ' + (map.state || '状态未知') + ' · 本地入口 ' + (map.local_ready === '1' ? '就绪' : '未验证') + ' · 远端连接未验证';
+    } else {
+      componentState.textContent = '组件未安装 · ' + (map.reason || '请先检测并填写组件信息');
+    }
+  }
+  function refreshComponent() {
+    fetchJson(componentUrl + '?operation=status', {credentials: 'same-origin', cache: 'no-store'})
+      .then(renderComponent)
+      .catch(function (error) { componentState.textContent = error && error.message === 'timeout' ? '组件状态读取超时，请重试' : '组件状态读取失败，请重试'; });
+  }
+  root.addEventListener('click', function (event) {
+    var metadataAction = event.target.getAttribute('data-naive-meta-action');
+    var componentAction = event.target.getAttribute('data-naive-component-action');
+    if (metadataAction) return requestMetadata(metadataAction === 'detect' ? 'detect' : 'cached', metadataAction === 'detect');
+    if (!componentAction) return;
+    if (componentAction === 'remove' && !window.confirm('确认移除 NaiveProxy 组件？节点配置会保留。')) return;
+    var urlField = field('naive_component_url');
+    var shaField = field('naive_component_sha256');
+    if (componentAction === 'install' && (!urlField || !shaField || !String(urlField.value || '').trim() || !String(shaField.value || '').trim())) {
+      componentState.textContent = '请先检测并填写官方 URL 和 SHA256';
+      return;
+    }
+    componentState.textContent = componentAction === 'install' ? '正在校验并安装…' : '正在移除组件…';
+    setBusy('[data-naive-component-action]', true);
+    var body = new URLSearchParams({operation: componentAction});
+    if (componentAction === 'install') { body.set('url', urlField.value); body.set('sha256', shaField.value); }
+    fetchJson(componentUrl, {method: 'POST', credentials: 'same-origin',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
+      .then(function (data) { componentState.textContent = data.ok ? '操作完成，请保存并应用设置；远端连接仍未验证。' : '操作失败：' + (data.error || '请检查组件信息'); refreshComponent(); })
+      .catch(function (error) { componentState.textContent = error && error.message === 'timeout' ? '操作超时，请检查日志后重试' : '操作请求失败，请重试'; })
+      .then(function () { setBusy('[data-naive-component-action]', false); });
+  });
+  requestMetadata('cached', false);
+  refreshComponent();
+}());
+</script>

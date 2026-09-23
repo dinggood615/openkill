@@ -1,5 +1,40 @@
 # Current status
 
+## NaiveProxy compatibility settings and metadata discovery (2026-09-23)
+
+- Scope: move the existing NaiveProxy component controls and status actions
+  into the Plugin Settings compatibility tab. The old dedicated route remains
+  as a redirect so bookmarks do not create a second UCI editor.
+- Settings contract: one set of `naive_*` fields is rendered by the
+  compatibility CBI model. Component metadata discovery is an explicit user
+  action; it may fill only empty URL/SHA256 fields and never enables nodes,
+  installs a binary or restarts OpenKill implicitly.
+- Metadata contract: query the official `klzgrad/naiveproxy` latest release
+  API, map a detected OpenWrt CPU family to an `openwrt-*` asset, and require
+  the GitHub asset `digest` before presenting an installable suggestion.
+  Unknown architectures, missing digests, API errors and stale data remain
+  visible as unavailable or pending verification; the source URL is never
+  guessed and a source archive is never treated as an executable.
+- Lifecycle contract: the existing HTTPS allow-list, size limit, archive
+  traversal check, ELF architecture check, loader/version probe and atomic
+  replacement remain the installation boundary. Metadata lookup only returns
+  URL, digest, size, release and architecture facts. Manual values are
+  preserved unless the user explicitly requests replacement.
+- UI contract: the compatibility tab owns the NaiveProxy settings card and
+  status/metadata controls. Desktop cards share the current two-column grid;
+  long URLs, SHA256 values and errors wrap inside the card and narrow layouts
+  collapse naturally. Existing Mihomo, DNS, adblock, region, RustDesk and
+  OpenVPN contracts are unchanged.
+- Validation plan: offline metadata parser fixtures, LuCI controller/CBI
+  contract checks, final CSS/template preview, POSIX syntax and local-gate;
+  no device or remote NaiveProxy session is required for this UI change.
+- Working-tree validation from baseline `54726821a62d27983c200bfe531cd08457f24d7b`:
+  `test-naiveproxy-integration.py`, `test-ui-contract.py`,
+  `test-ui-preview.py`, JavaScript syntax check, metadata shell syntax and
+  `scripts/local-gate.sh` pass. A WSL fixture run matched the official latest
+  x86_64 asset and GitHub digest; unknown/missing parser paths remain
+  fail-closed. No device or remote NaiveProxy session was used.
+
 ## Optional NaiveProxy bridge integration (2026-09-23)
 
 - Scope: add an opt-in official NaiveProxy helper process that exposes one

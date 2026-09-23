@@ -15,6 +15,7 @@ function index()
 	entry({"admin", "services", "openkill", "status"},call("action_status")).leaf=true
 	entry({"admin", "services", "openkill", "naive_status"},call("action_naive_status")).leaf=true
 	entry({"admin", "services", "openkill", "naive_component"},call("action_naive_component")).leaf=true
+	entry({"admin", "services", "openkill", "naive_metadata"},call("action_naive_metadata")).leaf=true
 	entry({"admin", "services", "openkill", "startlog"},call("action_start")).leaf=true
 	entry({"admin", "services", "openkill", "refresh_log"},call("action_refresh_log"))
 	entry({"admin", "services", "openkill", "del_log"},call("action_del_log"))
@@ -65,7 +66,9 @@ function index()
 	entry({"admin", "services", "openkill", "core_download"}, call("core_download"))
 	entry({"admin", "services", "openkill", "announcement"}, call("action_announcement"))
 	entry({"admin", "services", "openkill", "settings"},cbi("openkill/settings"),_("Plugin Settings"), 30).leaf = true
-	entry({"admin", "services", "openkill", "naive"},cbi("openkill/naive"),"NaiveProxy", 35).leaf = true
+	-- Keep the former dedicated URL as a migration redirect.  There must be
+	-- only one CBI editor for naive_* so saves cannot diverge between pages.
+	entry({"admin", "services", "openkill", "naive"},call("action_naive_redirect"),"NaiveProxy", 35).leaf = true
 	entry({"admin", "services", "openkill", "config-overwrite"},cbi("openkill/config-overwrite"),_("Overwrite Settings"), 40).leaf = true
 	entry({"admin", "services", "openkill", "config-subscribe"},cbi("openkill/config-subscribe"),_("Config Subscribe"), 60).leaf = true
 	entry({"admin", "services", "openkill", "servers"},cbi("openkill/servers"),nil).leaf = true
@@ -1644,6 +1647,60 @@ function action_naive_status()
 	}
 	HTTP.prepare_content("application/json")
 	HTTP.write_json(payload)
+end
+
+function action_naive_redirect()
+	local dispatcher = require "luci.dispatcher"
+	local http = require "luci.http"
+	http.redirect(dispatcher.build_url("admin", "services", "openkill", "settings") .. "?tab=compatibility#openkill-naive-component-info")
+end
+
+function action_naive_metadata()
+	local operation = HTTP.formvalue("operation") or "cached"
+	local apply = HTTP.formvalue("apply") == "1"
+	local replace = HTTP.formvalue("replace") == "1"
+	local fill_url = HTTP.formvalue("fill_url") ~= "0"
+	local fill_sha256 = HTTP.formvalue("fill_sha256") ~= "0"
+	local mode = operation == "detect" and "detect" or "cached"
+	local output = SYS.exec("/usr/share/openkill/openkill_naive_metadata.sh " .. mode .. " 2>/dev/null") or ""
+	local result = { ok = false, operation = mode, applied = false }
+	for line in output:gmatch("[^\r\n]+") do
+		local key, value = line:match("^([%w_]+)=(.*)$")
+		if key then result[key] = value end
+	end
+	if result.ok == "1" and result.url and result.sha256 and #result.sha256 == 64 and apply then
+		local uci_cursor = require "luci.model.uci".cursor()
+		local current_url = uci_cursor:get("openkill", "config", "naive_component_url") or ""
+		local current_sha = uci_cursor:get("openkill", "config", "naive_component_sha256") or ""
+		local changed = false
+		if (replace or (current_url == "" and fill_url)) then
+			uci_cursor:set("openkill", "config", "naive_component_url", result.url)
+			result.applied_url = true
+			changed = true
+		else
+			result.applied_url = false
+			result.preserved_url = true
+		end
+		if (replace or (current_sha == "" and fill_sha256)) then
+			uci_cursor:set("openkill", "config", "naive_component_sha256", result.sha256)
+			result.applied_sha256 = true
+			changed = true
+		else
+			result.applied_sha256 = false
+			result.preserved_sha256 = true
+		end
+		if changed then
+			uci_cursor:commit("openkill")
+		end
+		result.applied = changed
+		-- Keep the wire type stable: the shell contract is key=value and the
+		-- browser treats ok="1" as a successful metadata result.
+		result.ok = "1"
+	end
+	result.manual_url_present = (fs.uci_get_config("config", "naive_component_url") or "") ~= ""
+	result.manual_sha256_present = (fs.uci_get_config("config", "naive_component_sha256") or "") ~= ""
+	HTTP.prepare_content("application/json")
+	HTTP.write_json(result)
 end
 
 function action_naive_component()
