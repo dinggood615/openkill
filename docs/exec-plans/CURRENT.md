@@ -38,9 +38,19 @@
   The 2026-1140 RC Build passed ([35847382643](https://github.com/dinggood615/openkill/actions/runs/35847382643));
   its audited package SHA256 is
   `4ddba320ab058ca84a99d5012447a4dd40665a48c43b76ec569bfaf48cc3ef3f`.
-  Version metadata and release notes for 2026-1141 are now prepared; the
-  next action is to run the exact-commit Development CI and Formal Release
-  gate for that version.
+  Version metadata and release notes for 2026-1141 were prepared in commit
+  `7100fa8b43bf448a4cace58f28b58ca189a2e935`; its exact Development CI
+  passed ([35848107679](https://github.com/dinggood615/openkill/actions/runs/35848107679)).
+  Formal Release initially hit a transient upstream 403 while refreshing
+  third-party resources ([35848293474](https://github.com/dinggood615/openkill/actions/runs/35848293474));
+  the authorized retry passed with `release_gate=true` and `publish=true`
+  ([35848616900](https://github.com/dinggood615/openkill/actions/runs/35848616900)).
+  The formal package is published as
+  [v2026-1141-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1141-ipk)
+  and the package-channel asset
+  `luci-app-openkill_2026-1141_all.ipk` has SHA256
+  `e24c2d1922673402994fa5acc93853cd5a7b55f08f21af1bcad9ac3b0dbbe5f3`.
+  The package channel manifest points to commit `7100fa8b43bf448a4cace58f28b58ca189a2e935`.
 
 ## NaiveProxy installer archive compatibility (2026-09-23)
 
