@@ -375,6 +375,32 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-se
 
 /* ===== OpenKill Stage 2: Navigation and Page Header End ===== */
 
+.openkill-naive-panel {
+    margin-top: var(--ok-space-4, 16px);
+    padding: var(--ok-space-4, 16px);
+    border: 1px solid var(--ok-border, rgba(255,255,255,.16));
+    border-radius: var(--ok-radius-md, 8px);
+    background: var(--ok-surface, rgba(22,28,38,.86));
+}
+
+.openkill-naive-panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--ok-space-4, 16px);
+}
+
+.openkill-naive-panel h3,
+.openkill-naive-panel p { margin: 0; }
+.openkill-naive-panel p { margin-top: 6px; color: var(--ok-text-secondary, #aeb8c8); line-height: 1.45; }
+.openkill-naive-panel-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.openkill-naive-panel-state { margin-top: 14px; color: var(--ok-text-primary, #f1f4f8); overflow-wrap: anywhere; }
+
+@media (max-width: 720px) {
+    .openkill-naive-panel-header { flex-direction: column; }
+    .openkill-naive-panel-actions { justify-content: flex-start; }
+}
+
 /* ===== OpenKill Stage 3: Runtime Dashboard Layout Start =====
  * Grid, width and responsive behavior only. Component visuals remain in
  * oc.css; all existing status classes and DOM hooks stay in place. */
@@ -1325,6 +1351,12 @@ body[data-page="admin-services-openkill-config"] #cbi-openkill > .cbi-section-ca
 
 .oc.openkill-status-page .dashboard-content-layout .dashboard-security-section {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (min-width: 1101px) {
+    .oc.openkill-status-page .dashboard-content-layout .dashboard-security-section {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
 }
 
 /* Network settings use the same two-column card rhythm as Runtime &

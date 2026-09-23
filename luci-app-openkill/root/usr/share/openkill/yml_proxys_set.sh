@@ -249,9 +249,30 @@ yml_servers_set()
       return
    fi
 
-    if [ "$type" = "ss" ] || [ "$type" = "trojan" ] || [ "$type" = "ssr" ] || [ "$type" = "shadowquic" ]; then
+   if [ "$type" = "ss" ] || [ "$type" = "trojan" ] || [ "$type" = "ssr" ] || [ "$type" = "shadowquic" ]; then
         config_get "password" "$section" "password" ""
         if [ -z "$password" ]; then
+            return
+        fi
+    fi
+
+    # NaiveProxy is an optional helper process, not a Mihomo protocol.  Keep
+    # malformed or unavailable nodes out of the generated profile and expose
+    # only the helper's loopback SOCKS5 endpoint to Mihomo.
+    if [ "$type" = "naiveproxy" ]; then
+        [ "$(uci -q get openkill.config.naive_enabled 2>/dev/null || echo 0)" = "1" ] || return
+        naive_component_path="$(uci -q get openkill.config.naive_component_path 2>/dev/null || echo /etc/openkill/core/naive)"
+        case "$naive_component_path" in /etc/openkill/core/*) ;; *) return ;; esac
+        [ -x "$naive_component_path" ] || return
+        naive_listen_port="$(/usr/share/openkill/openkill_naive.sh port "$section" 2>/dev/null || true)"
+        if [ -z "$naive_listen_port" ]; then
+            return
+        fi
+        config_get "naive_username" "$section" "naive_username" ""
+        config_get "naive_password" "$section" "naive_password" ""
+        config_get "naive_transport" "$section" "naive_transport" "https"
+        case "$naive_transport" in https|quic) ;; *) return ;; esac
+        if [ -z "$naive_username" ] || [ -z "$naive_password" ]; then
             return
         fi
     fi
@@ -1652,6 +1673,20 @@ cat >> "$SERVER_FILE" <<-EOF
     fingerprint: "$fingerprint"
 EOF
     fi
+fi
+
+# NaiveProxy bridge.  The helper owns credentials and remote TLS/QUIC; the
+# Mihomo profile receives a local, TCP-only SOCKS5 endpoint.  This keeps
+# strategy groups and include-all behavior unchanged while avoiding an
+# unsupported `type: naiveproxy` stanza in Mihomo.
+if [ "$type" = "naiveproxy" ]; then
+cat >> "$SERVER_FILE" <<-EOF
+  - name: "$name"
+    type: socks5
+    server: "127.0.0.1"
+    port: $naive_listen_port
+    udp: false
+EOF
 fi
 
 #http

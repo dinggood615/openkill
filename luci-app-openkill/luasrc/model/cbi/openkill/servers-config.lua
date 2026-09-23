@@ -145,6 +145,7 @@ o:value("mieru", translate("Mieru"))
 o:value("anytls", translate("AnyTLS"))
 o:value("sudoku", translate("Sudoku"))
 o:value("socks5", translate("Socks5"))
+o:value("naiveproxy", "NaiveProxy")
 o:value("http", translate("HTTP(S)"))
 o:value("direct", translate("DIRECT"))
 o:value("dns", translate("DNS"))
@@ -177,6 +178,7 @@ o:depends("type", "anytls")
 o:depends("type", "sudoku")
 o:depends("type", "snell")
 o:depends("type", "socks5")
+o:depends("type", "naiveproxy")
 o:depends("type", "http")
 o:depends("type", "ssh")
 o:depends("type", "masque")
@@ -201,6 +203,7 @@ o:depends("type", "anytls")
 o:depends("type", "sudoku")
 o:depends("type", "snell")
 o:depends("type", "socks5")
+o:depends("type", "naiveproxy")
 o:depends("type", "http")
 o:depends("type", "ssh")
 o:depends("type", "masque")
@@ -795,6 +798,27 @@ o:depends("type", "socks5")
 o:depends("type", "http")
 o:depends("type", "ssh")
 o.rmempty = true
+
+-- NaiveProxy is an optional helper process.  These fields are deliberately
+-- separate from generic SOCKS credentials so a node can be renamed or
+-- migrated without changing the existing protocol writers.
+o = s:option(Value, "naive_username", "NaiveProxy Username")
+o.rmempty = false
+o.placeholder = "user"
+o:depends("type", "naiveproxy")
+
+o = s:option(Value, "naive_password", "NaiveProxy Password")
+o.password = true
+o.rmempty = false
+o:depends("type", "naiveproxy")
+
+o = s:option(ListValue, "naive_transport", "NaiveProxy Transport")
+o:value("https", "HTTPS")
+o:value("quic", "QUIC")
+o.default = "https"
+o.rmempty = false
+o:depends("type", "naiveproxy")
+o.description = "通过本机回环 SOCKS5 桥接到官方 NaiveProxy；UDP 转发在未验证前保持关闭。"
 
 o = s:option(Value, "private_key", translate("private-key"))
 o:depends("type", "ssh")

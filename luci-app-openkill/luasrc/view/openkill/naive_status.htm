@@ -1,0 +1,62 @@
+<% local http = require "luci.http"; local dispatcher = require "luci.dispatcher" %>
+<div class="openkill-naive-panel" data-naive-status-url="<%=dispatcher.build_url('admin','services','openkill','naive_component')%>">
+  <div class="openkill-naive-panel-header">
+    <div>
+      <h3>NaiveProxy 组件状态</h3>
+      <p>组件安装、回环入口和远端连接分阶段显示；没有远端测试时保持“未验证”。</p>
+    </div>
+    <div class="openkill-naive-panel-actions">
+      <button class="cbi-button cbi-button-apply" type="button" data-naive-action="refresh">刷新状态</button>
+      <button class="cbi-button" type="button" data-naive-action="install">按上方 URL 和 SHA256 安装</button>
+      <button class="cbi-button cbi-button-reset" type="button" data-naive-action="remove">移除组件</button>
+    </div>
+  </div>
+  <div class="openkill-naive-panel-state" id="openkill-naive-panel-state" aria-live="polite">正在读取状态…</div>
+</div>
+<script>
+(function () {
+  var panel = document.querySelector('.openkill-naive-panel');
+  if (!panel) return;
+  var endpoint = panel.getAttribute('data-naive-status-url');
+  var state = document.getElementById('openkill-naive-panel-state');
+  function render(data) {
+    var lines = String(data && data.state || '').split('\n').filter(Boolean);
+    var map = {};
+    lines.forEach(function (line) { var p = line.indexOf('='); if (p > 0) map[line.slice(0, p)] = line.slice(p + 1); });
+    var installed = !!(data && data.installed) || map.component_installed === '1';
+    var configured = map.configured || '0';
+    var generated = map.generated || '0';
+    state.textContent = !installed ? '组件未安装' :
+      (map.state === 'failed' ? '启动或配置失败：' + (map.reason || '未知原因') :
+      ('组件已安装' + (data && data.version && data.version !== 'unknown' ? ' · ' + data.version : '') + ' · 节点配置 ' + configured + ' · 已生成入口 ' + generated +
+       ' · ' + (map.local_ready === '1' ? '本地入口就绪' : '本地入口未验证') +
+       ' · 远端连接未验证'));
+  }
+  function refresh() {
+    state.textContent = '正在读取状态…';
+    fetch(endpoint + '?operation=status', { credentials: 'same-origin', cache: 'no-store' })
+      .then(function (response) { if (!response.ok) throw new Error('status'); return response.json(); })
+      .then(render).catch(function () { state.textContent = '状态读取失败，请重试'; });
+  }
+  panel.addEventListener('click', function (event) {
+    var action = event.target.getAttribute('data-naive-action');
+    if (!action) return;
+    if (action === 'refresh') return refresh();
+    if (action === 'remove' && !window.confirm('确认移除 NaiveProxy 组件？现有节点配置会保留。')) return;
+    if (action === 'install') {
+      var url = document.querySelector('[name="cbid.openkill.config.naive_component_url"]');
+      var sha = document.querySelector('[name="cbid.openkill.config.naive_component_sha256"]');
+      if (!url || !sha || !url.value || !sha.value) { state.textContent = '请先填写官方 HTTPS URL 和 SHA256'; return; }
+      var body = new URLSearchParams({ operation: 'install', url: url.value, sha256: sha.value });
+      state.textContent = '正在校验并安装组件…';
+      fetch(endpoint, { method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body })
+        .then(function (response) { return response.json(); }).then(function (result) { state.textContent = result.ok ? '组件安装完成，请保存并应用设置' : '组件安装失败：' + (result.error || '请检查来源和摘要'); refresh(); })
+        .catch(function () { state.textContent = '组件安装请求失败，请重试'; });
+      return;
+    }
+    fetch(endpoint, { method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({ operation: action }) })
+      .then(function () { refresh(); }).catch(function () { state.textContent = '操作失败，请重试'; });
+  });
+  refresh();
+}());
+</script>

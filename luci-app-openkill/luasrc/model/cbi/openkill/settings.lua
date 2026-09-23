@@ -193,6 +193,47 @@ o.default = "请求 → 端点集合 → 规则应用 → 隧道 → 隧道业�
 o:depends("openvpn_compatibility", "1")
 o.description = "状态页会分别显示配置、规则生成/应用、端点更新时间和未验证原因；不会用进程存在或状态文件存在推断握手、隧道业务或 DNS 已成功。"
 
+o = s:taboption("compatibility", Flag, "naive_enabled", "启用 NaiveProxy 桥接")
+o.default = "0"
+o.rmempty = false
+o.description = "默认关闭。仅为启用的 NaiveProxy 节点启动官方辅助进程，并在 127.0.0.1 创建 SOCKS5 入口；不会建立第二套透明接管。"
+
+o = s:taboption("compatibility", Flag, "naive_auto_start", "随 OpenKill 启动辅助进程")
+o.default = "1"
+o.rmempty = false
+o:depends("naive_enabled", "1")
+o.description = "仅影响 NaiveProxy 辅助进程；Mihomo 仍由 OpenKill 原有生命周期管理。"
+
+o = s:taboption("compatibility", Value, "naive_component_path", "NaiveProxy 组件路径")
+o.default = "/etc/openkill/core/naive"
+o.rmempty = false
+o:depends("naive_enabled", "1")
+o.description = "必须是受 OpenKill 管理的可执行文件；不接受任意路径或通过命令行传递凭据。"
+
+o = s:taboption("compatibility", Value, "naive_component_url", "NaiveProxy 官方组件 URL")
+o.datatype = "string"
+o.rmempty = true
+o:depends("naive_enabled", "1")
+o.description = "仅允许 klzgrad/naiveproxy 官方 HTTPS 来源。安装还需要提供 64 位 SHA256；下载失败保留旧组件。"
+
+o = s:taboption("compatibility", Value, "naive_component_sha256", "NaiveProxy 组件 SHA256")
+o.datatype = "and(string, minlength(64), maxlength(64))"
+o.rmempty = true
+o:depends("naive_enabled", "1")
+o.description = "摘要用于完整性核对，不替代来源真实性验证；不填写时不会执行安装。"
+
+o = s:taboption("compatibility", Value, "naive_port_base", "NaiveProxy 回环端口起点")
+o.datatype = "port"
+o.default = "11080"
+o.rmempty = false
+o:depends("naive_enabled", "1")
+o.description = "每个稳定 UCI 节点分配独立的 127.0.0.1 端口；仅 TCP SOCKS5，UDP 在验证前保持关闭。"
+
+o = s:taboption("compatibility", DummyValue, "_naive_status_contract", "NaiveProxy 状态")
+o.default = "未安装 → 已配置 → 本地入口就绪 → 远端验证（分阶段显示）"
+o:depends("naive_enabled", "1")
+o.description = "状态页区分组件安装、节点配置、配置生成、本地监听和远端连接；没有真实远端验证时显示未验证，不以进程存在代替连接成功。"
+
 o = s:taboption("compatibility", DynamicList, "remote_service_ports", "服务端口绕过列表")
 o.datatype = "port"
 o:depends("remote_service_bypass", "1")

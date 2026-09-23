@@ -189,6 +189,13 @@
                                     <span id="rustdesk-detail" class="security-status-detail">连接未验证 · 规则独立于广告与出口策略</span>
                                 </div>
                             </div>
+                            <div class="sub-card security-status-card" data-security-card="naiveproxy">
+                                <div class="card-title">NaiveProxy<a href="javascript:void(0);" onclick="window.open('<%=luci.dispatcher.build_url('admin','services','openkill','naive')%>', '_blank');" class="help-link" title="查看 NaiveProxy 组件与节点设置"><svg width="12" height="12"><use href="#oc-icon-help"/></svg></a></div>
+                                <div class="card-content security-status-content">
+                                    <span id="naiveproxy-status" class="security-status-value">未验证</span>
+                                    <span id="naiveproxy-detail" class="security-status-detail">可选回环 SOCKS5 桥接 · 连接未验证</span>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Row 4: Config File -->
@@ -456,7 +463,9 @@
         openvpn_status: document.getElementById('openvpn-status'),
         openvpn_detail: document.getElementById('openvpn-detail'),
         rustdesk_status: document.getElementById('rustdesk-status'),
-        rustdesk_detail: document.getElementById('rustdesk-detail')
+        rustdesk_detail: document.getElementById('rustdesk-detail'),
+        naiveproxy_status: document.getElementById('naiveproxy-status'),
+        naiveproxy_detail: document.getElementById('naiveproxy-detail')
     };
 
     var openkillRuntimeState = 'loading';
@@ -690,6 +699,37 @@
                 (rustFailed ? '兼容规则生成或应用失败 · 请查看诊断' :
                 (rustApplied ? '目标域名范围已应用 · real-IP、广告例外与出口策略独立' :
                 (rustGenerated ? '配置已生成 · 等待核心与防火墙就绪' : '未生成目标规则 · 连接未验证')));
+        }
+
+        var naiveLabel = DOMCache.naiveproxy_status;
+        var naiveDetail = DOMCache.naiveproxy_detail;
+        var naiveInstalled = !!(status && status.naive_component_installed);
+        var naiveEnabled = !!(status && status.naive_enabled);
+        var naiveConfigured = Number(status && status.naive_configured || 0);
+        var naiveGenerated = Number(status && status.naive_generated || 0);
+        var naiveLocalReady = status && (status.naive_local_ready === '1' || status.naive_local_ready === 1);
+        var naiveRemote = status && (status.naive_remote_verified === '1' || status.naive_remote_verified === 1);
+        var naiveState = status && status.naive_state ? status.naive_state : 'unknown';
+        var naiveReason = status && status.naive_reason ? status.naive_reason : 'unknown';
+        if (naiveLabel) {
+            var naiveText = !naiveInstalled ? '组件未安装' :
+                (!naiveEnabled ? '已关闭' :
+                (!naiveConfigured ? '已安装 · 未配置节点' :
+                (naiveState === 'failed' ? '启动失败' :
+                (naiveGenerated < naiveConfigured ? '节点配置不完整' :
+                (naiveRemote ? '远端连接已验证' :
+                (naiveLocalReady ? '本地入口已就绪 · 远端未验证' : '已生成 · 本地入口待启动'))))));
+            naiveLabel.textContent = naiveText;
+            naiveLabel.className = 'security-status-value ' +
+                ((!naiveInstalled || !naiveEnabled) ? 'is-muted' :
+                (naiveState === 'failed' || naiveGenerated < naiveConfigured ? 'is-error' :
+                (naiveRemote ? 'is-success' : 'is-pending')));
+        }
+        if (naiveDetail) {
+            naiveDetail.textContent = !naiveInstalled ? '安装可选组件后才能使用 NaiveProxy 节点' :
+                (!naiveEnabled ? '未创建辅助进程 · 现有节点行为不变' :
+                (naiveConfigured ? ('已生成 ' + naiveGenerated + '/' + naiveConfigured + ' 个回环 SOCKS5 入口 · ' + naiveReason) :
+                '组件可用 · 未配置 NaiveProxy 节点'));
         }
     }
 

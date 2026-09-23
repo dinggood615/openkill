@@ -61,6 +61,15 @@ config openkill 'config'
 	option openvpn_real_ip '0'
 	option openvpn_adblock_exception '0'
 	option openvpn_dns_mode 'inherit'
+	# NaiveProxy is an optional helper bridge. It is disabled by default and
+	# exposes only loopback SOCKS5 nodes to Mihomo; no transparent takeover is
+	# created by these settings.
+	option naive_enabled '0'
+	option naive_auto_start '1'
+	option naive_component_path '/etc/openkill/core/naive'
+	option naive_component_url ''
+	option naive_component_sha256 ''
+	option naive_port_base '11080'
 	option ipv6_enable '1'
 	option ipv6_dns '1'
 	option enable_custom_clash_rules '0'

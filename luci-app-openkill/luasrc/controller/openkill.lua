@@ -13,6 +13,8 @@ function index()
 	entry({"admin", "services", "openkill", "client"},form("openkill/client"),_("Overviews"), 20).leaf = true
 	entry({"admin", "services", "openkill", "conn_status"},call("action_conn_status")).leaf=true
 	entry({"admin", "services", "openkill", "status"},call("action_status")).leaf=true
+	entry({"admin", "services", "openkill", "naive_status"},call("action_naive_status")).leaf=true
+	entry({"admin", "services", "openkill", "naive_component"},call("action_naive_component")).leaf=true
 	entry({"admin", "services", "openkill", "startlog"},call("action_start")).leaf=true
 	entry({"admin", "services", "openkill", "refresh_log"},call("action_refresh_log"))
 	entry({"admin", "services", "openkill", "del_log"},call("action_del_log"))
@@ -63,6 +65,7 @@ function index()
 	entry({"admin", "services", "openkill", "core_download"}, call("core_download"))
 	entry({"admin", "services", "openkill", "announcement"}, call("action_announcement"))
 	entry({"admin", "services", "openkill", "settings"},cbi("openkill/settings"),_("Plugin Settings"), 30).leaf = true
+	entry({"admin", "services", "openkill", "naive"},cbi("openkill/naive"),"NaiveProxy", 35).leaf = true
 	entry({"admin", "services", "openkill", "config-overwrite"},cbi("openkill/config-overwrite"),_("Overwrite Settings"), 40).leaf = true
 	entry({"admin", "services", "openkill", "config-subscribe"},cbi("openkill/config-subscribe"),_("Config Subscribe"), 60).leaf = true
 	entry({"admin", "services", "openkill", "servers"},cbi("openkill/servers"),nil).leaf = true
@@ -1508,6 +1511,16 @@ function action_status()
 	local function rustdesk_value(name, fallback)
 		return rustdesk_state:match(name .. "=([^\n]+)") or fallback
 	end
+	local naive_state = fs.readfile("/tmp/openkill-naive.state") or ""
+	local function naive_value(name, fallback)
+		return naive_state:match(name .. "=([^\n]+)") or fallback
+	end
+	local naive_component_path = fs.uci_get_config("config", "naive_component_path") or "/etc/openkill/core/naive"
+	local naive_component_version = "unknown"
+	if fs.access(naive_component_path) then
+		naive_component_version = (SYS.exec(string.format("%q --version 2>/dev/null | head -c 96", naive_component_path)) or ""):gsub("[\r\n]+", " ")
+		if naive_component_version == "" then naive_component_version = "unknown" end
+	end
 
 	local result = {
 		-- status fields
@@ -1557,6 +1570,18 @@ function action_status()
 		rustdesk_verified = rustdesk_value("verified", "0"),
 		rustdesk_reason = rustdesk_value("reason", "not-started"),
 		rustdesk_updated = rustdesk_value("updated", "unknown"),
+		naive_enabled = fs.uci_get_config("config", "naive_enabled") == "1",
+		naive_auto_start = fs.uci_get_config("config", "naive_auto_start") == "1",
+		naive_component_path = naive_component_path,
+		naive_component_version = naive_component_version,
+		naive_component_installed = naive_value("component_installed", "0") == "1" or fs.access(naive_component_path),
+		naive_configured = tonumber(naive_value("configured", "0")) or 0,
+		naive_generated = tonumber(naive_value("generated", "0")) or 0,
+		naive_local_ready = naive_value("local_ready", "0"),
+		naive_remote_verified = naive_value("remote_verified", "0"),
+		naive_state = naive_value("state", "not-started"),
+		naive_reason = naive_value("reason", "not-started"),
+		naive_updated = naive_value("updated", "unknown"),
 		openvpn_compatibility = fs.uci_get_config("config", "openvpn_compatibility") == "1",
 		openvpn_transport_bypass = fs.uci_get_config("config", "openvpn_transport_bypass") == "1",
 		openvpn_role = fs.uci_get_config("config", "openvpn_role") or "router-client",
@@ -1599,6 +1624,57 @@ function action_status()
 		auth_pass = proxy_data.auth_pass,
 	}
 
+	HTTP.prepare_content("application/json")
+	HTTP.write_json(result)
+end
+
+function action_naive_status()
+	local component_path = fs.uci_get_config("config", "naive_component_path") or "/etc/openkill/core/naive"
+	local version = "unknown"
+	if fs.access(component_path) then
+		version = (SYS.exec(string.format("%q --version 2>/dev/null | head -c 96", component_path)) or ""):gsub("[\r\n]+", " ")
+		if version == "" then version = "unknown" end
+	end
+	local payload = {
+		enabled = fs.uci_get_config("config", "naive_enabled") == "1",
+		component = component_path,
+		version = version,
+		installed = fs.access(component_path),
+		state = fs.readfile("/tmp/openkill-naive.state") or "",
+	}
+	HTTP.prepare_content("application/json")
+	HTTP.write_json(payload)
+end
+
+function action_naive_component()
+	local operation = HTTP.formvalue("operation") or "status"
+	local result = { ok = false, operation = operation }
+	if operation == "status" then
+		result.ok = true
+		result.installed = fs.access(fs.uci_get_config("config", "naive_component_path") or "/etc/openkill/core/naive")
+		result.state = fs.readfile("/tmp/openkill-naive.state") or ""
+	elseif operation == "install" then
+		local url = HTTP.formvalue("url") or ""
+		local sha = HTTP.formvalue("sha256") or ""
+		-- Keep shell construction behind strict allow-lists.  The helper repeats
+		-- these checks and performs HTTPS, size, archive and digest validation.
+		if url:match("^https://github%.com/klzgrad/naiveproxy/") or url:match("^https://raw%.githubusercontent%.com/klzgrad/naiveproxy/") then
+			if sha:match("^[0-9A-Fa-f]+$") and #sha == 64 then
+				local command = string.format("/usr/share/openkill/openkill_naive.sh install %q %q >/tmp/openkill-naive-install.log 2>&1", url, sha)
+				result.exit = SYS.call(command)
+				result.ok = result.exit == 0
+			else
+				result.error = "invalid-sha256"
+			end
+		else
+			result.error = "untrusted-source"
+		end
+	elseif operation == "remove" then
+		result.exit = SYS.call("/usr/share/openkill/openkill_naive.sh remove >/dev/null 2>&1")
+		result.ok = result.exit == 0
+	else
+		result.error = "unsupported-operation"
+	end
 	HTTP.prepare_content("application/json")
 	HTTP.write_json(result)
 end

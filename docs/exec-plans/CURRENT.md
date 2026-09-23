@@ -1,5 +1,54 @@
 # Current status
 
+## Optional NaiveProxy bridge integration (2026-09-23)
+
+- Scope: add an opt-in official NaiveProxy helper process that exposes one
+  loopback SOCKS5 listener per stable OpenKill server section. Mihomo remains
+  the only transparent-takeover core; NaiveProxy never owns TUN/TPROXY/REDIRECT
+  or firewall state.
+- Configuration contract: UCI server section -> validated helper JSON (mode
+  0600) -> loopback SOCKS5 -> generated Mihomo `type: socks5` proxy. The UCI
+  section ID, not the display name, is the stable node identity and port-map
+  key. Credentials never enter command-line arguments or logs.
+- Lifecycle contract: component disabled or absent means no helper instance;
+  configured nodes may be saved but are reported unavailable. Preparation and
+  core config validation precede application. Each state distinguishes
+  configured, generated, local-listener-ready, remote-unverified and failed;
+  failure never silently becomes DIRECT. Stop/remove only cleans OpenKill's
+  own helper files and instances.
+- Component contract: installation is optional, HTTPS-only, size/digest
+  checked, staged and atomically activated with the previous binary retained
+  for rollback. Architecture/libc support is explicit; no invented release
+  asset or unverified package is accepted.
+- Network contract: bootstrap resolution follows the existing DNS/privacy
+  policy with an explicit no-loop exception when required. The bridge emits
+  `udp: false` until UDP forwarding is separately verified. Fake-IP values are
+  not sent as ordinary real addresses to the helper, and no broad port or
+  firewall bypass is added.
+- UI contract: reuse the existing node editor, component/settings patterns and
+  status cards. NaiveProxy is shown as an optional component with responsive
+  two-column forms and conservative lifecycle wording; existing users remain
+  disabled by default. Legacy writers, DNS policy, category order, parser
+  grammar, ABI and continuity behavior remain unchanged unless a reproduced
+  bridge defect requires an explicit amendment here.
+- Implementation evidence in the current working tree: `servers-config.lua`
+  exposes a NaiveProxy node type and isolated credential/transport fields;
+  `openkill_naive.sh` validates official HTTPS artifacts, ELF architecture,
+  digest, safe extraction and 0600 JSON; `yml_proxys_set.sh` emits only a
+  loopback `socks5` node with `udp: false`; the init script registers one
+  procd instance per stable section ID and cleans only its own state.
+- UI evidence: a dedicated NaiveProxy CBI page provides component fields and
+  status/install/remove actions; the runtime dashboard card reports installed,
+  configured, generated, local-ready and remote-unverified states. Existing
+  DNS, adblock, OpenVPN and RustDesk state cards retain their independent
+  semantics.
+- Local checks completed: `scripts/test-naiveproxy-integration.py`, UI contract
+  (25 tests), UI preview (2 tests), POSIX `sh -n` for the helper/generator/init,
+  ELF architecture fixture, Python compileall and `scripts/local-gate.sh` all
+  pass. No Naive binary, remote server or device packet path was used; remote
+  connection and package installation remain unverified.
+
+
 ## Dashboard lower-right alignment and status evidence recheck (2026-09-19)
 
 - Baseline rechecked before changes: master `e4a61dd5113776bdde3b8d9f8db30803de5c0b98`; working tree clean; device `192.168.1.103` reports OpenKill `2026-1131`, core `RUNNING/READY`.
