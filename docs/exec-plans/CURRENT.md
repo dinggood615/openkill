@@ -1,5 +1,41 @@
 # Current status
 
+## Settings navigation and network card layout (2026-09-23)
+
+- Scope: presentation-only changes to the LuCI settings navigation, card
+  grouping, and responsive CSS. DNS, IPv6, TUN, access-control, traffic
+  routing, UCI field names, legacy writers, parser behavior, ABI constants,
+  and continuity semantics remain unchanged.
+- Navigation contract: the compatibility tab keeps the existing stable key
+  and UCI ownership, moves between Network & Routing and Rules &
+  Subscriptions, and is labelled “兼容与辅助”. The former tab label and
+  `/naive` bookmark redirect remain accepted for migration.
+- Visibility contract: System Maintenance is visible by default and its
+  maintenance card is expanded; the user-facing “隐藏高级设置” toggle is
+  removed without deleting or renaming maintenance fields.
+- Network layout contract: DNS & Local Resolution pairs with IPv6 & TUN;
+  LAN/WAN Access pairs with Traffic Routing. Desktop rows stretch to their
+  tallest card, while narrow viewports use one column. No fixed heights or
+  network-policy changes are permitted.
+- Implementation evidence: `settings.lua` now orders Network & Routing,
+  Compatibility & Auxiliary, and Rules & Subscriptions in that sequence;
+  `settings_theme.htm` accepts both compatibility labels for tab resolution,
+  removes the advanced-settings toolbar control, keeps System Maintenance
+  visible, and keeps its card expanded. Network DNS no longer promotes the
+  entire card to a full-width row, so IPv6/TUN and LAN/WAN pair with the next
+  cards in the shared two-column grid. `oc.css` keeps the static maintenance
+  heading visually consistent with the other cards.
+- Local evidence: WSL `test-installer.py` (11 tests, one environment skip),
+  `test-ui-contract.py` (25 tests), `test-ui-preview.py` (2 tests),
+  `git diff --check`, and `scripts/local-gate.sh` pass. The standalone browser
+  probe reports `PLAYWRIGHT_UNAVAILABLE` on this host; no rendered screenshot
+  is claimed from that unavailable dependency. No device or packet-path test
+  was used.
+- Delivery status: presentation commit `47c726c` is created locally. GitHub
+  push is pending a transient TLS handshake failure; the next action is to
+  retry the push, verify the exact Development CI, and only then evaluate the
+  repository release gate.
+
 ## NaiveProxy installer archive compatibility (2026-09-23)
 
 - Device recheck found the configured official x86_64 asset downloads

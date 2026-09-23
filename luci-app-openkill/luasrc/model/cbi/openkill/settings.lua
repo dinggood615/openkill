@@ -82,9 +82,9 @@ end
 
 s:tab("basic", translate("Runtime & Services"))
 s:tab("network", translate("Network & Routing"))
+s:tab("compatibility", "兼容与辅助")
 s:tab("rules", translate("Rules & Subscriptions"))
 s:tab("stability", translate("Performance & Stability"))
-s:tab("compatibility", "兼容设置")
 s:tab("advanced", "系统维护")
 
 o = s:taboption("compatibility", DummyValue, "_compat_policy", "推荐 VPN 客户端访问策略")

@@ -8,8 +8,6 @@
 (function() {
     var SEARCH_HINT = '<%:Search settings by name or description%>';
     var NO_MATCH = '<%:No matching settings%>';
-    var SHOW_ADVANCED = '<%:Show advanced settings%>';
-    var HIDE_ADVANCED = '<%:Hide advanced settings%>';
     /* Stage 4 keeps category identity independent from tab order.  The
      * labels are only used to resolve the native CBI tab to a stable key;
      * field ownership below is always an explicit key list. */
@@ -27,7 +25,7 @@
             ]}
         ],
         network: [
-            {id: 'dns-local', title: '<%:DNS & Local Resolution%>', fullWidth: true, keys: [
+            {id: 'dns-local', title: '<%:DNS & Local Resolution%>', keys: [
                 'dns_listen_address', 'enable_redirect_dns', 'flush_dns_cache', 'dnsmasq_fix',
                 'dns_privacy_mode', 'enable_custom_domain_dns_server', 'custom_domain_dns_server', 'custom_domain_dns',
                 'adblock_mode', 'adblock_rule_url', 'adblock_rule_format', 'adblock_update_interval',
@@ -109,7 +107,7 @@
             ]},
             {id: 'maintenance-tools', title: '系统维护', keys: [
                 'version_update_panel', 'firewall_custom'
-            ], advanced: true}
+            ]}
         ]
     };
 
@@ -118,19 +116,8 @@
         network: /网络与分流|Network\s*&\s*Routing/i,
         rules: /规则与订阅|Rules\s*&\s*Subscriptions/i,
         stability: /性能与稳定|Performance\s*&\s*Stability/i,
-        compatibility: /兼容设置|Compatibility/i,
+        compatibility: /兼容设置|兼容与辅助|Compatibility/i,
         advanced: /系统维护|System\s*Maintenance|Advanced/i
-    };
-
-    var FULL_WIDTH_KEYS = {
-        custom_domain_dns: true,
-        adblock_allowlist: true,
-        adblock_blocklist: true,
-        local_network_pass: true,
-        chnroute_pass: true,
-        local_network6_pass: true,
-        chnroute6_pass: true,
-        firewall_custom: true
     };
 
     var DEVICE_COMPATIBILITY_KEYS = [
@@ -258,16 +245,6 @@
         return false;
     }
 
-    function hasFullWidthField(fields) {
-        return fields.some(function(field) {
-            var keys = fieldKeys(field);
-            for (var key in FULL_WIDTH_KEYS) {
-                if (FULL_WIDTH_KEYS[key] && (keys[key] || keys[key.toLowerCase()])) return true;
-            }
-            return false;
-        });
-    }
-
     function tabCategory(item) {
         var label = tabLabel(item);
         for (var key in TAB_CATEGORY_ALIASES) {
@@ -312,7 +289,10 @@
         card.className = 'openkill-settings-card';
         card.setAttribute('data-openkill-card', definition.id);
         if (definition.advanced) card.classList.add('openkill-settings-card-advanced');
-        if (definition.fullWidth || hasFullWidthField(fields)) {
+        /* Full-width is a layout decision made by the category definition.
+         * A field such as an allowlist can span its card body without forcing
+         * the whole card onto a separate grid row. */
+        if (definition.fullWidth) {
             card.classList.add('openkill-settings-card-full-width');
         }
 
@@ -347,10 +327,17 @@
         if (host) host.appendChild(card);
         else content.appendChild(card);
 
-        toggle.addEventListener('click', function() {
-            setCardExpanded(card, card.classList.contains('is-collapsed'));
-        });
-        setCardExpanded(card, !definition.advanced);
+        if (definition.id !== 'maintenance-tools') {
+            toggle.addEventListener('click', function() {
+                setCardExpanded(card, card.classList.contains('is-collapsed'));
+            });
+        } else {
+            toggle.setAttribute('aria-expanded', 'true');
+            toggle.setAttribute('aria-disabled', 'true');
+            toggle.classList.add('openkill-settings-card-toggle-static');
+            marker.hidden = true;
+        }
+        setCardExpanded(card, true);
         return card;
     }
 
@@ -527,15 +514,8 @@
         status.className = 'openkill-settings-search-status';
         status.setAttribute('aria-live', 'polite');
 
-        var advancedToggle = document.createElement('button');
-        advancedToggle.type = 'button';
-        advancedToggle.className = 'openkill-settings-advanced-toggle';
-        advancedToggle.textContent = SHOW_ADVANCED;
-        advancedToggle.setAttribute('aria-expanded', 'false');
-
         toolbar.appendChild(searchWrap);
         toolbar.appendChild(status);
-        toolbar.appendChild(advancedToggle);
         menu.parentNode.insertBefore(toolbar, menu);
 
         var tabItems = [];
@@ -594,27 +574,16 @@
         advancedItems.forEach(function(item) {
             item.classList.add('openkill-advanced-tab');
         });
-        if (!advancedItems.length) advancedToggle.style.display = 'none';
-
         function setAdvancedVisible(visible) {
-            visible = !!visible;
-            addClass(map, 'openkill-advanced-visible', visible);
-            addClass(map, 'openkill-advanced-collapsed', !visible);
+            /* System Maintenance is part of the normal settings surface.  It
+             * remains visible regardless of any value left in old browser
+             * storage from the removed advanced-settings toggle. */
+            visible = true;
+            addClass(map, 'openkill-advanced-visible', true);
+            addClass(map, 'openkill-advanced-collapsed', false);
             advancedItems.forEach(function(item) {
-                setAdvancedTabVisibility(item, visible);
+                setAdvancedTabVisibility(item, true);
             });
-            advancedToggle.textContent = visible ? HIDE_ADVANCED : SHOW_ADVANCED;
-            advancedToggle.setAttribute('aria-expanded', visible ? 'true' : 'false');
-            try {
-                localStorage.setItem('openkill.settings.advanced', visible ? '1' : '0');
-            } catch (ignore) {}
-            if (!visible && advancedItems.some(tabIsActive)) {
-                var firstVisible = tabItems.filter(function(item) {
-                    return advancedItems.indexOf(item) === -1;
-                })[0];
-                var link = firstVisible && firstVisible.querySelector('a');
-                if (link) link.click();
-            }
         }
 
         function updateSearch() {
@@ -688,14 +657,7 @@
                 updateSearch();
             }
         });
-        advancedToggle.addEventListener('click', function() {
-            setAdvancedVisible(!map.classList.contains('openkill-advanced-visible'));
-        });
-
-        var activeAdvanced = advancedItems.some(tabIsActive);
-        var savedAdvanced = false;
-        try { savedAdvanced = localStorage.getItem('openkill.settings.advanced') === '1'; } catch (ignore) {}
-        setAdvancedVisible(savedAdvanced || activeAdvanced);
+        setAdvancedVisible(true);
         if (map.querySelector(validationSelector())) {
             if (advancedItems.some(function(item) { return item.querySelector(validationSelector()); })) {
                 setAdvancedVisible(true);
