@@ -59,6 +59,9 @@
   No node was enabled and no packet-path or remote-authentication test ran.
   The pre-install backup remains at
   `D:\openkill-device-backup-20260923-naive-task\openkill-naive-task.tgz`.
+  The follow-up evidence commit `23f3a2365d0255ba1d9877a410bb45b6d7e2645f`
+  also passed exact Development CI
+  ([35857677654](https://github.com/dinggood615/openkill/actions/runs/35857677654)).
 
 ## Settings navigation and network card layout (2026-09-23)
 
