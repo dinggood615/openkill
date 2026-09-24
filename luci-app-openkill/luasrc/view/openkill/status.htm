@@ -638,7 +638,7 @@
         var adDnsSummary = adDnsLoaded ? '已加载' : (adDnsEffective ? '已生成·未验证' : '未知');
         var adCoreSummary = adCoreLoaded ? '已加载' : (adCoreEffective ? '已生成·未验证' : '未知');
         if (adblockLabel) {
-            var adLabel = '已配置 · 加载状态未知';
+            var adLabel = '已配置 · 待验证';
             if (adMode === 'off') adLabel = '已关闭';
             else if (adState === 'failed') adLabel = '规则生成失败';
             else if (adVerified) adLabel = '拦截已验证';

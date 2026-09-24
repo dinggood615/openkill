@@ -23,7 +23,7 @@ end
   <div class="openkill-naive-compatibility-head">
     <div>
       <strong>官方组件检测</strong>
-     <p>按当前 OpenWrt 架构匹配官方 OpenWrt 制品。自动安装会先校验 URL、摘要和组件格式，再安全替换旧版本。</p>
+     <p>按当前架构匹配官方组件，安装前校验来源与摘要。</p>
     </div>
     <span class="openkill-naive-compatibility-badge" data-naive-meta-state aria-live="polite">待检测</span>
   </div>
@@ -37,7 +37,7 @@ end
   </dl>
   <p class="openkill-naive-compatibility-url" data-naive-meta="url">官方 URL：—</p>
   <p class="openkill-naive-compatibility-digest" data-naive-meta="sha256">SHA256：—</p>
-  <p class="openkill-naive-compatibility-reason" data-naive-meta-reason aria-live="polite">尚未读取官方发布信息。</p>
+  <p class="openkill-naive-compatibility-reason" data-naive-meta-reason aria-live="polite">尚未检测组件信息。</p>
   <div class="openkill-naive-compatibility-actions">
     <button type="button" class="cbi-button cbi-button-apply" data-naive-meta-action="detect">检测并填写空缺</button>
     <button type="button" class="cbi-button" data-naive-meta-action="refresh">只刷新检测</button>
@@ -49,7 +49,7 @@ end
     <a class="cbi-button" href="<%=node_add_url%>"><% if has_current_config then %>添加或导入 NaiveProxy 节点<% else %>先选择配置文件以添加 NaiveProxy 节点<% end %></a>
     <a class="cbi-button" href="<%=node_manage_url%>">管理节点与策略组</a>
   </p>
-  <div class="openkill-naive-compatibility-status" data-naive-component-status aria-live="polite">组件状态尚未读取。</div>
+  <div class="openkill-naive-compatibility-status" data-naive-component-status aria-live="polite">组件状态待检测。</div>
 </div>
 <script>
 (function () {
@@ -112,12 +112,12 @@ end
     setText('sha256', data.sha256 ? 'SHA256：' + data.sha256 : 'SHA256：—');
     metaState.textContent = data.ok === '1' ? '可核对' : (data.reason === 'unsupported-architecture' ? '架构不支持' : '待核实');
     reason.textContent = data.reason === 'ready-to-review' ?
-      '已找到匹配制品和 GitHub asset digest。点击“检测并填写空缺”后只补齐空字段。' :
+      '已找到匹配组件，可填写空字段。' :
       ('当前状态：' + (data.reason || 'unknown'));
   }
   function requestMetadata(mode, apply) {
     metaState.textContent = '读取中…';
-    reason.textContent = '正在访问官方发布 API，页面会复用短期缓存。';
+    reason.textContent = '正在读取官方信息…';
     setBusy('[data-naive-meta-action]', true);
     var urlField = field('naive_component_url');
     var shaField = field('naive_component_sha256');
@@ -131,7 +131,7 @@ end
         if (data.ok === '1' && apply) {
           if (urlField && !String(urlField.value || '').trim() && data.url) urlField.value = data.url;
           if (shaField && !String(shaField.value || '').trim() && data.sha256) shaField.value = data.sha256;
-          reason.textContent = data.applied ? '匹配的 URL 和 SHA256 已填入当前表单草稿；保存设置后会保留。' : '已有输入未成对为空，已保留手动组件 URL/SHA256，未混用不同资产。';
+          reason.textContent = data.applied ? '组件信息已填入草稿，保存后生效。' : '已保留现有组件信息。';
         }
         return data;
       })

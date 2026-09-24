@@ -727,6 +727,77 @@ body[data-page="admin-services-openkill-client"] .myip-content-grid {
 
 /* ===== OpenKill Stage 5: Overwrite Layout End ===== */
 
+/* ===== OpenKill compact UI pass (2026-09-24) =====
+ * Shared presentation only. Keep CBI names, field order and runtime hooks
+ * unchanged while reducing visual noise and repeated helper text. */
+:root {
+    --ok-compact-page-gap: 10px;
+    --ok-compact-card-gap: 10px;
+    --ok-compact-card-radius: 7px;
+}
+
+.oc.openkill-status-page,
+.oc:not(.openkill-status-page),
+#cbi-openkill.openkill-settings {
+    --openkill-page-gap: var(--ok-compact-page-gap);
+    --openkill-card-gap: var(--ok-compact-card-gap);
+}
+
+.openkill-status-page .card-title,
+.openkill-status-page .section-title,
+#cbi-openkill.openkill-settings .openkill-settings-card-title {
+    letter-spacing: 0;
+    line-height: 1.3;
+}
+
+.openkill-status-page .card-content,
+.openkill-status-page .security-status-detail,
+#cbi-openkill.openkill-settings .cbi-value-description,
+#cbi-openkill.openkill-settings .openkill-settings-card-description {
+    color: var(--ok-flat-muted, #69758a);
+    font-size: 12px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.openkill-status-page .main-card,
+.openkill-status-page .sub-card,
+#cbi-openkill.openkill-settings .openkill-settings-card {
+    border-radius: var(--ok-compact-card-radius);
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value {
+    margin-bottom: 8px;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value:last-child {
+    margin-bottom: 0;
+}
+
+#cbi-openkill.openkill-settings .cbi-value-description {
+    max-width: 62ch;
+    margin-top: 3px;
+}
+
+.openkill-naive-compatibility p {
+    margin-top: 6px;
+    margin-bottom: 6px;
+}
+
+.openkill-naive-compatibility .openkill-naive-compatibility-actions,
+.openkill-naive-compatibility .openkill-naive-compatibility-links {
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+    .openkill-status-page .main-card,
+    .openkill-status-page .sub-card,
+    #cbi-openkill.openkill-settings .openkill-settings-card {
+        border-radius: 6px;
+    }
+}
+
 /* ===== OpenKill Stage 6: Subscription Layout Start =====
  * Layout-only compatibility for the native subscription TypedSection. */
 #cbi-openkill-config_subscribe,
