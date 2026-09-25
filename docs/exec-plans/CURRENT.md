@@ -2116,3 +2116,49 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
 - Device contract: before changing the authorized test device, archive OpenKill configuration, component and runtime state. Remove the previously imported private Naive node only after the backup, without touching unrelated nodes, subscriptions or YAML. Keep credentials out of logs and reports.
 - Outbound contract: OpenKill's existing fw4/legacy writers reserve GID 65534 as the self-traffic bypass. NaiveProxy helper instances remain root-owned for protected configuration but run with group `nogroup` so their remote TCP sockets are not recursively intercepted. No new central nft state, WAN change or broad port exemption is introduced.
 - Verification: test direct routing and draft creation statically and in LuCI; on the device confirm the helper's effective group, bounded file descriptors, local SOCKS5 readiness and a redacted TCP probe. Remote authentication, UDP, IPv6 and streaming remain unverified unless a non-secret endpoint test provides evidence.
+
+## 2026-1152 direct NaiveProxy entry and loop-repair release evidence (2026-09-25)
+
+- Source commits `904fdcfe580547d18f346c7e771a9d40397a2dd1` (direct
+  compatibility-card Add/Import route and helper `nogroup` loop fix),
+  `6a928ed76eb18c12c6dd02c13ef597ad057d3aca` (version metadata), and
+  `352d0b5e63fe637c88e126498c9e6dd503cc66e3` (clear marked draft after the
+  editor is submitted) are on `master`. The final exact Development CI passed:
+  [run 36143466609](https://github.com/dinggood615/openkill/actions/runs/36143466609).
+- Local NaiveProxy integration tests, POSIX/local-gate and diff checks passed.
+  The final RC Build from `352d0b5` passed:
+  [run 36143804420](https://github.com/dinggood615/openkill/actions/runs/36143804420).
+  The formal package is `luci-app-openkill_2026-1152_all.ipk`, SHA-256
+  `2a711d3f80b5afc9902f0406500c4aa254f5b9e8a261e697c3a5611bdb006744`,
+  archived under `D:\openkill-cache\formal-2026-1152`. The extracted package
+  contains the direct `naive_node` route, draft cleanup, `nogroup` helper
+  setting, Naive compatibility view and final CSS; archive members retain
+  root ownership and expected executable/read-only modes.
+- Formal Release with `release_gate=true` and `publish=true` passed:
+  [run 36144577215](https://github.com/dinggood615/openkill/actions/runs/36144577215).
+  Published [v2026-1152-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1152-ipk)
+  from `352d0b5`; the release asset SHA-256 matches the audited package above.
+  `v2026-1151-ipk` remains available for rollback.
+- Authorized-device backup before cleanup was
+  `/tmp/openkill-naive-cleanup-20260925-213824/config.tgz`, SHA-256
+  `3822fda3e4be8588acf9f69a373a349b0d131ad0be053a85c6da44ecd47dbb93`.
+  The earlier private NaiveProxy node was removed only after this backup; the
+  device now has zero NaiveProxy server sections and no private node in the
+  source, package or package-default conffile. Existing OpenKill configuration
+  and unrelated services were preserved.
+- Before cleanup, the device reproduced the failure as repeated helper
+  `ERR_INSUFFICIENT_RESOURCES` with approximately 1024 descriptors because the
+  root-group helper was recursively intercepted. A temporary `nogroup`
+  verification reduced the helper to a bounded descriptor count and a local
+  SOCKS5 HTTPS probe returned HTTP 204; this is transport-path evidence only,
+  not remote authentication or application access. The formal package now
+  carries the same `nogroup` service setting. After formal installation the
+  device reports OpenKill `2026-1152`, the core route and direct editor route
+  are present, the service core is running, and no Naive helper starts without
+  an enabled node. The modified device conffile was preserved by opkg as
+  `/etc/config/openkill-opkg`.
+- Browser-rendered device UI could not be re-captured in this iteration because
+  the browser debugging session detached; an unauthenticated HTTP probe
+  correctly returned LuCI 403/login-required. Source/package route checks and
+  device installation checks passed. Remote Naive authentication, UDP, IPv6,
+  streaming, and full browser viewport validation remain unverified.
