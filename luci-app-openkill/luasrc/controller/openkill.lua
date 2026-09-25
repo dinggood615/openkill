@@ -76,6 +76,9 @@ function index()
 	entry({"admin", "services", "openkill", "config-overwrite"},cbi("openkill/config-overwrite"),_("Overwrite Settings"), 40).leaf = true
 	entry({"admin", "services", "openkill", "config-subscribe"},cbi("openkill/config-subscribe"),_("Config Subscribe"), 60).leaf = true
 	entry({"admin", "services", "openkill", "servers"},cbi("openkill/servers"),nil).leaf = true
+	-- Create a NaiveProxy section and open its editor directly.  The
+	-- compatibility card must not send users through the generic server list.
+	entry({"admin", "services", "openkill", "naive_node"},call("action_naive_node")).leaf = true
 	entry({"admin", "services", "openkill", "other-rules-edit"},cbi("openkill/other-rules-edit"), nil).leaf = true
 	entry({"admin", "services", "openkill", "custom-dns-edit"},cbi("openkill/custom-dns-edit"), nil).leaf = true
 	entry({"admin", "services", "openkill", "other-file-edit"},cbi("openkill/other-file-edit"), nil).leaf = true
@@ -1730,6 +1733,44 @@ function action_naive_redirect()
 	local dispatcher = require "luci.dispatcher"
 	local http = require "luci.http"
 	http.redirect(dispatcher.build_url("admin", "services", "openkill", "settings") .. "?tab=compatibility#openkill-naive-component-info")
+end
+
+function action_naive_node()
+	local dispatcher = require "luci.dispatcher"
+	local http = require "luci.http"
+	local cursor = require("luci.model.uci").cursor()
+	local file_path = fs.get_file_path_from_request()
+	if not file_path then
+		http.redirect(dispatcher.build_url("admin", "services", "openkill", "config"))
+		return
+	end
+
+	-- A closed modal can leave a draft section behind.  Drafts are deliberately
+	-- marked and are removed only when starting another direct-add flow; user
+	-- created sections never carry this marker.
+	cursor:foreach("openkill", "servers", function(section)
+		if section.naive_pending == "1" then
+			cursor:delete("openkill", section[".name"])
+		end
+	end)
+	local sid = cursor:add("openkill", "servers")
+	if not sid then
+		http.status(500, "Unable to create NaiveProxy node")
+		return
+	end
+	cursor:set("openkill", sid, "config", "all")
+	cursor:set("openkill", sid, "type", "naiveproxy")
+	cursor:set("openkill", sid, "enabled", "0")
+	cursor:set("openkill", sid, "name", "NaiveProxy node")
+	cursor:set("openkill", sid, "naive_pending", "1")
+	cursor:commit("openkill")
+
+	local edit_url = dispatcher.build_url("admin", "services", "openkill", "servers-config", sid)
+	edit_url = edit_url .. "?file=" .. http.urlencode(file_path) .. "&type=naiveproxy"
+	if http.formvalue("import") == "1" then
+		edit_url = edit_url .. "&import=1"
+	end
+	http.redirect(edit_url)
 end
 
 function action_naive_metadata()

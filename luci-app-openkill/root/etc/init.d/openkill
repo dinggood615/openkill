@@ -44,12 +44,12 @@ naive_start_instances()
       [ -n "$instance" ] || continue
       procd_open_instance "$instance"
       procd_set_param command "$NAIVE_BIN" "$config_file"
-      # Keep the helper in the root group.  The OpenWrt NaiveProxy build uses
-      # Chromium's TLS/network sandbox and the generic nogroup drop causes
-      # authenticated TLS handshakes to fail with a broken pipe on devices
-      # whose resolver/certificate access is root-group restricted.
+      # The fw4 output path exempts GID 65534 from transparent interception.
+      # Keep the helper root-owned for its protected config, but run its
+      # sockets in nogroup so the remote transport cannot be sent back into
+      # OpenKill and recurse through its own SOCKS listener.
       procd_set_param user root
-      procd_set_param group root
+      procd_set_param group nogroup
       procd_set_param file "$config_file"
       procd_set_param respawn 300 5 3
       procd_set_param stderr 1

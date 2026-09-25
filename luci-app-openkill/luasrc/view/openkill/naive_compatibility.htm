@@ -12,8 +12,9 @@ local node_import_url = node_manage_url
 if has_current_config then
   local file_query = "?file=" .. http.urlencode(current_config)
   node_manage_url = node_manage_url .. file_query
-  node_add_url = node_manage_url .. "&add=naiveproxy"
-  node_import_url = node_manage_url .. "&add=naiveproxy&import=1"
+  local node_entry_url = dispatcher.build_url("admin", "services", "openkill", "naive_node") .. file_query
+  node_add_url = node_entry_url
+  node_import_url = node_entry_url .. "&import=1"
 else
   node_manage_url = dispatcher.build_url("admin", "services", "openkill", "config")
   node_add_url = node_manage_url
