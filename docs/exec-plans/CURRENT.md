@@ -15,6 +15,23 @@
 - Validation: add integration assertions for UCI default, normalization, UI,
   generator guard and endpoint response; run local tests and gates. No device
   or packet-path validation is authorized in this local step.
+- Implementation commit `abc5cab9f1023a1b3ed552d7647b35c92d5decd9` adds the
+  normalized `naive_bridge_mode` field, the compatibility-page selector, the
+  generator guard and mode-aware credential-free bridge status. Its exact
+  Development CI passed ([36117294535](https://github.com/dinggood615/openkill/actions/runs/36117294535)).
+- Version commit `6238417bc97747e1582a7659c95733f0f605eb47` prepared
+  2026-1148 and its exact Development CI passed
+  ([36117509671](https://github.com/dinggood615/openkill/actions/runs/36117509671)).
+  The RC Build passed ([36117683662](https://github.com/dinggood615/openkill/actions/runs/36117683662));
+  the audited candidate IPK SHA256 is
+  `4bfe67cb58a8c7ec04fd522131a73a5c2a1e1b9475ad89b13a5fb1e05d6062c`.
+- Formal Release passed with `release_gate=true` and `publish=true`
+  ([36118327110](https://github.com/dinggood615/openkill/actions/runs/36118327110)).
+  [v2026-1148-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1148-ipk)
+  is published from the version commit; its formal IPK SHA256 is
+  `559e722c090912cd7c454da13476bfb17541463ba670301c11e4d0ee1d1aa31f`.
+  The previous 2026-1147 release remains available for rollback. Device and
+  remote Naive endpoint validation were not performed in this local-only step.
 
 ## NaiveProxy page installation task flow (2026-09-23)
 
