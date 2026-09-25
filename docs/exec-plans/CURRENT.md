@@ -1819,3 +1819,33 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
 - Verification contract: run the NaiveProxy integration, UI contract,
   preview, local-gate and diff checks. Browser, device and remote endpoint
   validation remain explicitly unverified in this local-only change.
+
+## NaiveProxy bridge release evidence (2026-09-25)
+
+- Implementation commit `eca8ff25d753e6bc7743981f8bcaf9b58d328ddf` passed exact
+  Development CI ([run 36111656314](https://github.com/dinggood615/openkill/actions/runs/36111656314)).
+  It adds the bridge status endpoint, compact share-link importer and a
+  credential-free SOCKS5 YAML preview while preserving existing install and
+  helper lifecycle contracts.
+- Version commit `e1762b9e99451e1ac826e520de9fef2dc21b76e1` (`2026-1146`)
+  passed exact Development CI ([run 36111847076](https://github.com/dinggood615/openkill/actions/runs/36111847076)).
+- RC Build passed ([run 36111987140](https://github.com/dinggood615/openkill/actions/runs/36111987140)).
+  Candidate `luci-app-openkill_2026-1146_all.ipk` SHA-256 is
+  `f0b9fd4d33d3cb226a3c84dabab7801d0bd7a3616ea85df11d565b35a3e7f0c6`;
+  it is archived under `D:\openkill-cache\rc-2026-1146`. The workflow audit
+  passed package metadata, conffile preservation, maintainer-script deletion,
+  stale-reference and sensitive-content checks. Extracted files contain the
+  bridge endpoint, quick importer and `udp: false` SOCKS5 stanza.
+- Formal Release with `release_gate=true` and `publish=true` passed
+  ([run 36112629048](https://github.com/dinggood615/openkill/actions/runs/36112629048)).
+  Published release: [v2026-1146-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1146-ipk),
+  source `e1762b9e99451e1ac826e520de9fef2dc21b76e1`, asset
+  `luci-app-openkill_2026-1146_all.ipk`, SHA-256
+  `fc5ab070c3b27ac6fac23653b81f405bad2e3484ae93e21194a12556a582ab1f`.
+  The formal asset is archived under `D:\openkill-cache\formal-2026-1146` and
+  contains the same bridge, importer and UI markers. `v2026-1145-ipk` remains
+  available for rollback.
+- No device, browser-rendered viewport, remote Naive endpoint or packet-path
+  validation was performed in this local-only change. Local integration,
+  UI-contract, preview, POSIX/local-gate and package audits passed; credentials
+  and private configuration were not touched.
