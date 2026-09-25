@@ -14,6 +14,25 @@
   in-page modal buttons instead of top-level navigation links, and the legacy
   editor routes remain available. Run local UI/Naive tests and gates. Device
   and remote endpoint validation remain outside this local step.
+- Implementation commit `3b6b44b2a015de89a42bfc3677e56c81252c02cc` adds the
+  accessible in-page node-editor modal, keeps the existing CBI editor as the
+  single credential/UCI owner, and moves `naive_bridge_mode` into the
+  NaiveProxy card. Its exact Development CI passed
+  ([36127049657](https://github.com/dinggood615/openkill/actions/runs/36127049657)).
+- Version commit `e5f27d0b9588d2bd062ae234c620e82058b6c42a` prepared
+  2026-1149 and its exact Development CI passed
+  ([36127247152](https://github.com/dinggood615/openkill/actions/runs/36127247152)).
+  The RC Build passed ([36127402062](https://github.com/dinggood615/openkill/actions/runs/36127402062));
+  the audited candidate IPK SHA256 is
+  `71e9ec0531fcad677ab3fa992a2e37fbf41723617657915944d3e4fbc7f2bc28`.
+- Formal Release passed with `release_gate=true` and `publish=true`
+  ([36127769222](https://github.com/dinggood615/openkill/actions/runs/36127769222)).
+  [v2026-1149-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1149-ipk)
+  is published from the version commit; its formal IPK SHA256 is
+  `e70a905cd91cf07fedc58fca74da6f61c9d74f566d715dc392506a9cb3dfd5c4`.
+  The previous 2026-1148 release remains available for rollback. Device,
+  browser rendering and remote Naive endpoint validation were not performed
+  in this local-only step.
 
 ## NaiveProxy automatic versus self-managed YAML mode (2026-09-25)
 
