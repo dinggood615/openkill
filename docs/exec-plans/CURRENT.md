@@ -65,6 +65,43 @@
   release gate for the next version.  Device remote verification remains
   limited to the single redacted TCP probe above.
 
+### 2026-1150 delivery and candidate-device verification (2026-09-25)
+
+- Bounded source commit `6f02e095e523219b6312375b3703dcaa3e10f858` contains
+  the stable anonymous-UCI enumeration, standalone config-helper loading,
+  loopback listener readiness and device-specific root-group lifecycle fixes.
+  Local NaiveProxy/UI/installer tests, POSIX checks, `local-gate` and
+  `git diff --check` passed before push.
+- Exact Development CI passed for that commit:
+  [run 36135974228](https://github.com/dinggood615/openkill/actions/runs/36135974228).
+  RC Build passed:
+  [run 36136111931](https://github.com/dinggood615/openkill/actions/runs/36136111931).
+  Candidate `luci-app-openkill_2026-1150_all.ipk` SHA256 is
+  `0d5474c490f728247b389ebbb6757db30c8a733cd8dfc0041a9db51bfbf4d84f`.
+- Formal Release passed with `release_gate=true` and `publish=true`:
+  [run 36136659284](https://github.com/dinggood615/openkill/actions/runs/36136659284).
+  Published [v2026-1150-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1150-ipk)
+  from the same commit.  Formal IPK
+  `luci-app-openkill_2026-1150_all.ipk` SHA256 is
+  `49f2971a6366d770f0c96dc29f74d03d3c9c240deec60bf45a9a6061b4c74c01`;
+  previous v2026-1149 remains available for rollback.
+- Before installation, the device backup was created at
+  `/tmp/openkill-naive-postrelease-backup-20260925-2052.tgz` with SHA256
+  `bb50eecb2a9eb7d2f4e058c9cca9ea8338f84ee5615c50c1ed52c4f378a95e48`.
+  The uploaded package hash matched the formal asset before `opkg` upgraded
+  OpenKill to 2026-1150.  The service is `running`; the component reports
+  `naive 150.0.7871.63`; the helper state is
+  `configured=1/generated=1/component_installed=1/local_ready=1` with
+  `remote_verified=0`.  The active and selected YAML each retain the
+  credential-free loopback bridge and its streaming-group reference.  A
+  fixed TCP SOCKS5 probe returned HTTP 204; UDP, IPv6, streaming unlock and
+  broad LAN packet-path behavior remain unverified.
+- The package-manager upgrade emitted a transient `ubus service delete`
+  message while stopping the old service, but the installed package and
+  service recovered and the post-install checks above passed.  The protected
+  backup is the rollback path; reinstall v2026-1149 and restore that backup
+  only if a configuration rollback is needed.
+
 ## NaiveProxy inline node workflow (2026-09-25)
 
 - Scope: keep the existing server editor as the single UCI owner, but open
