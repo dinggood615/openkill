@@ -139,6 +139,8 @@ def main() -> None:
                 ["wsl.exe", "sh", "-n", path.as_posix().replace("D:", "/mnt/d").replace("\\", "/")],
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=30,
             )
             assert result.returncode == 0, f"POSIX syntax failed for {path}: {result.stderr}"

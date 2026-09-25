@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1146"
+PROJECT_VERSION="2026-1147"
 ACTION=install
 PACKAGE_FILE=""
 LOCAL_PACKAGE_MODE=0
@@ -57,9 +57,9 @@ if [ "$ACTION" = uninstall ]; then
 elif [ -n "$PACKAGE_FILE" ]; then
   # A supplied local package skips remote manifest resolution and download.
   LOCAL_PACKAGE_MODE=1
-  TOTAL_STEPS=7
+  TOTAL_STEPS=8
 else
-  TOTAL_STEPS=9
+  TOTAL_STEPS=10
 fi
 [ "$(id -u)" -eq 0 ] || die "Run as root"
 
@@ -381,6 +381,70 @@ install_core(){
   fi
   step "Resolving and installing the latest official stable Mihomo/Meta core"
   "$core" Meta || die "Official Mihomo/Meta core installation failed"
+}
+
+install_naive_component(){
+  # NaiveProxy is an optional helper.  A metadata or component failure must
+  # leave the OpenKill package usable, while a successful install records the
+  # exact URL/digest pair used by the installer for later diagnostics.
+  step "Matching and installing the optional official NaiveProxy component"
+  metadata="${OPENKILL_NAIVE_METADATA_SCRIPT:-/usr/share/openkill/openkill_naive_metadata.sh}"
+  helper="${OPENKILL_NAIVE_HELPER_SCRIPT:-/usr/share/openkill/openkill_naive.sh}"
+  [ -x "$metadata" ] || { detail "NaiveProxy metadata resolver is unavailable; OpenKill remains usable"; return 0; }
+  [ -x "$helper" ] || { detail "NaiveProxy installer helper is unavailable; OpenKill remains usable"; return 0; }
+
+  component_path=/etc/openkill/core/naive
+  configured_url=
+  configured_sha=
+  if command -v uci >/dev/null 2>&1; then
+    component_path=$(uci -q get openkill.config.naive_component_path 2>/dev/null || printf '%s' "$component_path")
+    configured_url=$(uci -q get openkill.config.naive_component_url 2>/dev/null || true)
+    configured_sha=$(uci -q get openkill.config.naive_component_sha256 2>/dev/null || true)
+  fi
+  case "$component_path" in /etc/openkill/core/*) ;; *) component_path=/etc/openkill/core/naive ;; esac
+
+  if [ -x "$component_path" ] && "$component_path" --version >/dev/null 2>&1; then
+    detail "NaiveProxy component already executable at $component_path; preserving it"
+    return 0
+  fi
+
+  url=
+  expected=
+  # A user supplied pair is usable only when both fields are present and the
+  # digest is structurally valid.  A half-filled pair is never combined with
+  # metadata from another release.
+  case "$configured_url" in https://github.com/klzgrad/naiveproxy/*|https://raw.githubusercontent.com/klzgrad/naiveproxy/*) ;; *) configured_url= ;; esac
+  case "$configured_sha" in ''|*[!0-9A-Fa-f]*) configured_sha= ;; esac
+  [ "${#configured_sha}" -eq 64 ] 2>/dev/null || configured_sha=
+  if [ -n "$configured_url" ] && [ -n "$configured_sha" ]; then
+    url=$configured_url
+    expected=$configured_sha
+    detail "Using the configured official NaiveProxy URL and SHA256 pair"
+  else
+    metadata_output=$("$metadata" detect 2>/dev/null || true)
+    metadata_ok=$(printf '%s\n' "$metadata_output" | sed -n 's/^ok=//p' | tail -n 1)
+    url=$(printf '%s\n' "$metadata_output" | sed -n 's/^url=//p' | tail -n 1)
+    expected=$(printf '%s\n' "$metadata_output" | sed -n 's/^sha256=//p' | tail -n 1)
+    metadata_reason=$(printf '%s\n' "$metadata_output" | sed -n 's/^reason=//p' | tail -n 1)
+    if [ "$metadata_ok" != 1 ] || [ -z "$url" ] || [ -z "$expected" ]; then
+      detail "NaiveProxy component not installed: official metadata unavailable (${metadata_reason:-unknown})"
+      return 0
+    fi
+    detail "Matched the official NaiveProxy asset for this OpenWrt architecture"
+  fi
+
+  if ! OPENKILL_NAIVE_BIN="$component_path" "$helper" install "$url" "$expected" >/dev/null 2>&1; then
+    detail "NaiveProxy component install failed; OpenKill remains usable and any previous component was preserved"
+    return 0
+  fi
+  if command -v uci >/dev/null 2>&1; then
+    [ -n "$configured_url" ] || uci -q set openkill.config.naive_component_url="$url" || true
+    [ -n "$configured_sha" ] || uci -q set openkill.config.naive_component_sha256="$expected" || true
+    uci -q set openkill.config.naive_component_path="$component_path" || true
+    uci -q commit openkill || true
+  fi
+  detail "NaiveProxy component installed and ready at $component_path; no helper was started"
+  return 0
 }
 
 backup_config(){
@@ -732,6 +796,7 @@ if [ "$PM" = opkg ]; then pm_run install "$PACKAGE_FILE"; else pm_run add --allo
 step "Validating installed service and runtime"
 validate_install
 install_core
+install_naive_component
 download_databases
 # Remove credentials and generated files left by older oixCloud-based builds.
 if command -v uci >/dev/null 2>&1; then

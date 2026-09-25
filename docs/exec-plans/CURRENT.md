@@ -1849,3 +1849,26 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   validation was performed in this local-only change. Local integration,
   UI-contract, preview, POSIX/local-gate and package audits passed; credentials
   and private configuration were not touched.
+
+## One-click NaiveProxy installer handoff (2026-09-25)
+
+- Scope: extend the existing OpenKill installer with an optional, non-fatal
+  NaiveProxy component phase. The phase consumes the official metadata
+  resolver's bound URL and SHA256 pair, installs only after ELF and version
+  checks, and records the pair only when the corresponding UCI fields are
+  empty. It never starts a helper or changes transparent proxy ownership.
+- Path contract: installer, status probe, service lifecycle and Mihomo writer
+  must use the configured `/etc/openkill/core/*` component path. A manually
+  installed fallback is diagnostic evidence until it passes the same executable
+  and version checks and is explicitly adopted.
+- Failure contract: metadata, downloader, digest, archive, architecture and
+  loader failures keep OpenKill usable and preserve a previous component;
+  installer output identifies the NaiveProxy phase without exposing credentials.
+- Bridge contract: enabled nodes still produce protected helper JSON, a stable
+  loopback SOCKS5 port, and a matching Mihomo `type: socks5` stanza with
+  `udp: false`; automatic YAML injection and user-managed snippets must not
+  create duplicate names or imply remote verification.
+- Verification contract: add installer contract coverage for metadata success,
+  missing metadata, existing component reuse and non-fatal failure; rerun the
+  NaiveProxy, UI, POSIX and local-gate suites. Device and remote endpoint tests
+  remain outside this local phase.

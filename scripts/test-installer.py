@@ -74,6 +74,38 @@ grep -q -- '-f mirror install local.ipk' "$WORK_DIR/calls"
         self.assertIn('testingcf.jsdelivr.net', SOURCE)
         self.assertIn('fastly.jsdelivr.net', SOURCE)
 
+    def test_one_click_install_has_nonfatal_naive_component_phase(self):
+        self.assertIn('install_naive_component()', SOURCE)
+        self.assertIn('openkill_naive_metadata.sh', SOURCE)
+        self.assertIn('OPENKILL_NAIVE_BIN="$component_path"', SOURCE)
+        self.assertIn('NaiveProxy component not installed: official metadata unavailable', SOURCE)
+        self.assertIn('NaiveProxy component install failed; OpenKill remains usable', SOURCE)
+        start = SOURCE.index('install_naive_component(){')
+        end = SOURCE.index('backup_config(){', start)
+        block = SOURCE[start:end]
+        self.assertNotIn('naive_username', block)
+        self.assertNotIn('naive_password', block)
+
+        harness = r'''
+set -eu
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+step(){ :; }
+detail(){ :; }
+export OPENKILL_NAIVE_METADATA_SCRIPT="$tmp/metadata"
+export OPENKILL_NAIVE_HELPER_SCRIPT="$tmp/helper"
+export TEST_LOG="$tmp/helper-call"
+printf '%s\n' '#!/bin/sh' 'printf "architecture=x86_64\\nurl=https://github.com/klzgrad/naiveproxy/releases/download/v1/asset.tar.xz\\nsha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef\\nok=1\\nreason=ready-to-review\\n"' > "$OPENKILL_NAIVE_METADATA_SCRIPT"
+printf '%s\n' '#!/bin/sh' 'printf "%s\\n" "$@" > "$TEST_LOG"' > "$OPENKILL_NAIVE_HELPER_SCRIPT"
+chmod 755 "$OPENKILL_NAIVE_METADATA_SCRIPT" "$OPENKILL_NAIVE_HELPER_SCRIPT"
+''' + block + r'''
+install_naive_component
+grep -Fxq 'install' "$TEST_LOG"
+grep -Fxq 'https://github.com/klzgrad/naiveproxy/releases/download/v1/asset.tar.xz' "$TEST_LOG"
+grep -Fxq '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef' "$TEST_LOG"
+'''
+        subprocess.run([BASH], input=harness, text=True, check=True)
+
     def test_manifest_selection_prefers_newest_version_over_fastest_stale_cdn(self):
         if not shutil.which("ruby"):
             self.skipTest("Ruby is not installed on this host")
