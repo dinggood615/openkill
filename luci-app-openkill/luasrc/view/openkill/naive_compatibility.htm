@@ -23,7 +23,10 @@ end
 <div id="openkill-naive-component-info" class="openkill-naive-compatibility"
      data-naive-metadata-url="<%=dispatcher.build_url('admin','services','openkill','naive_metadata')%>"
      data-naive-component-url="<%=dispatcher.build_url('admin','services','openkill','naive_component')%>"
-     data-naive-bridge-url="<%=dispatcher.build_url('admin','services','openkill','naive_bridge')%>">
+     data-naive-bridge-url="<%=dispatcher.build_url('admin','services','openkill','naive_bridge')%>"
+     data-naive-node-add-url="<%=node_add_url%>"
+     data-naive-node-import-url="<%=node_import_url%>"
+     data-naive-node-manage-url="<%=node_manage_url%>">
   <div class="openkill-naive-compatibility-head">
     <div>
       <strong>官方组件检测</strong>
@@ -50,9 +53,9 @@ end
     <button type="button" class="cbi-button cbi-button-reset" data-naive-component-action="remove">移除组件</button>
   </div>
   <p class="openkill-naive-compatibility-links">
-    <a class="cbi-button" href="<%=node_add_url%>"><% if has_current_config then %>添加 NaiveProxy 节点<% else %>先选择配置文件以添加节点<% end %></a>
-    <% if has_current_config then %><a class="cbi-button" href="<%=node_import_url%>">导入分享链接</a><% end %>
-    <a class="cbi-button" href="<%=node_manage_url%>">管理节点与策略组</a>
+    <button type="button" class="cbi-button" data-naive-node-action="add" <% if not has_current_config then %>disabled title="请先选择配置文件"<% end %>><% if has_current_config then %>添加 NaiveProxy 节点<% else %>请先选择配置文件<% end %></button>
+    <button type="button" class="cbi-button" data-naive-node-action="import" <% if not has_current_config then %>disabled title="请先选择配置文件"<% end %>>导入分享链接</button>
+    <button type="button" class="cbi-button" data-naive-node-action="manage">管理节点与策略组</button>
   </p>
   <div class="openkill-naive-compatibility-status" data-naive-component-status aria-live="polite">组件状态待检测。</div>
   <section class="openkill-naive-bridge" data-naive-bridge>
@@ -66,6 +69,17 @@ end
       <span data-naive-bridge-status aria-live="polite">未检测节点。</span>
     </div>
   </section>
+  <div class="openkill-naive-node-modal" data-naive-node-modal hidden aria-hidden="true">
+    <div class="openkill-naive-node-modal-backdrop" data-naive-node-close></div>
+    <section class="openkill-naive-node-dialog" role="dialog" aria-modal="true" aria-labelledby="openkill-naive-node-dialog-title">
+      <div class="openkill-naive-node-dialog-head">
+        <strong id="openkill-naive-node-dialog-title">NaiveProxy 节点</strong>
+        <button type="button" class="cbi-button" data-naive-node-close aria-label="关闭">关闭</button>
+      </div>
+      <p class="openkill-naive-node-dialog-hint">表单在当前页面打开，保存后关闭窗口即可刷新状态。</p>
+      <iframe title="NaiveProxy 节点编辑器" data-naive-node-frame loading="lazy"></iframe>
+    </section>
+  </div>
 </div>
 <script>
 (function () {
@@ -75,12 +89,17 @@ end
   var metadataUrl = root.getAttribute('data-naive-metadata-url');
   var componentUrl = root.getAttribute('data-naive-component-url');
   var bridgeUrl = root.getAttribute('data-naive-bridge-url');
+  var nodeAddUrl = root.getAttribute('data-naive-node-add-url');
+  var nodeImportUrl = root.getAttribute('data-naive-node-import-url');
+  var nodeManageUrl = root.getAttribute('data-naive-node-manage-url');
   var metaState = root.querySelector('[data-naive-meta-state]');
   var reason = root.querySelector('[data-naive-meta-reason]');
   var componentState = root.querySelector('[data-naive-component-status]');
   var bridgeOutput = root.querySelector('[data-naive-bridge-output]');
   var bridgeState = root.querySelector('[data-naive-bridge-status]');
   var metaFields = root.querySelectorAll('[data-naive-meta]');
+  var nodeModal = root.querySelector('[data-naive-node-modal]');
+  var nodeFrame = root.querySelector('[data-naive-node-frame]');
 
   function field(name) {
     return document.querySelector('[name="cbid.openkill.config.' + name + '"]');
@@ -176,6 +195,23 @@ end
       .then(renderComponent)
       .catch(function (error) { componentState.textContent = error && error.message === 'timeout' ? '组件状态读取超时，请重试' : '组件状态读取失败，请重试'; });
   }
+  function closeNodeModal() {
+    if (!nodeModal) return;
+    nodeModal.hidden = true;
+    nodeModal.setAttribute('aria-hidden', 'true');
+    if (nodeFrame) nodeFrame.src = 'about:blank';
+    refreshComponent();
+    refreshBridge();
+  }
+  function openNodeModal(kind) {
+    var url = kind === 'add' ? nodeAddUrl : (kind === 'import' ? nodeImportUrl : nodeManageUrl);
+    if (!url || !nodeModal || !nodeFrame) return;
+    nodeFrame.src = url;
+    nodeModal.hidden = false;
+    nodeModal.setAttribute('aria-hidden', 'false');
+    var close = nodeModal.querySelector('[data-naive-node-close]');
+    if (close) close.focus();
+  }
   function refreshBridge() {
     if (!bridgeUrl || !bridgeOutput) return Promise.resolve();
     bridgeState.textContent = '正在读取节点…';
@@ -247,6 +283,9 @@ end
     }).catch(function () { return null; }).then(function () { setBusy('[data-naive-meta-action], [data-naive-component-action], [data-naive-auto-install]', false); });
   }
   root.addEventListener('click', function (event) {
+    var nodeAction = event.target.getAttribute('data-naive-node-action');
+    if (nodeAction) { openNodeModal(nodeAction); return; }
+    if (event.target.hasAttribute('data-naive-node-close')) { closeNodeModal(); return; }
     var metadataAction = event.target.getAttribute('data-naive-meta-action');
     var componentAction = event.target.getAttribute('data-naive-component-action');
     if (event.target.getAttribute('data-naive-auto-install')) return autoInstall();
@@ -263,6 +302,9 @@ end
     var urlField = field('naive_component_url');
     var shaField = field('naive_component_sha256');
     return runComponentAction(componentAction, urlField, shaField);
+  });
+  root.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape' && nodeModal && !nodeModal.hidden) closeNodeModal();
   });
   requestMetadata('cached', false);
   refreshComponent();

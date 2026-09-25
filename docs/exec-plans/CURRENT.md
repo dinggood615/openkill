@@ -1,5 +1,20 @@
 # Current status
 
+## NaiveProxy inline node workflow (2026-09-25)
+
+- Scope: keep the existing server editor as the single UCI owner, but open
+  its add/import/manage routes inside an accessible modal on the Compatibility
+  & Auxiliary page. Move `naive_bridge_mode` into the NaiveProxy card layout
+  so it is no longer rendered under the generic Other Settings card.
+- Contract: the modal preserves the current selected YAML file and existing
+  stable server IDs; saving, importing, enabling and deleting continue through
+  the existing CBI editor. No duplicate node schema or credential endpoint is
+  introduced. Closing the modal refreshes component and bridge status.
+- Validation: assert that the card owns `naive_bridge_mode`, the page uses
+  in-page modal buttons instead of top-level navigation links, and the legacy
+  editor routes remain available. Run local UI/Naive tests and gates. Device
+  and remote endpoint validation remain outside this local step.
+
 ## NaiveProxy automatic versus self-managed YAML mode (2026-09-25)
 
 - Scope: add an explicit bridge mode to the existing NaiveProxy integration.
