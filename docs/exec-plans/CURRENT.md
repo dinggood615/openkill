@@ -2096,3 +2096,15 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   missing metadata, existing component reuse and non-fatal failure; rerun the
   NaiveProxy, UI, POSIX and local-gate suites. Device and remote endpoint tests
   remain outside this local phase.
+
+## 2026-1151 release evidence (2026-09-25)
+
+- Source fix commit: `1e2fcfd179beec3bc21f84f649d8cd5d8d043958`.
+- Development CI for the exact commit passed: [run 36139159582](https://github.com/dinggood615/openkill/actions/runs/36139159582).
+- RC Build passed from the exact commit: [run 36139343804](https://github.com/dinggood615/openkill/actions/runs/36139343804). The SDK audit summary reported `luci-app-openkill_2026-1151_all.ipk`, SHA256 `9b2280983fb956dfdf5cbc88f18524a8a4280b77bb7f45554746912d388335fb`.
+- Formal Release passed with `release_gate` and `publish`: [run 36139865576](https://github.com/dinggood615/openkill/actions/runs/36139865576). Published [v2026-1151-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1151-ipk); formal IPK SHA256 `f63c8ae3f1a57010fc78786b2e1f091b0806e7ae36d7b76dd6372c1494a5b704`.
+- Root cause was confirmed on the authorized device: `tblsection.htm` passed an URL-encoded `file=%2F...` route through Lua `string.format`, so `%2F` was parsed as a format directive and the NaiveProxy add/import editor failed before rendering. The fix replaces only the explicit `%s` placeholder and preserves encoded query bytes.
+- Device backup before the formal install: `/tmp/openkill-naive-1151-backup-20260925-212115/config.tgz`, SHA256 `4d7e63e516bc6e47ad67dd1d35a0ca91f3f2b06623c035b7ac8b7408e26d784`.
+- Device post-install evidence: OpenKill `2026-1151`, service `running`, `/etc/openkill/core/naive` executable, 127.0.0.1:11080 ready, fixed TCP SOCKS probe returned HTTP 204, helper state `configured=1/generated=1/component_installed=1/local_ready=1/remote_verified=0`. No DNS, routing, firewall, or central nft changes were made.
+- Browser evidence on the formal package: both “添加 NaiveProxy 节点” and “导入分享链接” opened the existing node editor with the encoded configuration path intact; no Runtime error was rendered. The existing node and protected configuration were preserved.
+- Remote Naive authentication, UDP forwarding, IPv6 behavior, and application-level streaming remain unverified because the test only used a fixed local TCP probe.
