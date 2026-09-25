@@ -152,6 +152,8 @@ def main() -> None:
     require(CONTROLLER, 'cursor:set("openkill", sid, "naive_pending", "1")')
     require(ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua", 'HTTP.formvalue("type") == "naiveproxy"')
     require(ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua", 'o.default = "naiveproxy"')
+    require(ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua", 'naive_pending") == "1"')
+    require(ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua", 'REQUEST_METHOD") == "POST"')
     require(ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers.lua", 'edit_url = edit_url .. "&import=1"')
     require(server_url, "import_naive_quick")
     require(server_url, "naive-quick-link-")

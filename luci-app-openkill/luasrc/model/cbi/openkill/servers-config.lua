@@ -105,6 +105,13 @@ if m.uci:get(openkill, sid) ~= "servers" then
 	return
 end
 
+-- Direct NaiveProxy entry creates a disabled draft so the editor has a stable
+-- section ID.  A submitted form turns it into an ordinary user node; an
+-- abandoned draft is cleaned by the next direct-add request.
+if m.uci:get(openkill, sid, "naive_pending") == "1" and HTTP.getenv("REQUEST_METHOD") == "POST" then
+	m.uci:delete(openkill, sid, "naive_pending")
+end
+
 -- [[ Servers Setting ]] --
 s = m:section(NamedSection, sid, "servers")
 s.anonymous = true
