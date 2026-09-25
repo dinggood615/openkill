@@ -1,5 +1,70 @@
 # Current status
 
+## NaiveProxy device node validation (2026-09-25)
+
+- Device phase authorized by the user for `192.168.1.103` after the 2026-1149
+  installation. Scope is a protected backup, redacted component/state checks,
+  importing one supplied NaiveProxy node, applying the helper bridge, and
+  checking the local SOCKS5 readiness and remote authentication result.
+- Credentials must be sent only through the protected UCI/Naive runtime files;
+  they must not appear in command output, logs, status JSON, generated YAML,
+  reports or commits. Do not enable `CENTRAL_ACTIVE`, apply central nft state,
+  alter WAN/default gateway, or run broad packet-path tests. Restore the backup
+  if the node import or service lifecycle fails.
+- Resume condition: after device evidence, repair any reproducible source
+  defect locally, run all gates, publish a new version only if code changes
+  are required, and record the redacted device result separately from local
+  and remote endpoint validation.
+
+### Device evidence and fixes (2026-09-25)
+
+- Rechecked the authorized target with `ssh -o BatchMode=yes openkill-103`.
+  It is Kwrt 25.12-SNAPSHOT x86_64 with OpenKill `2026-1149`; `curl`,
+  `jsonfilter`, `xz` and `xz-utils` are installed.  The configured binary
+  `/etc/openkill/core/naive` is executable and reports `150.0.7871.63`.
+- A protected device backup was created before configuration changes at
+  `/tmp/openkill-naive-backup-20260925-200732.tgz` (SHA256
+  `dfb54e988cb60990d80125e9d6e13b6609969c39d1cc1085f125778e680cdf81`).
+  A second protected code backup is at
+  `/tmp/openkill-naive-code-backup-20260925-201140.tgz` (SHA256
+  `aa949db502764af83da435ce12dc3f7f491192e9d527499b5e3e1502176a32ed`).
+- Root cause 1: anonymous UCI `servers` sections were enumerated with plain
+  `uci show`, yielding `@servers[0]`; the Naive helper rejected that as an
+  invalid stable ID, so it reported `no-enabled-nodes` and generated no
+  bridge.  The helper and init loops now use `uci -X show`.
+- Root cause 2: direct helper status/prepare calls did not load
+  `/lib/functions.sh`, so `config_load` failed silently outside the init
+  process.  The helper now loads the OpenWrt config functions when available.
+  It also reports `local_ready=1` only after every generated loopback port is
+  listening.
+- Root cause 3: this device's OpenWrt Naive build fails authenticated TLS when
+  procd launches it as root with the `nogroup` group (`broken pipe` and
+  `net_error -100`).  The Naive instance now stays in the root group; the
+  change is limited to the helper process and does not alter transparent
+  interception ownership.
+- The supplied node was imported into one stable UCI `servers` section with
+  credentials retained only in protected device configuration.  The source
+  YAML was then updated with a credential-free `127.0.0.1:11080` SOCKS5
+  bridge and its name was added to the existing streaming group.  The final
+  active YAML contains the bridge; no credentials were written to YAML.
+- Device result after the fixes: OpenKill `running`; helper state is
+  `configured=1`, `generated=1`, `component_installed=1`, `local_ready=1`,
+  `remote_verified=0`; the loopback listener accepted a proxied request to a
+  fixed HTTPS test endpoint and returned HTTP 204.  This proves local
+  process/bridge and one TCP remote request, not UDP, IPv6, streaming unlock
+  or general LAN packet-path behavior.
+- One temporary test invocation exposed a legacy writer hazard: running
+  `yml_proxys_set.sh` while UCI has no imported groups can replace the YAML
+  proxy/group arrays and make strict DNS refuse startup.  The backed-up YAML
+  was restored before the final device restart, then the bridge was added
+  while preserving the existing groups.  A follow-up local contract is needed
+  before changing that legacy writer; no broad writer change is included in
+  this device fix.
+- Next action: commit the bounded stable-ID, standalone-helper, listener-state
+  and root-group fixes; run gates and exact-commit CI, then use the formal
+  release gate for the next version.  Device remote verification remains
+  limited to the single redacted TCP probe above.
+
 ## NaiveProxy inline node workflow (2026-09-25)
 
 - Scope: keep the existing server editor as the single UCI owner, but open

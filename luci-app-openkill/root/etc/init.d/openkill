@@ -20,7 +20,7 @@ NAIVE_PORT_BASE="$(uci -q get openkill.config.naive_port_base 2>/dev/null || ech
 
 naive_stop_instances()
 {
-   for sid in $(uci -q show openkill 2>/dev/null | sed -n 's/^openkill\.\([^.=]*\)=servers$/\1/p'); do
+   for sid in $(uci -q -X show openkill 2>/dev/null | sed -n 's/^openkill\.\([^.=]*\)=servers$/\1/p'); do
       instance="$(naive_instance_name "$sid" 2>/dev/null || true)"
       [ -n "$instance" ] && procd_kill "$instance" >/dev/null 2>&1 || true
    done
@@ -32,7 +32,7 @@ naive_start_instances()
    [ "$(uci -q get openkill.config.naive_auto_start 2>/dev/null || echo 0)" = "1" ] || return 0
    naive_component_available || return 0
    config_load openkill
-   for sid in $(uci -q show openkill 2>/dev/null | sed -n 's/^openkill\.\([^.=]*\)=servers$/\1/p'); do
+   for sid in $(uci -q -X show openkill 2>/dev/null | sed -n 's/^openkill\.\([^.=]*\)=servers$/\1/p'); do
       config_get _enabled "$sid" enabled 0
       config_get _type "$sid" type ""
       [ "$_enabled" = 1 ] && [ "$_type" = naiveproxy ] || continue
@@ -44,8 +44,12 @@ naive_start_instances()
       [ -n "$instance" ] || continue
       procd_open_instance "$instance"
       procd_set_param command "$NAIVE_BIN" "$config_file"
+      # Keep the helper in the root group.  The OpenWrt NaiveProxy build uses
+      # Chromium's TLS/network sandbox and the generic nogroup drop causes
+      # authenticated TLS handshakes to fail with a broken pipe on devices
+      # whose resolver/certificate access is root-group restricted.
       procd_set_param user root
-      procd_set_param group nogroup
+      procd_set_param group root
       procd_set_param file "$config_file"
       procd_set_param respawn 300 5 3
       procd_set_param stderr 1

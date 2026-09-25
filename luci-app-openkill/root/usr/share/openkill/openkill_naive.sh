@@ -4,6 +4,10 @@
 # transparent-proxy path. Each enabled node is a loopback SOCKS listener.
 
 umask 077
+# The helper is called both from the procd init script and directly by LuCI
+# diagnostics.  Load OpenWrt's config helpers for the latter; without this,
+# `prepare` silently returned before seeing anonymous `servers` sections.
+[ -r /lib/functions.sh ] && . /lib/functions.sh
 NAIVE_ROOT="${OPENKILL_NAIVE_ROOT:-/etc/openkill/naive}"
 NAIVE_BIN="${OPENKILL_NAIVE_BIN:-/etc/openkill/core/naive}"
 NAIVE_RUNTIME="${OPENKILL_NAIVE_RUNTIME:-/tmp/openkill-naive}"
@@ -89,6 +93,34 @@ naive_port_for_section() {
 
 naive_component_available() { [ -x "$NAIVE_BIN" ]; }
 
+naive_port_listening() {
+    local port="$1"
+    naive_valid_port "$port" || return 1
+    if command -v ss >/dev/null 2>&1; then
+        ss -lnt 2>/dev/null | grep -qE "127[.]0[.]0[.]1:${port}[[:space:]]" && return 0
+    fi
+    if command -v netstat >/dev/null 2>&1; then
+        netstat -lnt 2>/dev/null | grep -qE "127[.]0[.]0[.]1:${port}[[:space:]]" && return 0
+    fi
+    return 1
+}
+
+naive_all_ports_ready() {
+    local sid _enabled _type port
+    [ "${1:-0}" -gt 0 ] 2>/dev/null || return 1
+    [ "${2:-0}" -eq "${1:-0}" ] 2>/dev/null || return 1
+    command -v uci >/dev/null 2>&1 || return 1
+    config_load openkill 2>/dev/null || return 1
+    for sid in $(uci -q -X show openkill 2>/dev/null | sed -n 's/^openkill\.\([^.=]*\)=servers$/\1/p'); do
+        config_get _enabled "$sid" enabled 0
+        config_get _type "$sid" type ""
+        [ "$_enabled" = 1 ] && [ "$_type" = naiveproxy ] || continue
+        port=$(naive_port_for_section "$sid" 2>/dev/null || true)
+        naive_port_listening "$port" || return 1
+    done
+    return 0
+}
+
 naive_state_value() {
     local name="$1" fallback="$2" state
     state=$(grep -m1 "^${name}=" "$NAIVE_STATE" 2>/dev/null || true)
@@ -112,6 +144,11 @@ naive_refresh_status() {
         else
             state=$(naive_state_value state prepared)
             reason=$(naive_state_value reason prepared)
+        fi
+        if naive_all_ports_ready "$configured" "$generated"; then
+            local_ready=1
+        else
+            local_ready=0
         fi
         cat > "$NAIVE_STATE" <<EOF
 configured=$configured
@@ -192,7 +229,9 @@ EOF
         return 0
     fi
     config_load openkill 2>/dev/null || return 0
-    for sid in $(uci -q show openkill 2>/dev/null | sed -n 's/^openkill\.\([^.=]*\)=servers$/\1/p'); do
+    # -X expands anonymous sections to stable cfg* IDs.  The default `uci
+    # show` form returns @servers[N], which is rejected by naive_valid_id.
+    for sid in $(uci -q -X show openkill 2>/dev/null | sed -n 's/^openkill\.\([^.=]*\)=servers$/\1/p'); do
         config_get _enabled "$sid" enabled 0
         config_get _type "$sid" type ""
         [ "$_enabled" = 1 ] && [ "$_type" = naiveproxy ] || continue
