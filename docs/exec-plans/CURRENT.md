@@ -1764,3 +1764,37 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
 - Next action: implement the scoped status template/CSS changes, run local
   gates, then prepare the next version only after the exact-commit CI and RC
   audit pass.
+
+## Runtime status dashboard alignment release evidence (2026-09-25)
+
+- Implementation commit `8f52fe5c5c0f54b41ed8421ed240773fc9eb29e5` shortens
+  the five live summaries while preserving full evidence in accessible detail
+  labels, changes the top grid to `2fr 1fr 1fr`, and lets the primary config
+  card and secondary metric matrix stretch across one shared lower grid row.
+  No network policy, state endpoint semantics, UCI field or startup/restore
+  behavior changed.
+- Local evidence: UI contract 25/25, UI preview 2/2, POSIX/local policy gate,
+  version bump check and `git diff --check` passed. Browser automation is not
+  available in this environment, so rendered viewport measurements and
+  screenshots remain unverified; device validation was not requested.
+- Versioned source commit `fef4244ea88fcf4a0ead6adf90d3f144ca6f0623`
+  (`2026-1145`) passed exact Development CI
+  ([run 36105228266](https://github.com/dinggood615/openkill/actions/runs/36105228266)).
+- RC Build from the same source passed
+  ([run 36105449460](https://github.com/dinggood615/openkill/actions/runs/36105449460)).
+  Candidate `luci-app-openkill_2026-1145_all.ipk` SHA-256 is
+  `79f8c8a128e92a03d144d097292790f29bcd123b097f738f02baf03313ad260e`.
+  The workflow audit passed package metadata, conffile preservation,
+  maintainer-script deletion, stale-reference and sensitive-content checks;
+  the extracted candidate contains the new status template and CSS markers.
+- Formal Release with `release_gate=true` and `publish=true` passed
+  ([run 36105951841](https://github.com/dinggood615/openkill/actions/runs/36105951841)).
+  Published release:
+  [v2026-1145-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1145-ipk),
+  source `fef4244ea88fcf4a0ead6adf90d3f144ca6f0623`, asset
+  `luci-app-openkill_2026-1145_all.ipk`, SHA-256
+  `47c5e5e4ac308e6e493e7df86f27f5b8a3db404f774092ff23e47426037c5a68`.
+  The formal asset was downloaded into `D:\openkill-cache\formal-2026-1145`
+  and its extracted status template/CSS matches the versioned source.
+- Previous `v2026-1144-ipk` remains available for rollback. No router,
+  central nft state, packet-path test or private configuration was touched.
