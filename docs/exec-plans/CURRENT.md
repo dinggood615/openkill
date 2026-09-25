@@ -1,5 +1,24 @@
 # Current status
 
+## NaiveProxy node editor runtime error (2026-09-25)
+
+- Device phase is authorized for the supplied NaiveProxy node on
+  `192.168.1.103`. The reported Add/Import actions reach the existing server
+  editor, but LuCI renders `openkill/tblsection` before the editor loads.
+- Scope of this fix is limited to the edit-link renderer and its regression
+  contract. It must preserve the selected YAML query, stable UCI server IDs,
+  node credentials and the existing add/import/manage routes. No DNS, routing,
+  firewall, legacy writer, parser or bridge lifecycle behavior is changed.
+- Root-cause hypothesis to verify on the device: `self.extedit:format(section)`
+  interprets percent-encoded `file=` bytes such as `%2F` as extra format
+  directives, producing `bad argument #2 to 'format'`. The implementation will
+  replace only the explicit `%s` route placeholder and leave encoded query
+  bytes untouched, then exercise add, import and manage URLs.
+- Before device changes, take a protected configuration/package backup. The
+  follow-up release must distinguish template rendering, form save, local
+  SOCKS5 readiness and remote authentication; credentials remain off output,
+  logs, reports and commits.
+
 ## NaiveProxy device node validation (2026-09-25)
 
 - Device phase authorized by the user for `192.168.1.103` after the 2026-1149

@@ -386,7 +386,7 @@ local sectiontype = "_"..self.config.."_"..string.match(self.sectiontype, "[%w_]
                                     <%- if self.extedit then -%>
                                         <input class="btn cbi-button cbi-button-edit" type="button" value="<%:Edit%>"
                                         <%- if type(self.extedit) == "string" then
-                                        %> onclick="location.href='<%=self.extedit:format(section)%>';return switch_to_tab<%=sectiontype%>()"
+                                        %> onclick="location.href='<%=self.extedit:gsub("%%s", section, 1)%>';return switch_to_tab<%=sectiontype%>()"
                                         <%- elseif type(self.extedit) == "function" then
                                         %> onclick="location.href='<%=self:extedit(section)%>';return switch_to_tab<%=sectiontype%>()"
                                         <%- end

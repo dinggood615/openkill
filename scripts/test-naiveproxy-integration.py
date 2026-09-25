@@ -23,6 +23,7 @@ SERVERS = ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua
 SETTINGS = ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua"
 SETTINGS_THEME = ROOT / "luci-app-openkill/luasrc/view/openkill/settings_theme.htm"
 NAIVE_VIEW = ROOT / "luci-app-openkill/luasrc/view/openkill/naive_compatibility.htm"
+TBLSECTION = ROOT / "luci-app-openkill/luasrc/view/openkill/tblsection.htm"
 CONFIG = ROOT / "luci-app-openkill/root/etc/config/openkill"
 MAKEFILE = ROOT / "luci-app-openkill/Makefile"
 
@@ -128,6 +129,8 @@ def main() -> None:
     require(NAIVE_VIEW, "本地 SOCKS5 YAML")
     require(NAIVE_VIEW, "data-naive-bridge-copy")
     require(NAIVE_VIEW, "导入分享链接")
+    require(TBLSECTION, 'self.extedit:gsub("%%s", section, 1)')
+    assert ':format(section)' not in TBLSECTION.read_text(encoding="utf-8"), "encoded file query must not pass through string.format"
     require(CONTROLLER, 'operation == "task-status"')
     require(CONTROLLER, 'openkill_naive.sh install-task')
 
