@@ -4,7 +4,7 @@ set -eu
 
 REPO="dinggood615/openkill"
 PACKAGE_REF="master"
-PROJECT_VERSION="2026-1153"
+PROJECT_VERSION="2026-1154"
 ACTION=install
 PACKAGE_FILE=""
 LOCAL_PACKAGE_MODE=0
@@ -14,6 +14,7 @@ SOURCE_ROOT=""
 TOTAL_STEPS=8
 CURRENT_STEP=0
 INSTALL_LOG=""
+SERVICE_WAS_RUNNING=0
 
 log(){ printf '\n==> %s\n' "$*"; [ -z "$INSTALL_LOG" ] || printf '==> %s\n' "$*" >> "$INSTALL_LOG"; }
 detail(){ printf '    %s\n' "$*"; [ -z "$INSTALL_LOG" ] || printf '    %s\n' "$*" >> "$INSTALL_LOG"; }
@@ -66,6 +67,15 @@ fi
 if command -v opkg >/dev/null 2>&1; then PM=opkg; EXT=ipk
 elif command -v apk >/dev/null 2>&1; then PM=apk; EXT=apk
 else die "Neither opkg nor apk is available"; fi
+
+# Package transactions run the service's prerm and therefore stop a running
+# instance.  Remember the pre-transaction state so a successful one-click
+# update restores the user's service without starting a first-install service
+# or changing a deliberately stopped configuration.
+if [ "$ACTION" != uninstall ] && [ -x /etc/init.d/openkill ] &&
+   /etc/init.d/openkill running >/dev/null 2>&1; then
+  SERVICE_WAS_RUNNING=1
+fi
 
 # Keep the selected repository configuration for update AND install.
 WORK_DIR=$(mktemp -d /tmp/openkill-install.XXXXXX)
@@ -485,8 +495,24 @@ database_fetch(){
   shift 3
   database_tmp="$WORK_DIR/database-$database_name"
   for database_url in "$@"; do
+    # Database refresh is optional because every package already carries a
+    # validated fallback copy.  Keep the whole refresh within one bounded
+    # budget instead of waiting for every mirror's full timeout when the
+    # device is behind a captive/Fake-IP DNS path.
+    database_timeout=180
+    if [ -n "${database_refresh_deadline:-}" ]; then
+      database_now=$(date +%s 2>/dev/null || printf '0')
+      case "$database_now" in ''|*[!0-9]*) database_now=0;; esac
+      if [ "$database_now" -ge "$database_refresh_deadline" ]; then
+        detail "Database refresh deadline reached; retaining the packaged copy: $database_name"
+        return 1
+      fi
+      database_remaining=$((database_refresh_deadline - database_now))
+      [ "$database_remaining" -lt "$database_timeout" ] && database_timeout="$database_remaining"
+      [ "$database_timeout" -gt 0 ] || return 1
+    fi
     detail "Downloading database $database_name: $database_url"
-    if download "$database_url" "$database_tmp" 180 1; then
+    if download "$database_url" "$database_tmp" "$database_timeout" 1; then
       database_size=$(wc -c < "$database_tmp" 2>/dev/null || printf '0')
       if [ "$database_size" -ge "$database_min_size" ] &&
          ! head -c 512 "$database_tmp" | grep -qiE '<!doctype|<html|<head|<body'; then
@@ -505,6 +531,14 @@ database_fetch(){
 download_databases(){
   step "Downloading GeoIP, GeoSite, ASN and China route databases"
   database_dir=$(database_root)
+  database_refresh_budget="${OPENKILL_DATABASE_REFRESH_BUDGET:-120}"
+  case "$database_refresh_budget" in
+    ''|*[!0-9]*) database_refresh_budget=120;;
+  esac
+  database_refresh_started=$(date +%s 2>/dev/null || printf '0')
+  case "$database_refresh_started" in ''|*[!0-9]*) database_refresh_started=0;; esac
+  database_refresh_deadline=$((database_refresh_started + database_refresh_budget))
+  detail "Optional database refresh budget: ${database_refresh_budget}s"
   database_ok=0
   database_fetch Country.mmdb "$database_dir/Country.mmdb" 10240 \
     "https://testingcf.jsdelivr.net/gh/alecthw/mmdb_china_ip_list@release/lite/Country.mmdb" \
@@ -804,6 +838,14 @@ if command -v uci >/dev/null 2>&1; then
     uci -q delete "openkill.config.$opt" || true
   done
   uci -q commit openkill || true
+fi
+if [ "$SERVICE_WAS_RUNNING" -eq 1 ] && [ -x /etc/init.d/openkill ]; then
+  if /etc/init.d/openkill start >/dev/null 2>&1 &&
+     /etc/init.d/openkill running >/dev/null 2>&1; then
+    detail "Restored the OpenKill service to its pre-install running state"
+  else
+    detail "OpenKill package installed, but restoring the previous running state failed; start it from the service page"
+  fi
 fi
 rm -f /tmp/oix_checkin /tmp/oix_info /tmp/openkill_oix_version.json
 rm -f /tmp/openkill_version_history.json /tmp/openkill_version_history_openkill.json

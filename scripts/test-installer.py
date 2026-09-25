@@ -74,6 +74,34 @@ grep -q -- '-f mirror install local.ipk' "$WORK_DIR/calls"
         self.assertIn('testingcf.jsdelivr.net', SOURCE)
         self.assertIn('fastly.jsdelivr.net', SOURCE)
 
+    def test_database_refresh_has_global_deadline_and_keeps_packaged_fallback(self):
+        self.assertIn('OPENKILL_DATABASE_REFRESH_BUDGET', SOURCE)
+        self.assertIn('Database refresh deadline reached; retaining the packaged copy', SOURCE)
+        start = SOURCE.index('database_fetch(){')
+        end = SOURCE.index('download_databases(){', start)
+        block = SOURCE[start:end]
+        harness = r'''
+set -eu
+WORK_DIR=$(mktemp -d)
+trap 'rm -rf "$WORK_DIR"' EXIT
+detail(){ printf '%s\n' "$*" >> "$WORK_DIR/detail"; }
+database_refresh_deadline=100
+date(){ printf '101\n'; }
+download(){ return 1; }
+''' + block + r'''
+if database_fetch GeoSite.dat "$WORK_DIR/GeoSite.dat" 10 https://one.example.invalid https://two.example.invalid; then
+  exit 1
+fi
+grep -q 'deadline reached' "$WORK_DIR/detail"
+        '''
+        subprocess.run([BASH], input=harness, text=True, check=True)
+
+    def test_one_click_update_restores_preexisting_service_state(self):
+        self.assertIn('SERVICE_WAS_RUNNING=0', SOURCE)
+        self.assertIn('/etc/init.d/openkill running', SOURCE)
+        self.assertIn('Restored the OpenKill service to its pre-install running state', SOURCE)
+        self.assertIn('starting a first-install service', SOURCE)
+
     def test_one_click_install_has_nonfatal_naive_component_phase(self):
         self.assertIn('install_naive_component()', SOURCE)
         self.assertIn('openkill_naive_metadata.sh', SOURCE)

@@ -2183,3 +2183,23 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   require successful metadata discovery. Re-run NaiveProxy integration,
   POSIX/BusyBox syntax, local-gate and diff checks, then perform a device
   metadata/install-path regression without restoring private node data.
+
+## One-click installer bounded database refresh (2026-09-25)
+
+- Device reproduction after the 2026-1153 candidate install: the one-click
+  installer remained in `/tmp/openkill-installer.*` while sequentially trying
+  the four GeoSite/GeoIP/ASN mirrors. The current device resolves public
+  GitHub/jsDelivr names to Fake-IP addresses and the TLS attempts fail, so
+  each optional database download waits for its full 180-second timeout. The
+  packaged databases are already a valid fallback; this delay makes the
+  installer appear hung even though the OpenKill package and component steps
+  have completed.
+- Planned repair: bound the optional database refresh with a single global
+  deadline, stop trying further mirrors when the deadline is exhausted, retain
+  packaged files, and report the skipped refresh as a non-fatal warning. This
+  does not alter DNS, routing, firewall, proxy or NaiveProxy node behavior.
+- Verification must cover a fast successful mirror, timeout/synthetic-IP
+  failure, deadline exhaustion and preservation of packaged databases. The
+  device test will terminate only the stale installer process from this
+  reproduction after recording its failure stage; no user configuration or
+  node data will be changed.
