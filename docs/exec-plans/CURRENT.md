@@ -1741,3 +1741,26 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
 - Versioned source commit `5bf4434eff786fee804f36782e2fc0b3df39f57b` passed exact Development CI ([run 35982382778](https://github.com/dinggood615/openkill/actions/runs/35982382778)). RC Build passed ([run 35982500360](https://github.com/dinggood615/openkill/actions/runs/35982500360)); the audited candidate `luci-app-openkill_2026-1144_all.ipk` has SHA-256 `0b2b3b895bab33c6ce37dea9efaf5c6a7d0e764254c9ec22314769f1a57b88db`. The audit reported package metadata, conffile preservation, maintainer-script deletion, stale-reference and sensitive-content checks as OK. The package was unpacked from the RC artifact and confirmed to contain the compact CSS marker, shortened NaiveProxy copy and corrected ad status wording.
 - Formal Release with `release_gate=true` and `publish=true` passed ([run 35983177776](https://github.com/dinggood615/openkill/actions/runs/35983177776)). Published release: [v2026-1144-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1144-ipk), source `5bf4434eff786fee804f36782e2fc0b3df39f57b`, asset `luci-app-openkill_2026-1144_all.ipk`, downloaded SHA-256 `29f29332f785a315c34586eeb72afc38aec8fb13a572775ab890b13d2dc1e9e` (9,225,962 bytes). v2026-1143 remains available for rollback.
 - Browser rendering was not claimed because this host has no available browser runtime. No device installation was requested in this UI-only pass; device state and remote business behavior remain unverified. No DNS, routing, filtering, protocol or startup policy was changed.
+
+## Runtime status dashboard alignment and copy pass (2026-09-25)
+
+- Scope: adjust only the runtime status page presentation: five-card copy,
+  dashboard DOM grouping, responsive grid sizing and state-summary display.
+  DNS, IPv6, TUN, routing, filtering, protocol behavior, UCI fields, status
+  endpoint semantics and startup/restore contracts remain unchanged.
+- Layout contract: the visual top row is one responsive grid with Running
+  Status at roughly 1/2 width and Control Panel/Mix Proxy at roughly 1/4
+  each. The lower primary and secondary columns stretch from one shared grid
+  row; no filler card, fixed-height spacer, negative margin or whole-page
+  scaling is allowed.
+- Copy contract: each DNS, adblock, OpenVPN, RustDesk and NaiveProxy card
+  keeps one evidence-based primary state plus one short necessary detail.
+  Generated, loaded, applied and verified remain distinct; unknown and
+  unverified states cannot be presented as healthy.
+- Verification contract: exercise the existing preview states (running,
+  disabled, startup_failed and error), UI contract/preview tests, local-gate
+  and diff checks. Browser rendering is recorded only if a browser runtime is
+  available; device and packet-path validation are outside this UI-only scope.
+- Next action: implement the scoped status template/CSS changes, run local
+  gates, then prepare the next version only after the exact-commit CI and RC
+  audit pass.

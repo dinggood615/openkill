@@ -612,6 +612,17 @@
     }
 
     function updateSecurityCards(status) {
+        function setSecurityDetail(element, summary, fullText) {
+            if (!element) return;
+            element.textContent = summary;
+            if (fullText && fullText !== summary) {
+                element.title = fullText;
+                element.setAttribute('aria-label', fullText);
+            } else {
+                element.removeAttribute('title');
+                element.removeAttribute('aria-label');
+            }
+        }
         var running = !!(status && status.clash === true);
         var dnsMode = status && status.dns_privacy_mode ? status.dns_privacy_mode : 'split';
         var dnsLabel = DOMCache.dns_privacy_status;
@@ -620,9 +631,9 @@
             dnsLabel.textContent = !running ? '未运行' : ('已配置 · ' + (dnsMode === 'strict' ? '严格隐私' : '分流隐私'));
             dnsLabel.className = 'security-status-value ' + (!running ? 'is-muted' : 'is-pending');
         }
-        if (dnsDetail) {
-            dnsDetail.textContent = !running ? '核心未运行，出站未验证' : '解析出口与防泄漏待设备验证';
-        }
+        setSecurityDetail(dnsDetail,
+            !running ? '核心未运行 · 出站未验证' : '解析出口待设备验证',
+            !running ? '核心未运行，DNS 出站未验证' : '解析出口与 DNS 防泄漏仍待设备验证');
 
         var adblockLabel = DOMCache.adblock_status;
         var adblockDetail = DOMCache.adblock_detail;
@@ -635,8 +646,8 @@
         var adCoreLoaded = status && (status.adblock_core_loaded === '1' || status.adblock_core_loaded === true);
         var adVerified = !!(status && status.adblock_verified);
         var adReason = status && status.adblock_reason ? status.adblock_reason : 'unknown';
-        var adDnsSummary = adDnsLoaded ? '已加载' : (adDnsEffective ? '已生成·未验证' : '未知');
-        var adCoreSummary = adCoreLoaded ? '已加载' : (adCoreEffective ? '已生成·未验证' : '未知');
+        var adDnsSummary = adDnsLoaded ? '已加载' : (adDnsEffective ? '已生成' : '未知');
+        var adCoreSummary = adCoreLoaded ? '已加载' : (adCoreEffective ? '已生成' : '未知');
         if (adblockLabel) {
             var adLabel = '已配置 · 待验证';
             if (adMode === 'off') adLabel = '已关闭';
@@ -648,12 +659,14 @@
             adblockLabel.className = 'security-status-value ' + (adMode === 'off' ? 'is-muted' :
                 (adVerified ? 'is-success' : (adState === 'failed' ? 'is-error' : 'is-pending')));
         }
-        if (adblockDetail) {
-            adblockDetail.textContent = adMode === 'off' ? 'DNS 隐私仍独立运行' :
-                (adState === 'failed' ? ('规则未生成 · ' + adReason) :
-                ('DNS 后端 ' + adDnsSummary + ' · 核心规则 ' + adCoreSummary +
-                (adVerified ? ' · 实际拦截已验证' : ' · 实际拦截未验证')));
-        }
+        var adFullDetail = adMode === 'off' ? 'DNS 隐私仍独立运行' :
+            (adState === 'failed' ? ('规则未生成 · ' + adReason) :
+            ('DNS 后端 ' + adDnsSummary + ' · 核心规则 ' + adCoreSummary +
+            (adVerified ? ' · 实际拦截已验证' : ' · 实际拦截未验证')));
+        var adSummary = adMode === 'off' ? 'DNS 隐私独立' :
+            (adState === 'failed' ? '规则生成失败' :
+            ('DNS ' + adDnsSummary + ' · 核心 ' + adCoreSummary + (adVerified ? ' · 已验证' : ' · 待验证')));
+        setSecurityDetail(adblockDetail, adSummary, adFullDetail);
 
         var vpnLabel = DOMCache.openvpn_status;
         var vpnDetail = DOMCache.openvpn_detail;
@@ -669,16 +682,18 @@
             vpnLabel.textContent = vpnLabelText;
             vpnLabel.className = 'security-status-value ' + (!vpnConfigured ? 'is-muted' : (vpnApplied ? 'is-success' : 'is-pending'));
         }
-        if (vpnDetail) {
-            vpnDetail.textContent = !vpnConfigured ? '兼容开关关闭' :
-                ('传输绕过 ' + (vpnTransportBypass ? '已开启' : '已关闭') + ' · 角色 ' +
-                (status.openvpn_role || 'router-client') + ' · 隧道 ' +
-                (tunnelState === 'established' ? '已建立' : '未验证') +
-                ' · ' + (status.openvpn_transport_protocol || 'udp') + '/' +
-                (status.openvpn_protocol_family || 'all') + ' · IPv4/IPv6 ' +
-                (status.openvpn_endpoint4 || '0') + '/' + (status.openvpn_endpoint6 || '0') +
-                (status.openvpn_reason && status.openvpn_reason !== 'applied' ? ' · ' + status.openvpn_reason : ''));
-        }
+        var vpnFullDetail = !vpnConfigured ? '兼容开关关闭' :
+            ('传输绕过 ' + (vpnTransportBypass ? '已开启' : '已关闭') + ' · 角色 ' +
+            (status.openvpn_role || 'router-client') + ' · 隧道 ' +
+            (tunnelState === 'established' ? '已建立' : '未验证') +
+            ' · ' + (status.openvpn_transport_protocol || 'udp') + '/' +
+            (status.openvpn_protocol_family || 'all') + ' · IPv4/IPv6 ' +
+            (status.openvpn_endpoint4 || '0') + '/' + (status.openvpn_endpoint6 || '0') +
+            (status.openvpn_reason && status.openvpn_reason !== 'applied' ? ' · ' + status.openvpn_reason : ''));
+        var vpnSummary = !vpnConfigured ? '兼容开关关闭' :
+            ('传输绕过 ' + (vpnTransportBypass ? '已开启' : '已关闭') + ' · 隧道 ' +
+            (tunnelState === 'established' ? '已建立' : '未验证'));
+        setSecurityDetail(vpnDetail, vpnSummary, vpnFullDetail);
 
         var rustLabel = DOMCache.rustdesk_status;
         var rustDetail = DOMCache.rustdesk_detail;
@@ -694,12 +709,15 @@
             rustLabel.className = 'security-status-value ' + (!rustConfigured ? 'is-muted' :
                 (rustFailed ? 'is-error' : (rustApplied ? (rustVerified ? 'is-success' : 'is-pending') : 'is-pending')));
         }
-        if (rustDetail) {
-            rustDetail.textContent = !rustConfigured ? '兼容开关关闭，未创建宽范围绕过' :
-                (rustFailed ? '兼容规则生成或应用失败 · 请查看诊断' :
-                (rustApplied ? '目标域名范围已应用 · real-IP、广告例外与出口策略独立' :
-                (rustGenerated ? '配置已生成 · 等待核心与防火墙就绪' : '未生成目标规则 · 连接未验证')));
-        }
+        var rustFullDetail = !rustConfigured ? '兼容开关关闭，未创建宽范围绕过' :
+            (rustFailed ? '兼容规则生成或应用失败 · 请查看诊断' :
+            (rustApplied ? '目标域名范围已应用 · real-IP、广告例外与出口策略独立' :
+            (rustGenerated ? '配置已生成 · 等待核心与防火墙就绪' : '未生成目标规则 · 连接未验证')));
+        var rustSummary = !rustConfigured ? '兼容开关关闭' :
+            (rustFailed ? '应用失败' :
+            (rustApplied ? (rustVerified ? '规则已应用 · 连接已验证' : '规则已应用 · 连接未验证') :
+            (rustGenerated ? '规则已生成 · 待应用' : '规则待生成')));
+        setSecurityDetail(rustDetail, rustSummary, rustFullDetail);
 
         var naiveLabel = DOMCache.naiveproxy_status;
         var naiveDetail = DOMCache.naiveproxy_detail;
@@ -727,13 +745,17 @@
                 (naiveState === 'failed' || naiveGenerated < naiveConfigured ? 'is-error' :
                 (naiveRemote ? 'is-success' : 'is-pending')));
         }
-        if (naiveDetail) {
-            naiveDetail.textContent = !naiveInstalled ? 'OpenKill 插件本体已安装；请单独安装 NaiveProxy 辅助组件' :
-                (naiveComponentReason === 'version-probe-failed' ? '组件可执行但版本探测失败 · 版本未知' :
-                (!naiveEnabled ? '未创建辅助进程 · 现有节点行为不变' :
-                (naiveConfigured ? ('已生成 ' + naiveGenerated + '/' + naiveConfigured + ' 个回环 SOCKS5 入口 · ' + naiveReason) :
-                '组件可用 · ' + naiveComponentVersion + ' · 未配置 NaiveProxy 节点')));
-        }
+        var naiveFullDetail = !naiveInstalled ? 'OpenKill 插件本体已安装；请单独安装 NaiveProxy 辅助组件' :
+            (naiveComponentReason === 'version-probe-failed' ? '组件可执行但版本探测失败 · 版本未知' :
+            (!naiveEnabled ? '未创建辅助进程 · 现有节点行为不变' :
+            (naiveConfigured ? ('已生成 ' + naiveGenerated + '/' + naiveConfigured + ' 个回环 SOCKS5 入口 · ' + naiveReason) :
+            '组件可用 · ' + naiveComponentVersion + ' · 未配置 NaiveProxy 节点')));
+        var naiveSummary = !naiveInstalled ? '组件未安装' :
+            (naiveComponentReason === 'version-probe-failed' ? '组件可执行 · 版本未知' :
+            (!naiveEnabled ? '辅助进程未启用' :
+            (naiveConfigured ? ('回环入口 ' + naiveGenerated + '/' + naiveConfigured) :
+            '节点未配置')));
+        setSecurityDetail(naiveDetail, naiveSummary, naiveFullDetail);
     }
 
     function setRuntimeControlsAvailable(available) {

@@ -1356,7 +1356,7 @@ body[data-page="admin-services-openkill-config"] #cbi-openkill > .cbi-section-ca
 
 .oc.openkill-status-page .dashboard-top-row {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
     align-items: stretch;
     gap: var(--ok-layout-card-gap, 12px);
     width: 100%;
@@ -1512,6 +1512,24 @@ body[data-page="admin-services-openkill-config"] #cbi-openkill > .cbi-section-ca
         min-height: 0;
     }
 
+    .oc.openkill-status-page .dashboard-content-layout > .dashboard-primary-column {
+        display: flex;
+        flex-direction: column;
+        align-content: stretch;
+    }
+
+    .oc.openkill-status-page .dashboard-content-layout > .dashboard-primary-column > .dashboard-config-section {
+        display: flex;
+        flex: 1 1 auto;
+        align-items: stretch;
+    }
+
+    .oc.openkill-status-page .dashboard-content-layout > .dashboard-primary-column > .dashboard-config-section > .sub-card {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+    }
+
     .oc.openkill-status-page .dashboard-content-layout > .dashboard-secondary-column {
         display: grid;
         grid-template-rows: max-content max-content minmax(0, 1fr);
@@ -1521,7 +1539,7 @@ body[data-page="admin-services-openkill-config"] #cbi-openkill > .cbi-section-ca
     .oc.openkill-status-page .dashboard-content-layout > .dashboard-secondary-column > .dashboard-metrics-section {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        grid-template-rows: repeat(4, minmax(0, 1fr));
+        grid-template-rows: repeat(4, minmax(min-content, 1fr));
         align-self: stretch;
         align-content: stretch;
         align-items: stretch;
@@ -1532,6 +1550,23 @@ body[data-page="admin-services-openkill-config"] #cbi-openkill > .cbi-section-ca
         min-height: 0;
         height: auto;
     }
+}
+
+/* The live summaries are intentionally short.  Full evidence remains in the
+ * title/accessible label populated by status.htm, while the card itself keeps
+ * a stable rhythm when a runtime state changes. */
+.oc.openkill-status-page .security-status-card,
+.oc.openkill-status-page .security-status-content,
+.oc.openkill-status-page .security-status-value,
+.oc.openkill-status-page .security-status-detail {
+    min-width: 0;
+    max-width: 100%;
+}
+
+.oc.openkill-status-page .security-status-value,
+.oc.openkill-status-page .security-status-detail {
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 @media (max-width: 1100px) {

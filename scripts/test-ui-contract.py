@@ -165,10 +165,15 @@ class LuCIContractTests(unittest.TestCase):
             "dashboard-content-layout",
             "data-dashboard-layout-ready",
             "dashboard-endpoint-card",
+            "setSecurityDetail",
+            "核心未运行 · 出站未验证",
+            "组件可执行 · 版本未知",
         ):
             with self.subTest(hook=hook):
                 self.assertIn(hook, source)
-        self.assertIn("grid-template-columns: repeat(3, minmax(0, 1fr));", css)
+        self.assertIn("grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);", css)
+        self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", css)
+        self.assertIn("grid-template-rows: repeat(4, minmax(min-content, 1fr));", css)
         self.assertIn(".dashboard-content-layout > .main-card", css)
         self.assertIn('[id="container.openkill.config.network"] .openkill-settings-card-stack', css)
         self.assertIn('[id="container.openkill.config.network"] .openkill-settings-card-body', css)
@@ -190,7 +195,7 @@ class LuCIContractTests(unittest.TestCase):
                 self.assertIn(hook, source if hook not in ("adblock_provider_effective", "adblock_dns_loaded", "adblock_core_loaded", "adblock_verified") else controller)
         self.assertIn('"state=generated"', adblock)
         self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", css)
-        self.assertIn("grid-template-rows: repeat(4, minmax(0, 1fr));", css)
+        self.assertIn("grid-template-rows: repeat(4, minmax(min-content, 1fr));", css)
 
     def test_status_settings_are_scoped_and_generation_guarded(self) -> None:
         source = STATUS.read_text(encoding="utf-8")
