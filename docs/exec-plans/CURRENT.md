@@ -2203,3 +2203,39 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   device test will terminate only the stale installer process from this
   reproduction after recording its failure stage; no user configuration or
   node data will be changed.
+
+## 2026-1154 one-click installer release evidence (2026-09-25)
+
+- Source commit `ae0c24bfd17401a8de0a3c3b783c3125f65a7046` is on `master`.
+  The exact Development CI passed: [run 36151093802](https://github.com/dinggood615/openkill/actions/runs/36151093802).
+- The RC Build passed from that exact source: [run 36151287232](https://github.com/dinggood615/openkill/actions/runs/36151287232).
+  Its SDK audit artifact is `OpenKill-openwrt-sdk-audit`, SHA256
+  `a0cdb968092d4a49cf64ccc6a610b4d846aeb2e222a33aa4a475333f1fde9f39`;
+  the contained `luci-app-openkill_2026-1154_all.ipk` SHA256 is
+  `a630e71013f54bc36760c8034161776a5ba411205d757eff26722fb9095991a8`.
+  Package metadata, conffile preservation, maintainer-script deletion audit,
+  stale-development-reference audit and sensitive-content audit passed.
+- Formal Release with `release_gate=true` and `publish=true` passed:
+  [run 36152194588](https://github.com/dinggood615/openkill/actions/runs/36152194588).
+  Published [v2026-1154-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1154-ipk)
+  from the exact source; the formal IPK SHA256 is
+  `ec548ab07da4c7d995a3aed7752e9508ee2635ec08e31e44e8c0dda5a5adadaf`.
+  `v2026-1153-ipk` remains available for rollback.
+- Authorized-device backup before the formal installation:
+  `/tmp/openkill-1154-formal-20260925-231502/config.tgz`, SHA256
+  `5dcb4773d84d45f55c2363f4e80828e81adab8ac614ddb3d7f132e683fc645ad`.
+  The formal package installed as OpenKill `2026-1154`; `/etc/openkill/core/naive`
+  is executable and the helper reports `component_installed=1`,
+  `configured=0`, `generated=0`, `local_ready=0`, `remote_verified=0`,
+  `state=disabled`, `reason=no-enabled-nodes`. No credentials or node data
+  were emitted or changed by this verification.
+- The stale pre-fix installer process was stopped after its failure stage was
+  recorded. The device's selected YAML was absent after that interrupted run,
+  so `/etc/init.d/openkill` correctly remains inactive instead of inventing a
+  configuration. This is a missing device configuration prerequisite, not a
+  claim that a NaiveProxy remote connection was restored.
+- Local installer behavior, the global optional-database deadline, service
+  state restoration, NaiveProxy integration, POSIX syntax and local-gate all
+  passed. The device still cannot reach public GitHub/jsDelivr through its
+  current Fake-IP/TLS bootstrap path; component download and remote Naive
+  authentication remain device-pending.
