@@ -1850,6 +1850,42 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   UI-contract, preview, POSIX/local-gate and package audits passed; credentials
   and private configuration were not touched.
 
+## One-click NaiveProxy installer release evidence (2026-09-25)
+
+- Implementation commit `1967eb87530f5884be3faa2c3cd0ad56e0a0bfd6` adds the
+  non-fatal installer phase and installer contract coverage. Its first
+  Development CI attempt ([run 36115591993](https://github.com/dinggood615/openkill/actions/runs/36115591993))
+  correctly rejected an intermediate commit whose version fields were split
+  across commits; no package was published from that state.
+- Versioned source commit `30f847b8a08733fda952efb78e5b599c1ef41b5f`
+  (`2026-1147`) contains the synchronized Makefile, installer, README, UI
+  preview and release notes. Exact Development CI passed ([run 36115735658](https://github.com/dinggood615/openkill/actions/runs/36115735658)).
+- Local evidence passed after the repair: installer tests 12/12 (one host
+  dependency skip), NaiveProxy integration contract, POSIX syntax checks,
+  local-gate and `git diff --check`. The integration test now decodes WSL
+  diagnostics with replacement handling so locale noise cannot mask syntax
+  results.
+- RC Build passed ([run 36115884484](https://github.com/dinggood615/openkill/actions/runs/36115884484)).
+  Candidate `luci-app-openkill_2026-1147_all.ipk` SHA-256 is
+  `02452a7532b9e4f8540f2903b3e025b6d55c9e2756bcd7606fb25d8087f9026f`;
+  it is archived under `D:\openkill-cache\rc-2026-1147`. The audit passed
+  package metadata, conffile preservation, maintainer-script deletion,
+  stale-reference and sensitive-content checks.
+- Formal Release with `release_gate=true` and `publish=true` passed
+  ([run 36116332106](https://github.com/dinggood615/openkill/actions/runs/36116332106)).
+  Published release: [v2026-1147-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1147-ipk),
+  source `30f847b8a08733fda952efb78e5b599c1ef41b5f`, asset
+  `luci-app-openkill_2026-1147_all.ipk`, SHA-256
+  `d9877d85489e74cd8cfa42d2ac4aed4e91c34f55b9f82ee452cfe6a6514469ea`.
+  The formal asset is archived under `D:\openkill-cache\formal-2026-1147`;
+  its extracted files include the NaiveProxy metadata helper, component path,
+  bridge endpoint and SOCKS5 writer. `v2026-1146-ipk` remains available for
+  rollback.
+- No router, device, browser-rendered viewport, remote Naive endpoint or
+  packet-path validation was performed. The one-click installer still treats
+  metadata/download/component failures as non-fatal to OpenKill and does not
+  start a helper without an enabled NaiveProxy node.
+
 ## One-click NaiveProxy installer handoff (2026-09-25)
 
 - Scope: extend the existing OpenKill installer with an optional, non-fatal
