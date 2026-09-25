@@ -41,12 +41,14 @@ def main() -> None:
     makefile = MAKEFILE.read_text(encoding="utf-8")
 
     require(CONFIG, "option naive_enabled '0'")
+    require(CONFIG, "option naive_bridge_mode 'auto'")
     require(SERVERS, 'o:value("naiveproxy", "NaiveProxy")')
     require(SERVERS, '"naive_username"')
     require(SERVERS, '"naive_transport"')
     require(generator, 'type: socks5')
     require(generator, 'server: "127.0.0.1"')
     require(generator, "udp: false")
+    require(generator, "naive_bridge_mode")
     assert 'type: naiveproxy' not in "\n".join(line for line in generator.splitlines() if not line.lstrip().startswith("#")), "unsupported native Mihomo type leaked into generator"
     require(helper, '"listen": "socks://127.0.0.1:%s"')
     require(helper, 'chmod 600 "$tmp"')
@@ -83,12 +85,14 @@ def main() -> None:
     require(CONTROLLER, "type: socks5")
     require(CONTROLLER, 'server = "127.0.0.1"')
     require(CONTROLLER, "udp = false")
+    require(CONTROLLER, 'mode = fs.uci_get_config("config", "naive_bridge_mode")')
     bridge_section = CONTROLLER.read_text(encoding="utf-8").split("function action_naive_bridge()", 1)[1].split("function action_naive_redirect", 1)[0]
     assert "naive_username" not in bridge_section and "naive_password" not in bridge_section, "bridge preview must not expose credentials"
     require(CONTROLLER, "action_naive_redirect")
     assert 'action_naive_redirect"),"NaiveProxy"' not in CONTROLLER.read_text(encoding="utf-8"), "legacy NaiveProxy route must stay hidden from the menu"
     assert 'uci_cursor:commit("openkill")' not in CONTROLLER.read_text(encoding="utf-8").split("function action_naive_metadata()", 1)[1].split("function action_naive_component()", 1)[0], "metadata discovery must not commit UCI"
     require(SETTINGS, '"naive_enabled"')
+    require(SETTINGS, '"naive_bridge_mode"')
     require(SETTINGS, 'template = "openkill/naive_compatibility"')
     require(SETTINGS_THEME, "naiveproxy-compatibility")
     require(SETTINGS_THEME, "openkill-naive-component-info")

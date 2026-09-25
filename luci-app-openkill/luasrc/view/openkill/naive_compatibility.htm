@@ -182,7 +182,8 @@ end
     return fetchJson(bridgeUrl + '?_=' + Date.now(), {credentials: 'same-origin', cache: 'no-store'})
       .then(function (data) {
         bridgeOutput.value = data && data.yaml ? data.yaml : '';
-        bridgeState.textContent = data && data.count ? ('已生成 ' + data.count + ' 个回环 SOCKS5 节点；UDP 未启用。') : '暂无已启用的 NaiveProxy 节点。';
+        var mode = data && data.mode === 'manual' ? '自管 YAML 模式' : '自动接入模式';
+        bridgeState.textContent = data && data.count ? ('已生成 ' + data.count + ' 个回环 SOCKS5 节点 · ' + mode + ' · UDP 未启用。') : ('暂无已启用的 NaiveProxy 节点 · ' + mode + '。');
       })
       .catch(function () { bridgeState.textContent = '节点读取失败，请重试。'; });
   }

@@ -1,5 +1,21 @@
 # Current status
 
+## NaiveProxy automatic versus self-managed YAML mode (2026-09-25)
+
+- Scope: add an explicit bridge mode to the existing NaiveProxy integration.
+  `auto` writes credential-free loopback SOCKS5 entries into the generated
+  Mihomo profile; `manual` keeps the helper and status lifecycle but only
+  exposes the generated loopback snippet for a user-managed YAML file.
+  Installation, DNS, routing, legacy writers, parser grammar and ABI remain
+  unchanged.
+- Contract: the mode is normalized to `auto` when absent or invalid. The
+  generator checks the mode before injecting a bridge, while the diagnostic
+  endpoint reports the same mode and continues to expose no credentials.
+  Manual mode never silently becomes DIRECT and does not stop the helper.
+- Validation: add integration assertions for UCI default, normalization, UI,
+  generator guard and endpoint response; run local tests and gates. No device
+  or packet-path validation is authorized in this local step.
+
 ## NaiveProxy page installation task flow (2026-09-23)
 
 - Scope: fix the NaiveProxy component installation request chain and expose

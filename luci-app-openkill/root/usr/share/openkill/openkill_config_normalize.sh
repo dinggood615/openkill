@@ -55,6 +55,8 @@ naive_enabled="$(uci -q get openkill.config.naive_enabled 2>/dev/null || true)"
 case "$naive_enabled" in 0|1) ;; *) uci -q set openkill.config.naive_enabled=0; changed=1 ;; esac
 naive_auto_start="$(uci -q get openkill.config.naive_auto_start 2>/dev/null || true)"
 case "$naive_auto_start" in 0|1) ;; *) uci -q set openkill.config.naive_auto_start=1; changed=1 ;; esac
+naive_bridge_mode="$(uci -q get openkill.config.naive_bridge_mode 2>/dev/null || true)"
+case "$naive_bridge_mode" in auto|manual) ;; *) uci -q set openkill.config.naive_bridge_mode=auto; changed=1 ;; esac
 naive_port_base="$(uci -q get openkill.config.naive_port_base 2>/dev/null || true)"
 case "$naive_port_base" in ''|*[!0-9]*) uci -q set openkill.config.naive_port_base=11080; changed=1 ;; esac
 if [ -n "$naive_port_base" ] && { [ "$naive_port_base" -lt 1024 ] 2>/dev/null || [ "$naive_port_base" -gt 65000 ] 2>/dev/null; }; then
@@ -119,6 +121,7 @@ set_default openvpn_adblock_exception 0
 set_default openvpn_dns_mode inherit
 set_default naive_enabled 0
 set_default naive_auto_start 1
+set_default naive_bridge_mode auto
 set_default naive_component_path /etc/openkill/core/naive
 set_default naive_component_url ''
 set_default naive_component_sha256 ''

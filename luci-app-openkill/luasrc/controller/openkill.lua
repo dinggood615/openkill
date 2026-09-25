@@ -1692,7 +1692,7 @@ end
 -- The helper owns the remote credentials; this endpoint only exposes the
 -- loopback address and stable port that yml_proxys_set.sh writes.
 function action_naive_bridge()
-	local payload = { ok = true, entries = {}, yaml = "", generated_at = os.time() }
+	local payload = { ok = true, entries = {}, yaml = "", generated_at = os.time(), mode = fs.uci_get_config("config", "naive_bridge_mode") or "auto" }
 	local current_path = fs.uci_get_config("config", "config_path") or ""
 	local current_name = fs.basename(current_path or "") or ""
 	local function yaml_quote(value)
