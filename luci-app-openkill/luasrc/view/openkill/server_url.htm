@@ -1,4 +1,5 @@
 <%+cbi/valueheader%>
+<% local http = require "luci.http"; local naive_quick_import = http.formvalue("type") == "naiveproxy" or http.formvalue("import") == "1" %>
 <script type="text/javascript">
 //<![CDATA[
 function padright(str, cnt, pad) {
@@ -1710,11 +1711,11 @@ function exportMieru(sid) {
     return 'mierus://' + url;
 }
 
-function import_url(btn, urlname, sid) {
+function import_url(btn, urlname, sid, presetUrl) {
     var s = document.getElementById(urlname + '-status');
     if (!s) return false;
 
-    var ssrurl = prompt("<%:Paste sharing link here%>", "");
+    var ssrurl = typeof presetUrl === 'string' ? presetUrl : prompt("<%:Paste sharing link here%>", "");
     if (ssrurl == null || ssrurl == "") {
         s.innerHTML = "<font style=\"color:red\"><%:User cancelled%></font>";
         return false;
@@ -1870,6 +1871,17 @@ function import_url(btn, urlname, sid) {
     endImportOtherParameters();
 
     return false;
+}
+
+function import_naive_quick(btn, urlname, sid) {
+    var input = document.getElementById('naive-quick-link-' + sid);
+    var value = input ? String(input.value || '').trim() : '';
+    var status = document.getElementById(urlname + '-status');
+    if (!value) {
+        if (status) status.innerHTML = '<font style="color:red">请粘贴 NaiveProxy 分享链接。</font>';
+        return false;
+    }
+    return import_url(btn, urlname, sid, value);
 }
 
 function parseSS(body, sid) {
@@ -3073,5 +3085,15 @@ function parseMieru(url, sid) {
 </script>
 <input type="button" class="btn cbi-button cbi-button-apply" value="<%:Import%>" onclick="return import_url(this, '<%=self.option%>', '<%=self.value%>')" />
 <input type="button" class="btn cbi-button cbi-button-apply" value="<%:Export%>" onclick="return export_url(this, '<%=self.option%>', '<%=self.value%>')" />
+<% if naive_quick_import then %>
+<div class="openkill-naive-quick-import">
+  <label for="naive-quick-link-<%=self.value%>">快速导入 NaiveProxy</label>
+  <div class="openkill-naive-quick-import-row">
+    <input id="naive-quick-link-<%=self.value%>" type="text" placeholder="naive+https://用户名:密码@主机:端口?..." autocomplete="off" />
+    <input type="button" class="btn cbi-button cbi-button-apply" value="解析并填入" onclick="return import_naive_quick(this, '<%=self.option%>', '<%=self.value%>')" />
+  </div>
+  <small>凭据只写入当前节点配置；保存后由 OpenKill 生成本地 SOCKS5 入口。</small>
+</div>
+<% end %>
 <span id="<%=self.option%>-status"></span>
 <%+cbi/valuefooter%>

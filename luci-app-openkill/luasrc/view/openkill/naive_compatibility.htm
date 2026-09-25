@@ -8,18 +8,22 @@ local has_current_config = current_config:sub(1, #config_prefix) == config_prefi
   fs.access(current_config) and fs.IsYamlExt(fs.basename(current_config))
 local node_manage_url = dispatcher.build_url("admin", "services", "openkill", "servers")
 local node_add_url = node_manage_url
+local node_import_url = node_manage_url
 if has_current_config then
   local file_query = "?file=" .. http.urlencode(current_config)
   node_manage_url = node_manage_url .. file_query
   node_add_url = node_manage_url .. "&add=naiveproxy"
+  node_import_url = node_manage_url .. "&add=naiveproxy&import=1"
 else
   node_manage_url = dispatcher.build_url("admin", "services", "openkill", "config")
   node_add_url = node_manage_url
+  node_import_url = node_manage_url
 end
 %>
 <div id="openkill-naive-component-info" class="openkill-naive-compatibility"
      data-naive-metadata-url="<%=dispatcher.build_url('admin','services','openkill','naive_metadata')%>"
-     data-naive-component-url="<%=dispatcher.build_url('admin','services','openkill','naive_component')%>">
+     data-naive-component-url="<%=dispatcher.build_url('admin','services','openkill','naive_component')%>"
+     data-naive-bridge-url="<%=dispatcher.build_url('admin','services','openkill','naive_bridge')%>">
   <div class="openkill-naive-compatibility-head">
     <div>
       <strong>官方组件检测</strong>
@@ -41,15 +45,27 @@ end
   <div class="openkill-naive-compatibility-actions">
     <button type="button" class="cbi-button cbi-button-apply" data-naive-meta-action="detect">检测并填写空缺</button>
     <button type="button" class="cbi-button" data-naive-meta-action="refresh">只刷新检测</button>
-    <button type="button" class="cbi-button cbi-button-apply" data-naive-auto-install="1">自动匹配并安装</button>
+    <button type="button" class="cbi-button cbi-button-apply" data-naive-auto-install="1">一键安装 NaiveProxy</button>
     <button type="button" class="cbi-button cbi-button-apply" data-naive-component-action="install">安装当前组件</button>
     <button type="button" class="cbi-button cbi-button-reset" data-naive-component-action="remove">移除组件</button>
   </div>
   <p class="openkill-naive-compatibility-links">
-    <a class="cbi-button" href="<%=node_add_url%>"><% if has_current_config then %>添加或导入 NaiveProxy 节点<% else %>先选择配置文件以添加 NaiveProxy 节点<% end %></a>
+    <a class="cbi-button" href="<%=node_add_url%>"><% if has_current_config then %>添加 NaiveProxy 节点<% else %>先选择配置文件以添加节点<% end %></a>
+    <% if has_current_config then %><a class="cbi-button" href="<%=node_import_url%>">导入分享链接</a><% end %>
     <a class="cbi-button" href="<%=node_manage_url%>">管理节点与策略组</a>
   </p>
   <div class="openkill-naive-compatibility-status" data-naive-component-status aria-live="polite">组件状态待检测。</div>
+  <section class="openkill-naive-bridge" data-naive-bridge>
+    <div class="openkill-naive-bridge-head">
+      <div><strong>本地 SOCKS5 YAML</strong><p>仅含回环地址和端口，可复制到自定义 YAML。</p></div>
+      <button type="button" class="cbi-button" data-naive-bridge-refresh>刷新</button>
+    </div>
+    <textarea readonly rows="5" data-naive-bridge-output placeholder="暂无已启用的 NaiveProxy 节点"></textarea>
+    <div class="openkill-naive-bridge-actions">
+      <button type="button" class="cbi-button cbi-button-apply" data-naive-bridge-copy>复制 YAML</button>
+      <span data-naive-bridge-status aria-live="polite">未检测节点。</span>
+    </div>
+  </section>
 </div>
 <script>
 (function () {
@@ -58,9 +74,12 @@ end
   root.setAttribute('data-naive-ready', '1');
   var metadataUrl = root.getAttribute('data-naive-metadata-url');
   var componentUrl = root.getAttribute('data-naive-component-url');
+  var bridgeUrl = root.getAttribute('data-naive-bridge-url');
   var metaState = root.querySelector('[data-naive-meta-state]');
   var reason = root.querySelector('[data-naive-meta-reason]');
   var componentState = root.querySelector('[data-naive-component-status]');
+  var bridgeOutput = root.querySelector('[data-naive-bridge-output]');
+  var bridgeState = root.querySelector('[data-naive-bridge-status]');
   var metaFields = root.querySelectorAll('[data-naive-meta]');
 
   function field(name) {
@@ -157,6 +176,16 @@ end
       .then(renderComponent)
       .catch(function (error) { componentState.textContent = error && error.message === 'timeout' ? '组件状态读取超时，请重试' : '组件状态读取失败，请重试'; });
   }
+  function refreshBridge() {
+    if (!bridgeUrl || !bridgeOutput) return Promise.resolve();
+    bridgeState.textContent = '正在读取节点…';
+    return fetchJson(bridgeUrl + '?_=' + Date.now(), {credentials: 'same-origin', cache: 'no-store'})
+      .then(function (data) {
+        bridgeOutput.value = data && data.yaml ? data.yaml : '';
+        bridgeState.textContent = data && data.count ? ('已生成 ' + data.count + ' 个回环 SOCKS5 节点；UDP 未启用。') : '暂无已启用的 NaiveProxy 节点。';
+      })
+      .catch(function () { bridgeState.textContent = '节点读取失败，请重试。'; });
+  }
   function pollTask(taskId) {
     var started = Date.now();
     function read() {
@@ -220,6 +249,14 @@ end
     var metadataAction = event.target.getAttribute('data-naive-meta-action');
     var componentAction = event.target.getAttribute('data-naive-component-action');
     if (event.target.getAttribute('data-naive-auto-install')) return autoInstall();
+    if (event.target.hasAttribute('data-naive-bridge-refresh')) return refreshBridge();
+    if (event.target.hasAttribute('data-naive-bridge-copy')) {
+      if (!bridgeOutput || !bridgeOutput.value) { bridgeState.textContent = '暂无可复制内容。'; return; }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(bridgeOutput.value).then(function () { bridgeState.textContent = 'YAML 已复制。'; }, function () { bridgeState.textContent = '复制失败，请手动选择文本。'; });
+      } else { bridgeOutput.focus(); bridgeOutput.select(); bridgeState.textContent = '请手动复制已选文本。'; }
+      return;
+    }
     if (metadataAction) return requestMetadata(metadataAction === 'detect' ? 'detect' : 'cached', metadataAction === 'detect');
     if (!componentAction) return;
     var urlField = field('naive_component_url');
@@ -228,5 +265,6 @@ end
   });
   requestMetadata('cached', false);
   refreshComponent();
+  refreshBridge();
 }());
 </script>

@@ -78,6 +78,13 @@ def main() -> None:
     require(status, "naive_component_installed")
     require(CONTROLLER, 'entry({"admin", "services", "openkill", "naive_component"}')
     require(CONTROLLER, 'entry({"admin", "services", "openkill", "naive_metadata"}')
+    require(CONTROLLER, 'entry({"admin", "services", "openkill", "naive_bridge"}')
+    require(CONTROLLER, "function action_naive_bridge()")
+    require(CONTROLLER, "type: socks5")
+    require(CONTROLLER, 'server = "127.0.0.1"')
+    require(CONTROLLER, "udp = false")
+    bridge_section = CONTROLLER.read_text(encoding="utf-8").split("function action_naive_bridge()", 1)[1].split("function action_naive_redirect", 1)[0]
+    assert "naive_username" not in bridge_section and "naive_password" not in bridge_section, "bridge preview must not expose credentials"
     require(CONTROLLER, "action_naive_redirect")
     assert 'action_naive_redirect"),"NaiveProxy"' not in CONTROLLER.read_text(encoding="utf-8"), "legacy NaiveProxy route must stay hidden from the menu"
     assert 'uci_cursor:commit("openkill")' not in CONTROLLER.read_text(encoding="utf-8").split("function action_naive_metadata()", 1)[1].split("function action_naive_component()", 1)[0], "metadata discovery must not commit UCI"
@@ -86,14 +93,14 @@ def main() -> None:
     require(SETTINGS_THEME, "naiveproxy-compatibility")
     require(SETTINGS_THEME, "openkill-naive-component-info")
     require(NAIVE_VIEW, "检测并填写空缺")
-    require(NAIVE_VIEW, "自动匹配并安装")
-    require(NAIVE_VIEW, "添加或导入 NaiveProxy 节点")
+    require(NAIVE_VIEW, "一键安装 NaiveProxy")
+    require(NAIVE_VIEW, "添加 NaiveProxy 节点")
     require(NAIVE_VIEW, 'fs.uci_get_config("config", "config_path")')
     require(NAIVE_VIEW, 'current_config:sub(1, #config_prefix) == config_prefix')
     require(NAIVE_VIEW, 'fs.access(current_config) and fs.IsYamlExt(fs.basename(current_config))')
     require(NAIVE_VIEW, 'http.urlencode(current_config)')
     require(NAIVE_VIEW, '"&add=naiveproxy"')
-    require(NAIVE_VIEW, '先选择配置文件以添加 NaiveProxy 节点')
+    require(NAIVE_VIEW, '先选择配置文件以添加节点')
     require(NAIVE_VIEW, "credentials: 'same-origin'")
     require(NAIVE_VIEW, "远端连接未验证")
     require(NAIVE_VIEW, "辅助组件未安装（OpenKill 插件本体可独立运行）")
@@ -101,6 +108,10 @@ def main() -> None:
     require(NAIVE_VIEW, "return data;")
     require(NAIVE_VIEW, "operation=task-status")
     require(NAIVE_VIEW, "function pollTask(taskId)")
+    require(NAIVE_VIEW, "data-naive-bridge-url")
+    require(NAIVE_VIEW, "本地 SOCKS5 YAML")
+    require(NAIVE_VIEW, "data-naive-bridge-copy")
+    require(NAIVE_VIEW, "导入分享链接")
     require(CONTROLLER, 'operation == "task-status"')
     require(CONTROLLER, 'openkill_naive.sh install-task')
 
@@ -118,6 +129,9 @@ def main() -> None:
     require(ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers.lua", 'edit_url .. "&type=naiveproxy"')
     require(ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua", 'HTTP.formvalue("type") == "naiveproxy"')
     require(ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua", 'o.default = "naiveproxy"')
+    require(ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers.lua", 'edit_url = edit_url .. "&import=1"')
+    require(server_url, "import_naive_quick")
+    require(server_url, "naive-quick-link-")
 
     if shutil.which("wsl.exe"):
         for path in (HELPER, METADATA, GENERATOR, INIT):

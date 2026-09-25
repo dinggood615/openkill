@@ -16,6 +16,7 @@ function index()
 	entry({"admin", "services", "openkill", "naive_status"},call("action_naive_status")).leaf=true
 	entry({"admin", "services", "openkill", "naive_component"},call("action_naive_component")).leaf=true
 	entry({"admin", "services", "openkill", "naive_metadata"},call("action_naive_metadata")).leaf=true
+	entry({"admin", "services", "openkill", "naive_bridge"},call("action_naive_bridge")).leaf=true
 	entry({"admin", "services", "openkill", "startlog"},call("action_start")).leaf=true
 	entry({"admin", "services", "openkill", "refresh_log"},call("action_refresh_log"))
 	entry({"admin", "services", "openkill", "del_log"},call("action_del_log"))
@@ -1683,6 +1684,44 @@ function action_naive_status()
 		component_reason = reason,
 		state = fs.readfile("/tmp/openkill-naive.state") or "",
 	}
+	HTTP.prepare_content("application/json")
+	HTTP.write_json(payload)
+end
+
+-- Return the credential-free Mihomo boundary for enabled NaiveProxy nodes.
+-- The helper owns the remote credentials; this endpoint only exposes the
+-- loopback address and stable port that yml_proxys_set.sh writes.
+function action_naive_bridge()
+	local payload = { ok = true, entries = {}, yaml = "", generated_at = os.time() }
+	local current_path = fs.uci_get_config("config", "config_path") or ""
+	local current_name = fs.basename(current_path or "") or ""
+	local function yaml_quote(value)
+		value = tostring(value or ""):gsub("\\", "\\\\"):gsub('"', '\\"')
+		value = value:gsub("[\r\n]", " ")
+		return '"' .. value .. '"'
+	end
+	uci:foreach("openkill", "servers", function(section)
+		if section.enabled == "1" and section.type == "naiveproxy" then
+			local target = section.config or "all"
+			if target == "all" or target == "" or target == current_name then
+				local sid = section[".name"] or ""
+				local port = SYS.exec(string.format("/usr/share/openkill/openkill_naive.sh port %q 2>/dev/null", sid)) or ""
+				port = port:gsub("[^0-9].*$", ""):gsub("^%s+", ""):gsub("%s+$", "")
+				if sid ~= "" and port:match("^[1-9][0-9]*$") then
+					local name = section.name or sid
+					local item = { id = sid, name = name, server = "127.0.0.1", port = tonumber(port), udp = false }
+					item.yaml = "- name: " .. yaml_quote(name) .. "\n" ..
+						"  type: socks5\n  server: \"127.0.0.1\"\n" ..
+						"  port: " .. port .. "\n  udp: false"
+					table.insert(payload.entries, item)
+				end
+			end
+		end
+	end)
+	local snippets = {}
+	for _, item in ipairs(payload.entries) do table.insert(snippets, item.yaml) end
+	payload.yaml = table.concat(snippets, "\n")
+	payload.count = #payload.entries
 	HTTP.prepare_content("application/json")
 	HTTP.write_json(payload)
 end

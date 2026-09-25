@@ -395,10 +395,25 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-se
 .openkill-naive-panel p { margin-top: 6px; color: var(--ok-text-secondary, #aeb8c8); line-height: 1.45; }
 .openkill-naive-panel-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .openkill-naive-panel-state { margin-top: 14px; color: var(--ok-text-primary, #f1f4f8); overflow-wrap: anywhere; }
+.openkill-naive-bridge { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--ok-border, rgba(148,163,184,.25)); }
+.openkill-naive-bridge-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.openkill-naive-bridge-head strong { color: var(--ok-text-primary, #f1f4f8); }
+.openkill-naive-bridge-head p { margin: 4px 0 0; color: var(--ok-text-secondary, #aeb8c8); line-height: 1.4; }
+.openkill-naive-bridge textarea { display: block; width: 100%; min-height: 118px; margin-top: 10px; resize: vertical; box-sizing: border-box; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .88em; line-height: 1.45; overflow-wrap: anywhere; }
+.openkill-naive-bridge-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.openkill-naive-bridge-actions span { color: var(--ok-text-secondary, #aeb8c8); overflow-wrap: anywhere; }
+.openkill-naive-quick-import { margin-top: 10px; padding: 10px 12px; border: 1px solid var(--ok-border, rgba(255,255,255,.16)); border-radius: var(--ok-radius-sm, 6px); background: var(--ok-surface-muted, rgba(15,23,42,.22)); }
+.openkill-naive-quick-import label { display: block; margin-bottom: 6px; color: var(--ok-text-primary, #f1f4f8); font-weight: 600; }
+.openkill-naive-quick-import-row { display: flex; align-items: center; gap: 8px; }
+.openkill-naive-quick-import-row input[type="text"] { flex: 1 1 auto; min-width: 0; }
+.openkill-naive-quick-import small { display: block; margin-top: 6px; color: var(--ok-text-secondary, #aeb8c8); overflow-wrap: anywhere; }
 
 @media (max-width: 720px) {
     .openkill-naive-panel-header { flex-direction: column; }
     .openkill-naive-panel-actions { justify-content: flex-start; }
+    .openkill-naive-bridge-head { flex-wrap: wrap; }
+    .openkill-naive-quick-import-row { flex-wrap: wrap; }
+    .openkill-naive-quick-import-row input[type="text"] { flex-basis: 100%; }
 }
 
 /* ===== OpenKill Stage 3: Runtime Dashboard Layout Start =====

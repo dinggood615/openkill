@@ -122,6 +122,9 @@ function ss.create(self, section)
 		local edit_url = ss.extedit % sid
 		if HTTP.formvalue("add") == "naiveproxy" then
 			edit_url = edit_url .. "&type=naiveproxy"
+			if HTTP.formvalue("import") == "1" then
+				edit_url = edit_url .. "&import=1"
+			end
 		end
 		HTTP.redirect(edit_url)
 		return
