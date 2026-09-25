@@ -177,6 +177,7 @@ end
       .catch(function (error) {
         metaState.textContent = error && error.message === 'timeout' ? '读取超时' : '读取失败';
         reason.textContent = '官方发布信息读取失败，请稍后重试；现有字段未修改。';
+        return {ok: '0', reason: error && error.message ? error.message : 'metadata-request-failed'};
       })
       .then(function (data) { setBusy('[data-naive-meta-action]', false); return data; }, function (error) { setBusy('[data-naive-meta-action]', false); throw error; });
   }
@@ -271,13 +272,27 @@ end
       })
       .then(function (data) { setBusy('[data-naive-component-action], [data-naive-auto-install]', false); return data; }, function (error) { setBusy('[data-naive-component-action], [data-naive-auto-install]', false); throw error; });
   }
+  function currentAssetPair() {
+    var urlField = field('naive_component_url');
+    var shaField = field('naive_component_sha256');
+    if (!urlField || !shaField) return null;
+    if (!String(urlField.value || '').trim() || !String(shaField.value || '').trim()) return null;
+    return {urlField: urlField, shaField: shaField};
+  }
   function autoInstall() {
     setBusy('[data-naive-meta-action], [data-naive-component-action], [data-naive-auto-install]', true);
+    var existing = currentAssetPair();
+    if (existing) {
+      componentState.textContent = '使用已填写的官方 URL 和 SHA256，开始安装…';
+      return runComponentAction('install', existing.urlField, existing.shaField)
+        .catch(function () { return null; })
+        .then(function () { setBusy('[data-naive-meta-action], [data-naive-component-action], [data-naive-auto-install]', false); });
+    }
     return requestMetadata('detect', true).then(function (data) {
       var urlField = field('naive_component_url');
       var shaField = field('naive_component_sha256');
       if (!data || data.ok !== '1' || !urlField || !shaField || !String(urlField.value || '').trim() || !String(shaField.value || '').trim()) {
-        componentState.textContent = '未找到可核验的匹配组件，未执行安装';
+        componentState.textContent = '组件信息检测失败，未执行安装：' + ((data && data.reason) || '未找到可核验制品');
         return null;
       }
       return runComponentAction('install', urlField, shaField);

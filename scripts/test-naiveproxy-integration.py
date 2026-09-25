@@ -123,6 +123,9 @@ def main() -> None:
     require(NAIVE_VIEW, "远端连接未验证")
     require(NAIVE_VIEW, "辅助组件未安装（OpenKill 插件本体可独立运行）")
     require(NAIVE_VIEW, "requestMetadata('detect', true)")
+    require(NAIVE_VIEW, "function currentAssetPair()")
+    require(NAIVE_VIEW, "使用已填写的官方 URL 和 SHA256，开始安装")
+    require(NAIVE_VIEW, "组件信息检测失败，未执行安装")
     require(NAIVE_VIEW, "return data;")
     require(NAIVE_VIEW, "operation=task-status")
     require(NAIVE_VIEW, "function pollTask(taskId)")
@@ -134,6 +137,13 @@ def main() -> None:
     assert ':format(section)' not in TBLSECTION.read_text(encoding="utf-8"), "encoded file query must not pass through string.format"
     require(CONTROLLER, 'operation == "task-status"')
     require(CONTROLLER, 'openkill_naive.sh install-task')
+
+    # A complete URL/digest pair must take the install-task path before any
+    # metadata refresh. This is the device-safe behavior when Fake-IP DNS or
+    # an upstream API temporarily prevents GitHub metadata discovery.
+    auto_install = NAIVE_VIEW.read_text(encoding="utf-8").split("function autoInstall()", 1)[1].split("root.addEventListener", 1)[0]
+    assert auto_install.index("currentAssetPair()") < auto_install.index("requestMetadata('detect', true)"), "auto-install must prefer an existing asset pair"
+    assert auto_install.index("runComponentAction('install', existing.urlField, existing.shaField)") < auto_install.index("requestMetadata('detect', true)"), "existing asset pair must start installation without metadata refresh"
 
     server_url = ROOT / "luci-app-openkill/luasrc/view/openkill/server_url.htm"
     server_url_text = server_url.read_text(encoding="utf-8")

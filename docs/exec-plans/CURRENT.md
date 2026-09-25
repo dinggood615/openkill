@@ -2162,3 +2162,24 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   correctly returned LuCI 403/login-required. Source/package route checks and
   device installation checks passed. Remote Naive authentication, UDP, IPv6,
   streaming, and full browser viewport validation remain unverified.
+
+## One-click NaiveProxy install failure repair (2026-09-25)
+
+- Reproduction: on the authorized test device, `openkill_naive_metadata.sh cached`
+  returned `reason=official-api-unavailable`; `curl` failed the TLS handshake to
+  GitHub because Fake-IP DNS resolved `api.github.com` into the synthetic
+  `198.18.0.0/15` range. This is a bootstrap metadata-path failure, not proof
+  that the selected component asset is invalid.
+- UI failure: `autoInstall()` always forced `requestMetadata('detect', true)`.
+  When the page already contained a complete URL/SHA256 pair, a metadata API
+  failure still prevented the install task from being started. The repair will
+  use a complete existing pair directly and only perform metadata discovery
+  when either field is missing; incomplete pairs remain blocked.
+- Contract: URL and SHA256 remain one bound trusted asset pair; no credentials,
+  node data or network-policy changes are introduced. Metadata errors remain
+  visible and never silently trigger DIRECT or an unverified download.
+- Verification: add behavior coverage that a complete pair starts
+  `install-task` without a metadata request, while missing/incomplete pairs
+  require successful metadata discovery. Re-run NaiveProxy integration,
+  POSIX/BusyBox syntax, local-gate and diff checks, then perform a device
+  metadata/install-path regression without restoring private node data.
