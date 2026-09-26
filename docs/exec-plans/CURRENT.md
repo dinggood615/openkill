@@ -59,6 +59,51 @@
   optimization fixture; the process exits successfully. Device reinstallation
   and remote VPS connectivity remain pending and are not claimed here.
 
+### 2026-1159 delivery evidence
+
+- Implementation commit `c22e3d36efcc799dd7e3c1b0c6fb251d3013838d` contains the
+  startup transaction, listener validation, strict-DNS diagnostics and
+  NaiveProxy component/lifecycle fixes. Version metadata and release notes were
+  prepared in `6b20f976fe67f66f165a7ac22e5fe27e8d1a2e45`; both commits are on
+  `master` and the version commit is the published source.
+- The exact version commit's Development CI passed: [run
+  36233800250](https://github.com/dinggood615/openkill/actions/runs/36233800250).
+  The source gate and local gate passed for `2026-1159`; `git diff --check` was
+  clean.
+- RC Build from the exact version commit passed: [run
+  36233919434](https://github.com/dinggood615/openkill/actions/runs/36233919434).
+  The candidate IPK is `luci-app-openkill_2026-1159_all.ipk`, 7,706,023 bytes,
+  SHA-256
+  `6965957aacc645a8880877f2840daf2e1db14bc964c3593f94d773fec17dd0ef`.
+  Its audit artifact digest is
+  `sha256:7fbba5bd71d73321f1a25347e1c4af69f240f3211e0ca162d68f011b79088771`;
+  metadata, conffile preservation, maintainer-script deletion, stale-reference
+  and sensitive-content checks passed under `D:\\openkill-cache\\rc-2026-1159`.
+- Formal Release passed with `release_gate=true` and `publish=true`: [run
+  36234170503](https://github.com/dinggood615/openkill/actions/runs/36234170503).
+  Published [v2026-1159-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1159-ipk)
+  from source `6b20f976fe67f66f165a7ac22e5fe27e8d1a2e45`. The public release
+  asset `luci-app-openkill_2026-1159_all.ipk` is 9,246,266 bytes with SHA-256
+  `2758a19fbec1b581a5f7c4d0e42c2804ad4a87ca97d542e0a3b2f895b552a2d3`.
+  The formal workflow artifact digest is
+  `sha256:5b02a8e48199ce06765a6992dc422bf45c52a9292f087e6e92d7eefe02ec5e85`;
+  the package control record is version `2026-1159`, architecture `all`, and
+  preserves `/etc/config/openkill`. The downloaded release audit is retained
+  under `D:\\openkill-cache\\formal-2026-1159`.
+- The authorized device phase was read-only. It confirmed OpenKill `2026-1158`,
+  an executable `/etc/openkill/core/naive` reporting `150.0.7871.63`, strict
+  DNS with no selectable proxy group, no running helper, and historical
+  NaiveProxy `SIGTRAP` exits. No UCI/config write, restart, package install,
+  packet-path test, central nft change or remote VPS authentication was done.
+  The strict-DNS failure must be repaired by adding a real selectable proxy
+  group (including the generated SOCKS5 name) or intentionally changing the
+  privacy mode; it must not silently fall back to `DIRECT`. The SIGTRAP remains
+  a separate device/runtime compatibility issue and is not claimed fixed by this
+  release.
+- Rollback is the retained `v2026-1158-ipk` package/tag after backing up the
+  device configuration and preserving the user's existing nodes and YAML. No
+  credentials, private node values or complete share links are recorded here.
+
 ## NaiveProxy manual health diagnosis and compact compatibility card (2026-09-26)
 
 - Scope: clarify the screenshot state where `final-yaml-missing-node` appears
