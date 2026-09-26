@@ -2856,3 +2856,33 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
 - Rollback remains `v2026-1159-ipk`; preserve `/etc/naiveproxy` before
   changing packages, stop the independent bridge if needed, reinstall the
   previous IPK, and leave user-managed YAML untouched.
+
+## 2026-1164 Naive import diagnostics and compatibility layout evidence (2026-09-26)
+
+- The follow-up implementation is in `57dd6facdd49c59f2c558990124c35fd443ae338`.
+  It decodes percent-encoded Naive share-link fields on the standalone
+  parser, reports the component probe reason instead of treating a registered
+  path as an available binary, and maps the ZeroTier fields into the
+  compatibility remote-access card while keeping system maintenance in the
+  adjacent capability grid. The exact Development CI passed:
+  [run 36250767369](https://github.com/dinggood615/openkill/actions/runs/36250767369).
+- Version metadata and release notes were prepared in
+  `d861a9e9f4f8b4ec1f4626e336387b9d7ae371a8`; its exact Development CI passed:
+  [run 36250902189](https://github.com/dinggood615/openkill/actions/runs/36250902189).
+- RC Build passed from that exact source:
+  [run 36251022781](https://github.com/dinggood615/openkill/actions/runs/36251022781).
+  The audited RC IPK SHA256 is
+  `bd8d02de53d8bf04f50affcc9e53c98a7a1731be601de9045ecae2f6dda2685b`.
+  Metadata, conffile preservation, persistent-delete, stale-reference and
+  sensitive-content audits passed.
+- Formal Release passed with `release_gate=true` and `publish=true`:
+  [run 36251278871](https://github.com/dinggood615/openkill/actions/runs/36251278871).
+  It published [v2026-1164-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1164-ipk)
+  from the exact source above. The formal
+  `luci-app-openkill_2026-1164_all.ipk` SHA256 is
+  `4a9197c6f2a9aeb43857e970a1d5d8e4e4b9445614c8e8888eb7794168c331ee`.
+- Local import, standalone parser, integration and UI contracts, POSIX
+  checks, `scripts/local-gate.sh` and `git diff --check` passed. Browser
+  rendering was unavailable because Playwright is not installed in this
+  environment; device and VPS/remote authentication were not run under the
+  current plan and remain unverified.
