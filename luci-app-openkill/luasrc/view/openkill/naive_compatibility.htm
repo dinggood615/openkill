@@ -31,44 +31,46 @@ end
      data-naive-node-manage-url="<%=node_manage_url%>">
   <div class="openkill-naive-compatibility-head">
     <div>
-      <strong>官方组件检测</strong>
-     <p>按当前架构匹配官方组件，安装前校验来源与摘要。</p>
+      <strong>NaiveProxy 辅助组件</strong>
+      <p>组件维护远端节点和本地 SOCKS5；Mihomo 接入由你管理。</p>
     </div>
     <span class="openkill-naive-compatibility-badge" data-naive-meta-state aria-live="polite">待检测</span>
   </div>
-  <dl class="openkill-naive-compatibility-facts" data-naive-meta-facts>
-    <div><dt>架构</dt><dd data-naive-meta="architecture">—</dd></div>
-    <div><dt>版本</dt><dd data-naive-meta="release">—</dd></div>
-    <div><dt>制品</dt><dd data-naive-meta="asset">—</dd></div>
-    <div><dt>大小</dt><dd data-naive-meta="size">—</dd></div>
-    <div><dt>摘要来源</dt><dd data-naive-meta="source">—</dd></div>
-    <div><dt>检查时间</dt><dd data-naive-meta="checked_at">—</dd></div>
-  </dl>
-  <p class="openkill-naive-compatibility-url" data-naive-meta="url">官方 URL：—</p>
-  <p class="openkill-naive-compatibility-digest" data-naive-meta="sha256">SHA256：—</p>
-  <p class="openkill-naive-compatibility-reason" data-naive-meta-reason aria-live="polite">尚未检测组件信息。</p>
-  <div class="openkill-naive-compatibility-actions">
-    <button type="button" class="cbi-button cbi-button-apply" data-naive-meta-action="detect">检测并填写空缺</button>
-    <button type="button" class="cbi-button" data-naive-meta-action="refresh">只刷新检测</button>
-    <button type="button" class="cbi-button cbi-button-apply" data-naive-auto-install="1">一键安装 NaiveProxy</button>
-    <button type="button" class="cbi-button cbi-button-apply" data-naive-component-action="install">安装当前组件</button>
-    <button type="button" class="cbi-button cbi-button-reset" data-naive-component-action="remove">移除组件</button>
-  </div>
+  <details class="openkill-naive-component-details">
+    <summary>组件详情与维护</summary>
+    <dl class="openkill-naive-compatibility-facts" data-naive-meta-facts>
+      <div><dt>架构</dt><dd data-naive-meta="architecture">—</dd></div>
+      <div><dt>版本</dt><dd data-naive-meta="release">—</dd></div>
+      <div><dt>制品</dt><dd data-naive-meta="asset">—</dd></div>
+      <div><dt>大小</dt><dd data-naive-meta="size">—</dd></div>
+      <div><dt>摘要来源</dt><dd data-naive-meta="source">—</dd></div>
+      <div><dt>检查时间</dt><dd data-naive-meta="checked_at">—</dd></div>
+    </dl>
+    <p class="openkill-naive-compatibility-url" data-naive-meta="url">官方 URL：—</p>
+    <p class="openkill-naive-compatibility-digest" data-naive-meta="sha256">SHA256：—</p>
+    <p class="openkill-naive-compatibility-reason" data-naive-meta-reason aria-live="polite">尚未检测组件信息。</p>
+    <div class="openkill-naive-compatibility-actions">
+      <button type="button" class="cbi-button cbi-button-apply" data-naive-meta-action="detect">检测组件</button>
+      <button type="button" class="cbi-button" data-naive-meta-action="refresh">刷新信息</button>
+      <button type="button" class="cbi-button cbi-button-apply" data-naive-auto-install="1">一键安装</button>
+      <button type="button" class="cbi-button cbi-button-reset" data-naive-component-action="remove">移除组件</button>
+    </div>
+  </details>
   <div class="openkill-naive-migration-actions" data-naive-migration-actions hidden>
     <button type="button" class="cbi-button cbi-button-apply" data-naive-migrate-manual>确认已改用手动 YAML</button>
     <span>确认前请保留现有桥接片段和策略组引用。</span>
   </div>
   <p class="openkill-naive-compatibility-links">
-    <button type="button" class="cbi-button" data-naive-node-action="add" <% if not has_current_config then %>disabled title="请先选择配置文件"<% end %>><% if has_current_config then %>添加 NaiveProxy 节点<% else %>请先选择配置文件<% end %></button>
-    <button type="button" class="cbi-button" data-naive-node-action="import" <% if not has_current_config then %>disabled title="请先选择配置文件"<% end %>>导入分享链接</button>
-    <button type="button" class="cbi-button" data-naive-node-action="manage">管理节点与策略组</button>
+    <button type="button" class="cbi-button" data-naive-node-action="add" <% if not has_current_config then %>disabled title="请先选择配置文件"<% end %>><% if has_current_config then %>添加节点<% else %>请先选择配置文件<% end %></button>
+    <button type="button" class="cbi-button" data-naive-node-action="import" <% if not has_current_config then %>disabled title="请先选择配置文件"<% end %>>导入链接</button>
+    <button type="button" class="cbi-button" data-naive-node-action="manage">管理节点</button>
   </p>
   <div class="openkill-naive-compatibility-status" data-naive-component-status aria-live="polite">组件状态待检测。</div>
   <div class="openkill-naive-migration-status" data-naive-migration-status aria-live="polite"></div>
   <div class="openkill-naive-generation-status" data-naive-generation-status aria-live="polite">手动 YAML 接入：组件只维护本地 SOCKS5，请复制下方片段到 YAML。</div>
   <section class="openkill-naive-health" data-naive-health>
     <div class="openkill-naive-health-head">
-      <div><strong>节点连通性</strong><p>逐节点测试 127.0.0.1 SOCKS5 → NaiveProxy → 固定 HTTPS 目标；辅助链路成功不代表 YAML 已接入。</p></div>
+      <div><strong>节点连通性</strong><p>测试对应回环 SOCKS5；YAML/Mihomo 仅作接入诊断。</p></div>
       <div class="openkill-naive-health-actions">
         <button type="button" class="cbi-button" data-naive-health-action="test-all">测试全部</button>
         <button type="button" class="cbi-button" data-naive-health-action="refresh">刷新</button>
@@ -77,15 +79,15 @@ end
     <div class="openkill-naive-health-summary" data-naive-health-summary aria-live="polite">尚未检测。</div>
     <div class="openkill-naive-health-table-wrap">
       <table class="openkill-naive-health-table">
-        <thead><tr><th>节点</th><th>状态</th><th>本地入口</th><th>Mihomo</th><th>延迟</th><th>最近检测</th><th>操作</th></tr></thead>
-        <tbody data-naive-health-rows><tr><td colspan="7">尚未检测启用节点。</td></tr></tbody>
+        <thead><tr><th>节点</th><th>状态</th><th>本地入口</th><th>延迟</th><th>最近检测</th><th>操作</th></tr></thead>
+        <tbody data-naive-health-rows><tr><td colspan="6">尚未检测启用节点。</td></tr></tbody>
       </table>
     </div>
     <div class="openkill-naive-health-task" data-naive-health-task aria-live="polite"></div>
   </section>
   <section class="openkill-naive-bridge" data-naive-bridge>
     <div class="openkill-naive-bridge-head">
-      <div><strong>本地 SOCKS5 YAML</strong><p>仅含回环地址和端口，可复制到自定义 YAML。</p></div>
+      <div><strong>本地 SOCKS5 YAML</strong><p>复制到 YAML 的 proxies，并把名称加入 proxy-groups。</p></div>
       <button type="button" class="cbi-button" data-naive-bridge-refresh>刷新</button>
     </div>
     <textarea readonly rows="5" data-naive-bridge-output placeholder="暂无已启用的 NaiveProxy 节点"></textarea>
@@ -101,7 +103,7 @@ end
         <strong id="openkill-naive-node-dialog-title">NaiveProxy 节点</strong>
         <button type="button" class="cbi-button" data-naive-node-close aria-label="关闭">关闭</button>
       </div>
-      <p class="openkill-naive-node-dialog-hint">表单在当前页面打开，保存后关闭窗口即可刷新状态。</p>
+      <p class="openkill-naive-node-dialog-hint">保存后关闭窗口，页面会刷新状态。</p>
       <iframe title="NaiveProxy 节点编辑器" data-naive-node-frame loading="lazy"></iframe>
     </section>
   </div>
@@ -315,7 +317,7 @@ end
       'loopback-port-unavailable': '检查回环端口分配。',
       'loopback-listener-not-ready': '检查辅助进程和本地监听。',
       'mihomo-not-loaded': '检查最终 YAML 和策略组引用。',
-      'final-yaml-missing-node': '重新应用配置并检查最终 YAML。',
+      'final-yaml-missing-node': '手动 YAML 尚未包含片段；复制下方 YAML 并加入代理组。',
       'final-yaml-missing-group': '把节点名称加入目标 proxy-groups。',
       'no-strategy-group': '选择目标策略组后重新应用。',
       'final-yaml-missing-group-reference': '检查策略组名称是否完全匹配。',
@@ -334,15 +336,20 @@ end
     var summary = data.summary || {};
     if (!ids.length) {
       healthSummary.textContent = data.exists ? '没有可展示的 NaiveProxy 节点结果。' : '尚未检测启用节点。';
-      healthRows.innerHTML = '<tr><td colspan="7">尚未检测启用节点。</td></tr>';
+      healthRows.innerHTML = '<tr><td colspan="6">尚未检测启用节点。</td></tr>';
       return;
     }
     var expiry = data.expired ? ' · 结果已过期' : '';
     var modeText = '手动 YAML';
     var migrationText = data.migration_required ? ' · 旧版自动设置待迁移' : '';
+    var yamlMissing = ids.some(function (sid) {
+      var yamlState = String((nodes[sid] || {}).final_yaml || '');
+      return yamlState.indexOf('final-yaml-missing') === 0;
+    });
+    var yamlText = yamlMissing ? ' · Mihomo 未接入，需复制下方片段' : '';
     healthSummary.textContent = !data.exists ?
       (modeText + migrationText + ' · 已配置 ' + ids.length + ' 个 · 尚未检测，点击“测试全部”') :
-      (modeText + migrationText + ' · 启用 ' + (summary.enabled || 0) + ' 个 · 可用 ' + (summary.available || 0) + ' 个 · 异常 ' + (summary.failed || 0) + ' 个' + expiry);
+      (modeText + migrationText + ' · 启用 ' + (summary.enabled || 0) + ' 个 · 可用 ' + (summary.available || 0) + ' 个 · 异常 ' + (summary.failed || 0) + ' 个' + expiry + yamlText);
     healthRows.innerHTML = ids.map(function (sid) {
       var item = nodes[sid] || {};
       var displayStatus = item.status || (item.enabled === false ? 'disabled' : 'unknown');
@@ -353,13 +360,12 @@ end
       var details = '阶段：' + (item.failure_stage || '—') + '；路径：' + (item.path || '—') + '；策略组：' + groups + '；Mihomo：' + (item.mihomo || '未验证') + '；最终 YAML：' + (item.final_yaml || '未检查') + '；辅助实例：' + (item.procd || '未检查') + '；原因：' + healthReason(item) + '；连续失败：' + (item.fail_count || '0') + '；恢复：' + (item.recovery || '—');
       if (data.expired && displayStatus !== 'disabled') displayStatus = 'expired';
       return '<tr>' +
-        '<td class="openkill-naive-health-name">' + healthEscape(item.name || sid) + '<small>' + healthEscape(sid) + '</small></td>' +
-        '<td><span class="openkill-naive-health-badge status-' + healthEscape(displayStatus) + '">' + healthEscape(healthLabel(displayStatus)) + '</span></td>' +
-        '<td>' + healthEscape(local) + '</td>' +
-        '<td>' + healthEscape(item.mihomo === 'not-tested' ? '未测试' : (item.mihomo || '未验证')) + '</td>' +
-        '<td>' + healthEscape(latency) + '</td>' +
-        '<td>' + healthEscape(checked) + '</td>' +
-        '<td><button type="button" class="cbi-button" data-naive-health-test="' + healthEscape(sid) + '">测试</button> <button type="button" class="cbi-button" data-naive-health-detail="' + healthEscape(sid) + '">诊断</button><details data-naive-health-details="' + healthEscape(sid) + '"><summary>详情</summary><span>' + healthEscape(details) + '</span></details></td>' +
+        '<td data-label="节点" class="openkill-naive-health-name">' + healthEscape(item.name || sid) + '<small>' + healthEscape(sid) + '</small></td>' +
+        '<td data-label="状态"><span class="openkill-naive-health-badge status-' + healthEscape(displayStatus) + '">' + healthEscape(healthLabel(displayStatus)) + '</span></td>' +
+        '<td data-label="本地入口">' + healthEscape(local) + '</td>' +
+        '<td data-label="延迟">' + healthEscape(latency) + '</td>' +
+        '<td data-label="最近检测">' + healthEscape(checked) + '</td>' +
+        '<td data-label="操作"><button type="button" class="cbi-button" data-naive-health-test="' + healthEscape(sid) + '">测试</button> <button type="button" class="cbi-button" data-naive-health-detail="' + healthEscape(sid) + '">诊断</button><details data-naive-health-details="' + healthEscape(sid) + '"><summary>详情</summary><span>' + healthEscape(details) + '</span></details></td>' +
         '</tr>';
     }).join('');
   }

@@ -175,6 +175,29 @@ esac
         assert "fixture-secret" not in content
         assert "fixture-user" not in content
 
+        # Manual YAML ownership intentionally allows the selected YAML to omit
+        # the copied bridge snippet.  That read-only diagnostic must not turn a
+        # successful helper/remote probe into a health failure.
+        yaml.write_text(
+            'proxies:\n'
+            '  - name: "Unrelated node"\n'
+            '    type: socks5\n'
+            '    server: 127.0.0.1\n'
+            '    port: 11999\n'
+            'proxy-groups:\n'
+            '  - name: "Proxy"\n'
+            '    proxies:\n'
+            '      - "Unrelated node"\n',
+            encoding="utf-8",
+        )
+        result = subprocess.run(command, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
+        assert result.returncode == 0, repr(result.stderr or result.stdout)
+        content = state.read_text(encoding="utf-8")
+        assert "node.node_ok.status=loopback-available" in content, content
+        assert "node.node_ok.final_yaml=final-yaml-missing-node" in content, content
+        assert "fixture-secret" not in content
+        assert "fixture-user" not in content
+
     print("NAIVEPROXY_HEALTH_FIXTURE=PASS")
 
 

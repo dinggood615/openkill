@@ -1,5 +1,27 @@
 # Current status
 
+## NaiveProxy manual health diagnosis and compact compatibility card (2026-09-26)
+
+- Scope: clarify the screenshot state where `final-yaml-missing-node` appears
+  while the helper is in manual YAML mode, and reduce the NaiveProxy card's
+  default UI without changing node credentials, DNS, routing, firewall, YAML
+  ownership or the helper protocol. The final-YAML result remains read-only
+  context; it must never turn a successful loopback probe into a failure.
+- Health contract: the primary status is the bounded probe through that node's
+  `127.0.0.1` SOCKS5 listener. Mihomo/YAML membership is shown as a separate
+  diagnostic and remains expected to be missing until the user copies the
+  credential-free snippet into the selected YAML and adds its name to a
+  strategy group. No direct fallback is allowed.
+- UI contract: keep component status, version/architecture, install, node
+  management, loopback YAML and per-node testing available; move URL, digest,
+  asset metadata, removal and detailed Mihomo diagnostics behind accessible
+  details. Remove duplicate default controls and the redundant Mihomo table
+  column while preserving the full row diagnostic.
+- Boundary: the current plan and AGENTS.md forbid device and packet-path
+  access in this iteration. Local fixtures will reproduce a missing-final-YAML
+  case and prove it does not suppress loopback health; device/remote causes
+  remain pending a separately authorized plan.
+
 ## NaiveProxy manual YAML mode and shared OpenKill theme (2026-09-26)
 
 - Scope: move the NaiveProxy contract to manual YAML ownership, keep the

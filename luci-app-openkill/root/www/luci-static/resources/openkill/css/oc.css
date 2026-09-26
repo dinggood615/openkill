@@ -10147,6 +10147,25 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
     white-space: nowrap;
 }
 
+#cbi-openkill.openkill-settings .openkill-naive-component-details {
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--ok-border);
+    border-radius: 6px;
+    background: var(--ok-surface-muted);
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-component-details > summary {
+    cursor: pointer;
+    color: var(--ok-text);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-component-details[open] > summary {
+    margin-bottom: 8px;
+}
+
 #cbi-openkill.openkill-settings .openkill-naive-compatibility-facts {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -10246,7 +10265,8 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
 
 #cbi-openkill.openkill-settings .openkill-naive-health-table {
     width: 100%;
-    min-width: 720px;
+    min-width: 0;
+    table-layout: fixed;
     border-collapse: collapse;
     color: var(--ok-text);
     font-size: 12px;
@@ -10396,6 +10416,51 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
 
     #cbi-openkill.openkill-settings .openkill-naive-health-actions {
         margin-top: 8px;
+    }
+
+    #cbi-openkill.openkill-settings .openkill-naive-health-table,
+    #cbi-openkill.openkill-settings .openkill-naive-health-table tbody,
+    #cbi-openkill.openkill-settings .openkill-naive-health-table tr,
+    #cbi-openkill.openkill-settings .openkill-naive-health-table td {
+        display: block;
+        width: auto;
+    }
+
+    #cbi-openkill.openkill-settings .openkill-naive-health-table thead {
+        display: none;
+    }
+
+    #cbi-openkill.openkill-settings .openkill-naive-health-table tr {
+        padding: 8px;
+        border-bottom: 1px solid var(--ok-border);
+    }
+
+    #cbi-openkill.openkill-settings .openkill-naive-health-table tr:last-child {
+        border-bottom: 0;
+    }
+
+    #cbi-openkill.openkill-settings .openkill-naive-health-table td {
+        display: grid;
+        grid-template-columns: minmax(74px, 28%) minmax(0, 1fr);
+        gap: 8px;
+        padding: 4px 0;
+        border-bottom: 0;
+    }
+
+    #cbi-openkill.openkill-settings .openkill-naive-health-table td::before {
+        content: attr(data-label);
+        color: var(--ok-muted);
+        font-size: 11px;
+    }
+
+    #cbi-openkill.openkill-settings .openkill-naive-health-table td[data-label="操作"] {
+        display: block;
+        padding-top: 8px;
+    }
+
+    #cbi-openkill.openkill-settings .openkill-naive-health-table td[data-label="操作"]::before {
+        display: block;
+        margin-bottom: 4px;
     }
 
     #cbi-openkill.openkill-settings .openkill-naive-node-modal { padding: 0; }
