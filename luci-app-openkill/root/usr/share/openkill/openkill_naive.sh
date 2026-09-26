@@ -91,7 +91,10 @@ naive_port_for_section() {
     return 1
 }
 
-naive_component_available() { [ -x "$NAIVE_BIN" ]; }
+# A file bit alone is insufficient on OpenWrt: an ELF can be present but use
+# the wrong loader/libc.  The version probe is local and does not contact the
+# VPS, so it is safe to use as the component availability boundary.
+naive_component_available() { [ -x "$NAIVE_BIN" ] && naive_binary_probe "$NAIVE_BIN"; }
 
 naive_port_listening() {
     local port="$1"
@@ -182,7 +185,18 @@ naive_json_prepare() {
     naive_valid_host "$server" || return 1
     naive_valid_port "$port" || return 1
     naive_valid_port "$listen_port" || return 1
-    case "$transport" in https|quic) ;; *) return 1 ;; esac
+    # Older UCI imports used "tls" for the HTTPS transport.  Keep that
+    # spelling compatible while emitting only protocols understood by the
+    # NaiveProxy JSON schema.
+    case "$transport" in
+        tls|https) transport=https ;;
+        quic) ;;
+        *) return 1 ;;
+    esac
+    # Empty credentials produce a syntactically valid URL but an unusable
+    # Naive connection.  Reject them before writing the protected config so
+    # a malformed node cannot be reported as a local-ready bridge.
+    [ -n "$user" ] && [ -n "$pass" ] || return 1
     encoded_user=$(naive_urlencode "$user") || return 1
     encoded_pass=$(naive_urlencode "$pass") || return 1
     host="$server"

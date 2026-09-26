@@ -223,7 +223,7 @@ end
       var path = data.component ? ' · 路径 ' + data.component : '';
       componentState.textContent = '组件已安装 · ' + (map.state || '状态未知') + path + ' · 本地入口 ' + (map.local_ready === '1' ? '就绪' : '未验证') + ' · 远端连接未验证';
     } else {
-      componentState.textContent = 'NaiveProxy 辅助组件未安装（OpenKill 插件本体可独立运行） · ' + (map.reason || '请先检测并填写组件信息');
+      componentState.textContent = 'NaiveProxy 辅助组件不可用（OpenKill 插件本体可独立运行） · ' + (data.component_reason || map.reason || '请先检测并填写组件信息');
     }
     if (migrationState) {
       migrationState.textContent = data && data.migration_required ?
@@ -300,6 +300,7 @@ end
     var labels = {
       available: '可用', 'loopback-available': '辅助链路可用', testing: '测试中', disabled: '已禁用', unknown: '未验证',
       'component-missing': '组件未安装', 'config-incomplete': '配置不完整',
+      'component-probe-failed': '组件不可执行', 'helper-exited': '辅助进程已退出',
       'config-not-ready': '配置未就绪', 'port-failed': '端口失败',
       'local-not-ready': '本地入口未就绪', 'mihomo-not-loaded': '未接入 Mihomo',
       'mihomo-auth-failed': 'Mihomo 认证失败', 'mihomo-unreachable': 'Mihomo 不可达',
@@ -312,6 +313,8 @@ end
   function healthReason(item) {
     var reasons = {
       'component-not-installed': '先安装 NaiveProxy 组件。',
+      'loader-or-version-probe-failed': '检查组件加载器和版本；确认设备架构匹配。',
+      'naive-helper-exited': '辅助进程已退出；查看诊断并检查节点参数或远端服务。',
       'missing-node-field': '补齐节点字段后重新应用。',
       'protected-config-not-ready': '重新保存并应用节点。',
       'loopback-port-unavailable': '检查回环端口分配。',

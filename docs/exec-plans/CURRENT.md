@@ -1,5 +1,64 @@
 # Current status
 
+## OpenKill startup preflight and NaiveProxy compatibility repair (2026-09-26)
+
+- Scope: diagnose the reported startup abort before Mihomo launch, make the
+  generated controller listener deterministic and valid, preserve strict DNS
+  privacy fail-closed behavior with an actionable selectable-group diagnostic,
+  and verify the NaiveProxy helper's VPS-facing configuration without changing
+  the NaiveProxy protocol or the user's YAML ownership.
+- Startup contract: `dashboard_bind_address` and `cn_port` are normalized by
+  the same address/port helpers used by runtime API probes before YAML
+  generation. Invalid legacy values fall back to loopback/9090 and are
+  recorded as a repair reason; a generated invalid `external-controller`
+  never replaces the last-good profile. Strict DNS still refuses a profile
+  with no selectable proxy group, but reports the missing group and preserves
+  the active configuration.
+- NaiveProxy contract: one protected JSON configuration and one loopback
+  SOCKS5 listener per enabled stable node; only supported `https`/`quic`
+  transports are emitted, credentials stay out of logs and YAML snippets, and
+  a helper/remote failure never becomes `DIRECT`. The component path and ELF
+  probe remain authoritative; no device-specific binary or node data is added
+  to the repository.
+- Device phase: the latest user request explicitly authorizes **read-only**
+  diagnostics on the test host `192.168.1.103` via the existing SSH alias.
+  The phase is limited to version/path/UCI/log/process/listener inspection and
+  redacted generated-config checks. It must not write UCI, restart services,
+  install packages, enable `CENTRAL_ACTIVE`, apply central nft state, or run
+  packet-path tests. If the host is unreachable, local evidence remains the
+  source of truth and the gap is recorded.
+- Verification: add regression fixtures for malformed controller values,
+  strict-DNS missing groups, Naive URL/config generation and credential
+  redaction; run the local gate and exact-commit Development CI before RC and
+  Formal Release.
+
+### Current evidence (before implementation commit)
+
+- Source baseline observed at `474c50e1fef0f3888e504cb2e4fc214fd902ce08`; the
+  worktree retains only this startup/Naive repair plus this plan update.
+- Read-only test-host inspection is authorized for this iteration. The host
+  reports `luci-app-openkill 2026-1158`, an executable x86_64 NaiveProxy
+  `150.0.7871.63` at `/etc/openkill/core/naive`, and no running OpenKill or
+  Naive instance. Its selected YAML contains an empty `proxy-groups:` and its
+  UCI has no `groups` sections while `dns_privacy_mode` is `strict`; this is the
+  direct cause of the startup transaction abort. The same logs contain helper
+  `SIGTRAP` exits, which remain a separate runtime/remote compatibility fault;
+  no packet-path or remote probe was run.
+- Local changes now normalize the controller bind/port before generation,
+  return a non-zero status for a failed YAML transaction, preserve the active
+  profile, and record a specific startup failure reason. Strict DNS accepts
+  only a real selectable proxy, provider, or include-all group and reports the
+  required repair. Naive status requires a local version probe, rejects empty
+  credentials, maps legacy `tls` to HTTPS, and reports a stopped helper as a
+  local lifecycle failure.
+- Local evidence so far: `scripts/test-runtime.py` (31 tests, 3 environment
+  skips), `scripts/test-naiveproxy-integration.py`,
+  `scripts/test-naiveproxy-health.py`, `scripts/test-openkill-optimization.py`,
+  POSIX syntax checks, `git diff --check`, and `sh scripts/local-gate.sh` all
+  pass. The Windows host emits harmless WSL/GBK reader warnings for the
+  optimization fixture; the process exits successfully. Device reinstallation
+  and remote VPS connectivity remain pending and are not claimed here.
+
 ## NaiveProxy manual health diagnosis and compact compatibility card (2026-09-26)
 
 - Scope: clarify the screenshot state where `final-yaml-missing-node` appears

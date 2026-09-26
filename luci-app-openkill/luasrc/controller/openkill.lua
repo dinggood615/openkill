@@ -1940,13 +1940,24 @@ function action_naive_component()
 		result.installed = fs.access(configured_path) and SYS.call(string.format("test -x %q", configured_path)) == 0
 		result.component = configured_path
 		result.component_reason = result.installed and "configured-path" or "missing"
+		if result.installed then
+			result.version = (SYS.exec(string.format("%q --version 2>/dev/null | head -c 96", configured_path)) or ""):gsub("[\r\n]+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+			if result.version == "" then
+				result.installed = false
+				result.component_reason = "version-probe-failed"
+			end
+		end
 		if not result.installed then
 			for _, candidate in ipairs({"/etc/openkill/core/naiveproxy", "/usr/bin/naive", "/usr/bin/naiveproxy", "/usr/local/bin/naive"}) do
 				if fs.access(candidate) and SYS.call(string.format("test -x %q", candidate)) == 0 then
-					result.installed = true
-					result.component = candidate
-					result.component_reason = "fallback-path"
-					break
+					local candidate_version = (SYS.exec(string.format("%q --version 2>/dev/null | head -c 96", candidate)) or ""):gsub("[\r\n]+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+					if candidate_version ~= "" then
+						result.installed = true
+						result.component = candidate
+						result.component_reason = "fallback-path"
+						result.version = candidate_version
+						break
+					end
 				end
 			end
 		end

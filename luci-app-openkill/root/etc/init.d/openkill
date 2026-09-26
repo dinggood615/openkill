@@ -4391,7 +4391,10 @@ get_config()
    enable=$(uci_get_config "enable")
    enable_custom_clash_rules=$(uci_get_config "enable_custom_clash_rules")
    da_password=$(uci_get_config "dashboard_password")
-   cn_port=$(uci_get_config "cn_port")
+   # Use the same validated fallback as runtime API probes.  The normalizer
+   # repairs the UCI value on a normal start; this guard also protects a
+   # partially migrated in-memory configuration during this transaction.
+   cn_port=$(openkill_controller_port)
    proxy_port=$(uci_get_config "proxy_port")
    tproxy_port=$(uci_get_config "tproxy_port" || echo 7895)
    proxy_mode=$(uci_get_config "proxy_mode")
@@ -4613,16 +4616,21 @@ start_service()
          # a missing component or malformed node is recorded as unavailable
          # and never changes the existing core startup contract.
          naive_prepare_all || LOG_WARN "NaiveProxy bridge preparation failed; configured nodes remain unavailable."
-         /usr/share/openkill/yml_change.sh \
-         "$en_mode" "$da_password" "$cn_port" "$proxy_port" "$TMP_CONFIG_FILE" "$ipv6_enable" "$http_port" "$socks_port"\
+          if ! /usr/share/openkill/yml_change.sh \
+          "$en_mode" "$da_password" "$cn_port" "$proxy_port" "$TMP_CONFIG_FILE" "$ipv6_enable" "$http_port" "$socks_port"\
          "$log_level" "$proxy_mode" "$en_mode_tun" "$stack_type" "$dns_port" "$mixed_port" "$tproxy_port" "$ipv6_dns"\
          "$store_fakeip" "$enable_meta_sniffer" "$enable_geoip_dat" "$geodata_loader" "$enable_meta_sniffer_custom"\
          "$interface_name" "$enable_tcp_concurrent" "$core_type" "$append_default_dns" "$enable_meta_sniffer_pure_ip"\
          "$find_process_mode" "$fakeip_range" "$ipv6_mode" "$stack_type_v6" "$enable_unified_delay"\
          "$enable_respect_rules" "$custom_fakeip_filter_mode" "$iptables_compat" "$disable_quic_go_gso" "$cors_allow"\
-         "$geo_custom_url" "$geoip_custom_url" "$geosite_custom_url" "$geoasn_custom_url"\
-         0 "" 0 0 0\
-         "$fakeip_range6" "$fake_ip_range6_enable" "$global_ua"
+          "$geo_custom_url" "$geoip_custom_url" "$geosite_custom_url" "$geoasn_custom_url"\
+          0 "" 0 0 0\
+          "$fakeip_range6" "$fake_ip_range6_enable" "$global_ua"; then
+             OPENKILL_START_FAILURE_REASON="yaml-generation-failed"
+             LOG_ERROR "OpenKill YAML generation failed; active configuration was kept. Review the preceding validation stage and repair the reported setting."
+             rm -f "$TMP_CONFIG_FILE"
+             start_fail
+          fi
 
          # Validate the rewritten controller context before starting Mihomo.
          # This catches a broken Shell/Ruby rewrite immediately instead of
@@ -4631,11 +4639,13 @@ start_service()
          controller_context="$(ruby /usr/share/openkill/runtime_context.rb "$TMP_CONFIG_FILE" 2>&1)" || {
             controller_context_error="$(printf '%s\n' "$controller_context" | sed -n '1p' | tr '\n' ' ' | cut -c1-160)"
             controller_context=""
+            OPENKILL_START_FAILURE_REASON="invalid-controller-listener"
             LOG_ERROR "Generated OpenKill YAML has no valid external-controller; startup aborted before core launch${controller_context_error:+: $controller_context_error}."
             start_fail
          }
          controller_endpoint="$(printf '%s\n' "$controller_context" | sed -n '1p')"
          [ -n "$controller_endpoint" ] || {
+            OPENKILL_START_FAILURE_REASON="empty-controller-listener"
             LOG_ERROR "Generated OpenKill YAML controller endpoint is empty; startup aborted."
             start_fail
          }
@@ -4716,6 +4726,7 @@ start_service()
          # check keeps the previous file and disables the service cleanly.
          if ! validate_generated_config; then
             rm -f "$TMP_CONFIG_FILE"
+            OPENKILL_START_FAILURE_REASON="generated-config-invalid"
             LOG_ERROR "OpenKill startup aborted; active configuration was not replaced."
             start_fail
          fi

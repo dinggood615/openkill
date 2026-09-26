@@ -61,6 +61,18 @@ normalize_bind_address()
 
 dashboard_bind_address=$(normalize_bind_address "$(uci_get_config "dashboard_bind_address" || echo lan)")
 dns_listen_address=$(normalize_bind_address "$(uci_get_config "dns_listen_address" || echo 127.0.0.1)")
+# Keep direct callers and older init scripts safe as well: an invalid legacy
+# cn_port must never be interpolated into external-controller or CORS origins.
+controller_port="${3:-}"
+[ -n "$controller_port" ] || controller_port=$(uci_get_config "cn_port" || printf '9090')
+case "$controller_port" in
+   ''|*[!0-9]*) controller_port=9090 ;;
+   *)
+      if [ "$controller_port" -lt 1 ] 2>/dev/null || [ "$controller_port" -gt 65535 ] 2>/dev/null; then
+         controller_port=9090
+      fi
+      ;;
+esac
 tun_owner=$(uci_get_config "tun_owner" || echo openkill)
 case "$tun_owner" in
    openkill|mihomo) ;;
@@ -1011,12 +1023,31 @@ begin
             Value['dns'][policy_key].delete_if { |_key, value| value.respond_to?(:empty?) && value.empty? }
          end
       end
-      if dns_privacy_mode == 'strict'
-         proxy_path = Array(Value['proxy-groups']).any? do |group|
-            next false unless group.is_a?(Hash)
-            Array(group['proxies']).any? { |target| !%w[DIRECT REJECT REJECT-DROP].include?(target.to_s) }
-         end
-         raise 'strict DNS privacy requires at least one selectable proxy group' unless proxy_path
+       if dns_privacy_mode == 'strict'
+          # A group can be selectable through explicit proxies, a provider
+          # (`use`) or Mihomo's include-all flag.  The old check only looked at
+          # group['proxies'], so valid imported profiles were rejected even
+          # when they had real proxy entries available through a provider.
+          proxy_names = Array(Value['proxies']).map do |proxy|
+             proxy.is_a?(Hash) && !proxy['name'].to_s.empty? ? proxy['name'].to_s : nil
+          end.compact
+          provider_names = Value['proxy-providers'].is_a?(Hash) ? Value['proxy-providers'].keys.map(&:to_s) : []
+          group_names = Array(Value['proxy-groups']).map do |group|
+             group.is_a?(Hash) && !group['name'].to_s.empty? ? group['name'].to_s : nil
+          end.compact
+          selectable_target = lambda do |target|
+             name = target.to_s
+             !%w[DIRECT REJECT REJECT-DROP].include?(name) &&
+                (proxy_names.include?(name) || provider_names.include?(name) || group_names.include?(name))
+          end
+          proxy_path = Array(Value['proxy-groups']).any? do |group|
+             next false unless group.is_a?(Hash)
+             explicit = Array(group['proxies']).any? { |target| selectable_target.call(target) }
+             include_all = group['include-all'] == true || group['include-all'].to_s == 'true'
+             provider = Array(group['use']).any? { |name| provider_names.include?(name.to_s) }
+             explicit || provider || (include_all && (proxy_names.any? || provider_names.any?))
+          end
+          raise 'strict DNS privacy requires at least one selectable proxy group (add a group with a proxy, provider, or include-all target)' unless proxy_path
          has_rules_suffix = lambda { |server| server.to_s.match?(/#RULES(?:&|\z)/i) }
          with_rules_suffix = lambda do |server|
             text = server.to_s
@@ -1162,6 +1193,7 @@ ensure
             File.delete('/tmp/openkill-rustdesk.state') rescue nil
          end
       rescue Exception => e
+         write_config = false
          YAML.LOG_ERROR('Write file failed:【%s】' % [e.message])
       end
    else
@@ -1170,4 +1202,5 @@ ensure
    end
    File.delete('/tmp/yaml_change_marshal') rescue nil
 end
+exit(write_config ? 0 : 1)
 " 2>/dev/null >> $LOG_FILE

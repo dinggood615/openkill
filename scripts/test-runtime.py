@@ -70,6 +70,9 @@ dns:
 
     def test_invalid_endpoints_and_multiline_secret_fail(self):
         for body in ['external-controller: "127.0.0.1:99999"',
+                     'external-controller: "127.0.0.1:0"',
+                     'external-controller: "127.0.0.1:not-a-port"',
+                     'external-controller: ""',
                      'external-controller: "example.com:9090"',
                      'external-controller: "127.0.0.1:9090"\nsecret: "a\\nb"']:
             self.assertNotEqual(self.context(body).returncode, 0)
@@ -173,6 +176,30 @@ class FirewallShellCompatibilityTests(unittest.TestCase):
 
 
 class DualStackRoutingTests(unittest.TestCase):
+    def test_startup_failure_stops_before_controller_probe(self):
+        init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        generation = init.split('/usr/share/openkill/yml_change.sh', 1)[1].split(
+            '# Validate the rewritten controller context', 1)[0]
+        self.assertIn('if ! /usr/share/openkill/yml_change.sh', init)
+        self.assertIn('OPENKILL_START_FAILURE_REASON="yaml-generation-failed"', generation)
+        self.assertIn('active configuration was kept', generation)
+        self.assertIn('exit(write_config ? 0 : 1)',
+                      (SHARE / 'yml_change.sh').read_text(encoding='utf-8'))
+
+    def test_strict_dns_group_validation_covers_providers_and_include_all(self):
+        change = (SHARE / 'yml_change.sh').read_text(encoding='utf-8')
+        self.assertIn("provider_names = Value['proxy-providers'].is_a?(Hash)", change)
+        self.assertIn("group['include-all'] == true", change)
+        self.assertIn("strict DNS privacy requires at least one selectable proxy group (add a group with a proxy, provider, or include-all target)", change)
+
+    def test_naive_transport_compatibility_and_crash_state_are_explicit(self):
+        helper = (SHARE / 'openkill_naive.sh').read_text(encoding='utf-8')
+        health = (SHARE / 'openkill_naive_health.sh').read_text(encoding='utf-8')
+        self.assertIn('tls|https) transport=https', helper)
+        self.assertIn('[ -n "$user" ] && [ -n "$pass" ]', helper)
+        self.assertIn('component-probe-failed', health)
+        self.assertIn('[ "$HEALTH_PROCD" = stopped ]', health)
+
     def test_tun_stack_argument_mapping_matrix(self):
         change = (SHARE / 'yml_change.sh').read_text(encoding='utf-8')
         init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')

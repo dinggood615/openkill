@@ -166,8 +166,10 @@ health_node() {
     HEALTH_PATH=none; HEALTH_LATENCY=; HEALTH_MIHOMO=not-tested; HEALTH_FINAL_YAML=not-tested; HEALTH_PROCD=unknown
     if [ "$enabled" != 1 ]; then
         HEALTH_STATUS=disabled; HEALTH_STAGE=none; HEALTH_REASON=node-disabled
-    elif ! naive_component_available; then
+    elif [ ! -x "$NAIVE_BIN" ]; then
         HEALTH_STATUS=component-missing; HEALTH_STAGE=component; HEALTH_REASON=component-not-installed
+    elif ! naive_binary_probe "$NAIVE_BIN"; then
+        HEALTH_STATUS=component-probe-failed; HEALTH_STAGE=component; HEALTH_REASON=loader-or-version-probe-failed
     elif [ -z "$name" ] || [ -z "$server" ] || ! naive_valid_port "$port" || [ -z "$user" ] || [ -z "$pass" ]; then
         HEALTH_STATUS=config-incomplete; HEALTH_STAGE=config; HEALTH_REASON=missing-node-field
     elif ! naive_valid_port "$listen"; then
@@ -185,6 +187,14 @@ health_node() {
         health_final_yaml_state "$name" "$listen"
         HEALTH_MIHOMO="$HEALTH_FINAL_YAML"
         health_socks_probe "$listen"
+    fi
+
+    # A stopped procd instance is a local lifecycle failure, not a remote
+    # authentication result.  Keep that distinction visible even when a
+    # stale listener table or an old health result exists.
+    if [ "$HEALTH_REASON" = loopback-listener-not-ready ] && [ "$HEALTH_PROCD" = stopped ]; then
+        HEALTH_STATUS=helper-exited
+        HEALTH_REASON=naive-helper-exited
     fi
 
     if [ "$HEALTH_STATUS" = available ] || [ "$HEALTH_STATUS" = loopback-available ]; then

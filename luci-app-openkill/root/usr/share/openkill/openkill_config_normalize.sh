@@ -3,6 +3,7 @@
 # idempotent: it only writes when a value is missing or unsafe.
 . /lib/functions.sh
 . /usr/share/openkill/uci.sh
+. /usr/share/openkill/address.sh
 
 changed=0
 set_default() {
@@ -105,6 +106,19 @@ set_default tun_endpoint_independent_nat 0
 set_default dashboard_bind_address lan
 set_default dns_listen_address 127.0.0.1
 set_default cn_port 9090
+# A stale import can leave the controller port empty, non-numeric or outside
+# the TCP range.  Repair it before any profile is rendered so the generated
+# external-controller and the runtime API probes share one valid value.
+cn_port="$(uci -q get openkill.config.cn_port 2>/dev/null || true)"
+case "$cn_port" in
+    ''|*[!0-9]*) uci -q set openkill.config.cn_port=9090; changed=1 ;;
+    *)
+        if [ "$cn_port" -lt 1 ] 2>/dev/null || [ "$cn_port" -gt 65535 ] 2>/dev/null; then
+            uci -q set openkill.config.cn_port=9090
+            changed=1
+        fi
+        ;;
+esac
 set_default wan_interface_mode auto
 set_default remote_service_bypass 0
 set_default openvpn_compatibility 0
@@ -252,9 +266,19 @@ elif [ "$tun_owner" = "mihomo" ] && [ "$(uci -q get openkill.config.tun_auto_det
 fi
 
 bind="$(uci -q get openkill.config.dashboard_bind_address 2>/dev/null || echo lan)"
-case "$bind" in lan|*.*.*.*|\[*\]|*:* ) ;; *) uci -q set openkill.config.dashboard_bind_address=lan; changed=1 ;; esac
+if [ "$bind" != lan ]; then
+    normalized_bind="$(openkill_bind_address "$bind")"
+    if [ "$normalized_bind" != "$bind" ]; then
+        uci -q set openkill.config.dashboard_bind_address="$normalized_bind"
+        changed=1
+    fi
+fi
 dns_bind="$(uci -q get openkill.config.dns_listen_address 2>/dev/null || echo 127.0.0.1)"
-case "$dns_bind" in *.*.*.*|\[*\]|*:* ) ;; *) uci -q set openkill.config.dns_listen_address=127.0.0.1; changed=1 ;; esac
+normalized_dns_bind="$(openkill_bind_address "$dns_bind")"
+if [ "$normalized_dns_bind" != "$dns_bind" ]; then
+    uci -q set openkill.config.dns_listen_address="$normalized_dns_bind"
+    changed=1
+fi
 
 ipv6_enable="$(uci -q get openkill.config.ipv6_enable 2>/dev/null || echo 0)"
 if [ "$ipv6_enable" != 1 ]; then
