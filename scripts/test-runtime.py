@@ -193,12 +193,12 @@ class DualStackRoutingTests(unittest.TestCase):
         self.assertIn("strict DNS privacy requires at least one selectable proxy group (add a group with a proxy, provider, or include-all target)", change)
 
     def test_naive_transport_compatibility_and_crash_state_are_explicit(self):
-        helper = (SHARE / 'openkill_naive.sh').read_text(encoding='utf-8')
-        health = (SHARE / 'openkill_naive_health.sh').read_text(encoding='utf-8')
-        self.assertIn('tls|https) transport=https', helper)
-        self.assertIn('[ -n "$user" ] && [ -n "$pass" ]', helper)
-        self.assertIn('component-probe-failed', health)
-        self.assertIn('[ "$HEALTH_PROCD" = stopped ]', health)
+        standalone = (SHARE / 'naiveproxy-standalone.sh').read_text(encoding='utf-8')
+        self.assertIn('tls|https) transport=https', standalone)
+        self.assertIn('[ -n "$server" ] && [ -n "$user" ] && [ -n "$pass" ]', standalone)
+        self.assertIn('component-not-executable', standalone)
+        self.assertIn('local-not-ready', standalone)
+        self.assertIn('socks5h://127.0.0.1', standalone)
 
     def test_tun_stack_argument_mapping_matrix(self):
         change = (SHARE / 'yml_change.sh').read_text(encoding='utf-8')

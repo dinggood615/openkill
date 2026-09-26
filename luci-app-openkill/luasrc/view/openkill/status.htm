@@ -190,7 +190,7 @@
                                 </div>
                             </div>
                             <div class="sub-card security-status-card" data-security-card="naiveproxy">
-                                <div class="card-title">NaiveProxy<a href="javascript:void(0);" onclick="window.open('<%=luci.dispatcher.build_url('admin','services','openkill','naive')%>', '_blank');" class="help-link" title="查看 NaiveProxy 组件与节点设置"><svg width="12" height="12"><use href="#oc-icon-help"/></svg></a></div>
+                                <div class="card-title">NaiveProxy<a href="javascript:void(0);" onclick="window.open('<%=luci.dispatcher.build_url('admin','services','openkill','naive')%>', '_blank');" class="help-link" title="查看 NaiveProxy 独立服务设置"><svg width="12" height="12"><use href="#oc-icon-help"/></svg></a></div>
                                 <div class="card-content security-status-content">
                                     <span id="naiveproxy-status" class="security-status-value">未验证</span>
                                     <span id="naiveproxy-detail" class="security-status-detail">可选回环 SOCKS5 桥接 · 连接未验证</span>
@@ -732,7 +732,7 @@
         var naiveState = status && status.naive_state ? status.naive_state : 'unknown';
         var naiveReason = status && status.naive_reason ? status.naive_reason : 'unknown';
         if (naiveLabel) {
-            var naiveText = !naiveInstalled ? 'NaiveProxy 辅助组件未安装' :
+            var naiveText = !naiveInstalled ? 'NaiveProxy 独立组件未安装' :
                 (!naiveEnabled ? '已关闭' :
                 (!naiveConfigured ? '已安装 · 未配置节点' :
                 (naiveState === 'failed' ? '启动失败' :
@@ -745,7 +745,7 @@
                 (naiveState === 'failed' || naiveGenerated < naiveConfigured ? 'is-error' :
                 (naiveRemote ? 'is-success' : 'is-pending')));
         }
-        var naiveFullDetail = !naiveInstalled ? 'OpenKill 插件本体已安装；请单独安装 NaiveProxy 辅助组件' :
+        var naiveFullDetail = !naiveInstalled ? 'OpenKill 插件本体已安装；一键安装会尝试安装 NaiveProxy 独立组件' :
             (naiveComponentReason === 'version-probe-failed' ? '组件可执行但版本探测失败 · 版本未知' :
             (!naiveEnabled ? '未创建辅助进程 · 现有节点行为不变' :
             (naiveConfigured ? ('已生成 ' + naiveGenerated + '/' + naiveConfigured + ' 个回环 SOCKS5 入口 · ' + naiveReason) :

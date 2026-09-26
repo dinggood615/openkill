@@ -52,18 +52,9 @@ openvpn_adblock_exception="$(uci -q get openkill.config.openvpn_adblock_exceptio
 case "$openvpn_adblock_exception" in 0|1) ;; *) uci -q set openkill.config.openvpn_adblock_exception=0; changed=1 ;; esac
 openvpn_dns_mode="$(uci -q get openkill.config.openvpn_dns_mode 2>/dev/null || true)"
 case "$openvpn_dns_mode" in inherit|conditional) ;; *) uci -q set openkill.config.openvpn_dns_mode=inherit; changed=1 ;; esac
-naive_enabled="$(uci -q get openkill.config.naive_enabled 2>/dev/null || true)"
-case "$naive_enabled" in 0|1) ;; *) uci -q set openkill.config.naive_enabled=0; changed=1 ;; esac
-naive_auto_start="$(uci -q get openkill.config.naive_auto_start 2>/dev/null || true)"
-case "$naive_auto_start" in 0|1) ;; *) uci -q set openkill.config.naive_auto_start=1; changed=1 ;; esac
-naive_bridge_mode="$(uci -q get openkill.config.naive_bridge_mode 2>/dev/null || true)"
-case "$naive_bridge_mode" in auto|manual) ;; *) uci -q set openkill.config.naive_bridge_mode=manual; changed=1 ;; esac
-naive_port_base="$(uci -q get openkill.config.naive_port_base 2>/dev/null || true)"
-case "$naive_port_base" in ''|*[!0-9]*) uci -q set openkill.config.naive_port_base=11080; changed=1 ;; esac
-if [ -n "$naive_port_base" ] && { [ "$naive_port_base" -lt 1024 ] 2>/dev/null || [ "$naive_port_base" -gt 65000 ] 2>/dev/null; }; then
-    uci -q set openkill.config.naive_port_base=11080
-    changed=1
-fi
+# Legacy naive_* values are intentionally not normalized or defaulted.  They
+# remain untouched in an upgraded conffile for migration/rollback, while a
+# fresh installation uses only the independent /etc/naiveproxy service.
 set_default enable_unified_delay 1
 set_default disable_udp_quic 0
 
@@ -133,13 +124,6 @@ set_default openvpn_tunnel_policy inherit
 set_default openvpn_real_ip 0
 set_default openvpn_adblock_exception 0
 set_default openvpn_dns_mode inherit
-set_default naive_enabled 0
-set_default naive_auto_start 1
-set_default naive_bridge_mode manual
-set_default naive_component_path /etc/openkill/core/naive
-set_default naive_component_url ''
-set_default naive_component_sha256 ''
-set_default naive_port_base 11080
 set_default compatibility_fallback 0
 
 compatibility_profile="$(uci -q get openkill.config.compatibility_profile 2>/dev/null || true)"

@@ -99,6 +99,124 @@ np_probe_component() {
     "$NP_BIN" --version >/dev/null 2>&1
 }
 
+# Install the independently-owned component without touching OpenKill UCI or
+# any node file.  The caller supplies the already-bound official URL, digest
+# and (when available) release-asset size.  Every failure happens before the
+# existing executable is moved, so an update cannot strand a working bridge.
+NP_INSTALL_ERROR=""
+np_install_error() { NP_INSTALL_ERROR="$1"; return 1; }
+
+np_read_byte() {
+    local file="$1" offset="$2"
+    if command -v od >/dev/null 2>&1; then
+        od -An -j"$offset" -N1 -tu1 "$file" 2>/dev/null | tr -d ' '
+    elif command -v hexdump >/dev/null 2>&1; then
+        dd if="$file" bs=1 skip="$offset" count=1 2>/dev/null | hexdump -v -e '1/1 "%u"'
+    else
+        return 1
+    fi
+}
+
+np_elf_arch_ok() {
+    local file="$1" machine class data b0 b1 em expected
+    class=$(np_read_byte "$file" 4); data=$(np_read_byte "$file" 5)
+    b0=$(np_read_byte "$file" 18); b1=$(np_read_byte "$file" 19)
+    [ -n "$class" ] && [ -n "$data" ] && [ -n "$b0" ] && [ -n "$b1" ] || return 1
+    if [ "$data" = 1 ]; then em=$((b0 + b1 * 256)); else em=$((b1 + b0 * 256)); fi
+    machine=$(uname -m 2>/dev/null || printf 'unknown')
+    case "$machine" in
+        x86_64|amd64) expected=62; [ "$class" = 2 ] || return 1 ;;
+        aarch64|arm64) expected=183; [ "$class" = 2 ] || return 1 ;;
+        armv7*|armhf) expected=40; [ "$class" = 1 ] || return 1 ;;
+        mips|mipsel) expected=8; [ "$class" = 1 ] || return 1 ;;
+        mips64*|mips64el) expected=8; [ "$class" = 2 ] || return 1 ;;
+        *) return 1 ;;
+    esac
+    [ "$em" -eq "$expected" ]
+}
+
+np_component_install() {
+    local url="$1" expected="$2" expected_size="${3:-}" tmp archive extract candidate size actual magic previous
+    NP_INSTALL_ERROR=""
+    case "$url" in
+        https://github.com/klzgrad/naiveproxy/releases/download/*) ;;
+        *) np_install_error untrusted-source; return 2 ;;
+    esac
+    case "$expected" in ''|*[!0-9A-Fa-f]*) np_install_error invalid-sha256; return 2 ;; esac
+    [ "${#expected}" -eq 64 ] || { np_install_error invalid-sha256; return 2; }
+    case "$expected_size" in ''|*[!0-9]*) expected_size= ;; esac
+    np_dirs || { np_install_error runtime-directory-failed; return 1; }
+    command -v sha256sum >/dev/null 2>&1 || { np_install_error sha256sum-missing; return 3; }
+    command -v tar >/dev/null 2>&1 || { np_install_error tar-missing; return 3; }
+    tmp="$NP_ROOT/.component-download.$$"; archive="$tmp"; extract="$NP_ROOT/.component-extract.$$"
+    rm -f "$tmp" "$tmp.tar"; rm -rf "$extract"
+    if command -v curl >/dev/null 2>&1; then
+        curl -fL --connect-timeout 10 --max-time 300 --max-filesize 209715200 \
+            --proto '=https' -H 'User-Agent: OpenKill-NaiveProxy-Installer' "$url" -o "$tmp" \
+            || { rm -f "$tmp"; np_install_error download-failed; return 4; }
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q -O "$tmp" "$url" || { rm -f "$tmp"; np_install_error download-failed; return 4; }
+    else
+        np_install_error downloader-missing; return 3
+    fi
+    size=$(wc -c < "$tmp" 2>/dev/null || printf '0')
+    [ "$size" -gt 0 ] 2>/dev/null && [ "$size" -le 209715200 ] 2>/dev/null || { rm -f "$tmp"; np_install_error invalid-size; return 5; }
+    [ -z "$expected_size" ] || [ "$size" -eq "$expected_size" ] 2>/dev/null || { rm -f "$tmp"; np_install_error size-mismatch; return 5; }
+    actual=$(sha256sum "$tmp" 2>/dev/null | awk '{print tolower($1)}')
+    [ "$actual" = "$(printf '%s' "$expected" | tr 'A-F' 'a-f')" ] || { rm -f "$tmp"; np_install_error digest-mismatch; return 5; }
+    magic=$(od -An -tx1 -N4 "$tmp" 2>/dev/null | tr -d ' \n\r')
+    if [ "$magic" = 7f454c46 ]; then
+        candidate="$tmp"
+    else
+        case "$url" in *.tar.xz) ;; *) rm -f "$tmp"; np_install_error unsupported-asset; return 6 ;; esac
+        command -v xz >/dev/null 2>&1 || { rm -f "$tmp"; np_install_error xz-missing; return 6; }
+        archive="$tmp.tar"
+        xz -dc "$tmp" > "$archive" 2>/dev/null || { rm -f "$tmp" "$archive"; np_install_error decompress-failed; return 6; }
+        tar -tf "$archive" >/dev/null 2>&1 || { rm -f "$tmp" "$archive"; np_install_error invalid-archive; return 6; }
+        if tar -tf "$archive" | grep -Eq '(^/|(^|/)\.\.(\/|$))' || tar -tvf "$archive" 2>/dev/null | grep -Eq '(^l| -> )'; then
+            rm -f "$tmp" "$archive"; np_install_error unsafe-archive; return 6
+        fi
+        mkdir -p "$extract" || { rm -f "$tmp" "$archive"; np_install_error extract-directory-failed; return 6; }
+        tar -xf "$archive" -C "$extract" || { rm -rf "$extract" "$tmp" "$archive"; np_install_error extract-failed; return 6; }
+        candidate=$(find "$extract" -type f -name naive -perm -u=x 2>/dev/null | head -n 1)
+        [ -n "$candidate" ] || candidate=$(find "$extract" -type f -name naive 2>/dev/null | head -n 1)
+        [ -n "$candidate" ] || { rm -rf "$extract" "$tmp" "$archive"; np_install_error component-missing-in-archive; return 6; }
+    fi
+    cp "$candidate" "$NP_BIN.new" || { rm -rf "$extract" "$tmp" "$archive"; np_install_error stage-copy-failed; return 7; }
+    rm -rf "$extract"; rm -f "$tmp" "$archive"; chmod 755 "$NP_BIN.new" || { rm -f "$NP_BIN.new"; np_install_error permission-failed; return 7; }
+    magic=$(od -An -tx1 -N4 "$NP_BIN.new" 2>/dev/null | tr -d ' \n\r')
+    [ "$magic" = 7f454c46 ] || { rm -f "$NP_BIN.new"; np_install_error not-elf; return 8; }
+    np_elf_arch_ok "$NP_BIN.new" || { rm -f "$NP_BIN.new"; np_install_error wrong-architecture; return 8; }
+    "$NP_BIN.new" --version >/dev/null 2>&1 || { rm -f "$NP_BIN.new"; np_install_error loader-or-version-probe-failed; return 8; }
+    {
+        printf 'sha256=%s\n' "$actual"
+        printf 'size=%s\n' "$size"
+        printf 'url=%s\n' "$url"
+        printf 'asset=%s\n' "${url##*/}"
+        case "${url##*/}" in
+            naiveproxy-v*-openwrt-*) printf 'version=%s\n' "$(printf '%s' "${url##*/}" | sed 's/^naiveproxy-\(v[^-]*\)-openwrt-.*/\1/')" ;;
+            *) printf 'version=unknown\n' ;;
+        esac
+        printf 'installed_at=%s\n' "$(date +%s)"
+    } > "$NP_ROOT/component.meta.new.$$" || { rm -f "$NP_BIN.new" "$NP_ROOT/component.meta.new.$$"; np_install_error metadata-write-failed; return 10; }
+    chmod 600 "$NP_ROOT/component.meta.new.$$" || { rm -f "$NP_BIN.new" "$NP_ROOT/component.meta.new.$$"; np_install_error metadata-permission-failed; return 10; }
+    previous="$NP_BIN.previous"
+    rm -f "$previous"
+    if [ -e "$NP_BIN" ]; then mv -f "$NP_BIN" "$previous" || { rm -f "$NP_BIN.new" "$NP_ROOT/component.meta.new.$$"; np_install_error preserve-old-failed; return 9; }; fi
+    if ! mv -f "$NP_BIN.new" "$NP_BIN"; then
+        [ -e "$previous" ] && mv -f "$previous" "$NP_BIN" || true
+        rm -f "$NP_ROOT/component.meta.new.$$"
+        np_install_error replace-failed; return 9
+    fi
+    chown root:root "$NP_BIN" 2>/dev/null || true; chmod 755 "$NP_BIN"
+    if ! mv -f "$NP_ROOT/component.meta.new.$$" "$NP_ROOT/component.meta"; then
+        rm -f "$NP_BIN"
+        [ -e "$previous" ] && mv -f "$previous" "$NP_BIN" || true
+        np_install_error metadata-replace-failed; return 10
+    fi
+    return 0
+}
+
 np_health_begin() {
     np_dirs || return 1
     mkdir "$NP_HEALTH_LOCK" 2>/dev/null || return 1
@@ -190,10 +308,12 @@ np_health_all() {
 }
 
 np_manifest() {
-    local now id file name enabled port config pid health_status latency checked expires reason state
+    local now id file name enabled port config pid health_status latency checked expires reason state component_version
     np_dirs || return 1; now=$(date +%s)
+    component_version=$(sed -n 's/^version=//p' "$NP_ROOT/component.meta" 2>/dev/null | head -n1)
+    [ -n "$component_version" ] || component_version=unknown
     {
-        printf 'version=1\nmode=standalone\nupdated=%s\ncomponent=%s\n' "$now" "$NP_BIN"
+        printf 'version=1\nmode=standalone\nupdated=%s\ncomponent=%s\ncomponent_version=%s\n' "$now" "$NP_BIN" "$(np_safe "$component_version")"
         if np_probe_component; then printf 'component_status=available\n'; else printf 'component_status=unavailable\n'; fi
         for id in $(np_ids); do
             file=$(np_node_file "$id") || continue; name=$(np_node_value "$file" name); [ -n "$name" ] || name="$id"
@@ -323,6 +443,7 @@ np_dispatch() {
     np_dirs || exit 1
     case "${1:-status}" in
         component) np_probe_component; exit $? ;;
+        install) np_component_install "$2" "$3" "${4:-}"; rc=$?; [ "$rc" -eq 0 ] && np_manifest >/dev/null 2>&1 || true; exit "$rc" ;;
         prepare) np_prepare "$2" >/dev/null; exit $? ;;
         port) np_port "$2"; exit $? ;;
         health)
@@ -336,7 +457,7 @@ np_dispatch() {
         control) np_control; exit $? ;;
         yaml) np_yaml; exit $? ;;
         manifest|status) np_manifest && cat "$NP_RUN/manifest"; exit $? ;;
-        *) echo "usage: $0 {component|prepare ID|port ID|health [ID|all]|yaml|manifest|status|control}" >&2; exit 2 ;;
+        *) echo "usage: $0 {component|install URL SHA256 [SIZE]|prepare ID|port ID|health [ID|all]|yaml|manifest|status|control}" >&2; exit 2 ;;
     esac
 }
 

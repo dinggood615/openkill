@@ -1530,7 +1530,7 @@ function action_status()
 	local naive_component_path = naive_manifest:match("component=([^\n]+)") or "/etc/naiveproxy/naive"
 	local naive_component_reason = naive_manifest:match("component_status=([^\n]+)") or "unavailable"
 	local naive_component_installed = naive_component_reason == "available"
-	local naive_component_version = "unknown"
+	local naive_component_version = naive_manifest:match("component_version=([^\n]+)") or "unknown"
 	local naive_configured, naive_generated, naive_local_ready, naive_remote_verified = 0, 0, 0, 0
 	local naive_failed = false
 	for line in naive_manifest:gmatch("[^\r\n]+") do
@@ -1691,6 +1691,27 @@ function action_naive_standalone_status()
 	local count = 0
 	for _ in pairs(result.nodes) do count = count + 1 end
 	result.count = count
+	-- Legacy OpenKill Naive fields are read only migration evidence.  Count
+	-- sections/options without returning any credential-bearing value; the
+	-- standalone service remains the sole owner of nodes and lifecycle.
+	local legacy_nodes, legacy_options = 0, false
+	local ok_uci, uci = pcall(require, "luci.model.uci")
+	if ok_uci and uci then
+		local cursor = uci.cursor()
+		for option, _ in pairs({ naive_enabled = true, naive_auto_start = true,
+			naive_bridge_mode = true, naive_component_path = true,
+			naive_component_url = true, naive_component_sha256 = true,
+			naive_health_enabled = true, naive_health_interval = true,
+			naive_health_timeout = true, naive_port_base = true }) do
+			if cursor:get("openkill", "config", option) ~= nil then legacy_options = true end
+		end
+		cursor:foreach("openkill", "servers", function(section)
+			if section.type == "naiveproxy" then legacy_nodes = legacy_nodes + 1 end
+		end)
+	end
+	result.legacy_migration = legacy_options or legacy_nodes > 0
+	result.legacy_nodes = legacy_nodes
+	result.legacy_note = result.legacy_migration and "检测到旧版 OpenKill Naive 配置；请迁移到独立服务并手动加入 SOCKS5 YAML。" or nil
 	result.health_target = "restricted-https"
 	result.health_note = "HTTPS 探测耗时包含 SOCKS5 与 TLS；不代表 Mihomo 已加载或策略组已选择。"
 	HTTP.prepare_content("application/json")

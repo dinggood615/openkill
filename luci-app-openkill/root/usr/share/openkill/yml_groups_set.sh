@@ -65,7 +65,7 @@ yml_servers_add()
 {
 
    local section="$1"
-   local enabled config name type listen yaml_entry
+   local enabled config name type
    add_for_this=0
    config_get_bool "enabled" "$section" "enabled" "1"
    config_get "config" "$section" "config" ""
@@ -79,17 +79,10 @@ yml_servers_add()
    if [ "$enabled" = "0" ]; then
       return
    else
-      # NaiveProxy is manual-YAML only.  Do not create a strategy-group
-      # reference for a helper node until its credential-free loopback
-      # SOCKS5 entry is already present in the user's active YAML.
+      # NaiveProxy nodes belong to the independent service.  OpenKill does
+      # not create or update their user-managed YAML group references.
       if [ "$type" = "naiveproxy" ]; then
-         listen=$(/usr/share/openkill/openkill_naive.sh port "$section" 2>/dev/null || true)
-         yaml_entry=$(grep -A8 -F -- "name: \"$name\"" "$CONFIG_FILE" 2>/dev/null | head -n 9)
-         if [ -z "$yaml_entry" ] || ! printf '%s\n' "$yaml_entry" | grep -Fq -- 'type: socks5' ||
-            ! printf '%s\n' "$yaml_entry" | grep -Fq -- 'server: 127.0.0.1' ||
-            ! printf '%s\n' "$yaml_entry" | grep -Fq -- "port: $listen"; then
-            return
-         fi
+         return
       fi
       if [ -z "$4" ]; then
          config_list_foreach "$section" "groups" set_groups "$name" "$2"

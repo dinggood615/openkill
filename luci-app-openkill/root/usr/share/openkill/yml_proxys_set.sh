@@ -32,63 +32,6 @@ FEATURE_BBR3=$(uci_get_config "feature_bbr3" || echo 0)
 FEATURE_ZEROTIER=$(uci_get_config "feature_zerotier" || echo 0)
 servers_name="/tmp/servers_name.list"
 proxy_provider_name="/tmp/provider_name.list"
-NAIVE_GENERATION_STATE="/tmp/openkill-naive-generation.state"
-NAIVE_MANUAL_IDENTITIES="/tmp/openkill-naive-manual-identities"
-
-# Keep manual-YAML migration observable without writing credentials or remote
-# endpoint details. Each key is scoped by the stable UCI section ID so the
-# compatibility page can explain why a node was preserved or still needs a
-# user-managed YAML entry.
-naive_generation_reset() {
-   : > "$NAIVE_GENERATION_STATE" 2>/dev/null || true
-   chmod 600 "$NAIVE_GENERATION_STATE" 2>/dev/null || true
-}
-
-naive_generation_record() {
-   local sid="$1" stage="$2" reason="$3" groups="$4"
-   [ -n "$sid" ] || return 0
-   sid=$(printf '%s' "$sid" | sed 's/[^A-Za-z0-9_]/_/g')
-   reason=$(printf '%s' "$reason" | tr '\r\n' '  ' | cut -c1-120)
-   groups=$(printf '%s' "$groups" | tr '\r\n' '  ' | cut -c1-240)
-   {
-      printf 'node_%s_stage=%s\n' "$sid" "$stage"
-      printf 'node_%s_reason=%s\n' "$sid" "$reason"
-      printf 'node_%s_groups=%s\n' "$sid" "$groups"
-      printf 'updated=%s\n' "$(date +%s)"
-   } >> "$NAIVE_GENERATION_STATE" 2>/dev/null || true
-}
-
-naive_group_marker() {
-   [ -n "$1" ] || return 0
-   naive_group_count=$((naive_group_count + 1))
-   if [ -n "$naive_group_names" ]; then
-      naive_group_names="$naive_group_names,$1"
-   else
-      naive_group_names="$1"
-   fi
-}
-
-# Keep only credential-free identities while rebuilding the proxy list.  The
-# manual YAML contract means a loopback SOCKS5 entry that the user already
-# placed in the active file must survive a normal OpenKill rewrite; a new
-# NaiveProxy UCI section is never injected automatically.
-naive_manual_identity() {
-   local section="$1" enabled type config name port listen
-   config_get_bool enabled "$section" enabled 0
-   config_get type "$section" type ""
-   config_get config "$section" config ""
-   config_get name "$section" name ""
-   [ "$enabled" = "1" ] && [ "$type" = "naiveproxy" ] && [ -n "$name" ] || return 0
-   [ -z "$config" ] || [ "$config" = "all" ] || [ "$config" = "$CONFIG_NAME" ] || return 0
-   listen=$(/usr/share/openkill/openkill_naive.sh port "$section" 2>/dev/null || true)
-   case "$listen" in ''|*[!0-9]*) return 0 ;; esac
-   # Names are YAML data, not shell code; tabs/newlines are rejected for the
-   # identity sidecar so they cannot alter the merge format.
-   case "$name" in *[\	\r\n]*) return 0 ;; esac
-   printf '%s\t%s\n' "$name" "$listen" >> "$NAIVE_MANUAL_IDENTITIES"
-}
-
-naive_generation_reset
 set_lock
 
 if [ ! -z "$UPDATE_CONFIG_FILE" ]; then
@@ -286,15 +229,7 @@ yml_servers_set()
    config_get "server" "$section" "server" ""
    config_get "port" "$section" "port" ""
 
-   if [ "$type" = "naiveproxy" ]; then
-      naive_group_count=0
-      naive_group_names=""
-      config_list_foreach "$section" "groups" naive_group_marker
-      naive_generation_record "$section" "seen" "pending" "$naive_group_names"
-   fi
-
    if [ "$enabled" = "0" ]; then
-      [ "$type" = "naiveproxy" ] && naive_generation_record "$section" "skipped" "node-disabled" "$naive_group_names"
       return
    fi
 
@@ -303,17 +238,14 @@ yml_servers_set()
    fi
 
    if [ -z "$name" ]; then
-      [ "$type" = "naiveproxy" ] && naive_generation_record "$section" "skipped" "missing-name" "$naive_group_names"
       return
    fi
 
    if [ -z "$server" ] && [ "$type" != "direct" ] && [ "$type" != "dns" ] && [ "$type" != "zerotier" ]; then
-      [ "$type" = "naiveproxy" ] && naive_generation_record "$section" "skipped" "missing-server" "$naive_group_names"
       return
    fi
 
    if [ -z "$port" ] && [ "$type" != "direct" ] && [ "$type" != "dns" ] && [ "$type" != "zerotier" ]; then
-      [ "$type" = "naiveproxy" ] && naive_generation_record "$section" "skipped" "missing-port" "$naive_group_names"
       return
    fi
 
@@ -324,14 +256,9 @@ yml_servers_set()
         fi
     fi
 
-    # NaiveProxy is an optional helper process, not a Mihomo protocol.  The
-    # manual-YAML contract deliberately stops this writer from injecting even
-    # a loopback bridge.  Existing credential-free loopback entries are merged
-    # back below so an upgrade or unrelated apply cannot silently remove a
-    # working user-managed node; new users receive the copyable snippet from
-    # action_naive_bridge instead.
+    # NaiveProxy is an independent service, not a Mihomo protocol.  Legacy
+    # UCI sections are migration evidence only and are never rendered here.
     if [ "$type" = "naiveproxy" ]; then
-        naive_generation_record "$section" "skipped" "manual-yaml-required" "$naive_group_names"
         return
     fi
 
@@ -2364,33 +2291,8 @@ yml_proxy_provider_name_get()
    }
 }
 
-naive_generation_finalize() {
-   local section="$1" enabled type name group_names listen yaml_entry
-   config_get_bool enabled "$section" enabled 0
-   config_get type "$section" type ""
-   config_get name "$section" name ""
-   [ "$enabled" = "1" ] && [ "$type" = "naiveproxy" ] && [ -n "$name" ] || return 0
-   group_names=""
-   naive_group_count=0
-   naive_group_names=""
-   config_list_foreach "$section" "groups" naive_group_marker
-   group_names="$naive_group_names"
-   listen=$(/usr/share/openkill/openkill_naive.sh port "$section" 2>/dev/null || true)
-   yaml_entry=$(grep -A8 -F -- "name: \"$name\"" "$CONFIG_FILE" 2>/dev/null | head -n 9)
-   if [ -n "$yaml_entry" ] && printf '%s\n' "$yaml_entry" | grep -Fq -- 'type: socks5' &&
-      printf '%s\n' "$yaml_entry" | grep -Fq -- 'server: 127.0.0.1' &&
-      printf '%s\n' "$yaml_entry" | grep -Fq -- "port: $listen"; then
-      naive_generation_record "$section" "final" "manual-yaml-preserved" "$group_names"
-   else
-      naive_generation_record "$section" "final" "manual-yaml-required" "$group_names"
-   fi
-}
-
 #创建配置文件
 config_load "openkill"
-: > "$NAIVE_MANUAL_IDENTITIES" 2>/dev/null || true
-chmod 600 "$NAIVE_MANUAL_IDENTITIES" 2>/dev/null || true
-config_foreach naive_manual_identity "servers"
 config_foreach yml_servers_name_get "servers"
 config_foreach yml_proxy_provider_name_get "proxy-provider"
 
@@ -2414,7 +2316,8 @@ egrep '^ {0,}-' $SERVER_FILE |grep name: |awk -F 'name: ' '{print $2}' |sed 's/,
 if [ -s "/tmp/Proxy_Server" ]; then
    sed -i "s/^ \{0,\}/      - /" /tmp/Proxy_Server 2>/dev/null #添加参数
 else
-   rm -rf $SERVER_FILE
+   # Keep an empty proxies document so the merge below can retain the
+   # user's existing loopback SOCKS5 entries owned by naiveproxy-bridge.
    rm -rf /tmp/Proxy_Server
 fi
 rm -rf $servers_name
@@ -2432,23 +2335,17 @@ begin
     begin
       if File.exist?(src_file)
         src = YAML.load_file(src_file)
-        if key == 'proxies' && File.exist?('$NAIVE_MANUAL_IDENTITIES')
-          identities = {}
-          File.foreach('$NAIVE_MANUAL_IDENTITIES') do |line|
-            name, port = line.chomp.split("\t", 2)
-            identities[name] = port.to_i if name && port && port.to_i > 0
-          end
+        if key == 'proxies'
           generated = Array(src[key])
           existing = Array(Value[key])
           generated_names = generated.map { |item| item.is_a?(Hash) ? item['name'].to_s : '' }
           existing.each do |item|
             next unless item.is_a?(Hash)
-            name = item['name'].to_s
-            next unless identities.key?(name)
             next unless item['type'].to_s == 'socks5'
             next unless item['server'].to_s == '127.0.0.1'
-            next unless item['port'].to_i == identities[name]
-            next if generated_names.include?(name)
+            next unless item['port'].to_i > 0
+            name = item['name'].to_s
+            next if name.empty? || generated_names.include?(name)
             generated << item
             generated_names << name
           end
@@ -2477,17 +2374,12 @@ if [ "$config_hash" != "OK" ]; then
     LOG_ERROR "Config merge failed; active YAML was left unchanged."
 fi
 
-# Verify the result after the merge, not only the temporary proxy fragment.
-# This catches later writer/overlay failures while keeping the diagnostic
-# credential-free.
-config_foreach naive_generation_finalize "servers"
 
 rm -rf $SERVER_FILE 2>/dev/null
 rm -rf $PROXY_PROVIDER_FILE 2>/dev/null
 rm -rf /tmp/yaml_groups.yaml 2>/dev/null
 rm -rf /tmp/Proxy_Server 2>/dev/null
 rm -rf /tmp/Proxy_Provider 2>/dev/null
-rm -f "$NAIVE_MANUAL_IDENTITIES" 2>/dev/null
 
 LOG_OUT "Config File【$CONFIG_NAME】Write Successful!"
 del_lock

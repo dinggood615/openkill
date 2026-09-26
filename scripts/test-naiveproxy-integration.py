@@ -12,9 +12,10 @@ INSTALLER = ROOT / "scripts/install-openkill.sh"
 CONTROLLER = ROOT / "luci-app-openkill/luasrc/controller/openkill.lua"
 SETTINGS = ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua"
 SERVERS = ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua"
-LEGACY_CBI = ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/naive.lua"
 VIEW = ROOT / "luci-app-openkill/luasrc/view/openkill/naive_compatibility.htm"
 GENERATOR = ROOT / "luci-app-openkill/root/usr/share/openkill/yml_proxys_set.sh"
+CONFIG = ROOT / "luci-app-openkill/root/etc/config/openkill"
+NORMALIZE = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_config_normalize.sh"
 
 
 def require(path: Path, value: str) -> str:
@@ -32,6 +33,8 @@ def main() -> None:
     require(STANDALONE, "expires_at")
     require(STANDALONE, "remote-auth-failed")
     require(STANDALONE, "NP_HEALTH_LOCK")
+    require(STANDALONE, "np_component_install")
+    require(STANDALONE, "install URL SHA256 [SIZE]")
     assert "openkill.config" not in standalone and "uci" not in standalone
     bridge = require(BRIDGE_INIT, "USE_PROCD=1")
     require(BRIDGE_INIT, "procd_set_param respawn 300 5 3")
@@ -42,13 +45,15 @@ def main() -> None:
     openkill = require(OPENKILL_INIT, "standalone")
     assert ". openkill_naive.sh" not in openkill
     assert "openkill_naive_health.sh" not in openkill
-    installer = require(INSTALLER, "NaiveProxy is independent")
+    installer = require(INSTALLER, "install_naive_standalone_component")
+    require(INSTALLER, "naiveproxy-component-metadata.sh")
     assert "install_naive_component(){" not in installer
     require(INSTALLER, "naiveproxy-bridge")
     controller = require(CONTROLLER, "action_naive_standalone_status")
     require(CONTROLLER, "/var/run/naiveproxy/manifest")
     require(CONTROLLER, "/var/run/naiveproxy/snippets.yaml")
     require(CONTROLLER, "action_naive_bridge_control")
+    require(CONTROLLER, "legacy_migration")
     require(CONTROLLER, 'HTTP.formvalue("operation")')
     assert "cursor:set(\"openkill\", sid, \"naive_password\"" not in controller
     assert "cursor:set(\"openkill\", sid, \"naive_username\"" not in controller
@@ -56,8 +61,7 @@ def main() -> None:
     require(SETTINGS, "openkill/naive_compatibility")
     servers = require(SERVERS, 'o:value("naiveproxy", "NaiveProxy")')
     assert '"naive_username"' not in servers and '"naive_password"' not in servers
-    require(LEGACY_CBI, "standalone bridge")
-    view = require(VIEW, "独立辅助服务")
+    view = require(VIEW, "NaiveProxy 独立服务")
     require(VIEW, "刷新状态")
     require(VIEW, "naiveproxy-standalone.sh health all")
     require(VIEW, "生成 SOCKS5 YAML")
@@ -67,7 +71,13 @@ def main() -> None:
     require(VIEW, "data-naive-node-remove")
     assert "data-naive-node-action" not in view
     assert "naive_username" not in view and "naive_password" not in view
-    generator = require(GENERATOR, "manual-yaml-required")
+    generator = require(GENERATOR, "independent service")
+    assert "openkill_naive.sh" not in generator
+    config = require(CONFIG, "independent service")
+    assert "option naive_enabled" not in config and "option naive_component_path" not in config
+    normalize = require(NORMALIZE, "Legacy naive_*")
+    assert "set_default naive_enabled" not in normalize
+    assert "uci -q set openkill.config.naive_bridge_mode" not in normalize
     assert "type: naiveproxy" not in generator
 
     if shutil.which("wsl.exe"):

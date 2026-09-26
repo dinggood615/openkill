@@ -1,5 +1,34 @@
 # Current status
 
+## NaiveProxy legacy cleanup and one-click standalone component (2026-09-26)
+
+- Scope: remove the retired `NaiveProxy 辅助组件` presentation and old
+  OpenKill-owned node/health writers; keep only the independent
+  `naiveproxy-bridge` card and its redacted read-only adapter. Existing
+  `naive_*` UCI and server sections are migration evidence and will not be
+  deleted or rewritten by this change.
+- Installation contract: the one-click installer must install the OpenKill
+  package, then resolve and verify an official NaiveProxy OpenWrt asset and
+  place the executable under `/etc/naiveproxy/naive`. Version, asset, URL,
+  size and expected SHA256 stay bound; failure keeps the previous executable
+  and reports the independent component stage.
+- Ownership contract: node JSON, loopback ports, procd lifecycle and health
+  results remain under `/etc/naiveproxy` and `/var/run/naiveproxy`. OpenKill
+  does not save credentials, inject Mihomo nodes, or rewrite user YAML.
+- Compatibility contract: old routes remain read-only redirects/status
+  aliases; old helper scripts and UCI display options are removed only after
+  all production references and tests are migrated. Manual SOCKS5 YAML
+  remains user-owned and is never deleted during upgrade or rollback.
+- Verification boundary: local fixtures, shell syntax, UI contracts and
+  installer contracts are required. Device, browser rendering and real VPS
+  authentication remain unverified unless a later plan explicitly authorizes
+  them.
+- Local evidence before commit: the independent bridge fixture covers health,
+  redacted YAML and offline install replacement/rollback; integration,
+  installer, runtime, UI-contract, POSIX syntax and `sh scripts/local-gate.sh`
+  all pass. Browser rendering, device state and VPS authentication remain
+  pending by design.
+
 ## 2026-1161 release preparation (2026-09-26)
 
 - Source implementation is on master commit `8adb826` and its exact

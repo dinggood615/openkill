@@ -58,9 +58,9 @@ if [ "$ACTION" = uninstall ]; then
 elif [ -n "$PACKAGE_FILE" ]; then
   # A supplied local package skips remote manifest resolution and download.
   LOCAL_PACKAGE_MODE=1
-  TOTAL_STEPS=8
+  TOTAL_STEPS=9
 else
-  TOTAL_STEPS=10
+  TOTAL_STEPS=11
 fi
 [ "$(id -u)" -eq 0 ] || die "Run as root"
 
@@ -409,12 +409,54 @@ validate_install(){
   sh -n /etc/init.d/openkill || die "OpenKill service script validation failed"
   sh -n /etc/init.d/naiveproxy-bridge || die "Independent NaiveProxy service script validation failed"
   sh -n /usr/share/openkill/naiveproxy-standalone.sh || die "Independent NaiveProxy library validation failed"
+  sh -n /usr/share/openkill/naiveproxy-component-metadata.sh || die "NaiveProxy component metadata script validation failed"
   sh -n /usr/share/openkill/openkill_core.sh || die "OpenKill core installer validation failed"
   sh -n /usr/share/openkill/openkill_update.sh || die "OpenKill updater validation failed"
   sh -n /usr/share/openkill/openkill_watchdog.sh || die "OpenKill watchdog validation failed"
   [ -x /usr/share/openkill/openkill_semantic_check.sh ] || die "OpenKill semantic validator is missing"
   sh -n /usr/share/openkill/openkill_semantic_check.sh || die "OpenKill semantic validator syntax check failed"
   ruby -ryaml -e 'exit 0' || die "Ruby YAML runtime is incomplete"
+}
+
+install_naive_standalone_component(){
+  local metadata_script metadata_output ok reason url sha size asset current_sha
+  step "Resolving and installing the NaiveProxy independent component"
+  metadata_script=/usr/share/openkill/naiveproxy-component-metadata.sh
+  if [ ! -x "$metadata_script" ]; then
+    detail "NaiveProxy independent component: metadata resolver is missing"
+    return 1
+  fi
+  metadata_output="$WORK_DIR/naiveproxy-metadata"
+  if ! sh "$metadata_script" detect > "$metadata_output" 2> "$WORK_DIR/naiveproxy-metadata.err"; then
+    detail "NaiveProxy independent component: metadata lookup failed"
+    return 1
+  fi
+  ok=$(sed -n 's/^ok=//p' "$metadata_output" | tail -n 1)
+  if [ "$ok" != 1 ]; then
+    reason=$(sed -n 's/^reason=//p' "$metadata_output" | tail -n 1)
+    detail "NaiveProxy independent component: no trusted compatible asset (${reason:-metadata-unavailable})"
+    return 1
+  fi
+  url=$(sed -n 's/^url=//p' "$metadata_output" | tail -n 1)
+  sha=$(sed -n 's/^sha256=//p' "$metadata_output" | tail -n 1)
+  size=$(sed -n 's/^size=//p' "$metadata_output" | tail -n 1)
+  asset=$(sed -n 's/^asset=//p' "$metadata_output" | tail -n 1)
+  [ -n "$url" ] && [ -n "$sha" ] && [ -n "$size" ] || {
+    detail "NaiveProxy independent component: metadata is incomplete (URL, size or SHA256 missing)"
+    return 1
+  }
+  current_sha=$(sed -n 's/^sha256=//p' /etc/naiveproxy/component.meta 2>/dev/null | tail -n 1 || true)
+  if [ "$current_sha" = "$sha" ] && [ -x /etc/naiveproxy/naive ] && /etc/naiveproxy/naive --version >/dev/null 2>&1; then
+    detail "NaiveProxy independent component already matches the verified asset: ${asset:-current}"
+    return 0
+  fi
+  detail "Verified NaiveProxy independent asset: ${asset:-unknown} (${size} bytes)"
+  if sh /usr/share/openkill/naiveproxy-standalone.sh install "$url" "$sha" "$size"; then
+    detail "NaiveProxy independent component installed under /etc/naiveproxy/naive"
+    return 0
+  fi
+  detail "NaiveProxy independent component install failed; OpenKill remains installed and the previous component was retained"
+  return 1
 }
 
 database_root(){
@@ -769,7 +811,12 @@ if [ "$PM" = opkg ]; then pm_run install "$PACKAGE_FILE"; else pm_run add --allo
 step "Validating installed service and runtime"
 validate_install
 install_core
-detail "NaiveProxy is independent; install its component separately under /etc/naiveproxy"
+if install_naive_standalone_component; then
+  NAIVE_COMPONENT_RESULT=installed
+else
+  NAIVE_COMPONENT_RESULT=failed
+fi
+detail "OpenKill package result: installed; NaiveProxy independent component result: $NAIVE_COMPONENT_RESULT"
 download_databases
 # Remove credentials and generated files left by older oixCloud-based builds.
 if command -v uci >/dev/null 2>&1; then

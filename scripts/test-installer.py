@@ -103,8 +103,9 @@ grep -q 'deadline reached' "$WORK_DIR/detail"
         self.assertIn('starting a first-install service', SOURCE)
 
     def test_one_click_install_leaves_naiveproxy_to_standalone_service(self):
-        self.assertNotIn('install_naive_component(){', SOURCE)
-        self.assertIn('NaiveProxy is independent', SOURCE)
+        self.assertIn('install_naive_standalone_component(){', SOURCE)
+        self.assertIn('naiveproxy-component-metadata.sh', SOURCE)
+        self.assertIn('NaiveProxy independent component result', SOURCE)
         self.assertIn('naiveproxy-bridge', SOURCE)
         self.assertIn('validate_install', SOURCE)
         self.assertIn('naiveproxy-standalone.sh', SOURCE)

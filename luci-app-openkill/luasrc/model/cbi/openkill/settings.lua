@@ -193,7 +193,7 @@ o.default = "请求 → 端点集合 → 规则应用 → 隧道 → 隧道业�
 o:depends("openvpn_compatibility", "1")
 o.description = "状态页会分别显示配置、规则生成/应用、端点更新时间和未验证原因；不会用进程存在或状态文件存在推断握手、隧道业务或 DNS 已成功。"
 
-o = s:taboption("compatibility", DummyValue, "_naive_component_info", "NaiveProxy 独立辅助服务")
+o = s:taboption("compatibility", DummyValue, "_naive_component_info", "NaiveProxy 独立服务")
 o.template = "openkill/naive_compatibility"
 o.description = "独立服务维护节点、进程和回环 SOCKS5；OpenKill 只读取脱敏状态，YAML 由用户手动维护。"
 
