@@ -40,6 +40,47 @@
   endpoint claim is made until a separately authorized device phase supplies
   evidence.
 
+### 2026-1156 delivery evidence
+
+- Implementation commit `348ac4bbf4c07f25adf9f06c84ebf96b722bc3a5` adds the
+  stable-ID per-node health state, exact Mihomo delay checks, self-managed
+  loopback probes, bounded task scheduling, expiry and credential-free UI
+  diagnostics. Local health, NaiveProxy integration, UI contract/interaction/
+  preview, import behavior, POSIX and CSS-pruning checks passed. The local
+  `verify_3e2_safe_config.py` helper could not start because this workstation
+  lacks PyYAML; the Development/RC workflows install that dependency and their
+  semantic gates passed.
+- Development CI for the implementation commit passed as run
+  `36216779897`:
+  https://github.com/dinggood615/openkill/actions/runs/36216779897
+- Version preparation commit `533b460fa1212bebbe4ac7a049efe7b5caad54b6`
+  advances the source metadata and release notes to `2026-1156`. Its exact
+  Development CI passed as run `36217481855`:
+  https://github.com/dinggood615/openkill/actions/runs/36217481855
+- RC Build run `36216937032` passed from `348ac4b`. The audited candidate
+  `luci-app-openkill_2026-1155_all.ipk` is cached under
+  `D:\openkill-cache\rc-36216937032` with SHA256
+  `a94f12363f0ba0aff184f04b0ac55687eb4e1552333729d60c3c5bddb9666151`;
+  the artifact ZIP digest is
+  `bce335181efc5d7ecd5980154f606e173259771c093b09d31ced80a72d1e0b4e`.
+  The package audit confirmed the health script is root-owned mode 0755 and
+  the NaiveProxy view, controller and final CSS are present.
+- Formal Release run `36217561587` passed with `release_gate=true` and
+  `publish=true` from `533b460`. Published release:
+  https://github.com/dinggood615/openkill/releases/tag/v2026-1156-ipk
+  targets commit `533b460fa1212bebbe4ac7a049efe7b5caad54b6` and contains
+  `luci-app-openkill_2026-1156_all.ipk` with SHA256
+  `e41ce2899fccb8d22dce1fb29867f5345e14238f919189a7eafeec8e615d2012`.
+  The formal artifact is cached under
+  `D:\openkill-cache\formal-2026-1156-artifact`; the previous release remains
+  available for rollback.
+- Verification boundary: no router/device, packet-path or real Naive remote
+  endpoint test was run in this iteration. The fixture proves one exact
+  Mihomo node can report a 42 ms delay while an independently failing node is
+  reported as `mihomo-not-loaded`; it does not prove remote authentication,
+  UDP, IPv6, streaming or permanent availability. Device and remote status
+  remain pending a separately authorized phase.
+
 ### 2026-1155 delivery evidence
 
 - Source fix commit: `dcc16b54fe7a31819dbe319594eefbbdb8b6da76`;
