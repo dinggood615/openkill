@@ -11,6 +11,16 @@
 - Next action: run local gates on the versioned source, push the release
   preparation commit, verify its exact Development CI, then run the RC Build
   and Formal Release gates. Record their links and package hashes here.
+- Release evidence: versioned source commit `26f16a3` passed exact
+  Development CI run `36240077008`; RC Build run `36240284537` passed with
+  candidate digest
+  `ed119de959a90be3ce3680d8352be10058451eb4960c13fadc2c8aee417d9212`.
+  Formal Release run `36240505507` passed with tag `v2026-1161-ipk` and
+  published IPK digest
+  `259fddb16614bd210ca61ccc2a4b3e0041bf321a5c89c85b8a0e1aa053cbdcdd`.
+  Release URL: https://github.com/dinggood615/openkill/releases/tag/v2026-1161-ipk
+- Device installation, browser rendering and real VPS/packet-path tests remain
+  unverified under this plan.
 
 ## NaiveProxy controls and VPN policy layout (2026-09-26)
 
