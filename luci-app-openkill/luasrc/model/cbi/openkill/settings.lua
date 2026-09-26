@@ -193,77 +193,9 @@ o.default = "请求 → 端点集合 → 规则应用 → 隧道 → 隧道业�
 o:depends("openvpn_compatibility", "1")
 o.description = "状态页会分别显示配置、规则生成/应用、端点更新时间和未验证原因；不会用进程存在或状态文件存在推断握手、隧道业务或 DNS 已成功。"
 
-o = s:taboption("compatibility", Flag, "naive_enabled", "启用 NaiveProxy 桥接")
-o.default = "0"
-o.rmempty = false
-o.description = "默认关闭。仅为启用的 NaiveProxy 节点启动官方辅助进程，并在 127.0.0.1 创建 SOCKS5 入口；不会建立第二套透明接管。"
-
-o = s:taboption("compatibility", Flag, "naive_auto_start", "随 OpenKill 启动辅助进程")
-o.default = "1"
-o.rmempty = false
-o:depends("naive_enabled", "1")
-o.description = "仅影响 NaiveProxy 辅助进程；Mihomo 仍由 OpenKill 原有生命周期管理。"
-
-o = s:taboption("compatibility", DummyValue, "_naive_bridge_mode_manual", "NaiveProxy 接入方式")
-o.default = "手动接入 YAML"
-o:depends("naive_enabled", "1")
-o.description = "本组件只维护远端连接和 127.0.0.1 SOCKS5；请将下方片段放入 YAML 的 proxies，并自行加入策略组。旧版自动模式会提示迁移，不会改写现有 YAML。"
-
-o = s:taboption("compatibility", Value, "naive_component_path", "NaiveProxy 组件路径")
-o.default = "/etc/openkill/core/naive"
-o.rmempty = false
-o.description = "必须是受 OpenKill 管理的可执行文件；不接受任意路径或通过命令行传递凭据。"
-
-o = s:taboption("compatibility", Value, "naive_component_url", "NaiveProxy 官方组件 URL")
-o.datatype = "string"
-o.rmempty = true
-o.description = "仅允许 klzgrad/naiveproxy 官方 HTTPS 来源。安装还需要提供 64 位 SHA256；下载失败保留旧组件。"
-
-o = s:taboption("compatibility", Value, "naive_component_sha256", "NaiveProxy 组件 SHA256")
-o.datatype = "and(string, minlength(64), maxlength(64))"
-o.rmempty = true
-o.description = "摘要用于完整性核对，不替代来源真实性验证；不填写时不会执行安装。"
-
-o = s:taboption("compatibility", Value, "naive_port_base", "NaiveProxy 回环端口起点")
-o.datatype = "port"
-o.default = "11080"
-o.rmempty = false
-o.description = "每个稳定 UCI 节点分配独立的 127.0.0.1 端口；仅 TCP SOCKS5，UDP 在验证前保持关闭。"
-
-o = s:taboption("compatibility", Flag, "naive_health_enabled", "周期检测 NaiveProxy 节点")
-o.default = "0"
-o.rmempty = false
-o:depends("naive_enabled", "1")
-o.description = "默认关闭；开启后按设定间隔检测启用节点，不改变策略组选择，也不会失败直连。"
-
-o = s:taboption("compatibility", ListValue, "naive_health_interval", "检测间隔")
-o:value("300", "5 分钟")
-o:value("600", "10 分钟")
-o:value("900", "15 分钟")
-o:value("1800", "30 分钟")
-o.default = "300"
-o.rmempty = false
-o:depends("naive_health_enabled", "1")
-o.description = "结果缓存两倍间隔后过期；单次检测最多等待 8 秒。"
-
-o = s:taboption("compatibility", ListValue, "naive_health_timeout", "单次检测超时")
-o:value("3", "3 秒")
-o:value("5", "5 秒")
-o:value("8", "8 秒（推荐）")
-o:value("10", "10 秒")
-o:value("15", "15 秒")
-o.default = "8"
-o.rmempty = false
-o:depends("naive_enabled", "1")
-o.description = "仅用于固定 HTTPS 探测或 Mihomo 节点延迟接口。"
-
-o = s:taboption("compatibility", DummyValue, "_naive_status_contract", "NaiveProxy 状态")
-o.default = "未安装 → 已配置 → 本地入口就绪 → 远端验证（分阶段显示）"
-o.description = "状态页区分组件安装、节点配置、配置生成、本地监听和远端连接；没有真实远端验证时显示未验证，不以进程存在代替连接成功。"
-
-o = s:taboption("compatibility", DummyValue, "_naive_component_info", "NaiveProxy 组件检测与操作")
+o = s:taboption("compatibility", DummyValue, "_naive_component_info", "NaiveProxy 独立辅助服务")
 o.template = "openkill/naive_compatibility"
-o.description = "检测官方最新 OpenWrt 制品并按本机架构匹配；只会填入空缺的 URL 和 SHA256，不会自动安装或重启服务。"
+o.description = "独立服务维护节点、进程和回环 SOCKS5；OpenKill 只读取脱敏状态，YAML 由用户手动维护。"
 
 o = s:taboption("compatibility", DynamicList, "remote_service_ports", "服务端口绕过列表")
 o.datatype = "port"

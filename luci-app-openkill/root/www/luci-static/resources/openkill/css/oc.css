@@ -10472,3 +10472,38 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
 }
 
 /* ===== Running status grid closeout End ===== */
+
+/* ===== Standalone NaiveProxy card ===== */
+#cbi-openkill.openkill-settings .openkill-naive-standalone-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 14px 0;
+}
+#cbi-openkill.openkill-settings .openkill-naive-standalone-help,
+#cbi-openkill.openkill-settings .openkill-naive-standalone-status,
+#cbi-openkill.openkill-settings .openkill-naive-standalone-yaml {
+    padding: 12px 14px;
+    border: 1px solid var(--oc-border, #475569);
+    border-radius: 8px;
+    background: var(--oc-surface-subtle, rgba(15, 23, 42, .35));
+}
+#cbi-openkill.openkill-settings .openkill-naive-standalone-help p { margin: 4px 0; }
+#cbi-openkill.openkill-settings .openkill-naive-standalone-note { opacity: .78; }
+#cbi-openkill.openkill-settings .openkill-naive-standalone-table-wrap { overflow-x: auto; margin: 12px 0; }
+#cbi-openkill.openkill-settings .openkill-naive-standalone-table { width: 100%; border-collapse: collapse; }
+#cbi-openkill.openkill-settings .openkill-naive-standalone-table th,
+#cbi-openkill.openkill-settings .openkill-naive-standalone-table td { padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--oc-border, #475569); vertical-align: top; }
+#cbi-openkill.openkill-settings .openkill-naive-standalone-table small { display: block; opacity: .68; overflow-wrap: anywhere; }
+#cbi-openkill.openkill-settings .openkill-naive-standalone-yaml { margin-top: 12px; }
+#cbi-openkill.openkill-settings .openkill-naive-standalone-yaml summary { cursor: pointer; font-weight: 600; }
+#cbi-openkill.openkill-settings .openkill-naive-standalone-yaml textarea { width: 100%; min-height: 132px; margin: 10px 0; font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+@media (max-width: 700px) {
+    #cbi-openkill.openkill-settings .openkill-naive-standalone-table thead { display: none; }
+    #cbi-openkill.openkill-settings .openkill-naive-standalone-table,
+    #cbi-openkill.openkill-settings .openkill-naive-standalone-table tbody,
+    #cbi-openkill.openkill-settings .openkill-naive-standalone-table tr,
+    #cbi-openkill.openkill-settings .openkill-naive-standalone-table td { display: block; width: 100%; box-sizing: border-box; }
+    #cbi-openkill.openkill-settings .openkill-naive-standalone-table tr { margin-bottom: 10px; border: 1px solid var(--oc-border, #475569); border-radius: 8px; }
+    #cbi-openkill.openkill-settings .openkill-naive-standalone-table td { border: 0; padding: 5px 10px; }
+}

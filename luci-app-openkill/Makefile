@@ -61,6 +61,7 @@ define Build/Prepare
 	$(foreach po,$(wildcard ${CURDIR}/po/zh-cn/*.po), \
 		po2lmo $(po) $(PKG_BUILD_DIR)/$(patsubst %.po,%.lmo,$(notdir $(po)));)
 	chmod 0755 $(PKG_BUILD_DIR)/root/etc/init.d/openkill
+	chmod 0755 $(PKG_BUILD_DIR)/root/etc/init.d/naiveproxy-bridge
 	chmod -R 0755 $(PKG_BUILD_DIR)/root/usr/share/openkill/
 	exit 0
 endef
@@ -93,6 +94,8 @@ define Package/$(PKG_NAME)/postinst
 		# selection cannot point at a dashboard that is no longer packaged.
 		rm -rf /usr/share/openkill/ui/zashboard >/dev/null 2>&1 || true
 		[ -x /usr/share/openkill/openkill_config_normalize.sh ] && /usr/share/openkill/openkill_config_normalize.sh >/dev/null 2>&1 || true
+		mkdir -p /etc/naiveproxy/nodes /var/run/naiveproxy >/dev/null 2>&1 || true
+		chmod 700 /etc/naiveproxy /etc/naiveproxy/nodes /var/run/naiveproxy >/dev/null 2>&1 || true
 		rm -f /tmp/openkill.change /tmp/openkill/openkill.change /tmp/openkill/capabilities.env >/dev/null 2>&1 || true
 		rm -rf /tmp/luci-indexcache /tmp/luci-indexcache.* /tmp/luci-modulecache /var/luci-modulecache >/dev/null 2>&1 || true
 	fi

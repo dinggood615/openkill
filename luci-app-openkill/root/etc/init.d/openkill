@@ -15,50 +15,6 @@ USE_PROCD=1
 . $IPKG_INSTROOT/usr/share/openkill/openkill_network.sh
 . $IPKG_INSTROOT/usr/share/openkill/openkill_nft_shadow.sh
 . $IPKG_INSTROOT/usr/share/openkill/openkill_openvpn.sh
-. $IPKG_INSTROOT/usr/share/openkill/openkill_naive.sh
-NAIVE_PORT_BASE="$(uci -q get openkill.config.naive_port_base 2>/dev/null || echo 11080)"
-
-naive_stop_instances()
-{
-   for sid in $(uci -q -X show openkill 2>/dev/null | sed -n 's/^openkill\.\([^.=]*\)=servers$/\1/p'); do
-      instance="$(naive_instance_name "$sid" 2>/dev/null || true)"
-      [ -n "$instance" ] && procd_kill "$instance" >/dev/null 2>&1 || true
-   done
-}
-
-naive_start_instances()
-{
-   [ "$(uci -q get openkill.config.naive_enabled 2>/dev/null || echo 0)" = "1" ] || return 0
-   [ "$(uci -q get openkill.config.naive_auto_start 2>/dev/null || echo 0)" = "1" ] || return 0
-   naive_component_available || return 0
-   config_load openkill
-   for sid in $(uci -q -X show openkill 2>/dev/null | sed -n 's/^openkill\.\([^.=]*\)=servers$/\1/p'); do
-      config_get _enabled "$sid" enabled 0
-      config_get _type "$sid" type ""
-      [ "$_enabled" = 1 ] && [ "$_type" = naiveproxy ] || continue
-      naive_prepare_section "$sid" || continue
-      listen_port="$(naive_port_for_section "$sid" 2>/dev/null || true)"
-      config_file="$NAIVE_RUNTIME/${sid}.json"
-      [ -n "$listen_port" ] && [ -r "$config_file" ] || continue
-      instance="$(naive_instance_name "$sid" 2>/dev/null || true)"
-      [ -n "$instance" ] || continue
-      procd_open_instance "$instance"
-      procd_set_param command "$NAIVE_BIN" "$config_file"
-      # The fw4 output path exempts GID 65534 from transparent interception.
-      # Keep the helper root-owned for its protected config, but run its
-      # sockets in nogroup so the remote transport cannot be sent back into
-      # OpenKill and recurse through its own SOCKS listener.
-      procd_set_param user root
-      procd_set_param group nogroup
-      procd_set_param file "$config_file"
-      # Bound helper restarts so a broken node cannot create an endless
-      # respawn loop; remote probe failures are handled by the health worker.
-      procd_set_param respawn 300 5 3
-      procd_set_param stderr 1
-      procd_close_instance
-   done
-}
-
 # A single observer entry point is shared by apply-success and stable
 # NO_ACTION reconcile boundaries.  It is deliberately read-only and its
 # result is never allowed to become a production return value.
@@ -126,10 +82,6 @@ add_cron()
    }
    [ -z "$(grep "/etc/init.d/openkill" "$CRON_FILE" 2>/dev/null)" ] && {
       [ "$(uci_bool_value auto_restart)" -eq 1 ] && echo "0 $(uci_get_config "auto_restart_day_time" || 1) * * $(uci_get_config "auto_restart_week_time" || 0) /etc/init.d/openkill restart #openkill-cron-task" >> $CRON_FILE
-   }
-
-   [ -z "$(grep "openkill_naive_health.sh" "$CRON_FILE" 2>/dev/null)" ] && {
-      [ "$(uci_bool_value naive_health_enabled)" -eq 1 ] && echo "*/5 * * * * /usr/share/openkill/openkill_naive_health.sh scheduled #openkill-naive-health" >> $CRON_FILE
    }
 
    config_load "openkill"
@@ -4612,10 +4564,10 @@ start_service()
       if ! $QUICK_START; then
          LOG_OUT "Step 3: Modify The Config File..."
          config_check
-         # Prepare optional NaiveProxy loopback bridges before YAML generation;
-         # a missing component or malformed node is recorded as unavailable
-         # and never changes the existing core startup contract.
-         naive_prepare_all || LOG_WARN "NaiveProxy bridge preparation failed; configured nodes remain unavailable."
+         # NaiveProxy is an independent service. OpenKill never prepares,
+         # starts, stops or rewrites its node configuration during YAML
+         # generation; users copy the credential-free SOCKS5 stanza manually.
+         LOG_TIP "NaiveProxy standalone mode: OpenKill will not start helpers or rewrite node credentials."
           if ! /usr/share/openkill/yml_change.sh \
           "$en_mode" "$da_password" "$cn_port" "$proxy_port" "$TMP_CONFIG_FILE" "$ipv6_enable" "$http_port" "$socks_port"\
          "$log_level" "$proxy_mode" "$en_mode_tun" "$stack_type" "$dns_port" "$mixed_port" "$tproxy_port" "$ipv6_dns"\
@@ -4735,7 +4687,6 @@ start_service()
       fi
 
       LOG_OUT "Step 4: Start Running The Clash Core..."
-      naive_start_instances
       start_run_core
 
       LOG_OUT "Step 5: Add Cron Rules, Start Daemons..."
@@ -4770,7 +4721,6 @@ stop_service()
       # Mihomo-native auto-redirect can request an fw4 reload while exiting;
       # deleting the include first recreates the exact startup race we avoid.
       LOG_OUT "Step 2: Stop The OpenKill Core..."
-      naive_stop_instances
       # The package manager may invoke prerm after the service was already
       # stopped.  procd prints "Command failed: Not found" for that expected
       # state; suppress it and rely on the bounded running-state check below.
@@ -4778,7 +4728,7 @@ stop_service()
       for i in $(seq 1 10); do
          procd_running "openkill" >/dev/null && sleep 1 || break
       done
-      naive_stop_configs
+      # Standalone NaiveProxy owns /etc/naiveproxy and its runtime files.
       # procd may terminate watchdog with SIGKILL; remove its private lock
       # after the service is confirmed stopped so the next start is clean.
       rm -rf /tmp/openkill-watchdog.lock /tmp/openkill-proxy-address.lock

@@ -89,6 +89,7 @@ NATIVE_TESTS: tuple[Case, ...] = tuple(
         Path("test-openkill-optimization.py"),
         Path("test-openvpn-compatibility.py"),
         Path("test-naiveproxy-integration.py"),
+        Path("test-naiveproxy-standalone.py"),
         Path("test-openkill-test-gates.py"),
         Path("test-ui-contract.py"),
         Path("test-ui-interactions.py"),

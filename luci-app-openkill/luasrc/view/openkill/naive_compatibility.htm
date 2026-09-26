@@ -1,527 +1,76 @@
-<%
-local dispatcher = require "luci.dispatcher"
-local http = require "luci.http"
-local fs = require "luci.openkill"
-local current_config = fs.uci_get_config("config", "config_path") or ""
-local config_prefix = "/etc/openkill/config/"
-local has_current_config = current_config:sub(1, #config_prefix) == config_prefix and
-  fs.access(current_config) and fs.IsYamlExt(fs.basename(current_config))
-local node_manage_url = dispatcher.build_url("admin", "services", "openkill", "servers")
-local node_add_url = node_manage_url
-local node_import_url = node_manage_url
-if has_current_config then
-  local file_query = "?file=" .. http.urlencode(current_config)
-  node_manage_url = node_manage_url .. file_query
-  local node_entry_url = dispatcher.build_url("admin", "services", "openkill", "naive_node") .. file_query
-  node_add_url = node_entry_url
-  node_import_url = node_entry_url .. "&import=1"
-else
-  node_manage_url = dispatcher.build_url("admin", "services", "openkill", "config")
-  node_add_url = node_manage_url
-  node_import_url = node_manage_url
-end
-%>
-<div id="openkill-naive-component-info" class="openkill-naive-compatibility"
-     data-naive-metadata-url="<%=dispatcher.build_url('admin','services','openkill','naive_metadata')%>"
-     data-naive-component-url="<%=dispatcher.build_url('admin','services','openkill','naive_component')%>"
-     data-naive-bridge-url="<%=dispatcher.build_url('admin','services','openkill','naive_bridge')%>"
-     data-naive-health-url="<%=dispatcher.build_url('admin','services','openkill','naive_health')%>"
-     data-naive-node-add-url="<%=node_add_url%>"
-     data-naive-node-import-url="<%=node_import_url%>"
-     data-naive-node-manage-url="<%=node_manage_url%>">
+<% local dispatcher = require "luci.dispatcher" %>
+<section id="openkill-naive-component-info" class="openkill-naive-compatibility"
+  data-naive-standalone-url="<%=dispatcher.build_url('admin','services','openkill','naive_standalone_status')%>">
   <div class="openkill-naive-compatibility-head">
     <div>
-      <strong>NaiveProxy 辅助组件</strong>
-      <p>组件维护远端节点和本地 SOCKS5；Mihomo 接入由你管理。</p>
+      <strong>NaiveProxy 独立辅助服务</strong>
+      <p>独立维护节点和回环 SOCKS5；OpenKill 只读取状态，不保存凭据或改写 YAML。</p>
     </div>
-    <span class="openkill-naive-compatibility-badge" data-naive-meta-state aria-live="polite">待检测</span>
+    <span class="openkill-naive-compatibility-badge" data-naive-standalone-summary aria-live="polite">未检测</span>
   </div>
-  <details class="openkill-naive-component-details">
-    <summary>组件详情与维护</summary>
-    <dl class="openkill-naive-compatibility-facts" data-naive-meta-facts>
-      <div><dt>架构</dt><dd data-naive-meta="architecture">—</dd></div>
-      <div><dt>版本</dt><dd data-naive-meta="release">—</dd></div>
-      <div><dt>制品</dt><dd data-naive-meta="asset">—</dd></div>
-      <div><dt>大小</dt><dd data-naive-meta="size">—</dd></div>
-      <div><dt>摘要来源</dt><dd data-naive-meta="source">—</dd></div>
-      <div><dt>检查时间</dt><dd data-naive-meta="checked_at">—</dd></div>
-    </dl>
-    <p class="openkill-naive-compatibility-url" data-naive-meta="url">官方 URL：—</p>
-    <p class="openkill-naive-compatibility-digest" data-naive-meta="sha256">SHA256：—</p>
-    <p class="openkill-naive-compatibility-reason" data-naive-meta-reason aria-live="polite">尚未检测组件信息。</p>
-    <div class="openkill-naive-compatibility-actions">
-      <button type="button" class="cbi-button cbi-button-apply" data-naive-meta-action="detect">检测组件</button>
-      <button type="button" class="cbi-button" data-naive-meta-action="refresh">刷新信息</button>
-      <button type="button" class="cbi-button cbi-button-apply" data-naive-auto-install="1">一键安装</button>
-      <button type="button" class="cbi-button cbi-button-reset" data-naive-component-action="remove">移除组件</button>
-    </div>
+  <div class="openkill-naive-standalone-actions">
+    <button type="button" class="cbi-button" data-naive-standalone-action="refresh">刷新状态</button>
+    <button type="button" class="cbi-button" data-naive-standalone-action="yaml">生成 SOCKS5 YAML</button>
+  </div>
+  <div class="openkill-naive-standalone-help">
+    <p><strong>手动操作</strong>：在 <code>/etc/naiveproxy/nodes/</code> 添加权限为 600 的节点 JSON，执行 <code>/etc/init.d/naiveproxy-bridge start</code>；检测用 <code>/usr/share/openkill/naiveproxy-standalone.sh health all</code>。</p>
+    <p>复制下方片段到 YAML 的 <code>proxies</code>，再将节点名称加入目标 <code>proxy-groups</code>。OpenKill 不会自动接入、启动、重启或删除节点。</p>
+    <p class="openkill-naive-standalone-note">状态仅代表 NaiveProxy → 本地 SOCKS5 → 固定 HTTPS 探测链路，不代表 Mihomo 已加载或业务全部可用。</p>
+  </div>
+  <div class="openkill-naive-standalone-status" data-naive-standalone-status aria-live="polite">正在读取独立服务状态…</div>
+  <div class="openkill-naive-standalone-table-wrap">
+    <table class="openkill-naive-standalone-table">
+      <thead><tr><th>节点</th><th>本地入口</th><th>进程</th><th>连通性</th><th>HTTPS 耗时</th><th>最近检测</th></tr></thead>
+      <tbody data-naive-standalone-rows><tr><td colspan="6">暂无独立节点</td></tr></tbody>
+    </table>
+  </div>
+  <details class="openkill-naive-standalone-yaml">
+    <summary>本地 SOCKS5 YAML（不含凭据）</summary>
+    <textarea readonly rows="6" data-naive-standalone-yaml placeholder="暂无已启用节点"></textarea>
+    <button type="button" class="cbi-button cbi-button-apply" data-naive-standalone-copy>复制 YAML</button>
+    <span data-naive-standalone-copy-status aria-live="polite"></span>
   </details>
-  <div class="openkill-naive-migration-actions" data-naive-migration-actions hidden>
-    <button type="button" class="cbi-button cbi-button-apply" data-naive-migrate-manual>确认已改用手动 YAML</button>
-    <span>确认前请保留现有桥接片段和策略组引用。</span>
-  </div>
-  <p class="openkill-naive-compatibility-links">
-    <button type="button" class="cbi-button" data-naive-node-action="add" <% if not has_current_config then %>disabled title="请先选择配置文件"<% end %>><% if has_current_config then %>添加节点<% else %>请先选择配置文件<% end %></button>
-    <button type="button" class="cbi-button" data-naive-node-action="import" <% if not has_current_config then %>disabled title="请先选择配置文件"<% end %>>导入链接</button>
-    <button type="button" class="cbi-button" data-naive-node-action="manage">管理节点</button>
-  </p>
-  <div class="openkill-naive-compatibility-status" data-naive-component-status aria-live="polite">组件状态待检测。</div>
-  <div class="openkill-naive-migration-status" data-naive-migration-status aria-live="polite"></div>
-  <div class="openkill-naive-generation-status" data-naive-generation-status aria-live="polite">手动 YAML 接入：组件只维护本地 SOCKS5，请复制下方片段到 YAML。</div>
-  <section class="openkill-naive-health" data-naive-health>
-    <div class="openkill-naive-health-head">
-      <div><strong>节点连通性</strong><p>测试对应回环 SOCKS5；YAML/Mihomo 仅作接入诊断。</p></div>
-      <div class="openkill-naive-health-actions">
-        <button type="button" class="cbi-button" data-naive-health-action="test-all">测试全部</button>
-        <button type="button" class="cbi-button" data-naive-health-action="refresh">刷新</button>
-      </div>
-    </div>
-    <div class="openkill-naive-health-summary" data-naive-health-summary aria-live="polite">尚未检测。</div>
-    <div class="openkill-naive-health-table-wrap">
-      <table class="openkill-naive-health-table">
-        <thead><tr><th>节点</th><th>状态</th><th>本地入口</th><th>延迟</th><th>最近检测</th><th>操作</th></tr></thead>
-        <tbody data-naive-health-rows><tr><td colspan="6">尚未检测启用节点。</td></tr></tbody>
-      </table>
-    </div>
-    <div class="openkill-naive-health-task" data-naive-health-task aria-live="polite"></div>
-  </section>
-  <section class="openkill-naive-bridge" data-naive-bridge>
-    <div class="openkill-naive-bridge-head">
-      <div><strong>本地 SOCKS5 YAML</strong><p>复制到 YAML 的 proxies，并把名称加入 proxy-groups。</p></div>
-      <button type="button" class="cbi-button" data-naive-bridge-refresh>刷新</button>
-    </div>
-    <textarea readonly rows="5" data-naive-bridge-output placeholder="暂无已启用的 NaiveProxy 节点"></textarea>
-    <div class="openkill-naive-bridge-actions">
-      <button type="button" class="cbi-button cbi-button-apply" data-naive-bridge-copy>复制 YAML</button>
-      <span data-naive-bridge-status aria-live="polite">未检测节点。</span>
-    </div>
-  </section>
-  <div class="openkill-naive-node-modal" data-naive-node-modal hidden aria-hidden="true">
-    <div class="openkill-naive-node-modal-backdrop" data-naive-node-close></div>
-    <section class="openkill-naive-node-dialog" role="dialog" aria-modal="true" aria-labelledby="openkill-naive-node-dialog-title">
-      <div class="openkill-naive-node-dialog-head">
-        <strong id="openkill-naive-node-dialog-title">NaiveProxy 节点</strong>
-        <button type="button" class="cbi-button" data-naive-node-close aria-label="关闭">关闭</button>
-      </div>
-      <p class="openkill-naive-node-dialog-hint">保存后关闭窗口，页面会刷新状态。</p>
-      <iframe title="NaiveProxy 节点编辑器" data-naive-node-frame loading="lazy"></iframe>
-    </section>
-  </div>
-</div>
+</section>
 <script>
 (function () {
   var root = document.getElementById('openkill-naive-component-info');
-  if (!root || root.getAttribute('data-naive-ready') === '1') return;
-  root.setAttribute('data-naive-ready', '1');
-  var metadataUrl = root.getAttribute('data-naive-metadata-url');
-  var componentUrl = root.getAttribute('data-naive-component-url');
-  var bridgeUrl = root.getAttribute('data-naive-bridge-url');
-  var healthUrl = root.getAttribute('data-naive-health-url');
-  var nodeAddUrl = root.getAttribute('data-naive-node-add-url');
-  var nodeImportUrl = root.getAttribute('data-naive-node-import-url');
-  var nodeManageUrl = root.getAttribute('data-naive-node-manage-url');
-  var metaState = root.querySelector('[data-naive-meta-state]');
-  var reason = root.querySelector('[data-naive-meta-reason]');
-  var componentState = root.querySelector('[data-naive-component-status]');
-  var migrationState = root.querySelector('[data-naive-migration-status]');
-  var migrationActions = root.querySelector('[data-naive-migration-actions]');
-  var generationState = root.querySelector('[data-naive-generation-status]');
-  var bridgeOutput = root.querySelector('[data-naive-bridge-output]');
-  var bridgeState = root.querySelector('[data-naive-bridge-status]');
-  var healthSummary = root.querySelector('[data-naive-health-summary]');
-  var healthRows = root.querySelector('[data-naive-health-rows]');
-  var healthTask = root.querySelector('[data-naive-health-task]');
-  var metaFields = root.querySelectorAll('[data-naive-meta]');
-  var nodeModal = root.querySelector('[data-naive-node-modal]');
-  var nodeFrame = root.querySelector('[data-naive-node-frame]');
-  var healthPollTimer = null;
-
-  function field(name) {
-    return document.querySelector('[name="cbid.openkill.config.' + name + '"]');
+  if (!root || root.getAttribute('data-naive-standalone-ready') === '1') return;
+  root.setAttribute('data-naive-standalone-ready', '1');
+  var endpoint = root.getAttribute('data-naive-standalone-url');
+  var summary = root.querySelector('[data-naive-standalone-summary]');
+  var status = root.querySelector('[data-naive-standalone-status]');
+  var rows = root.querySelector('[data-naive-standalone-rows]');
+  var yaml = root.querySelector('[data-naive-standalone-yaml]');
+  var copyStatus = root.querySelector('[data-naive-standalone-copy-status]');
+  var busy = false;
+  function esc(value) { var d = document.createElement('div'); d.textContent = value == null ? '' : String(value); return d.innerHTML; }
+  function when(value) { return value && Number(value) ? new Date(Number(value) * 1000).toLocaleString() : '—'; }
+  function request(operation) {
+    var url = endpoint + (operation ? '?operation=' + encodeURIComponent(operation) : '');
+    return fetch(url, { method: operation === 'health' ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('http-' + r.status); return r.json(); });
   }
-  function setText(name, value) {
-    for (var i = 0; i < metaFields.length; i++) {
-      if (metaFields[i].getAttribute('data-naive-meta') === name) {
-        metaFields[i].textContent = value || '—';
-      }
-    }
+  function render(data) {
+    data = data || {}; var list = []; var available = 0; var failed = 0;
+    Object.keys(data.nodes || {}).forEach(function (id) { var n = data.nodes[id] || {}; n.id = id; list.push(n); if (n.health === 'available') available++; if (n.health === 'probe-failed' || n.health === 'expired') failed++; });
+    summary.textContent = data.component_status === 'available' ? ('独立组件可用 · 节点 ' + list.length + ' · 可用 ' + available + ' · 异常 ' + failed) : '独立组件未运行';
+    status.textContent = '模式：手动 YAML · 最近刷新：' + when(data.updated) + ' · 结果仅代表辅助链路';
+    rows.innerHTML = list.length ? list.map(function (n) {
+      var health = n.health === 'available' ? '连接成功' : (n.health === 'expired' ? '结果已过期' : (n.health === 'probe-failed' ? ('连接失败 · ' + esc(n.reason || '探测失败')) : (n.state === 'running' ? '未检测' : '未启动')));
+      var local = n.local_ready === '1' ? '127.0.0.1:' + esc(n.port) : '未就绪';
+      return '<tr><td><strong>' + esc(n.name || n.id) + '</strong><small>' + esc(n.id) + '</small></td><td>' + local + '</td><td>' + esc(n.state || 'unknown') + '</td><td>' + health + '</td><td>' + (n.latency_ms && n.latency_ms !== 'unknown' ? esc(n.latency_ms) + ' ms' : '—') + '</td><td>' + when(n.checked_at) + '</td></tr>';
+    }).join('') : '<tr><td colspan="6">暂无独立节点，请先在 /etc/naiveproxy/nodes/ 添加 JSON。</td></tr>';
   }
-  function setBusy(selector, busy) {
-    var buttons = root.querySelectorAll(selector);
-    for (var i = 0; i < buttons.length; i++) buttons[i].disabled = !!busy;
-  }
-  function fetchJson(url, options) {
-    options = options || {};
-    var controller = window.AbortController ? new AbortController() : null;
-    var timer;
-    if (controller) options.signal = controller.signal;
-    var request = new Promise(function (resolve, reject) {
-      timer = window.setTimeout(function () {
-        if (controller) controller.abort();
-        reject(new Error('timeout'));
-      }, 20000);
-      fetch(url, options).then(resolve, reject);
-    });
-    return request.then(function (value) {
-      window.clearTimeout(timer);
-      return value;
-    }, function (error) {
-      window.clearTimeout(timer);
-      throw error;
-    }).then(function (response) {
-      if (!response.ok) throw new Error('http-' + response.status);
-      return response.json();
-    });
-  }
-  function renderMeta(data) {
-    data = data || {};
-    setText('architecture', data.architecture);
-    setText('release', data.release);
-    setText('asset', data.asset);
-    setText('size', data.size ? String(data.size) + ' bytes' : '—');
-    setText('source', data.source || (data.reason === 'official-api-unavailable' ? '官方接口不可用' : '—'));
-    setText('checked_at', data.checked_at ? new Date(Number(data.checked_at) * 1000).toLocaleString() : '—');
-    setText('url', data.url ? '官方 URL：' + data.url : '官方 URL：—');
-    setText('sha256', data.sha256 ? 'SHA256：' + data.sha256 : 'SHA256：—');
-    metaState.textContent = data.ok === '1' ? '可核对' : (data.reason === 'unsupported-architecture' ? '架构不支持' : '待核实');
-    reason.textContent = data.reason === 'ready-to-review' ?
-      '已找到匹配组件，可填写空字段。' :
-      ('当前状态：' + (data.reason || 'unknown'));
-  }
-  function requestMetadata(mode, apply) {
-    metaState.textContent = '读取中…';
-    reason.textContent = '正在读取官方信息…';
-    setBusy('[data-naive-meta-action]', true);
-    var urlField = field('naive_component_url');
-    var shaField = field('naive_component_sha256');
-    var bothEmpty = urlField && shaField && !String(urlField.value || '').trim() && !String(shaField.value || '').trim();
-    var body = new URLSearchParams({ operation: mode, apply: apply ? '1' : '0',
-      fill_url: bothEmpty ? '1' : '0', fill_sha256: bothEmpty ? '1' : '0' });
-    return fetchJson(metadataUrl, {method: 'POST', credentials: 'same-origin',
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
-      .then(function (data) {
-        renderMeta(data);
-        if (data.ok === '1' && apply) {
-          if (urlField && !String(urlField.value || '').trim() && data.url) urlField.value = data.url;
-          if (shaField && !String(shaField.value || '').trim() && data.sha256) shaField.value = data.sha256;
-          reason.textContent = data.applied ? '组件信息已填入草稿，保存后生效。' : '已保留现有组件信息。';
-        }
-        return data;
-      })
-      .catch(function (error) {
-        metaState.textContent = error && error.message === 'timeout' ? '读取超时' : '读取失败';
-        reason.textContent = '官方发布信息读取失败，请稍后重试；现有字段未修改。';
-        return {ok: '0', reason: error && error.message ? error.message : 'metadata-request-failed'};
-      })
-      .then(function (data) { setBusy('[data-naive-meta-action]', false); return data; }, function (error) { setBusy('[data-naive-meta-action]', false); throw error; });
-  }
-  function renderComponent(data) {
-    var lines = String(data && data.state || '').split('\n').filter(Boolean);
-    var map = {};
-    lines.forEach(function (line) { var p = line.indexOf('='); if (p > 0) map[line.slice(0, p)] = line.slice(p + 1); });
-    if (data && data.installed) {
-      var path = data.component ? ' · 路径 ' + data.component : '';
-      componentState.textContent = '组件已安装 · ' + (map.state || '状态未知') + path + ' · 本地入口 ' + (map.local_ready === '1' ? '就绪' : '未验证') + ' · 远端连接未验证';
-    } else {
-      componentState.textContent = 'NaiveProxy 辅助组件不可用（OpenKill 插件本体可独立运行） · ' + (data.component_reason || map.reason || '请先检测并填写组件信息');
-    }
-    if (migrationState) {
-      migrationState.textContent = data && data.migration_required ?
-        '检测到旧版自动接入设置：请确认现有 YAML 已保留桥接节点，再改用手动 YAML；OpenKill 不会替你改写或删除该节点。' : '';
-    }
-    if (migrationActions) migrationActions.hidden = !(data && data.migration_required);
-    if (generationState) {
-      var generation = String(data && data.generation_state || '');
-      if (!generation) {
-        generationState.textContent = '手动 YAML 接入：组件只维护本地 SOCKS5，请复制下方片段到 YAML。';
-      } else if (generation.indexOf('reason=manual-yaml-required') >= 0) {
-        generationState.textContent = '辅助实例可独立运行；请将下方 SOCKS5 片段加入 YAML 和目标策略组。';
-      } else if (generation.indexOf('reason=manual-yaml-preserved') >= 0) {
-        generationState.textContent = '已保留现有手动 SOCKS5 节点；策略组和最终 YAML 由你管理。';
-      } else if (generation.indexOf('stage=skipped') >= 0) {
-        var reasonMatch = generation.match(/reason=([^\\n]+)/);
-        generationState.textContent = '未自动写入 YAML：' + (reasonMatch ? reasonMatch[1] : '请查看诊断');
-      } else {
-        generationState.textContent = '辅助实例状态已记录；YAML 接入由你管理。';
-      }
-    }
-  }
-  function refreshComponent() {
-    fetchJson(componentUrl + '?operation=status', {credentials: 'same-origin', cache: 'no-store'})
-      .then(renderComponent)
-      .catch(function (error) { componentState.textContent = error && error.message === 'timeout' ? '组件状态读取超时，请重试' : '组件状态读取失败，请重试'; });
-  }
-  function migrateManual() {
-    if (!window.confirm('确认现有 YAML 已保留 NaiveProxy SOCKS5 节点及策略组引用，并改由手动 YAML 管理吗？')) return;
-    setBusy('[data-naive-migrate-manual]', true);
-    return fetchJson(componentUrl, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: new URLSearchParams({operation: 'migrate-manual'})})
-      .then(function (data) {
-        if (!data || !data.ok) throw new Error('manual-migration-failed');
-        refreshComponent();
-      })
-      .catch(function () { if (migrationState) migrationState.textContent = '迁移未完成，未修改现有 YAML；请保留原配置后重试。'; })
-      .then(function () { setBusy('[data-naive-migrate-manual]', false); });
-  }
-  function closeNodeModal() {
-    if (!nodeModal) return;
-    nodeModal.hidden = true;
-    nodeModal.setAttribute('aria-hidden', 'true');
-    if (nodeFrame) nodeFrame.src = 'about:blank';
-    refreshComponent();
-    refreshBridge();
-    refreshHealth();
-  }
-  function openNodeModal(kind) {
-    var url = kind === 'add' ? nodeAddUrl : (kind === 'import' ? nodeImportUrl : nodeManageUrl);
-    if (!url || !nodeModal || !nodeFrame) return;
-    nodeFrame.src = url;
-    nodeModal.hidden = false;
-    nodeModal.setAttribute('aria-hidden', 'false');
-    var close = nodeModal.querySelector('[data-naive-node-close]');
-    if (close) close.focus();
-  }
-  function refreshBridge() {
-    if (!bridgeUrl || !bridgeOutput) return Promise.resolve();
-    bridgeState.textContent = '正在读取节点…';
-    return fetchJson(bridgeUrl + '?_=' + Date.now(), {credentials: 'same-origin', cache: 'no-store'})
-      .then(function (data) {
-        bridgeOutput.value = data && data.yaml ? data.yaml : '';
-        var mode = '手动 YAML 模式';
-        bridgeState.textContent = data && data.count ? ('已生成 ' + data.count + ' 个回环 SOCKS5 片段 · ' + mode + ' · UDP 未启用。请手动加入 proxies 和策略组。' + (data.migration_required ? ' 旧版自动设置待迁移。' : '')) : ('暂无已启用的 NaiveProxy 节点 · ' + mode + '。');
-      })
-      .catch(function () { bridgeState.textContent = '节点读取失败，请重试。'; });
-  }
-  function healthEscape(value) {
-    return String(value == null ? '' : value).replace(/[&<>\"']/g, function (c) {
-      return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c];
-    });
-  }
-  function healthLabel(status) {
-    var labels = {
-      available: '可用', 'loopback-available': '辅助链路可用', testing: '测试中', disabled: '已禁用', unknown: '未验证',
-      'component-missing': '组件未安装', 'config-incomplete': '配置不完整',
-      'component-probe-failed': '组件不可执行', 'helper-exited': '辅助进程已退出',
-      'config-not-ready': '配置未就绪', 'port-failed': '端口失败',
-      'local-not-ready': '本地入口未就绪', 'mihomo-not-loaded': '未接入 Mihomo',
-      'mihomo-auth-failed': 'Mihomo 认证失败', 'mihomo-unreachable': 'Mihomo 不可达',
-      'mihomo-probe-failed': '探测失败', 'probe-failed': '探测失败',
-      'final-yaml-missing': '最终 YAML 缺少节点', 'no-strategy-group': '未加入策略组', 'expired': '结果已过期',
-      'remote-auth-failed': '远端认证失败'
-    };
-    return labels[status] || status || '未知';
-  }
-  function healthReason(item) {
-    var reasons = {
-      'component-not-installed': '先安装 NaiveProxy 组件。',
-      'loader-or-version-probe-failed': '检查组件加载器和版本；确认设备架构匹配。',
-      'naive-helper-exited': '辅助进程已退出；查看诊断并检查节点参数或远端服务。',
-      'missing-node-field': '补齐节点字段后重新应用。',
-      'protected-config-not-ready': '重新保存并应用节点。',
-      'loopback-port-unavailable': '检查回环端口分配。',
-      'loopback-listener-not-ready': '检查辅助进程和本地监听。',
-      'mihomo-not-loaded': '检查最终 YAML 和策略组引用。',
-      'final-yaml-missing-node': '手动 YAML 尚未包含片段；复制下方 YAML 并加入代理组。',
-      'final-yaml-missing-group': '把节点名称加入目标 proxy-groups。',
-      'no-strategy-group': '选择目标策略组后重新应用。',
-      'final-yaml-missing-group-reference': '检查策略组名称是否完全匹配。',
-      'node-disabled': '启用节点后保存并应用。',
-      'mihomo-auth-failed': '检查 Mihomo 控制接口认证。',
-      'mihomo-unreachable': '检查 Mihomo 是否已启动。',
-      'remote-auth-failed': '检查节点凭据后重新应用。',
-      'probe-failed': '检查辅助链路和远端服务。'
-    };
-    return reasons[item && item.reason] || (item && item.reason) || '查看诊断详情。';
-  }
-  function renderHealth(data) {
-    data = data || {};
-    var nodes = data.nodes || {};
-    var ids = Object.keys(nodes);
-    var summary = data.summary || {};
-    if (!ids.length) {
-      healthSummary.textContent = data.exists ? '没有可展示的 NaiveProxy 节点结果。' : '尚未检测启用节点。';
-      healthRows.innerHTML = '<tr><td colspan="6">尚未检测启用节点。</td></tr>';
-      return;
-    }
-    var expiry = data.expired ? ' · 结果已过期' : '';
-    var modeText = '手动 YAML';
-    var migrationText = data.migration_required ? ' · 旧版自动设置待迁移' : '';
-    var yamlMissing = ids.some(function (sid) {
-      var yamlState = String((nodes[sid] || {}).final_yaml || '');
-      return yamlState.indexOf('final-yaml-missing') === 0;
-    });
-    var yamlText = yamlMissing ? ' · Mihomo 未接入，需复制下方片段' : '';
-    healthSummary.textContent = !data.exists ?
-      (modeText + migrationText + ' · 已配置 ' + ids.length + ' 个 · 尚未检测，点击“测试全部”') :
-      (modeText + migrationText + ' · 启用 ' + (summary.enabled || 0) + ' 个 · 可用 ' + (summary.available || 0) + ' 个 · 异常 ' + (summary.failed || 0) + ' 个' + expiry + yamlText);
-    healthRows.innerHTML = ids.map(function (sid) {
-      var item = nodes[sid] || {};
-      var displayStatus = item.status || (item.enabled === false ? 'disabled' : 'unknown');
-      var latency = item.latency_ms && item.latency_ms !== 'unknown' ? item.latency_ms + ' ms' : '—';
-      var checked = item.checked_at && item.checked_at !== 'unknown' ? new Date(Number(item.checked_at) * 1000).toLocaleString() : '—';
-      var local = item.local_port && item.local_port !== 'unknown' ? '127.0.0.1:' + item.local_port : '—';
-      var groups = item.groups && typeof item.groups.join === 'function' && item.groups.length ? item.groups.join('、') : (item.groups || '未加入策略组');
-      var details = '阶段：' + (item.failure_stage || '—') + '；路径：' + (item.path || '—') + '；策略组：' + groups + '；Mihomo：' + (item.mihomo || '未验证') + '；最终 YAML：' + (item.final_yaml || '未检查') + '；辅助实例：' + (item.procd || '未检查') + '；原因：' + healthReason(item) + '；连续失败：' + (item.fail_count || '0') + '；恢复：' + (item.recovery || '—');
-      if (data.expired && displayStatus !== 'disabled') displayStatus = 'expired';
-      return '<tr>' +
-        '<td data-label="节点" class="openkill-naive-health-name">' + healthEscape(item.name || sid) + '<small>' + healthEscape(sid) + '</small></td>' +
-        '<td data-label="状态"><span class="openkill-naive-health-badge status-' + healthEscape(displayStatus) + '">' + healthEscape(healthLabel(displayStatus)) + '</span></td>' +
-        '<td data-label="本地入口">' + healthEscape(local) + '</td>' +
-        '<td data-label="延迟">' + healthEscape(latency) + '</td>' +
-        '<td data-label="最近检测">' + healthEscape(checked) + '</td>' +
-        '<td data-label="操作"><button type="button" class="cbi-button" data-naive-health-test="' + healthEscape(sid) + '">测试</button> <button type="button" class="cbi-button" data-naive-health-detail="' + healthEscape(sid) + '">诊断</button><details data-naive-health-details="' + healthEscape(sid) + '"><summary>详情</summary><span>' + healthEscape(details) + '</span></details></td>' +
-        '</tr>';
-    }).join('');
-  }
-  function refreshHealth() {
-    if (!healthUrl || !healthSummary) return Promise.resolve();
-    healthSummary.textContent = '正在读取检测结果…';
-    return fetchJson(healthUrl + '?operation=status&_=' + Date.now(), {credentials: 'same-origin', cache: 'no-store'})
-      .then(renderHealth)
-      .catch(function () { healthSummary.textContent = '检测结果读取失败，请重试。'; });
-  }
-  function pollHealthTask(taskId) {
-    var started = Date.now();
-    if (healthPollTimer) window.clearTimeout(healthPollTimer);
-    function read() {
-      if (Date.now() - started > 240000) throw new Error('health-task-timeout');
-      return fetchJson(healthUrl + '?operation=task-status&task_id=' + encodeURIComponent(taskId), {credentials: 'same-origin', cache: 'no-store'})
-        .then(function (data) {
-          healthTask.textContent = '检测任务 ' + taskId + '：' + (data && data.stage === 'probing' ? '探测中' : (data && data.state || '处理中'));
-          if (data && data.health) renderHealth(data.health);
-          if (data && (data.state === 'succeeded' || data.state === 'failed')) {
-            healthTask.textContent = data.state === 'succeeded' ? '检测完成。' : '检测失败，请查看节点诊断。';
-            return data;
-          }
-          return new Promise(function (resolve) { healthPollTimer = window.setTimeout(function () { read().then(resolve, function (error) { resolve(Promise.reject(error)); }); }, 1000); });
-        });
-    }
-    return read().catch(function () { healthTask.textContent = '检测任务超时或读取失败，请刷新后重试。'; });
-  }
-  function startHealthTest(scope, sid) {
-    if (!healthUrl) return Promise.resolve();
-    var body = new URLSearchParams({operation: scope === 'one' ? 'test' : 'test-all'});
-    if (scope === 'one') body.set('sid', sid);
-    setBusy('[data-naive-health-action], [data-naive-health-test]', true);
-    healthTask.textContent = '正在创建检测任务…';
-    return fetchJson(healthUrl, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
-      .then(function (data) {
-        if (!data || !data.ok || !data.task_id) throw new Error('health-task-start-failed');
-        return pollHealthTask(data.task_id);
-      })
-      .then(function (value) { setBusy('[data-naive-health-action], [data-naive-health-test]', false); return value; }, function (error) { setBusy('[data-naive-health-action], [data-naive-health-test]', false); throw error; });
-  }
-  function pollTask(taskId) {
-    var started = Date.now();
-    function read() {
-      if (Date.now() - started > 240000) {
-        throw new Error('task-timeout');
-      }
-      return fetchJson(componentUrl + '?operation=task-status&task_id=' + encodeURIComponent(taskId), {credentials: 'same-origin', cache: 'no-store'})
-        .then(function (data) {
-          var stage = data && data.stage ? data.stage : 'processing';
-          var labels = {queued: '排队中', starting: '准备安装', validating: '校验输入', downloading: '下载组件', verifying: '核对摘要', extracting: '解包组件', probing: '检查架构与加载器', replacing: '安全替换组件', completed: '安装完成'};
-          componentState.textContent = '安装任务 ' + taskId + '：' + (labels[stage] || stage);
-          if (data && (data.state === 'succeeded' || data.state === 'failed')) return data;
-          return new Promise(function (resolve) { window.setTimeout(function () { read().then(resolve, function (error) { resolve(Promise.reject(error)); }); }, 1000); });
-        });
-    }
-    return read();
-  }
-  function runComponentAction(componentAction, urlField, shaField) {
-    if (componentAction === 'remove' && !window.confirm('确认移除 NaiveProxy 组件？节点配置会保留。')) return Promise.resolve();
-    if (componentAction === 'install' && (!urlField || !shaField || !String(urlField.value || '').trim() || !String(shaField.value || '').trim())) {
-      componentState.textContent = '请先检测并填写官方 URL 和 SHA256';
-      return Promise.resolve();
-    }
-    componentState.textContent = componentAction === 'install' ? '正在校验并安装…' : '正在移除组件…';
-    setBusy('[data-naive-component-action], [data-naive-auto-install]', true);
-    var body = new URLSearchParams({operation: componentAction});
-    if (componentAction === 'install') { body.set('url', urlField.value); body.set('sha256', shaField.value); }
-    return fetchJson(componentUrl, {method: 'POST', credentials: 'same-origin',
-      headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
-      .then(function (data) {
-        if (componentAction === 'install' && data && data.ok && data.task_id) return pollTask(data.task_id);
-        return data;
-      })
-      .then(function (data) {
-        if (data && data.state === 'succeeded') componentState.textContent = '组件安装完成；请保存并应用设置，远端连接仍未验证。';
-        else if (data && data.state === 'failed') componentState.textContent = '组件安装失败：' + (data.error || '请查看诊断日志');
-        else if (data && !data.ok) componentState.textContent = '操作失败：' + (data.error || '请检查组件信息');
-        else if (data && data.ok) componentState.textContent = '组件操作完成；远端连接仍未验证。';
-        refreshComponent();
-        return data;
-      })
-      .catch(function (error) {
-        componentState.textContent = error && (error.message === 'timeout' || error.message === 'task-timeout') ? '安装任务超时，请检查日志后重试' : '操作请求失败，请重试';
-        throw error;
-      })
-      .then(function (data) { setBusy('[data-naive-component-action], [data-naive-auto-install]', false); return data; }, function (error) { setBusy('[data-naive-component-action], [data-naive-auto-install]', false); throw error; });
-  }
-  function currentAssetPair() {
-    var urlField = field('naive_component_url');
-    var shaField = field('naive_component_sha256');
-    if (!urlField || !shaField) return null;
-    if (!String(urlField.value || '').trim() || !String(shaField.value || '').trim()) return null;
-    return {urlField: urlField, shaField: shaField};
-  }
-  function autoInstall() {
-    setBusy('[data-naive-meta-action], [data-naive-component-action], [data-naive-auto-install]', true);
-    var existing = currentAssetPair();
-    if (existing) {
-      componentState.textContent = '使用已填写的官方 URL 和 SHA256，开始安装…';
-      return runComponentAction('install', existing.urlField, existing.shaField)
-        .catch(function () { return null; })
-        .then(function () { setBusy('[data-naive-meta-action], [data-naive-component-action], [data-naive-auto-install]', false); });
-    }
-    return requestMetadata('detect', true).then(function (data) {
-      var urlField = field('naive_component_url');
-      var shaField = field('naive_component_sha256');
-      if (!data || data.ok !== '1' || !urlField || !shaField || !String(urlField.value || '').trim() || !String(shaField.value || '').trim()) {
-        componentState.textContent = '组件信息检测失败，未执行安装：' + ((data && data.reason) || '未找到可核验制品');
-        return null;
-      }
-      return runComponentAction('install', urlField, shaField);
-    }).catch(function () { return null; }).then(function () { setBusy('[data-naive-meta-action], [data-naive-component-action], [data-naive-auto-install]', false); });
+  function refresh(operation) {
+    if (busy) return; busy = true; status.textContent = operation === 'health' ? '正在测试节点…' : '正在读取状态…';
+    request(operation).then(render).catch(function () { status.textContent = '独立服务状态读取失败，请检查 naiveproxy-bridge'; }).then(function () { busy = false; });
   }
   root.addEventListener('click', function (event) {
-    var healthTestSid = event.target.getAttribute('data-naive-health-test');
-    var healthDetailSid = event.target.getAttribute('data-naive-health-detail');
-    var healthAction = event.target.getAttribute('data-naive-health-action');
-    if (healthTestSid) { startHealthTest('one', healthTestSid).catch(function () {}); return; }
-    if (healthDetailSid) {
-      var detail = root.querySelector('[data-naive-health-details="' + healthDetailSid.replace(/[^A-Za-z0-9_-]/g, '') + '"]');
-      if (detail) detail.open = !detail.open;
-      return;
-    }
-    if (healthAction === 'test-all') { startHealthTest('all', '').catch(function () {}); return; }
-    if (healthAction === 'refresh') { refreshHealth(); return; }
-    if (event.target.hasAttribute('data-naive-migrate-manual')) { migrateManual(); return; }
-    var nodeAction = event.target.getAttribute('data-naive-node-action');
-    if (nodeAction) { openNodeModal(nodeAction); return; }
-    if (event.target.hasAttribute('data-naive-node-close')) { closeNodeModal(); return; }
-    var metadataAction = event.target.getAttribute('data-naive-meta-action');
-    var componentAction = event.target.getAttribute('data-naive-component-action');
-    if (event.target.getAttribute('data-naive-auto-install')) return autoInstall();
-    if (event.target.hasAttribute('data-naive-bridge-refresh')) return refreshBridge();
-    if (event.target.hasAttribute('data-naive-bridge-copy')) {
-      if (!bridgeOutput || !bridgeOutput.value) { bridgeState.textContent = '暂无可复制内容。'; return; }
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(bridgeOutput.value).then(function () { bridgeState.textContent = 'YAML 已复制。'; }, function () { bridgeState.textContent = '复制失败，请手动选择文本。'; });
-      } else { bridgeOutput.focus(); bridgeOutput.select(); bridgeState.textContent = '请手动复制已选文本。'; }
-      return;
-    }
-    if (metadataAction) return requestMetadata(metadataAction === 'detect' ? 'detect' : 'cached', metadataAction === 'detect');
-    if (!componentAction) return;
-    var urlField = field('naive_component_url');
-    var shaField = field('naive_component_sha256');
-    return runComponentAction(componentAction, urlField, shaField);
+    var action = event.target.getAttribute('data-naive-standalone-action');
+    if (action === 'refresh') refresh('');
+    if (action === 'yaml') fetch(endpoint + '?operation=yaml', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (text) { yaml.value = text; }).catch(function () { status.textContent = 'YAML 读取失败'; });
+    if (event.target.hasAttribute('data-naive-standalone-copy')) { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(yaml.value).then(function () { copyStatus.textContent = '已复制'; }); else { yaml.select(); document.execCommand('copy'); copyStatus.textContent = '已复制'; } }
   });
-  root.addEventListener('keydown', function (event) {
-    if (event.key === 'Escape' && nodeModal && !nodeModal.hidden) closeNodeModal();
-  });
-  requestMetadata('cached', false);
-  refreshComponent();
-  refreshBridge();
-  refreshHealth();
+  refresh('');
 }());
 </script>

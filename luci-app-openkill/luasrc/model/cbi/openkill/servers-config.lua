@@ -166,7 +166,7 @@ if not m.uci:get(openkill, sid, "type") and HTTP.formvalue("type") == "naiveprox
 	o.default = "naiveproxy"
 end
 
-o.description = translate("Using incorrect encryption mothod may causes service fail to start")
+o.description = translate("NaiveProxy is maintained by the standalone bridge; add its credentials in /etc/naiveproxy, then copy the loopback SOCKS5 entry into YAML.")
 
 o = s:option(Value, "name", translate("Server Alias"))
 o.rmempty = false
@@ -811,26 +811,9 @@ o:depends("type", "http")
 o:depends("type", "ssh")
 o.rmempty = true
 
--- NaiveProxy is an optional helper process.  These fields are deliberately
--- separate from generic SOCKS credentials so a node can be renamed or
--- migrated without changing the existing protocol writers.
-o = s:option(Value, "naive_username", "NaiveProxy Username")
-o.rmempty = false
-o.placeholder = "user"
-o:depends("type", "naiveproxy")
-
-o = s:option(Value, "naive_password", "NaiveProxy Password")
-o.password = true
-o.rmempty = false
-o:depends("type", "naiveproxy")
-
-o = s:option(ListValue, "naive_transport", "NaiveProxy Transport")
-o:value("https", "HTTPS")
-o:value("quic", "QUIC")
-o.default = "https"
-o.rmempty = false
-o:depends("type", "naiveproxy")
-o.description = "通过本机回环 SOCKS5 桥接到官方 NaiveProxy；UDP 转发在未验证前保持关闭。"
+-- NaiveProxy credentials are intentionally not exposed in the OpenKill
+-- server editor.  Existing legacy fields remain readable for migration, but
+-- all new node data belongs to the standalone bridge under /etc/naiveproxy.
 
 o = s:option(Value, "private_key", translate("private-key"))
 o:depends("type", "ssh")

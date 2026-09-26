@@ -1,229 +1,72 @@
-"""Local contract checks for the optional NaiveProxy bridge.
-
-The test is deliberately offline. It checks the generated boundary (helper
-JSON -> loopback SOCKS5 -> Mihomo) and runs POSIX syntax validation through
-WSL when available; it never contacts a device or a remote server.
-"""
-
-from __future__ import annotations
+"""Offline contract checks for the standalone NaiveProxy boundary."""
 
 from pathlib import Path
-import shutil
 import subprocess
-
+import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
-HELPER = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_naive.sh"
-METADATA = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_naive_metadata.sh"
-GENERATOR = ROOT / "luci-app-openkill/root/usr/share/openkill/yml_proxys_set.sh"
-INIT = ROOT / "luci-app-openkill/root/etc/init.d/openkill"
-HEALTH = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_naive_health.sh"
-STATUS = ROOT / "luci-app-openkill/luasrc/view/openkill/status.htm"
+STANDALONE = ROOT / "luci-app-openkill/root/usr/share/openkill/naiveproxy-standalone.sh"
+BRIDGE_INIT = ROOT / "luci-app-openkill/root/etc/init.d/naiveproxy-bridge"
+OPENKILL_INIT = ROOT / "luci-app-openkill/root/etc/init.d/openkill"
+INSTALLER = ROOT / "scripts/install-openkill.sh"
 CONTROLLER = ROOT / "luci-app-openkill/luasrc/controller/openkill.lua"
-SERVERS = ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua"
 SETTINGS = ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua"
-SETTINGS_THEME = ROOT / "luci-app-openkill/luasrc/view/openkill/settings_theme.htm"
-NAIVE_VIEW = ROOT / "luci-app-openkill/luasrc/view/openkill/naive_compatibility.htm"
-TBLSECTION = ROOT / "luci-app-openkill/luasrc/view/openkill/tblsection.htm"
-CONFIG = ROOT / "luci-app-openkill/root/etc/config/openkill"
-MAKEFILE = ROOT / "luci-app-openkill/Makefile"
-PRUNE_CSS = ROOT / "luci-app-openkill/tools/prune-ui-css.sh"
-FLAT_CSS = ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css"
+SERVERS = ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua"
+LEGACY_CBI = ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/naive.lua"
+VIEW = ROOT / "luci-app-openkill/luasrc/view/openkill/naive_compatibility.htm"
+GENERATOR = ROOT / "luci-app-openkill/root/usr/share/openkill/yml_proxys_set.sh"
 
 
-def require(path: Path | str, text: str) -> None:
-    source = path.read_text(encoding="utf-8") if isinstance(path, Path) else path
-    assert text in source, f"{text!r} missing from {path}"
+def require(path: Path, value: str) -> str:
+    text = path.read_text(encoding="utf-8")
+    assert value in text, f"{value!r} missing from {path}"
+    return text
 
 
 def main() -> None:
-    helper = HELPER.read_text(encoding="utf-8")
-    metadata = METADATA.read_text(encoding="utf-8")
-    generator = GENERATOR.read_text(encoding="utf-8")
-    init = INIT.read_text(encoding="utf-8")
-    health = HEALTH.read_text(encoding="utf-8")
-    status = STATUS.read_text(encoding="utf-8")
-    makefile = MAKEFILE.read_text(encoding="utf-8")
-    prune_css = PRUNE_CSS.read_text(encoding="utf-8")
-    flat_css = FLAT_CSS.read_text(encoding="utf-8")
-
-    require(CONFIG, "option naive_enabled '0'")
-    require(CONFIG, "option naive_bridge_mode 'manual'")
-    require(SERVERS, 'o:value("naiveproxy", "NaiveProxy")')
-    require(SERVERS, '"naive_username"')
-    require(SERVERS, '"naive_transport"')
-    require(generator, 'naive_generation_record "$section" "skipped" "manual-yaml-required"')
-    require(generator, "NAIVE_MANUAL_IDENTITIES")
-    require(generator, "manual-yaml-required")
-    require(generator, "manual-yaml-preserved")
-    require(generator, "NAIVE_GENERATION_STATE")
-    require(generator, "naive_generation_record")
-    assert 'type: naiveproxy' not in "\n".join(line for line in generator.splitlines() if not line.lstrip().startswith("#")), "unsupported native Mihomo type leaked into generator"
-    require(helper, '"listen": "socks://127.0.0.1:%s"')
-    require(helper, 'chmod 600 "$tmp"')
-    require(helper, "sha256sum")
-    require(helper, "naive_arch_ok")
-    require(helper, "naive_read_byte")
-    require(helper, "naive_refresh_status")
-    require(helper, "command -v hexdump")
-    require(helper, "naive_binary_probe")
-    require(helper, "tar -tf")
-    require(helper, "component-not-installed")
-    require(helper, "NAIVE_CONFIGURED_BIN")
-    require(helper, "/usr/bin/naiveproxy")
-    require(helper, "uci -q -X show openkill")
-    require(helper, ". /lib/functions.sh")
-    require(helper, "naive_port_listening")
-    require(helper, "local_ready=1")
-    require(helper, "*.tar.xz)")
-    require(helper, "install-task")
-    require(helper, "task-status")
-    require(helper, "NAIVE_TASK_LOCK")
-    require(helper, "naive_task_stage")
-    require(helper, "command -v xz")
-    require(helper, 'xz -dc "$tmp"')
-    require(makefile, "+unzip +xz")
-    require(prune_css, "skip_section")
-    require(prune_css, "skip_login")
-    require(flat_css, 'body[data-page^="admin-services-openkill"]')
-    require(flat_css, "--ok-page-bg")
-    require(metadata, "https://api.github.com/repos/klzgrad/naiveproxy/releases/latest")
-    require(metadata, "official-github-release-asset")
-    require(metadata, "jsonfilter")
-    require(metadata, "no-compatible-openwrt-asset")
-    require(init, ". $IPKG_INSTROOT/usr/share/openkill/openkill_naive.sh")
-    require(init, "procd_set_param command \"$NAIVE_BIN\" \"$config_file\"")
-    require(init, "procd_set_param user root")
-    require(init, "procd_set_param group nogroup")
-    assert init.count("uci -q -X show openkill") >= 2, "init must resolve stable server IDs for stop/start"
-    require(status, "id=\"naiveproxy-status\"")
-    require(status, "naive_component_installed")
-    require(CONTROLLER, 'entry({"admin", "services", "openkill", "naive_component"}')
-    require(CONTROLLER, 'entry({"admin", "services", "openkill", "naive_metadata"}')
-    require(CONTROLLER, 'entry({"admin", "services", "openkill", "naive_bridge"}')
-    require(CONTROLLER, 'entry({"admin", "services", "openkill", "naive_health"}')
-    require(CONTROLLER, 'operation == "migrate-manual"')
-    require(CONTROLLER, "function action_naive_health()")
-    require(CONTROLLER, "function action_naive_bridge()")
-    require(CONTROLLER, "version-probe-failed")
-    require(CONTROLLER, "type: socks5")
-    require(CONTROLLER, 'server = "127.0.0.1"')
-    require(CONTROLLER, "udp = false")
-    require(CONTROLLER, 'mode = "manual"')
-    require(CONTROLLER, "migration_required")
-    require(CONTROLLER, 'generation_state = fs.readfile("/tmp/openkill-naive-generation.state")')
-    require(CONTROLLER, 'result.generation_state = fs.readfile("/tmp/openkill-naive-generation.state")')
-    bridge_section = CONTROLLER.read_text(encoding="utf-8").split("function action_naive_bridge()", 1)[1].split("function action_naive_redirect", 1)[0]
-    assert "naive_username" not in bridge_section and "naive_password" not in bridge_section, "bridge preview must not expose credentials"
-    require(CONTROLLER, "action_naive_redirect")
-    assert 'action_naive_redirect"),"NaiveProxy"' not in CONTROLLER.read_text(encoding="utf-8"), "legacy NaiveProxy route must stay hidden from the menu"
-    assert 'uci_cursor:commit("openkill")' not in CONTROLLER.read_text(encoding="utf-8").split("function action_naive_metadata()", 1)[1].split("function action_naive_component()", 1)[0], "metadata discovery must not commit UCI"
-    require(SETTINGS, '"naive_enabled"')
-    require(SETTINGS, '"_naive_bridge_mode_manual"')
-    require(SETTINGS, 'template = "openkill/naive_compatibility"')
-    require(SETTINGS_THEME, "naiveproxy-compatibility")
-    require(SETTINGS_THEME, "openkill-naive-component-info")
-    require(SETTINGS_THEME, "_naive_bridge_mode_manual")
-    require(NAIVE_VIEW, "检测组件")
-    require(NAIVE_VIEW, "组件详情与维护")
-    require(NAIVE_VIEW, 'colspan="6"')
-    naive_view = NAIVE_VIEW.read_text(encoding="utf-8")
-    assert '<th>Mihomo</th>' not in naive_view, "Mihomo membership belongs in diagnostics, not the default table"
-    require(NAIVE_VIEW, "一键安装")
-    require(NAIVE_VIEW, "添加节点")
-    require(NAIVE_VIEW, "data-naive-node-action=\"add\"")
-    require(NAIVE_VIEW, "data-naive-node-action=\"import\"")
-    require(NAIVE_VIEW, "data-naive-node-modal")
-    require(NAIVE_VIEW, "function openNodeModal(kind)")
-    assert '<a class="cbi-button" href="<%=node_add_url%>"' not in NAIVE_VIEW.read_text(encoding="utf-8"), "Naive add must open in-page modal"
-    require(NAIVE_VIEW, 'fs.uci_get_config("config", "config_path")')
-    require(NAIVE_VIEW, 'current_config:sub(1, #config_prefix) == config_prefix')
-    require(NAIVE_VIEW, 'fs.access(current_config) and fs.IsYamlExt(fs.basename(current_config))')
-    require(NAIVE_VIEW, 'http.urlencode(current_config)')
-    require(NAIVE_VIEW, '"naive_node"')
-    require(NAIVE_VIEW, '请先选择配置文件')
-    require(NAIVE_VIEW, "credentials: 'same-origin'")
-    require(NAIVE_VIEW, "远端连接未验证")
-    require(NAIVE_VIEW, "辅助组件不可用（OpenKill 插件本体可独立运行）")
-    require(NAIVE_VIEW, "requestMetadata('detect', true)")
-    require(NAIVE_VIEW, "function currentAssetPair()")
-    require(NAIVE_VIEW, "使用已填写的官方 URL 和 SHA256，开始安装")
-    require(NAIVE_VIEW, "组件信息检测失败，未执行安装")
-    require(NAIVE_VIEW, "return data;")
-    require(NAIVE_VIEW, "operation=task-status")
-    require(NAIVE_VIEW, "function pollTask(taskId)")
-    require(NAIVE_VIEW, "data-naive-bridge-url")
-    require(NAIVE_VIEW, "本地 SOCKS5 YAML")
-    require(NAIVE_VIEW, "data-naive-bridge-copy")
-    require(NAIVE_VIEW, "data-naive-generation-status")
-    require(NAIVE_VIEW, "导入链接")
-    require(NAIVE_VIEW, "节点连通性")
-    require(NAIVE_VIEW, "测试全部")
-    require(NAIVE_VIEW, "data-naive-health-test")
-    require(NAIVE_VIEW, "data-naive-migration-status")
-    require(NAIVE_VIEW, "data-naive-migrate-manual")
-    require(NAIVE_VIEW, "手动 YAML 接入")
-    require(NAIVE_VIEW, "loopback-available")
-    require(HEALTH, "HEALTH_TARGET=\"https://www.gstatic.com/generate_204\"")
-    require(HEALTH, "health_socks_probe")
-    assert "health_mihomo_probe" not in health, "manual health must not probe Mihomo delay"
-    assert "/delay" not in health, "manual health must not probe a controller delay endpoint"
-    require(HEALTH, "--proxy \"socks5h://127.0.0.1:${port}\"")
-    require(HEALTH, "final-yaml-missing-node")
-    require(HEALTH, "final-yaml-missing-group-reference")
-    require(HEALTH, "loopback-available")
-    require(HEALTH, "health_procd_state")
-    require(HEALTH, "bounded-procd-respawn")
-    require(HEALTH, 'health_append_node "$sid" procd')
-    require(HEALTH, "HEALTH_LOCK")
-    require(HEALTH, "task-start")
-    require(HEALTH, "task-status")
-    assert "DIRECT" not in health, "health worker must not silently fall back to DIRECT"
-    assert 'health_append_node "$sid" password' not in health, "health output must not expose credential fields"
-    require(TBLSECTION, 'self.extedit:gsub("%%s", section, 1)')
-    assert ':format(section)' not in TBLSECTION.read_text(encoding="utf-8"), "encoded file query must not pass through string.format"
-    require(CONTROLLER, 'operation == "task-status"')
-    require(CONTROLLER, 'openkill_naive.sh install-task')
-
-    # A complete URL/digest pair must take the install-task path before any
-    # metadata refresh. This is the device-safe behavior when Fake-IP DNS or
-    # an upstream API temporarily prevents GitHub metadata discovery.
-    auto_install = NAIVE_VIEW.read_text(encoding="utf-8").split("function autoInstall()", 1)[1].split("root.addEventListener", 1)[0]
-    assert auto_install.index("currentAssetPair()") < auto_install.index("requestMetadata('detect', true)"), "auto-install must prefer an existing asset pair"
-    assert auto_install.index("runComponentAction('install', existing.urlField, existing.shaField)") < auto_install.index("requestMetadata('detect', true)"), "existing asset pair must start installation without metadata refresh"
-
-    server_url = ROOT / "luci-app-openkill/luasrc/view/openkill/server_url.htm"
-    server_url_text = server_url.read_text(encoding="utf-8")
-    require(server_url_text, "function parseNaiveProxy(url, sid)")
-    require(server_url_text, 'case "naive+https":')
-    require(server_url_text, 'case "naive+quic":')
-    require(server_url_text, 'case "naiveproxy":')
-    require(server_url_text, "naive_username")
-    require(server_url_text, "naiveImportWarnings")
-    server_manager = ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers.lua"
-    require(server_manager, 'HTTP.formvalue("add") == "naiveproxy"')
-    require(server_manager, 'HTTP.redirect(DISP.build_url("admin", "services", "openkill", "config"))')
-    require(ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers.lua", 'edit_url .. "&type=naiveproxy"')
-    require(CONTROLLER, 'function action_naive_node()')
-    require(CONTROLLER, 'entry({"admin", "services", "openkill", "naive_node"}')
-    require(CONTROLLER, 'cursor:set("openkill", sid, "naive_pending", "1")')
-    require(ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua", 'HTTP.formvalue("type") == "naiveproxy"')
-    require(ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua", 'o.default = "naiveproxy"')
-    require(ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua", 'naive_pending") == "1"')
-    require(ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua", 'REQUEST_METHOD") == "POST"')
-    require(ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers.lua", 'edit_url = edit_url .. "&import=1"')
-    require(server_url, "import_naive_quick")
-    require(server_url, "naive-quick-link-")
+    standalone = require(STANDALONE, "/etc/naiveproxy")
+    require(STANDALONE, "socks5h://127.0.0.1")
+    require(STANDALONE, "udp: false")
+    require(STANDALONE, "chmod 600")
+    require(STANDALONE, "component_status=available")
+    require(STANDALONE, "expires_at")
+    require(STANDALONE, "remote-auth-failed")
+    require(STANDALONE, "NP_HEALTH_LOCK")
+    assert "openkill.config" not in standalone and "uci" not in standalone
+    bridge = require(BRIDGE_INIT, "USE_PROCD=1")
+    require(BRIDGE_INIT, "procd_set_param respawn 300 5 3")
+    require(BRIDGE_INIT, "group nogroup")
+    assert "uci" not in bridge
+    openkill = require(OPENKILL_INIT, "standalone")
+    assert ". openkill_naive.sh" not in openkill
+    assert "openkill_naive_health.sh" not in openkill
+    installer = require(INSTALLER, "NaiveProxy is independent")
+    assert "install_naive_component(){" not in installer
+    require(INSTALLER, "naiveproxy-bridge")
+    controller = require(CONTROLLER, "action_naive_standalone_status")
+    require(CONTROLLER, "/var/run/naiveproxy/manifest")
+    require(CONTROLLER, "/var/run/naiveproxy/snippets.yaml")
+    assert "cursor:set(\"openkill\", sid, \"naive_password\"" not in controller
+    assert "cursor:set(\"openkill\", sid, \"naive_username\"" not in controller
+    settings = require(SETTINGS, "_naive_component_info")
+    require(SETTINGS, "openkill/naive_compatibility")
+    servers = require(SERVERS, 'o:value("naiveproxy", "NaiveProxy")')
+    assert '"naive_username"' not in servers and '"naive_password"' not in servers
+    require(LEGACY_CBI, "standalone bridge")
+    view = require(VIEW, "独立辅助服务")
+    require(VIEW, "刷新状态")
+    require(VIEW, "naiveproxy-standalone.sh health all")
+    require(VIEW, "生成 SOCKS5 YAML")
+    assert "data-naive-node-action" not in view
+    assert "naive_username" not in view and "naive_password" not in view
+    generator = require(GENERATOR, "manual-yaml-required")
+    assert "type: naiveproxy" not in generator
 
     if shutil.which("wsl.exe"):
-        for path in (HELPER, METADATA, GENERATOR, INIT, HEALTH, PRUNE_CSS):
+        for path in (STANDALONE, BRIDGE_INIT, OPENKILL_INIT):
             result = subprocess.run(
                 ["wsl.exe", "sh", "-n", path.as_posix().replace("D:", "/mnt/d").replace("\\", "/")],
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=30,
+                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30,
             )
             assert result.returncode == 0, f"POSIX syntax failed for {path}: {result.stderr}"
 

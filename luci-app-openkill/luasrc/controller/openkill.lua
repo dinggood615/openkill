@@ -18,6 +18,7 @@ function index()
 	entry({"admin", "services", "openkill", "naive_metadata"},call("action_naive_metadata")).leaf=true
 	entry({"admin", "services", "openkill", "naive_bridge"},call("action_naive_bridge")).leaf=true
 	entry({"admin", "services", "openkill", "naive_health"},call("action_naive_health")).leaf=true
+	entry({"admin", "services", "openkill", "naive_standalone_status"},call("action_naive_standalone_status")).leaf=true
 	entry({"admin", "services", "openkill", "startlog"},call("action_start")).leaf=true
 	entry({"admin", "services", "openkill", "refresh_log"},call("action_refresh_log"))
 	entry({"admin", "services", "openkill", "del_log"},call("action_del_log"))
@@ -1522,38 +1523,20 @@ function action_status()
 	local function rustdesk_value(name, fallback)
 		return rustdesk_state:match(name .. "=([^\n]+)") or fallback
 	end
-	local naive_state = fs.readfile("/tmp/openkill-naive.state") or ""
-	local function naive_value(name, fallback)
-		return naive_state:match(name .. "=([^\n]+)") or fallback
-	end
-	local function naive_probe(path)
-		if not path or path == "" or not fs.access(path) then
-			return false, "missing", "unknown"
-		end
-		if SYS.call(string.format("test -x %q", path)) ~= 0 then
-			return false, "not-executable", "unknown"
-		end
-		local version = (SYS.exec(string.format("%q --version 2>/dev/null | head -c 96", path)) or "")
-		version = version:gsub("[\r\n]+", " "):gsub("^%s+", ""):gsub("%s+$", "")
-		if version == "" then
-			return true, "version-probe-failed", "unknown"
-		end
-		return true, "executable", version
-	end
-	local naive_component_path = fs.uci_get_config("config", "naive_component_path") or "/etc/openkill/core/naive"
-	local naive_component_installed, naive_component_reason, naive_component_version = naive_probe(naive_component_path)
-	if not naive_component_installed then
-		for _, candidate in ipairs({"/etc/openkill/core/naiveproxy", "/usr/bin/naive", "/usr/bin/naiveproxy", "/usr/local/bin/naive"}) do
-			local ok, reason, version = naive_probe(candidate)
-			if ok then
-				naive_component_path = candidate
-				naive_component_installed = true
-				naive_component_reason = "fallback-path"
-				naive_component_version = version
-				break
-			end
-			if naive_component_reason == "missing" then naive_component_reason = reason end
-		end
+	-- NaiveProxy is an independent service.  Read only its redacted manifest;
+	-- do not inspect legacy UCI credentials or infer health from OpenKill state.
+	local naive_manifest = fs.readfile("/var/run/naiveproxy/manifest") or ""
+	local naive_component_path = naive_manifest:match("component=([^\n]+)") or "/etc/naiveproxy/naive"
+	local naive_component_reason = naive_manifest:match("component_status=([^\n]+)") or "unavailable"
+	local naive_component_installed = naive_component_reason == "available"
+	local naive_component_version = "unknown"
+	local naive_configured, naive_generated, naive_local_ready, naive_remote_verified = 0, 0, 0, 0
+	local naive_failed = false
+	for line in naive_manifest:gmatch("[^\r\n]+") do
+		if line:match("^node%.[%w_-]+%.enabled=(1|true|yes|on)$") then naive_configured = naive_configured + 1 end
+		if line:match("^node%.[%w_-]+%.state=running$") then naive_generated = naive_generated + 1; naive_local_ready = naive_local_ready + 1 end
+		if line:match("^node%.[%w_-]+%.health=available$") then naive_remote_verified = naive_remote_verified + 1 end
+		if line:match("^node%.[%w_-]+%.health=(component%-missing|config%-invalid|local%-not%-ready|probe%-failed)$") then naive_failed = true end
 	end
 
 	local result = {
@@ -1604,20 +1587,20 @@ function action_status()
 		rustdesk_verified = rustdesk_value("verified", "0"),
 		rustdesk_reason = rustdesk_value("reason", "not-started"),
 		rustdesk_updated = rustdesk_value("updated", "unknown"),
-		naive_enabled = fs.uci_get_config("config", "naive_enabled") == "1",
-		naive_auto_start = fs.uci_get_config("config", "naive_auto_start") == "1",
+		naive_enabled = naive_configured > 0,
+		naive_auto_start = false,
 		naive_component_path = naive_component_path,
 		naive_component_version = naive_component_version,
 		naive_component_installed = naive_component_installed,
-		naive_component_reason = naive_component_installed and naive_component_reason or naive_value("reason", naive_component_reason),
-		naive_configured = tonumber(naive_value("configured", "0")) or 0,
-		naive_generated = tonumber(naive_value("generated", "0")) or 0,
-		naive_local_ready = naive_value("local_ready", "0"),
-		naive_remote_verified = naive_value("remote_verified", "0"),
-		naive_state = naive_value("state", "not-started"),
-		naive_reason = naive_value("reason", "not-started"),
-		naive_updated = naive_value("updated", "unknown"),
-		naive_generation_state = fs.readfile("/tmp/openkill-naive-generation.state") or "",
+		naive_component_reason = naive_component_reason,
+		naive_configured = naive_configured,
+		naive_generated = naive_generated,
+		naive_local_ready = naive_local_ready > 0 and "1" or "0",
+		naive_remote_verified = naive_remote_verified > 0 and "1" or "0",
+		naive_state = naive_failed and "failed" or (naive_local_ready > 0 and "running" or "not-started"),
+		naive_reason = naive_failed and "standalone-health-failed" or "standalone-manifest",
+		naive_updated = naive_manifest:match("updated=([^\n]+)") or "unknown",
+		naive_generation_state = "standalone-manual-yaml",
 		openvpn_compatibility = fs.uci_get_config("config", "openvpn_compatibility") == "1",
 		openvpn_transport_bypass = fs.uci_get_config("config", "openvpn_transport_bypass") == "1",
 		openvpn_role = fs.uci_get_config("config", "openvpn_role") or "router-client",
@@ -1664,191 +1647,70 @@ function action_status()
 	HTTP.write_json(result)
 end
 
-function action_naive_status()
-	local component_path = fs.uci_get_config("config", "naive_component_path") or "/etc/openkill/core/naive"
-	local function probe(path)
-		if not path or path == "" or not fs.access(path) then return false, "missing", "unknown" end
-		if SYS.call(string.format("test -x %q", path)) ~= 0 then return false, "not-executable", "unknown" end
-		local version = (SYS.exec(string.format("%q --version 2>/dev/null | head -c 96", path)) or ""):gsub("[\r\n]+", " "):gsub("^%s+", ""):gsub("%s+$", "")
-		if version == "" then return true, "version-probe-failed", "unknown" end
-		return true, "executable", version
-	end
-	local installed, reason, version = probe(component_path)
-	if not installed then
-		for _, candidate in ipairs({"/etc/openkill/core/naiveproxy", "/usr/bin/naive", "/usr/bin/naiveproxy", "/usr/local/bin/naive"}) do
-			local ok, candidate_reason, candidate_version = probe(candidate)
-			if ok then component_path, installed, reason, version = candidate, true, "fallback-path", candidate_version; break end
-			if reason == "missing" then reason = candidate_reason end
-		end
-	end
-	local configured_mode = fs.uci_get_config("config", "naive_bridge_mode") or "manual"
-	local payload = {
-		enabled = fs.uci_get_config("config", "naive_enabled") == "1",
-		component = component_path,
-		version = version,
-		installed = installed,
-		component_reason = reason,
-		mode = "manual",
-		legacy_mode = configured_mode,
-		migration_required = configured_mode == "auto",
-		state = fs.readfile("/tmp/openkill-naive.state") or "",
-	}
-	HTTP.prepare_content("application/json")
-	HTTP.write_json(payload)
-end
-
--- Return credential-free manual YAML snippets for enabled NaiveProxy nodes.
--- The helper owns remote credentials; this endpoint never injects a node into
--- Mihomo and only exposes the loopback address and stable port for copying.
-function action_naive_bridge()
-	local configured_mode = fs.uci_get_config("config", "naive_bridge_mode") or "manual"
-	local payload = {
-		ok = true, entries = {}, yaml = "", generated_at = os.time(), mode = "manual",
-		legacy_mode = configured_mode, migration_required = configured_mode == "auto",
-		generation_state = fs.readfile("/tmp/openkill-naive-generation.state") or ""
-	}
-	local current_path = fs.uci_get_config("config", "config_path") or ""
-	local current_name = fs.basename(current_path or "") or ""
-	local function yaml_quote(value)
-		value = tostring(value or ""):gsub("\\", "\\\\"):gsub('"', '\\"')
-		value = value:gsub("[\r\n]", " ")
-		return '"' .. value .. '"'
-	end
-	uci:foreach("openkill", "servers", function(section)
-		if section.enabled == "1" and section.type == "naiveproxy" then
-			local target = section.config or "all"
-			if target == "all" or target == "" or target == current_name then
-				local sid = section[".name"] or ""
-				local port = SYS.exec(string.format("/usr/share/openkill/openkill_naive.sh port %q 2>/dev/null", sid)) or ""
-				port = port:gsub("[^0-9].*$", ""):gsub("^%s+", ""):gsub("%s+$", "")
-				if sid ~= "" and port:match("^[1-9][0-9]*$") then
-					local name = section.name or sid
-					local groups = {}
-					if type(section.groups) == "table" then
-						for _, group in ipairs(section.groups) do
-							if group and group ~= "" then table.insert(groups, group) end
-						end
-					end
-					local item = { id = sid, name = name, server = "127.0.0.1", port = tonumber(port), udp = false, groups = groups }
-					item.yaml = "- name: " .. yaml_quote(name) .. "\n" ..
-						"  type: socks5\n  server: \"127.0.0.1\"\n" ..
-						"  port: " .. port .. "\n  udp: false"
-					table.insert(payload.entries, item)
-				end
-			end
-		end
-	end)
-	local snippets = {}
-	for _, item in ipairs(payload.entries) do table.insert(snippets, item.yaml) end
-	payload.yaml = table.concat(snippets, "\n")
-	payload.count = #payload.entries
-	HTTP.prepare_content("application/json")
-	HTTP.write_json(payload)
-end
-
--- Return per-node, credential-free health state.  The shell worker performs
--- the bounded probe; LuCI only parses its mode-600 cache and task metadata.
-function action_naive_health()
-	local health_file = "/tmp/openkill-naive-health.state"
-	local function read_state()
-		local raw = fs.readfile(health_file) or ""
-		local result = { updated = 0, expires_at = 0, nodes = {}, summary = { enabled = 0, available = 0, failed = 0, expired = 0 }, mode = "unknown", timeout = 0, interval = 0, target = "restricted-https" }
-		for line in raw:gmatch("[^\r\n]+") do
-			local sid, key, value = line:match("^node%.([%w_-]+)%.([%w_]+)=(.*)$")
-			if sid and key then
-				result.nodes[sid] = result.nodes[sid] or { id = sid }
-				result.nodes[sid][key] = value
-			else
-				local skey, svalue = line:match("^summary%.([%w_]+)=(.*)$")
-				if skey then
-					result.summary[skey] = tonumber(svalue) or 0
-				else
-					local key2, value2 = line:match("^([%w_]+)=(.*)$")
-					if key2 == "updated" or key2 == "expires_at" or key2 == "timeout" or key2 == "interval" then result[key2] = tonumber(value2) or 0 end
-					if key2 == "target" or key2 == "mode" then result[key2] = value2 end
-				end
-			end
-		end
-		-- Merge current UCI identity into the cache so a newly configured or
-		-- disabled node is visible before its first health run.  Credentials,
-		-- server addresses and share links are deliberately never returned.
-		uci:foreach("openkill", "servers", function(section)
-			if section.type == "naiveproxy" then
-				local sid = section[".name"] or ""
-				if sid:match("^[A-Za-z0-9_-]+$") then
-					result.nodes[sid] = result.nodes[sid] or { id = sid }
-					result.nodes[sid].name = section.name or sid
-					result.nodes[sid].enabled = section.enabled == "1"
-					result.nodes[sid].groups = {}
-					if type(section.groups) == "table" then
-						for _, group in ipairs(section.groups) do
-							if group and group ~= "" then table.insert(result.nodes[sid].groups, group) end
-						end
-					end
-				end
-			end
-		end)
-		local now = os.time()
-		if result.mode == "unknown" then result.mode = "manual" end
-		local configured_mode = fs.uci_get_config("config", "naive_bridge_mode") or "manual"
-		result.legacy_mode = configured_mode
-		result.migration_required = configured_mode == "auto"
-		result.expired = result.expires_at > 0 and now >= result.expires_at
-		result.exists = raw ~= ""
-		return result
-	end
-	local function write_result(result)
-		HTTP.prepare_content("application/json")
-		HTTP.write_json(result)
-	end
+-- Read-only adapter for the independent NaiveProxy bridge.  This endpoint
+-- never touches OpenKill UCI or the selected Mihomo YAML and only exposes the
+-- standalone service's redacted manifest and credential-free SOCKS5 snippet.
+function action_naive_standalone_status()
 	local operation = HTTP.formvalue("operation") or "status"
-	if operation == "status" then
-		local result = read_state()
-		result.ok = true
-		write_result(result)
+	local output
+	if operation == "yaml" then
+		output = fs.readfile("/var/run/naiveproxy/snippets.yaml") or ""
+		HTTP.prepare_content("text/plain")
+		HTTP.write(output)
 		return
+	else
+		-- OpenKill is a read-only adapter. Health probes are scheduled or
+		-- started by naiveproxy-bridge; this request never starts a process,
+		-- rewrites a node, or runs a remote probe.
+		output = fs.readfile("/var/run/naiveproxy/manifest") or ""
 	end
-	local script = "/usr/share/openkill/openkill_naive_health.sh"
-	if operation == "test-all" or operation == "test" then
-		local sid = HTTP.formvalue("sid") or ""
-		if operation == "test" and not sid:match("^[A-Za-z0-9_-]+$") then
-			write_result({ ok = false, error = "invalid-node-id" })
-			return
+	local result = { ok = true, mode = "standalone", nodes = {}, component_status = "unavailable", updated = 0 }
+	for line in output:gmatch("[^\r\n]+") do
+		local key, value = line:match("^([%w_.-]+)=(.*)$")
+		if key then
+			if key == "component_status" then
+				result.component_status = value
+			elseif key == "component" then
+				result.component = value
+			elseif key == "updated" then
+				result.updated = tonumber(value) or 0
+			else
+				local sid, field = key:match("^node%.([%w_-]+)%.([%w_]+)$")
+				if sid and field then
+					result.nodes[sid] = result.nodes[sid] or { id = sid }
+					if field == "port" or field == "pid" or field == "latency_ms" or field == "checked_at" or field == "expires_at" then
+						result.nodes[sid][field] = tonumber(value) or 0
+					else
+						result.nodes[sid][field] = value
+					end
+				end
+			end
 		end
-		local scope = operation == "test" and "one" or "all"
-		local output = SYS.exec(string.format("%q task-start %q %q 2>/dev/null", script, scope, sid)) or ""
-		local result = { ok = false, operation = operation }
-		for line in output:gmatch("[^\r\n]+") do
-			local key, value = line:match("^([%w_]+)=(.*)$")
-			if key == "task_id" or key == "state" then result[key] = value end
-		end
-		result.ok = result.task_id ~= nil and result.task_id:match("^task%-[A-Za-z0-9%-]+$") ~= nil
-		if not result.ok then result.error = "task-start-failed" end
-		write_result(result)
-		return
 	end
-	if operation == "task-status" then
-		local task_id = HTTP.formvalue("task_id") or ""
-		if not task_id:match("^task%-[A-Za-z0-9%-]+$") then
-			write_result({ ok = false, error = "invalid-task-id" })
-			return
-		end
-		local output = SYS.exec(string.format("%q task-status %q 2>/dev/null", script, task_id)) or ""
-		local result = { ok = false, task_id = task_id }
-		for line in output:gmatch("[^\r\n]+") do
-			local key, value = line:match("^([%w_]+)=(.*)$")
-			if key == "state" or key == "stage" or key == "error" or key == "updated" then result[key] = value end
-		end
-		result.ok = result.state ~= nil
-		if result.state == "succeeded" or result.state == "failed" then
-			local state = read_state()
-			result.health = state
-		end
-		if not result.ok then result.error = "task-not-found" end
-		write_result(result)
-		return
-	end
-	write_result({ ok = false, error = "unsupported-operation" })
+	local count = 0
+	for _ in pairs(result.nodes) do count = count + 1 end
+	result.count = count
+	result.health_target = "restricted-https"
+	result.health_note = "HTTPS 探测耗时包含 SOCKS5 与 TLS；不代表 Mihomo 已加载或策略组已选择。"
+	HTTP.prepare_content("application/json")
+	HTTP.write_json(result)
+end
+
+function action_naive_status()
+	-- Compatibility alias for the read-only standalone status adapter.
+	action_naive_standalone_status()
+end
+
+-- Legacy aliases kept read-only for older LuCI callers.
+function action_naive_bridge()
+	-- Legacy API: the standalone bridge owns nodes and emits only its
+	-- credential-free manifest/YAML.  Keep the endpoint read-only.
+	action_naive_standalone_status()
+end
+
+function action_naive_health()
+	-- Legacy API: health is executed by naiveproxy-bridge, never by OpenKill.
+	action_naive_standalone_status()
 end
 
 function action_naive_redirect()
@@ -1860,169 +1722,22 @@ end
 function action_naive_node()
 	local dispatcher = require "luci.dispatcher"
 	local http = require "luci.http"
-	local cursor = require("luci.model.uci").cursor()
-	local file_path = fs.get_file_path_from_request()
-	if not file_path then
-		http.redirect(dispatcher.build_url("admin", "services", "openkill", "config"))
-		return
-	end
-
-	-- A closed modal can leave a draft section behind.  Drafts are deliberately
-	-- marked and are removed only when starting another direct-add flow; user
-	-- created sections never carry this marker.
-	cursor:foreach("openkill", "servers", function(section)
-		if section.naive_pending == "1" then
-			cursor:delete("openkill", section[".name"])
-		end
-	end)
-	local sid = cursor:add("openkill", "servers")
-	if not sid then
-		http.status(500, "Unable to create NaiveProxy node")
-		return
-	end
-	cursor:set("openkill", sid, "config", "all")
-	cursor:set("openkill", sid, "type", "naiveproxy")
-	cursor:set("openkill", sid, "enabled", "0")
-	cursor:set("openkill", sid, "name", "NaiveProxy node")
-	cursor:set("openkill", sid, "naive_pending", "1")
-	cursor:commit("openkill")
-
-	local edit_url = dispatcher.build_url("admin", "services", "openkill", "servers-config", sid)
-	edit_url = edit_url .. "?file=" .. http.urlencode(file_path) .. "&type=naiveproxy"
-	if http.formvalue("import") == "1" then
-		edit_url = edit_url .. "&import=1"
-	end
-	http.redirect(edit_url)
+	-- This legacy route used to create an OpenKill UCI draft.  Keep old
+	-- bookmarks useful, but never create or edit a credential-bearing node in
+	-- OpenKill; the standalone bridge owns that data now.
+	http.redirect(dispatcher.build_url("admin", "services", "openkill", "settings") .. "?tab=compatibility#openkill-naive-component-info")
 end
 
 function action_naive_metadata()
-	local operation = HTTP.formvalue("operation") or "cached"
-	local apply = HTTP.formvalue("apply") == "1"
-	local replace = HTTP.formvalue("replace") == "1"
-	local fill_url = HTTP.formvalue("fill_url") ~= "0"
-	local fill_sha256 = HTTP.formvalue("fill_sha256") ~= "0"
-	local mode = operation == "detect" and "detect" or "cached"
-	local output = SYS.exec("/usr/share/openkill/openkill_naive_metadata.sh " .. mode .. " 2>/dev/null") or ""
-	local result = { ok = false, operation = mode, applied = false }
-	for line in output:gmatch("[^\r\n]+") do
-		local key, value = line:match("^([%w_]+)=(.*)$")
-		if key then result[key] = value end
-	end
-	if result.ok == "1" and result.url and result.sha256 and #result.sha256 == 64 and apply then
-		-- Metadata discovery is a draft operation.  Never commit UCI from a
-		-- read/auto-fill request: the browser fills the two fields together and
-		-- the normal CBI Save & Apply remains the only persistence boundary.
-		-- This also prevents a URL and digest from different asset generations
-		-- being silently mixed by an intermediate request.
-		-- Treat URL and digest as one immutable asset tuple.  If only one field
-		-- is empty, leave both untouched so a manual URL cannot be paired with a
-		-- digest from another release.
-		result.applied = (fill_url and fill_sha256) or replace
-		result.applied_url = result.applied
-		result.applied_sha256 = result.applied
-		if not result.applied then result.reason = "manual-asset-pair-preserved" end
-		-- Keep the wire type stable: the shell contract is key=value and the
-		-- browser treats ok="1" as a successful metadata result.
-		result.ok = "1"
-	end
-	result.manual_url_present = (fs.uci_get_config("config", "naive_component_url") or "") ~= ""
-	result.manual_sha256_present = (fs.uci_get_config("config", "naive_component_sha256") or "") ~= ""
-	HTTP.prepare_content("application/json")
-	HTTP.write_json(result)
+	-- Kept for old callers. Component discovery is owned by the standalone
+	-- service and never writes OpenKill UCI.
+	action_naive_standalone_status()
 end
 
 function action_naive_component()
-	local operation = HTTP.formvalue("operation") or "status"
-	local result = { ok = false, operation = operation }
-	if operation == "status" then
-		result.ok = true
-		local configured_path = fs.uci_get_config("config", "naive_component_path") or "/etc/openkill/core/naive"
-		result.installed = fs.access(configured_path) and SYS.call(string.format("test -x %q", configured_path)) == 0
-		result.component = configured_path
-		result.component_reason = result.installed and "configured-path" or "missing"
-		if result.installed then
-			result.version = (SYS.exec(string.format("%q --version 2>/dev/null | head -c 96", configured_path)) or ""):gsub("[\r\n]+", " "):gsub("^%s+", ""):gsub("%s+$", "")
-			if result.version == "" then
-				result.installed = false
-				result.component_reason = "version-probe-failed"
-			end
-		end
-		if not result.installed then
-			for _, candidate in ipairs({"/etc/openkill/core/naiveproxy", "/usr/bin/naive", "/usr/bin/naiveproxy", "/usr/local/bin/naive"}) do
-				if fs.access(candidate) and SYS.call(string.format("test -x %q", candidate)) == 0 then
-					local candidate_version = (SYS.exec(string.format("%q --version 2>/dev/null | head -c 96", candidate)) or ""):gsub("[\r\n]+", " "):gsub("^%s+", ""):gsub("%s+$", "")
-					if candidate_version ~= "" then
-						result.installed = true
-						result.component = candidate
-						result.component_reason = "fallback-path"
-						result.version = candidate_version
-						break
-					end
-				end
-			end
-		end
-		result.state = fs.readfile("/tmp/openkill-naive.state") or ""
-		result.generation_state = fs.readfile("/tmp/openkill-naive-generation.state") or ""
-		result.legacy_mode = fs.uci_get_config("config", "naive_bridge_mode") or "manual"
-		result.migration_required = result.legacy_mode == "auto"
-	elseif operation == "migrate-manual" then
-		local mode = fs.uci_get_config("config", "naive_bridge_mode") or "manual"
-		if mode == "auto" then
-			uci:set("openkill", "config", "naive_bridge_mode", "manual")
-			result.ok = uci:commit("openkill")
-			result.migrated = result.ok
-		else
-			result.ok = true
-			result.migrated = false
-		end
-	elseif operation == "install" then
-		local url = HTTP.formvalue("url") or ""
-		local sha = HTTP.formvalue("sha256") or ""
-		-- Keep shell construction behind strict allow-lists.  The helper repeats
-		-- these checks and performs HTTPS, size, archive and digest validation.
-		if url:match("^https://github%.com/klzgrad/naiveproxy/") or url:match("^https://raw%.githubusercontent%.com/klzgrad/naiveproxy/") then
-			if sha:match("^[0-9A-Fa-f]+$") and #sha == 64 then
-				-- Installation is deliberately detached from the LuCI request.  A
-				-- download or archive probe can take longer than a browser request;
-				-- the returned task id is polled by the compatibility card.
-				local output = SYS.exec(string.format("/usr/share/openkill/openkill_naive.sh install-task %q %q 2>/dev/null", url, sha)) or ""
-				for line in output:gmatch("[^\r\n]+") do
-					local key, value = line:match("^([%w_]+)=(.*)$")
-					if key == "task_id" or key == "state" then result[key] = value end
-				end
-				if result.task_id and result.task_id:match("^task%-[A-Za-z0-9%-]+$") then
-					result.ok = true
-				else
-					result.error = "task-start-failed"
-				end
-			else
-				result.error = "invalid-sha256"
-			end
-		else
-			result.error = "untrusted-source"
-		end
-	elseif operation == "task-status" then
-		local task_id = HTTP.formvalue("task_id") or ""
-		if task_id:match("^task%-[A-Za-z0-9%-]+$") then
-			local output = SYS.exec(string.format("/usr/share/openkill/openkill_naive.sh task-status %q 2>/dev/null", task_id)) or ""
-			result.task_id = task_id
-			for line in output:gmatch("[^\r\n]+") do
-				local key, value = line:match("^([%w_]+)=(.*)$")
-				if key == "state" or key == "stage" or key == "error" or key == "updated" then result[key] = value end
-			end
-			result.ok = result.state ~= nil
-			if not result.ok then result.error = "task-not-found" end
-		else
-			result.error = "invalid-task-id"
-		end
-	elseif operation == "remove" then
-		result.exit = SYS.call("/usr/share/openkill/openkill_naive.sh remove >/dev/null 2>&1")
-		result.ok = result.exit == 0
-	else
-		result.error = "unsupported-operation"
-	end
-	HTTP.prepare_content("application/json")
-	HTTP.write_json(result)
+	-- Kept for old callers. OpenKill cannot install, remove or restart the
+	-- independent NaiveProxy component.
+	action_naive_standalone_status()
 end
 
 -- Streaming write.

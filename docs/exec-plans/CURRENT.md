@@ -1,5 +1,41 @@
 # Current status
 
+## NaiveProxy standalone bridge and manual YAML ownership (2026-09-26)
+
+- Scope: split NaiveProxy component/node ownership from OpenKill. The new
+  standalone bridge owns `/etc/naiveproxy`, procd instances, loopback SOCKS5
+  listeners and per-node HTTPS health results. OpenKill becomes a read-only
+  status view and a credential-free YAML snippet generator; it must not write
+  Naive credentials, auto-start helpers, inject proxy entries or rewrite the
+  user's YAML.
+- Config contract: standalone node JSON is mode 600 under `/etc/naiveproxy`;
+  runtime state is sanitized and bounded under `/var/run/naiveproxy`. The
+  OpenKill UCI and selected YAML remain user-owned. Legacy OpenKill Naive data
+  is migration evidence only and is never silently deleted or copied.
+- Lifecycle contract: one stable node ID maps to one loopback port and one
+  procd instance. Manual start/stop is authoritative; local process/listener
+  failures may trigger bounded per-instance recovery, while remote probe
+  failures never restart unrelated services or fall back to DIRECT.
+- Health contract: probes use the matching SOCKS5 listener and a fixed HTTPS
+  allowlist with bounded timeout/size/redirects. Displayed delay is HTTPS
+  request elapsed time, not ping, UDP or full Mihomo routing verification.
+- Verification boundary: local fixtures must prove independent lifecycle,
+  credential redaction, YAML non-rewrite and status expiry. Device and remote
+  VPS tests remain forbidden unless a later CURRENT section explicitly
+  authorizes them.
+- Implementation evidence (working tree): added the independent
+  `naiveproxy-bridge` procd service and `naiveproxy-standalone.sh` library;
+  node JSON and runtime state stay under `/etc/naiveproxy` and
+  `/var/run/naiveproxy`, while OpenKill reads only the redacted manifest and
+  generated credential-free SOCKS5 snippets. Legacy OpenKill Naive routes now
+  redirect or expose read-only status, and the OpenKill init script no longer
+  starts, stops, probes or injects Naive nodes.
+- Local checks completed: standalone fixture (component probe, protected
+  config, loopback probe, HTTPS timing, expiry fields and YAML redaction),
+  standalone integration contract, UI contract/interactions, optimization
+  checks, POSIX syntax and `sh scripts/local-gate.sh`. Device, browser and
+  remote VPS behavior remain unverified by plan.
+
 ## OpenKill startup preflight and NaiveProxy compatibility repair (2026-09-26)
 
 - Scope: diagnose the reported startup abort before Mihomo launch, make the
