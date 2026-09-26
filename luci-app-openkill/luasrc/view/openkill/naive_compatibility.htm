@@ -1,76 +1,67 @@
 <% local dispatcher = require "luci.dispatcher" %>
 <section id="openkill-naive-component-info" class="openkill-naive-compatibility"
-  data-naive-standalone-url="<%=dispatcher.build_url('admin','services','openkill','naive_standalone_status')%>">
+  data-naive-standalone-url="<%=dispatcher.build_url('admin','services','openkill','naive_standalone_status')%>"
+  data-naive-control-url="<%=dispatcher.build_url('admin','services','openkill','naive_bridge_control')%>">
   <div class="openkill-naive-compatibility-head">
-    <div>
-      <strong>NaiveProxy 独立辅助服务</strong>
-      <p>独立维护节点和回环 SOCKS5；OpenKill 只读取状态，不保存凭据或改写 YAML。</p>
-    </div>
+    <div><strong>NaiveProxy 独立辅助服务</strong><p>独立维护节点、进程和回环 SOCKS5；OpenKill 只显示脱敏状态。</p></div>
     <span class="openkill-naive-compatibility-badge" data-naive-standalone-summary aria-live="polite">未检测</span>
   </div>
-  <div class="openkill-naive-standalone-actions">
-    <button type="button" class="cbi-button" data-naive-standalone-action="refresh">刷新状态</button>
-    <button type="button" class="cbi-button" data-naive-standalone-action="yaml">生成 SOCKS5 YAML</button>
-  </div>
-  <div class="openkill-naive-standalone-help">
-    <p><strong>手动操作</strong>：在 <code>/etc/naiveproxy/nodes/</code> 添加权限为 600 的节点 JSON，执行 <code>/etc/init.d/naiveproxy-bridge start</code>；检测用 <code>/usr/share/openkill/naiveproxy-standalone.sh health all</code>。</p>
-    <p>复制下方片段到 YAML 的 <code>proxies</code>，再将节点名称加入目标 <code>proxy-groups</code>。OpenKill 不会自动接入、启动、重启或删除节点。</p>
-    <p class="openkill-naive-standalone-note">状态仅代表 NaiveProxy → 本地 SOCKS5 → 固定 HTTPS 探测链路，不代表 Mihomo 已加载或业务全部可用。</p>
+  <div class="openkill-naive-standalone-toolbar" role="toolbar" aria-label="NaiveProxy 服务操作">
+    <button type="button" class="cbi-button cbi-button-apply" data-naive-action="start">启动服务</button>
+    <button type="button" class="cbi-button" data-naive-action="stop">停止服务</button>
+    <button type="button" class="cbi-button" data-naive-action="add">添加节点</button>
+    <button type="button" class="cbi-button" data-naive-action="import">导入链接</button>
+    <button type="button" class="cbi-button" data-naive-action="health">测试全部</button>
+    <button type="button" class="cbi-button" data-naive-action="refresh">刷新状态</button>
+    <button type="button" class="cbi-button" data-naive-action="yaml">生成 SOCKS5 YAML</button>
   </div>
   <div class="openkill-naive-standalone-status" data-naive-standalone-status aria-live="polite">正在读取独立服务状态…</div>
-  <div class="openkill-naive-standalone-table-wrap">
-    <table class="openkill-naive-standalone-table">
-      <thead><tr><th>节点</th><th>本地入口</th><th>进程</th><th>连通性</th><th>HTTPS 耗时</th><th>最近检测</th></tr></thead>
-      <tbody data-naive-standalone-rows><tr><td colspan="6">暂无独立节点</td></tr></tbody>
-    </table>
-  </div>
-  <details class="openkill-naive-standalone-yaml">
-    <summary>本地 SOCKS5 YAML（不含凭据）</summary>
+  <div class="openkill-naive-standalone-component" data-naive-component-info>组件状态：未检测</div>
+  <div class="openkill-naive-standalone-table-wrap"><table class="openkill-naive-standalone-table">
+    <thead><tr><th>节点</th><th>本地入口</th><th>进程</th><th>连通性</th><th>HTTPS 耗时</th><th>最近检测</th><th>操作</th></tr></thead>
+    <tbody data-naive-standalone-rows><tr><td colspan="7">暂无独立节点</td></tr></tbody>
+  </table></div>
+  <details class="openkill-naive-standalone-yaml"><summary>本地 SOCKS5 YAML（不含凭据）</summary>
+    <p>复制后手动加入 YAML 的 <code>proxies</code> 和目标 <code>proxy-groups</code>；复制不等于 Mihomo 已加载。</p>
     <textarea readonly rows="6" data-naive-standalone-yaml placeholder="暂无已启用节点"></textarea>
-    <button type="button" class="cbi-button cbi-button-apply" data-naive-standalone-copy>复制 YAML</button>
-    <span data-naive-standalone-copy-status aria-live="polite"></span>
+    <button type="button" class="cbi-button cbi-button-apply" data-naive-standalone-copy>复制 YAML</button><span data-naive-standalone-copy-status aria-live="polite"></span>
   </details>
+  <details class="openkill-naive-standalone-diagnostics"><summary>诊断与边界</summary>
+    <p>检测路径：指定节点的 127.0.0.1 SOCKS5 → NaiveProxy → 固定 HTTPS 目标。耗时包含代理连接和 HTTPS 请求，不代表 ping、UDP 或完整 Mihomo 分流。</p>
+    <p>节点 JSON 由独立服务保存于 <code>/etc/naiveproxy/nodes/</code>，权限应为 600；服务入口为 <code>/etc/init.d/naiveproxy-bridge</code>，命令行检测为 <code>/usr/share/openkill/naiveproxy-standalone.sh health all</code>。OpenKill 不保存凭据、不改写用户 YAML。</p>
+  </details>
+  <div class="openkill-naive-dialog" data-naive-dialog hidden role="dialog" aria-modal="true" aria-labelledby="openkill-naive-dialog-title">
+    <div class="openkill-naive-dialog-panel"><div class="openkill-naive-dialog-head"><h3 id="openkill-naive-dialog-title">添加 NaiveProxy 节点</h3><button type="button" class="cbi-button" data-naive-dialog-close>关闭</button></div>
+      <form data-naive-node-form><div class="openkill-naive-form-grid">
+        <label>节点名称<input name="name" required maxlength="120" autocomplete="off"></label>
+        <label>服务器<input name="server" required maxlength="253" autocomplete="off"></label>
+        <label>端口<input name="port" required inputmode="numeric" pattern="[0-9]{1,5}" autocomplete="off"></label>
+        <label>用户名<input name="username" required maxlength="512" autocomplete="off"></label>
+        <label>密码<input name="password" required type="password" maxlength="1024" autocomplete="new-password"></label>
+        <label>传输<select name="transport"><option value="https">HTTPS</option><option value="quic">QUIC</option></select></label>
+        <label class="openkill-naive-form-check"><input name="enabled" type="checkbox" checked> 启用节点</label>
+      </div><label class="openkill-naive-import-field">分享链接（可选）<textarea name="share" rows="3" placeholder="支持 naive+https:// 或 naiveproxy://"></textarea></label>
+      <div class="openkill-naive-preview" data-naive-preview aria-live="polite">填写字段后保存；密码只显示为掩码。</div>
+      <div class="openkill-naive-dialog-actions"><button type="submit" class="cbi-button cbi-button-apply">保存到独立服务</button><button type="button" class="cbi-button" data-naive-dialog-close>取消</button></div></form>
+    </div>
+  </div>
 </section>
 <script>
 (function () {
-  var root = document.getElementById('openkill-naive-component-info');
-  if (!root || root.getAttribute('data-naive-standalone-ready') === '1') return;
-  root.setAttribute('data-naive-standalone-ready', '1');
-  var endpoint = root.getAttribute('data-naive-standalone-url');
-  var summary = root.querySelector('[data-naive-standalone-summary]');
-  var status = root.querySelector('[data-naive-standalone-status]');
-  var rows = root.querySelector('[data-naive-standalone-rows]');
-  var yaml = root.querySelector('[data-naive-standalone-yaml]');
-  var copyStatus = root.querySelector('[data-naive-standalone-copy-status]');
-  var busy = false;
-  function esc(value) { var d = document.createElement('div'); d.textContent = value == null ? '' : String(value); return d.innerHTML; }
-  function when(value) { return value && Number(value) ? new Date(Number(value) * 1000).toLocaleString() : '—'; }
-  function request(operation) {
-    var url = endpoint + (operation ? '?operation=' + encodeURIComponent(operation) : '');
-    return fetch(url, { method: operation === 'health' ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store' })
-      .then(function (r) { if (!r.ok) throw new Error('http-' + r.status); return r.json(); });
-  }
-  function render(data) {
-    data = data || {}; var list = []; var available = 0; var failed = 0;
-    Object.keys(data.nodes || {}).forEach(function (id) { var n = data.nodes[id] || {}; n.id = id; list.push(n); if (n.health === 'available') available++; if (n.health === 'probe-failed' || n.health === 'expired') failed++; });
-    summary.textContent = data.component_status === 'available' ? ('独立组件可用 · 节点 ' + list.length + ' · 可用 ' + available + ' · 异常 ' + failed) : '独立组件未运行';
-    status.textContent = '模式：手动 YAML · 最近刷新：' + when(data.updated) + ' · 结果仅代表辅助链路';
-    rows.innerHTML = list.length ? list.map(function (n) {
-      var health = n.health === 'available' ? '连接成功' : (n.health === 'expired' ? '结果已过期' : (n.health === 'probe-failed' ? ('连接失败 · ' + esc(n.reason || '探测失败')) : (n.state === 'running' ? '未检测' : '未启动')));
-      var local = n.local_ready === '1' ? '127.0.0.1:' + esc(n.port) : '未就绪';
-      return '<tr><td><strong>' + esc(n.name || n.id) + '</strong><small>' + esc(n.id) + '</small></td><td>' + local + '</td><td>' + esc(n.state || 'unknown') + '</td><td>' + health + '</td><td>' + (n.latency_ms && n.latency_ms !== 'unknown' ? esc(n.latency_ms) + ' ms' : '—') + '</td><td>' + when(n.checked_at) + '</td></tr>';
-    }).join('') : '<tr><td colspan="6">暂无独立节点，请先在 /etc/naiveproxy/nodes/ 添加 JSON。</td></tr>';
-  }
-  function refresh(operation) {
-    if (busy) return; busy = true; status.textContent = operation === 'health' ? '正在测试节点…' : '正在读取状态…';
-    request(operation).then(render).catch(function () { status.textContent = '独立服务状态读取失败，请检查 naiveproxy-bridge'; }).then(function () { busy = false; });
-  }
-  root.addEventListener('click', function (event) {
-    var action = event.target.getAttribute('data-naive-standalone-action');
-    if (action === 'refresh') refresh('');
-    if (action === 'yaml') fetch(endpoint + '?operation=yaml', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (text) { yaml.value = text; }).catch(function () { status.textContent = 'YAML 读取失败'; });
-    if (event.target.hasAttribute('data-naive-standalone-copy')) { if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(yaml.value).then(function () { copyStatus.textContent = '已复制'; }); else { yaml.select(); document.execCommand('copy'); copyStatus.textContent = '已复制'; } }
-  });
-  refresh('');
+  var root=document.getElementById('openkill-naive-component-info'); if(!root||root.getAttribute('data-naive-standalone-ready')==='1')return; root.setAttribute('data-naive-standalone-ready','1');
+  var endpoint=root.getAttribute('data-naive-standalone-url'), control=root.getAttribute('data-naive-control-url'), summary=root.querySelector('[data-naive-standalone-summary]'), status=root.querySelector('[data-naive-standalone-status]'), component=root.querySelector('[data-naive-component-info]'), rows=root.querySelector('[data-naive-standalone-rows]'), yaml=root.querySelector('[data-naive-standalone-yaml]'), copyStatus=root.querySelector('[data-naive-standalone-copy-status]'), dialog=root.querySelector('[data-naive-dialog]'), form=root.querySelector('[data-naive-node-form]'), preview=root.querySelector('[data-naive-preview]'), busy=false;
+  function esc(v){var d=document.createElement('div');d.textContent=v==null?'':String(v);return d.innerHTML;} function when(v){return v&&Number(v)?new Date(Number(v)*1000).toLocaleString():'—';}
+  function request(op){var u=endpoint+(op?'?operation='+encodeURIComponent(op):'');return fetch(u,{credentials:'same-origin',cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('http-'+r.status);return op==='yaml'?r.text():r.json();});}
+  function post(fields){var body=new URLSearchParams();Object.keys(fields).forEach(function(k){body.append(k,fields[k]==null?'':fields[k]);});return fetch(control,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded;charset=UTF-8'},body:body.toString()}).then(function(r){return r.json().then(function(d){if(!r.ok||!d.ok)throw new Error(d.error||'operation-failed');return d;});});}
+  function render(data){data=data||{};var list=[],available=0,failed=0;Object.keys(data.nodes||{}).forEach(function(id){var n=data.nodes[id]||{};n.id=id;list.push(n);if(n.health==='available')available++;if(n.health==='probe-failed'||n.health==='expired'||n.health==='local-not-ready')failed++;});summary.textContent=data.component_status==='available'?('组件可用 · 节点 '+list.length+' · 可用 '+available+' · 异常 '+failed):'独立组件未运行';component.textContent='组件：'+(data.component_status==='available'?'可执行':'未检测或不可执行')+(data.component?' · 路径已登记':'');rows.innerHTML=list.length?list.map(function(n){var h=n.health==='available'?'连接成功':(n.health==='expired'?'结果已过期':(n.health==='probe-failed'?('连接失败 · '+esc(n.reason||'探测失败')):(n.state==='running'?'未检测':(n.enabled==='0'?'已禁用':'未启动'))));var local=n.local_ready==='1'?'127.0.0.1:'+esc(n.port):'未就绪';return '<tr><td><strong>'+esc(n.name||n.id)+'</strong><small>'+esc(n.id)+'</small></td><td>'+local+'</td><td>'+esc(n.state||'unknown')+'</td><td>'+h+'</td><td>'+(n.latency_ms&&n.latency_ms!=='unknown'?esc(n.latency_ms)+' ms':'—')+'</td><td>'+when(n.checked_at)+'</td><td><button type="button" class="cbi-button" data-naive-node-health="'+esc(n.id)+'">测试</button> <button type="button" class="cbi-button" data-naive-node-remove="'+esc(n.id)+'">删除</button></td></tr>';}).join(''):'<tr><td colspan="7">暂无独立节点，请添加或导入节点。</td></tr>';}
+  function refresh(msg){if(busy)return;busy=true;status.textContent=msg||'正在读取独立服务状态…';request('').then(function(d){render(d);status.textContent='状态已刷新 · '+when(d.updated);}).catch(function(){status.textContent='状态读取失败，请检查独立服务或登录状态。';}).then(function(){busy=false;});}
+  function shareFields(raw){raw=String(raw||'').trim();if(!raw)return null;var normalized=raw.replace(/^naive\+https:\/\//i,'https://').replace(/^naiveproxy:\/\//i,'https://'),u=new URL(normalized);if(u.protocol!=='https:')throw new Error('protocol');var unknown=[];u.searchParams.forEach(function(v,k){if(k!=='security'&&k!=='type'&&k!=='headerType')unknown.push(k);});if(u.searchParams.get('security')&&u.searchParams.get('security')!=='tls')unknown.push('security');if(u.searchParams.get('type')&&u.searchParams.get('type')!=='tcp')unknown.push('type');if(u.searchParams.get('headerType')&&u.searchParams.get('headerType')!=='none')unknown.push('headerType');return{name:decodeURIComponent((u.hash||'').slice(1))||u.hostname,server:u.hostname,port:u.port||'443',username:decodeURIComponent(u.username),password:decodeURIComponent(u.password),transport:'https',warning:unknown.length?'未识别参数：'+unknown.join(', '):''};}
+  function fill(f){Object.keys(f||{}).forEach(function(k){var i=form.elements[k];if(i&&k!=='warning')i.value=f[k]||'';});}
+  function openDialog(mode){dialog.hidden=false;dialog.querySelector('h3').textContent=mode==='import'?'导入 NaiveProxy 分享链接':'添加 NaiveProxy 节点';form.reset();form.elements.enabled.checked=true;preview.textContent=mode==='import'?'粘贴链接后将先预览脱敏字段。':'填写字段后保存；密码只显示为掩码。';form.elements.share.focus();}
+  function closeDialog(){dialog.hidden=true;}
+  root.addEventListener('click',function(e){var a=e.target.getAttribute('data-naive-action');if(a==='add'||a==='import'){openDialog(a);return;}if(a==='refresh')refresh();if(a==='yaml')request('yaml').then(function(t){yaml.value=t||'';yaml.closest('details').open=true;}).catch(function(){status.textContent='YAML 读取失败，请检查独立服务状态。';});if(a==='start'||a==='stop'||a==='health'){if(busy)return;busy=true;status.textContent='正在提交独立服务操作…';post({operation:a}).then(function(){refresh('操作已提交，正在读取状态…');}).catch(function(){status.textContent='操作失败，请检查独立服务状态。';busy=false;});}var id=e.target.getAttribute('data-naive-node-health');if(id)post({operation:'health',id:id}).then(function(){refresh('节点检测完成');}).catch(function(){status.textContent='节点检测失败，请检查独立服务。';});id=e.target.getAttribute('data-naive-node-remove');if(id&&window.confirm('确认删除此独立节点？'))post({operation:'remove',id:id}).then(function(){refresh('节点已删除');}).catch(function(){status.textContent='删除失败，节点仍保留。';});if(e.target.hasAttribute('data-naive-dialog-close'))closeDialog();if(e.target.hasAttribute('data-naive-standalone-copy')){if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(yaml.value).then(function(){copyStatus.textContent='已复制';});else{yaml.select();document.execCommand('copy');copyStatus.textContent='已复制';}}});
+  form.elements.share.addEventListener('input',function(){if(!form.elements.share.value.trim())return;try{var f=shareFields(form.elements.share.value);fill(f);preview.textContent='预览：'+esc(f.name)+' · '+esc(f.server)+':'+esc(f.port)+(f.warning?' · '+esc(f.warning):'');}catch(e){preview.textContent='链接格式无效或缺少凭据，请检查后重试。';}});
+  form.addEventListener('submit',function(e){e.preventDefault();var f={operation:form.elements.share.value.trim()?'import':'add',name:form.elements.name.value,server:form.elements.server.value,port:form.elements.port.value,username:form.elements.username.value,password:form.elements.password.value,transport:form.elements.transport.value,enabled:form.elements.enabled.checked?'1':'0'};if(!f.name||!f.server||!f.port||!f.username||!f.password){preview.textContent='请完整填写节点名称、服务器、端口和凭据。';return;}post(f).then(function(){closeDialog();refresh('节点已保存，正在刷新独立服务状态…');}).catch(function(){preview.textContent='保存失败，未覆盖已有节点；请检查端口、组件和重复节点。';});});
+  request('yaml').then(function(t){yaml.value=t||'';}).catch(function(){});refresh();
 }());
 </script>

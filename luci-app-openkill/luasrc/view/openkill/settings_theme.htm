@@ -73,7 +73,10 @@
             ]}
         ],
         compatibility: [
-            {id: 'vpn-policy', title: 'VPN 访问策略', keys: ['_compat_policy', '_compat_scope', 'compatibility_profile']},
+            {id: 'vpn-policy', title: 'VPN 访问策略', keys: [
+                '_compat_policy', '_compat_scope', 'compatibility_profile',
+                'disable_quic_go_gso', 'small_flash_memory', 'bypass_gateway_compatible'
+            ]},
             {id: 'remote-service', title: '远程访问绕过', keys: [
                 'remote_service_bypass', 'rustdesk_compatibility', 'rustdesk_server_domains', 'remote_service_ports', 'wan_ac_black_ips',
                 'wan_ac_black_ports', 'wan_interface_mode', 'wan_interface_name'
@@ -88,10 +91,6 @@
             {id: 'naiveproxy-compatibility', title: 'NaiveProxy 辅助组件', keys: [
                 '_naive_component_info'
             ]},
-            {id: 'device-compatibility', title: '<%:Device Compatibility%>', keys: [
-                'disable_quic_go_gso', 'small_flash_memory'
-            ]},
-            {id: 'gateway-compatibility', title: '旁路由兼容', keys: ['bypass_gateway_compatible']}
         ],
         advanced: [
             {id: 'mihomo-capabilities', title: '<%:Mihomo Capabilities%>', keys: [

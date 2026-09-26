@@ -36,6 +36,8 @@ def main() -> None:
     bridge = require(BRIDGE_INIT, "USE_PROCD=1")
     require(BRIDGE_INIT, "procd_set_param respawn 300 5 3")
     require(BRIDGE_INIT, "group nogroup")
+    require(STANDALONE, "np_control")
+    require(STANDALONE, "np_control_add")
     assert "uci" not in bridge
     openkill = require(OPENKILL_INIT, "standalone")
     assert ". openkill_naive.sh" not in openkill
@@ -46,6 +48,8 @@ def main() -> None:
     controller = require(CONTROLLER, "action_naive_standalone_status")
     require(CONTROLLER, "/var/run/naiveproxy/manifest")
     require(CONTROLLER, "/var/run/naiveproxy/snippets.yaml")
+    require(CONTROLLER, "action_naive_bridge_control")
+    require(CONTROLLER, 'HTTP.formvalue("operation")')
     assert "cursor:set(\"openkill\", sid, \"naive_password\"" not in controller
     assert "cursor:set(\"openkill\", sid, \"naive_username\"" not in controller
     settings = require(SETTINGS, "_naive_component_info")
@@ -57,6 +61,10 @@ def main() -> None:
     require(VIEW, "刷新状态")
     require(VIEW, "naiveproxy-standalone.sh health all")
     require(VIEW, "生成 SOCKS5 YAML")
+    require(VIEW, "启动服务")
+    require(VIEW, "导入链接")
+    require(VIEW, "data-naive-node-health")
+    require(VIEW, "data-naive-node-remove")
     assert "data-naive-node-action" not in view
     assert "naive_username" not in view and "naive_password" not in view
     generator = require(GENERATOR, "manual-yaml-required")

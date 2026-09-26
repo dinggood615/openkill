@@ -221,6 +221,104 @@ np_yaml() {
     done
 }
 
+# Read a small key=value request from stdin.  Credentials never appear in the
+# command line; the request is consumed by this service and discarded after
+# the operation.  Newlines are rejected because node JSON is line-oriented.
+np_control_read() {
+    NP_CTL_action=""; NP_CTL_id=""; NP_CTL_name=""; NP_CTL_server=""
+    NP_CTL_port=""; NP_CTL_username=""; NP_CTL_password=""
+    NP_CTL_transport="https"; NP_CTL_enabled="1"
+    local line key value cr
+    cr=$(printf '\r')
+    while IFS= read -r line; do
+        case "$line" in *"$cr") line=${line%?} ;; esac
+        key=${line%%=*}; value=${line#*=}
+        case "$key" in
+            action|operation) NP_CTL_action="$value" ;; id) NP_CTL_id="$value" ;;
+            name) NP_CTL_name="$value" ;; server) NP_CTL_server="$value" ;;
+            port) NP_CTL_port="$value" ;; username) NP_CTL_username="$value" ;;
+            password) NP_CTL_password="$value" ;; transport) NP_CTL_transport="$value" ;;
+            enabled) NP_CTL_enabled="$value" ;;
+        esac
+    done
+    [ -n "$NP_CTL_action" ] || return 1
+}
+
+np_json_quote() {
+    printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/[[:cntrl:]]/ /g'
+}
+
+np_make_id() {
+    local seed="$1" value
+    value=$(printf '%s' "$seed" | cksum 2>/dev/null | awk '{print $1}')
+    [ -n "$value" ] || value=1
+    printf 'node-%s' "$value"
+}
+
+np_node_matches() {
+    local id file server port username
+    for id in $(np_ids); do
+        file=$(np_node_file "$id") || continue
+        server=$(np_node_value "$file" server); port=$(np_node_value "$file" port)
+        username=$(np_node_value "$file" username)
+        [ "$server" = "$NP_CTL_server" ] && [ "$port" = "$NP_CTL_port" ] && [ "$username" = "$NP_CTL_username" ] && printf '%s\n' "$id" && return 0
+    done
+    return 1
+}
+
+np_control_add() {
+    local id file tmp duplicate
+    [ -n "$NP_CTL_name" ] && [ -n "$NP_CTL_server" ] && [ -n "$NP_CTL_username" ] && [ -n "$NP_CTL_password" ] || return 10
+    np_valid_port "$NP_CTL_port" || return 11
+    case "$NP_CTL_transport" in tls|https) NP_CTL_transport=https ;; quic) ;; *) return 12 ;; esac
+    duplicate=$(np_node_matches 2>/dev/null || true)
+    [ -z "$duplicate" ] || { printf 'duplicate_id=%s\n' "$duplicate"; return 13; }
+    id="$NP_CTL_id"
+    np_valid_id "$id" || id=$(np_make_id "$NP_CTL_server|$NP_CTL_port|$NP_CTL_username")
+    np_valid_id "$id" || return 14
+    file=$(np_node_file "$id") || return 14
+    [ ! -e "$file" ] || return 13
+    tmp="$file.new.$$"
+    printf '{"name":"%s","server":"%s","port":%s,"username":"%s","password":"%s","transport":"%s","enabled":"%s"}\n' \
+        "$(np_json_quote "$NP_CTL_name")" "$(np_json_quote "$NP_CTL_server")" "$NP_CTL_port" \
+        "$(np_json_quote "$NP_CTL_username")" "$(np_json_quote "$NP_CTL_password")" \
+        "$NP_CTL_transport" "$(np_json_quote "$NP_CTL_enabled")" > "$tmp" || return 15
+    chmod 600 "$tmp" || return 15
+    mv -f "$tmp" "$file" || return 15
+    np_port "$id" >/dev/null || return 16
+    np_manifest >/dev/null || return 17
+    printf 'id=%s\n' "$id"
+}
+
+np_control_remove() {
+    local file
+    np_valid_id "$NP_CTL_id" || return 20
+    file=$(np_node_file "$NP_CTL_id") || return 20
+    [ -f "$file" ] || return 21
+    rm -f "$file" "$NP_CONFIG_DIR/$NP_CTL_id.json" "$NP_STATE_DIR/health.$NP_CTL_id" || return 22
+    np_manifest >/dev/null || return 23
+}
+
+np_control() {
+    np_control_read || return 30
+    case "$NP_CTL_action" in
+        add|import) np_control_add ;;
+        remove) np_control_remove ;;
+        start) /etc/init.d/naiveproxy-bridge start >/dev/null 2>&1; rc=$?; np_manifest >/dev/null 2>&1 || true; return "$rc" ;;
+        stop) /etc/init.d/naiveproxy-bridge stop >/dev/null 2>&1; rc=$?; np_manifest >/dev/null 2>&1 || true; return "$rc" ;;
+        health)
+            if [ -n "$NP_CTL_id" ]; then
+                np_health_begin || return 31
+                np_health_one "$NP_CTL_id"; rc=$?
+                np_health_end
+                [ "$rc" -eq 0 ] && np_manifest >/dev/null 2>&1 || true
+                return "$rc"
+            fi
+            np_health_all; return $? ;;
+        *) return 32 ;;
+    esac
+}
+
 np_dispatch() {
     np_dirs || exit 1
     case "${1:-status}" in
@@ -235,9 +333,10 @@ np_dispatch() {
             [ "$rc" -eq 0 ] && np_manifest
             exit "$rc"
             ;;
+        control) np_control; exit $? ;;
         yaml) np_yaml; exit $? ;;
         manifest|status) np_manifest && cat "$NP_RUN/manifest"; exit $? ;;
-        *) echo "usage: $0 {component|prepare ID|port ID|health [ID|all]|yaml|manifest|status}" >&2; exit 2 ;;
+        *) echo "usage: $0 {component|prepare ID|port ID|health [ID|all]|yaml|manifest|status|control}" >&2; exit 2 ;;
     esac
 }
 

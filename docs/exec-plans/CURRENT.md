@@ -1,5 +1,24 @@
 # Current status
 
+## NaiveProxy controls and VPN policy layout (2026-09-26)
+
+- Scope: move the existing device and bypass-router compatibility fields into
+  the `VPN 访问策略` card while preserving their UCI names, defaults, depends
+  rules and network semantics. Keep the independent NaiveProxy bridge as a
+  separate equal-width card in the compatibility page.
+- Service contract: add only a permission-checked local control boundary for
+  `naiveproxy-bridge`. Start, stop, node import and health actions remain owned
+  by the standalone service; OpenKill must not write Naive credentials to UCI,
+  pass secrets in command arguments, modify the selected YAML, or restart
+  Mihomo. Responses contain redacted identifiers and state only.
+- UI contract: the card exposes service state, add/import actions, per-node
+  test latency, refresh and diagnostics. Existing read-only status and manual
+  SOCKS5 YAML ownership remain authoritative. Device and VPS tests are outside
+  this iteration unless a later plan explicitly authorizes them.
+- Failure contract: invalid sessions, malformed requests, duplicate tasks,
+  missing component, port conflicts and probe failures must return a specific
+  redacted stage. Remote failures never trigger unrelated restarts or DIRECT.
+
 ## NaiveProxy standalone bridge and manual YAML ownership (2026-09-26)
 
 - Scope: split NaiveProxy component/node ownership from OpenKill. The new

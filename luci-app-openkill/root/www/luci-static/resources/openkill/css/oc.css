@@ -10480,6 +10480,22 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
     gap: 8px;
     margin: 14px 0;
 }
+#cbi-openkill.openkill-settings .openkill-naive-standalone-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 14px 0;
+}
+#cbi-openkill.openkill-settings .openkill-naive-standalone-toolbar .cbi-button,
+#cbi-openkill.openkill-settings .openkill-naive-standalone-table .cbi-button {
+    min-width: 0;
+    white-space: nowrap;
+}
+#cbi-openkill.openkill-settings .openkill-naive-standalone-component {
+    margin: 8px 0;
+    color: var(--oc-text-secondary, #aeb8c8);
+    overflow-wrap: anywhere;
+}
 #cbi-openkill.openkill-settings .openkill-naive-standalone-help,
 #cbi-openkill.openkill-settings .openkill-naive-standalone-status,
 #cbi-openkill.openkill-settings .openkill-naive-standalone-yaml {
@@ -10498,6 +10514,25 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
 #cbi-openkill.openkill-settings .openkill-naive-standalone-yaml { margin-top: 12px; }
 #cbi-openkill.openkill-settings .openkill-naive-standalone-yaml summary { cursor: pointer; font-weight: 600; }
 #cbi-openkill.openkill-settings .openkill-naive-standalone-yaml textarea { width: 100%; min-height: 132px; margin: 10px 0; font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+#cbi-openkill.openkill-settings .openkill-naive-standalone-diagnostics { margin-top: 12px; color: var(--oc-text-secondary, #aeb8c8); }
+#cbi-openkill.openkill-settings .openkill-naive-standalone-diagnostics summary { cursor: pointer; color: var(--oc-text-primary, #f1f4f8); font-weight: 600; }
+#cbi-openkill.openkill-settings .openkill-naive-standalone-diagnostics p { margin: 8px 0; overflow-wrap: anywhere; }
+#cbi-openkill.openkill-settings .openkill-naive-dialog[hidden] { display: none; }
+#cbi-openkill.openkill-settings .openkill-naive-dialog { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 18px; background: rgba(2, 6, 23, .72); }
+#cbi-openkill.openkill-settings .openkill-naive-dialog-panel { width: min(680px, 100%); max-height: min(90vh, 760px); overflow: auto; padding: 18px; border: 1px solid var(--oc-border, #475569); border-radius: 10px; background: var(--oc-surface, #1e293b); box-shadow: 0 16px 50px rgba(0,0,0,.35); }
+#cbi-openkill.openkill-settings .openkill-naive-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+#cbi-openkill.openkill-settings .openkill-naive-dialog-head h3 { margin: 0; color: var(--oc-text-primary, #f1f4f8); }
+#cbi-openkill.openkill-settings .openkill-naive-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+#cbi-openkill.openkill-settings .openkill-naive-form-grid label,
+#cbi-openkill.openkill-settings .openkill-naive-import-field { display: grid; gap: 6px; color: var(--oc-text-primary, #f1f4f8); font-weight: 600; }
+#cbi-openkill.openkill-settings .openkill-naive-form-grid input,
+#cbi-openkill.openkill-settings .openkill-naive-form-grid select,
+#cbi-openkill.openkill-settings .openkill-naive-import-field textarea { min-width: 0; box-sizing: border-box; width: 100%; }
+#cbi-openkill.openkill-settings .openkill-naive-form-check { display: flex; align-items: center; gap: 8px; }
+#cbi-openkill.openkill-settings .openkill-naive-form-check input { width: auto; }
+#cbi-openkill.openkill-settings .openkill-naive-import-field { margin-top: 12px; }
+#cbi-openkill.openkill-settings .openkill-naive-preview { margin-top: 12px; padding: 10px; border-radius: 6px; background: var(--oc-surface-subtle, rgba(15,23,42,.35)); color: var(--oc-text-secondary, #aeb8c8); overflow-wrap: anywhere; }
+#cbi-openkill.openkill-settings .openkill-naive-dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 @media (max-width: 700px) {
     #cbi-openkill.openkill-settings .openkill-naive-standalone-table thead { display: none; }
     #cbi-openkill.openkill-settings .openkill-naive-standalone-table,
@@ -10506,4 +10541,6 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
     #cbi-openkill.openkill-settings .openkill-naive-standalone-table td { display: block; width: 100%; box-sizing: border-box; }
     #cbi-openkill.openkill-settings .openkill-naive-standalone-table tr { margin-bottom: 10px; border: 1px solid var(--oc-border, #475569); border-radius: 8px; }
     #cbi-openkill.openkill-settings .openkill-naive-standalone-table td { border: 0; padding: 5px 10px; }
+    #cbi-openkill.openkill-settings .openkill-naive-form-grid { grid-template-columns: 1fr; }
+    #cbi-openkill.openkill-settings .openkill-naive-dialog { padding: 8px; }
 }

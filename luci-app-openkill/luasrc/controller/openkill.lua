@@ -19,6 +19,7 @@ function index()
 	entry({"admin", "services", "openkill", "naive_bridge"},call("action_naive_bridge")).leaf=true
 	entry({"admin", "services", "openkill", "naive_health"},call("action_naive_health")).leaf=true
 	entry({"admin", "services", "openkill", "naive_standalone_status"},call("action_naive_standalone_status")).leaf=true
+	entry({"admin", "services", "openkill", "naive_bridge_control"},call("action_naive_bridge_control")).leaf=true
 	entry({"admin", "services", "openkill", "startlog"},call("action_start")).leaf=true
 	entry({"admin", "services", "openkill", "refresh_log"},call("action_refresh_log"))
 	entry({"admin", "services", "openkill", "del_log"},call("action_del_log"))
@@ -1692,6 +1693,59 @@ function action_naive_standalone_status()
 	result.count = count
 	result.health_target = "restricted-https"
 	result.health_note = "HTTPS 探测耗时包含 SOCKS5 与 TLS；不代表 Mihomo 已加载或策略组已选择。"
+	HTTP.prepare_content("application/json")
+	HTTP.write_json(result)
+end
+
+-- Mutations are handed to the independent bridge through stdin.  No secret is
+-- placed in a command argument, UCI value, log message or OpenKill state.
+-- The bridge validates and persists the request under /etc/naiveproxy.
+function action_naive_bridge_control()
+	local method = HTTP.getenv("REQUEST_METHOD") or "GET"
+	local operation = HTTP.formvalue("operation") or ""
+	local allowed = { add = true, import = true, remove = true, start = true, stop = true, health = true }
+	local result = { ok = false, operation = operation, stage = "request" }
+	if method ~= "POST" or not allowed[operation] then
+		HTTP.status(400, "Bad Request")
+		result.error = "post-and-supported-operation-required"
+		HTTP.prepare_content("application/json")
+		HTTP.write_json(result)
+		return
+	end
+	local fields = { "operation", "id", "name", "server", "port", "username", "password", "transport", "enabled" }
+	local pipe = io.popen("/usr/share/openkill/naiveproxy-standalone.sh control", "w")
+	if not pipe then
+		HTTP.status(503, "Service Unavailable")
+		result.stage = "bridge-unavailable"
+		result.error = "independent-service-unavailable"
+	else
+		for _, key in ipairs(fields) do
+			local value = HTTP.formvalue(key)
+			if value ~= nil then
+				-- The bridge consumes one line per value. Reject control characters
+				-- before handing the request across; this also bounds log/state data.
+				if #value > 4096 or value:find("[\r\n]") then
+					pipe:close()
+					HTTP.status(400, "Bad Request")
+					result.stage = "request-validation"
+					result.error = "invalid-field"
+					HTTP.prepare_content("application/json")
+					HTTP.write_json(result)
+					return
+				end
+				pipe:write(key .. "=" .. value .. "\n")
+			end
+		end
+		local closed, why, code = pipe:close()
+		if closed == true or code == 0 then
+			result.ok = true
+			result.stage = "accepted"
+		else
+			HTTP.status(422, "Unprocessable Entity")
+			result.stage = "bridge-rejected"
+			result.error = "operation-failed"
+		end
+	end
 	HTTP.prepare_content("application/json")
 	HTTP.write_json(result)
 end
