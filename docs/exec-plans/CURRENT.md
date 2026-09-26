@@ -31,13 +31,30 @@
 
 ## 2026-1162 release preparation (2026-09-26)
 
-- Observed implementation baseline: `af6ac6eef83b74b1e5a36d3bac3165da9ddd9652`
-  on `master`; its exact OpenKill Development CI run `36243366039` passed.
-- Version metadata and release notes now target `2026-1162`; this version
-  change is intentionally separate from the implementation commit and is the
-  only planned source-version increment for this delivery.
-- Next action: commit and push the version metadata, verify its exact
-  Development CI, then run the manual RC Build and Formal Release gates.
+- Implementation baseline: `af6ac6eef83b74b1e5a36d3bac3165da9ddd9652` on
+  `master`; exact OpenKill Development CI run `36243366039` passed.
+- Versioned source commit: `adb6fea9c11731693fa9da905d977704d31267d8`;
+  exact Development CI run `36243523330` passed. This is the only source
+  version increment for this delivery.
+- RC Build run `36243671292` passed from the exact versioned source. The
+  candidate IPK is 7,689,820 bytes with SHA256
+  `3d9c58a67a59f1cd586fb826bf889a34713c565caa18ebdaa6c2ad1b83a4698d`;
+  package metadata, conffile preservation, stale-reference and sensitive
+  content audits passed. The package contains the standalone component
+  installer/service and no retired `openkill_naive*` files.
+- Formal Release run `36244585080` passed with `release_gate=true` and
+  `publish=true`. It published
+  [v2026-1162-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1162-ipk)
+  from the exact versioned source. The formal IPK is 9,233,381 bytes with
+  independently verified SHA256
+  `e0f9ee456326b555da828c6c9bbf0a69a2e0cc8956adce6852d1f315a8ab1256`.
+- Rollback remains `v2026-1161-ipk`; preserve `/etc/naiveproxy` and the
+  user-managed YAML, stop the standalone bridge if needed, reinstall the
+  previous IPK, and leave legacy configuration available for migration.
+- Local fixtures, installer/standalone/integration/runtime/UI contracts,
+  POSIX syntax, `sh scripts/local-gate.sh`, `git diff --check`, RC and Formal
+  audits passed. Browser rendering, device state and real VPS authentication
+  were not run under the current local-only plan and remain unverified.
 
 ## 2026-1161 release preparation (2026-09-26)
 
