@@ -17,6 +17,33 @@
   integration suite, POSIX checks, local-gate and diff review before any
   release. Device and remote endpoint tests remain separate evidence.
 
+### 2026-1155 delivery evidence
+
+- Source fix commit: `dcc16b54fe7a31819dbe319594eefbbdb8b6da76`;
+  Development CI run `36208543045` passed:
+  https://github.com/dinggood615/openkill/actions/runs/36208543045
+- Version commit: `6dbd34e7ce612ad8d23db24c9b0b78f4a182a66e` (`2026-1155`);
+  Development CI run `36209437647` passed:
+  https://github.com/dinggood615/openkill/actions/runs/36209437647
+- RC Build run `36209058686` passed from the source-fix commit. The audited
+  2026-1154 candidate was retained in `D:\openkill-cache\rc-2026-1154-auto-bridge`;
+  IPK SHA256 was
+  `fc6072120f9ac400fa62573f8186644a6fed051c7d2df1af55c4ab3c024a4ed2`.
+- Formal Release run `36209617084` passed with `release_gate=true` and
+  `publish=true` from `6dbd34e`. The official release is
+  https://github.com/dinggood615/openkill/releases/tag/v2026-1155-ipk and its
+  package `luci-app-openkill_2026-1155_all.ipk` has SHA256
+  `4393c86752319c9b73413edc432be3913048c23934da014dad6c2082fc1cd20d`.
+  The published tag targets `6dbd34e7ce612ad8d23db24c9b0b78f4a182a66e`;
+  the previous release and rollback asset remain intact.
+- Local evidence: Naive integration, UI contract/interaction/preview tests,
+  POSIX syntax checks, `scripts/local-gate.sh`, `git diff --check`, and final
+  package marker inspection passed. The formal package contains the diagnostic
+  state endpoint, generator stage checks, and UI status hook.
+- This release has no new device or remote-endpoint run. The earlier device
+  evidence below remains separate; automatic-mode internet connectivity for
+  this exact release is therefore device-pending rather than claimed as fixed.
+
 ## NaiveProxy node editor runtime error (2026-09-25)
 
 - Device phase is authorized for the supplied NaiveProxy node on
