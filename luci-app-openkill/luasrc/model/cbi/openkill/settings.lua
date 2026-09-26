@@ -233,6 +233,33 @@ o.default = "11080"
 o.rmempty = false
 o.description = "每个稳定 UCI 节点分配独立的 127.0.0.1 端口；仅 TCP SOCKS5，UDP 在验证前保持关闭。"
 
+o = s:taboption("compatibility", Flag, "naive_health_enabled", "周期检测 NaiveProxy 节点")
+o.default = "0"
+o.rmempty = false
+o:depends("naive_enabled", "1")
+o.description = "默认关闭；开启后按设定间隔检测启用节点，不改变策略组选择，也不会失败直连。"
+
+o = s:taboption("compatibility", ListValue, "naive_health_interval", "检测间隔")
+o:value("300", "5 分钟")
+o:value("600", "10 分钟")
+o:value("900", "15 分钟")
+o:value("1800", "30 分钟")
+o.default = "300"
+o.rmempty = false
+o:depends("naive_health_enabled", "1")
+o.description = "结果缓存两倍间隔后过期；单次检测最多等待 8 秒。"
+
+o = s:taboption("compatibility", ListValue, "naive_health_timeout", "单次检测超时")
+o:value("3", "3 秒")
+o:value("5", "5 秒")
+o:value("8", "8 秒（推荐）")
+o:value("10", "10 秒")
+o:value("15", "15 秒")
+o.default = "8"
+o.rmempty = false
+o:depends("naive_enabled", "1")
+o.description = "仅用于固定 HTTPS 探测或 Mihomo 节点延迟接口。"
+
 o = s:taboption("compatibility", DummyValue, "_naive_status_contract", "NaiveProxy 状态")
 o.default = "未安装 → 已配置 → 本地入口就绪 → 远端验证（分阶段显示）"
 o.description = "状态页区分组件安装、节点配置、配置生成、本地监听和远端连接；没有真实远端验证时显示未验证，不以进程存在代替连接成功。"

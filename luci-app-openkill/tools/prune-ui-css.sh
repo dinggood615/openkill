@@ -10,25 +10,25 @@ css="${1:-}"
 tmp="${css}.prune.$$"
 
 awk '
-  BEGIN { skip = 0 }
-  # SECTION 7 was the removed OixCloud page.
-  /SECTION 7: oixcloud\.htm/ { skip = 1; next }
-  skip && /SECTION 8: debug\.htm/ { skip = 0 }
-  skip { next }
+  BEGIN { skip_section = 0; skip_login = 0; skip_card = 0; skip_dark = 0; skip_oix_responsive = 0 }
+  # Each retired block has its own state.  Keeping the states separate avoids
+  # an earlier block suppressing the reset marker for a later block.
+  /SECTION 7: oixcloud\.htm/ { skip_section = 1; next }
+  skip_section { if (/SECTION 8: debug\.htm/) skip_section = 0; else next }
 
   # The login panel was appended between the log/update sections and has no
   # remaining template or controller route.
-  /oixCloud login panel/ { skip = 1; next }
-  skip && /SECTION 13: update\.htm/ { skip = 0 }
-  skip { next }
+  /oixCloud login panel/ { skip_login = 1; next }
+  skip_login { if (/SECTION 13: update\.htm/) skip_login = 0; else next }
 
   # These variables were only consumed by the removed card/login styles.
-  /Card \(oixcloud legacy\)/ { skip = 1; next }
-  skip && /Progress Bar/ { skip = 0 }
-  skip { next }
-  /OixCloud Dark/ { skip = 1; next }
-  skip && /Tab \/ Radio/ { skip = 0 }
-  skip { next }
+  /Card \(oixcloud legacy\)/ { skip_card = 1; next }
+  skip_card { if (/Progress Bar/) skip_card = 0; else next }
+  /OixCloud Dark/ { skip_dark = 1; next }
+  skip_dark { if (/Tab \/ Radio/) skip_dark = 0; else next }
+
+  /\/\* oixcloud\.htm \*\// { skip_oix_responsive = 1; next }
+  skip_oix_responsive { if (/\/\* update\.htm \*\//) skip_oix_responsive = 0; else next }
 
   { print }
 ' "$css" > "$tmp"

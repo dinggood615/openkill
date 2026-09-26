@@ -17,6 +17,7 @@ function index()
 	entry({"admin", "services", "openkill", "naive_component"},call("action_naive_component")).leaf=true
 	entry({"admin", "services", "openkill", "naive_metadata"},call("action_naive_metadata")).leaf=true
 	entry({"admin", "services", "openkill", "naive_bridge"},call("action_naive_bridge")).leaf=true
+	entry({"admin", "services", "openkill", "naive_health"},call("action_naive_health")).leaf=true
 	entry({"admin", "services", "openkill", "startlog"},call("action_start")).leaf=true
 	entry({"admin", "services", "openkill", "refresh_log"},call("action_refresh_log"))
 	entry({"admin", "services", "openkill", "del_log"},call("action_del_log"))
@@ -1734,6 +1735,108 @@ function action_naive_bridge()
 	payload.count = #payload.entries
 	HTTP.prepare_content("application/json")
 	HTTP.write_json(payload)
+end
+
+-- Return per-node, credential-free health state.  The shell worker performs
+-- the bounded probe; LuCI only parses its mode-600 cache and task metadata.
+function action_naive_health()
+	local health_file = "/tmp/openkill-naive-health.state"
+	local function read_state()
+		local raw = fs.readfile(health_file) or ""
+		local result = { updated = 0, expires_at = 0, nodes = {}, summary = { enabled = 0, available = 0, failed = 0, expired = 0 }, mode = "unknown", timeout = 0, interval = 0, target = "restricted-https" }
+		for line in raw:gmatch("[^\r\n]+") do
+			local sid, key, value = line:match("^node%.([%w_-]+)%.([%w_]+)=(.*)$")
+			if sid and key then
+				result.nodes[sid] = result.nodes[sid] or { id = sid }
+				result.nodes[sid][key] = value
+			else
+				local skey, svalue = line:match("^summary%.([%w_]+)=(.*)$")
+				if skey then
+					result.summary[skey] = tonumber(svalue) or 0
+				else
+					local key2, value2 = line:match("^([%w_]+)=(.*)$")
+					if key2 == "updated" or key2 == "expires_at" or key2 == "timeout" or key2 == "interval" then result[key2] = tonumber(value2) or 0 end
+					if key2 == "target" or key2 == "mode" then result[key2] = value2 end
+				end
+			end
+		end
+		-- Merge current UCI identity into the cache so a newly configured or
+		-- disabled node is visible before its first health run.  Credentials,
+		-- server addresses and share links are deliberately never returned.
+		uci:foreach("openkill", "servers", function(section)
+			if section.type == "naiveproxy" then
+				local sid = section[".name"] or ""
+				if sid:match("^[A-Za-z0-9_-]+$") then
+					result.nodes[sid] = result.nodes[sid] or { id = sid }
+					result.nodes[sid].name = section.name or sid
+					result.nodes[sid].enabled = section.enabled == "1"
+					result.nodes[sid].groups = {}
+					if type(section.groups) == "table" then
+						for _, group in ipairs(section.groups) do
+							if group and group ~= "" then table.insert(result.nodes[sid].groups, group) end
+						end
+					end
+				end
+			end
+		end)
+		local now = os.time()
+		if result.mode == "unknown" then result.mode = fs.uci_get_config("config", "naive_bridge_mode") or "unknown" end
+		result.expired = result.expires_at > 0 and now >= result.expires_at
+		result.exists = raw ~= ""
+		return result
+	end
+	local function write_result(result)
+		HTTP.prepare_content("application/json")
+		HTTP.write_json(result)
+	end
+	local operation = HTTP.formvalue("operation") or "status"
+	if operation == "status" then
+		local result = read_state()
+		result.ok = true
+		write_result(result)
+		return
+	end
+	local script = "/usr/share/openkill/openkill_naive_health.sh"
+	if operation == "test-all" or operation == "test" then
+		local sid = HTTP.formvalue("sid") or ""
+		if operation == "test" and not sid:match("^[A-Za-z0-9_-]+$") then
+			write_result({ ok = false, error = "invalid-node-id" })
+			return
+		end
+		local scope = operation == "test" and "one" or "all"
+		local output = SYS.exec(string.format("%q task-start %q %q 2>/dev/null", script, scope, sid)) or ""
+		local result = { ok = false, operation = operation }
+		for line in output:gmatch("[^\r\n]+") do
+			local key, value = line:match("^([%w_]+)=(.*)$")
+			if key == "task_id" or key == "state" then result[key] = value end
+		end
+		result.ok = result.task_id ~= nil and result.task_id:match("^task%-[A-Za-z0-9%-]+$") ~= nil
+		if not result.ok then result.error = "task-start-failed" end
+		write_result(result)
+		return
+	end
+	if operation == "task-status" then
+		local task_id = HTTP.formvalue("task_id") or ""
+		if not task_id:match("^task%-[A-Za-z0-9%-]+$") then
+			write_result({ ok = false, error = "invalid-task-id" })
+			return
+		end
+		local output = SYS.exec(string.format("%q task-status %q 2>/dev/null", script, task_id)) or ""
+		local result = { ok = false, task_id = task_id }
+		for line in output:gmatch("[^\r\n]+") do
+			local key, value = line:match("^([%w_]+)=(.*)$")
+			if key == "state" or key == "stage" or key == "error" or key == "updated" then result[key] = value end
+		end
+		result.ok = result.state ~= nil
+		if result.state == "succeeded" or result.state == "failed" then
+			local state = read_state()
+			result.health = state
+		end
+		if not result.ok then result.error = "task-not-found" end
+		write_result(result)
+		return
+	end
+	write_result({ ok = false, error = "unsupported-operation" })
 end
 
 function action_naive_redirect()

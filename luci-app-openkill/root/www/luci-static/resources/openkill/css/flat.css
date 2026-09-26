@@ -805,6 +805,20 @@ body[data-page="admin-services-openkill-client"] .myip-content-grid {
     flex-wrap: wrap;
 }
 
+#cbi-openkill.openkill-settings .openkill-naive-health {
+    min-width: 0;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-table-wrap {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-table td,
+#cbi-openkill.openkill-settings .openkill-naive-health-table th {
+    overflow-wrap: anywhere;
+}
+
 @media (max-width: 640px) {
     .openkill-status-page .main-card,
     .openkill-status-page .sub-card,

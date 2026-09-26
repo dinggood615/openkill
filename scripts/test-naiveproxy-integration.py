@@ -17,6 +17,7 @@ HELPER = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_naive.sh"
 METADATA = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_naive_metadata.sh"
 GENERATOR = ROOT / "luci-app-openkill/root/usr/share/openkill/yml_proxys_set.sh"
 INIT = ROOT / "luci-app-openkill/root/etc/init.d/openkill"
+HEALTH = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_naive_health.sh"
 STATUS = ROOT / "luci-app-openkill/luasrc/view/openkill/status.htm"
 CONTROLLER = ROOT / "luci-app-openkill/luasrc/controller/openkill.lua"
 SERVERS = ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua"
@@ -26,6 +27,7 @@ NAIVE_VIEW = ROOT / "luci-app-openkill/luasrc/view/openkill/naive_compatibility.
 TBLSECTION = ROOT / "luci-app-openkill/luasrc/view/openkill/tblsection.htm"
 CONFIG = ROOT / "luci-app-openkill/root/etc/config/openkill"
 MAKEFILE = ROOT / "luci-app-openkill/Makefile"
+PRUNE_CSS = ROOT / "luci-app-openkill/tools/prune-ui-css.sh"
 
 
 def require(path: Path | str, text: str) -> None:
@@ -38,8 +40,10 @@ def main() -> None:
     metadata = METADATA.read_text(encoding="utf-8")
     generator = GENERATOR.read_text(encoding="utf-8")
     init = INIT.read_text(encoding="utf-8")
+    health = HEALTH.read_text(encoding="utf-8")
     status = STATUS.read_text(encoding="utf-8")
     makefile = MAKEFILE.read_text(encoding="utf-8")
+    prune_css = PRUNE_CSS.read_text(encoding="utf-8")
 
     require(CONFIG, "option naive_enabled '0'")
     require(CONFIG, "option naive_bridge_mode 'auto'")
@@ -81,6 +85,8 @@ def main() -> None:
     require(helper, "command -v xz")
     require(helper, 'xz -dc "$tmp"')
     require(makefile, "+unzip +xz")
+    require(prune_css, "skip_section")
+    require(prune_css, "skip_login")
     require(metadata, "https://api.github.com/repos/klzgrad/naiveproxy/releases/latest")
     require(metadata, "official-github-release-asset")
     require(metadata, "jsonfilter")
@@ -95,6 +101,8 @@ def main() -> None:
     require(CONTROLLER, 'entry({"admin", "services", "openkill", "naive_component"}')
     require(CONTROLLER, 'entry({"admin", "services", "openkill", "naive_metadata"}')
     require(CONTROLLER, 'entry({"admin", "services", "openkill", "naive_bridge"}')
+    require(CONTROLLER, 'entry({"admin", "services", "openkill", "naive_health"}')
+    require(CONTROLLER, "function action_naive_health()")
     require(CONTROLLER, "function action_naive_bridge()")
     require(CONTROLLER, "type: socks5")
     require(CONTROLLER, 'server = "127.0.0.1"')
@@ -143,6 +151,25 @@ def main() -> None:
     require(NAIVE_VIEW, "data-naive-generation-status")
     require(NAIVE_VIEW, "尚未加入策略组")
     require(NAIVE_VIEW, "导入分享链接")
+    require(NAIVE_VIEW, "节点连通性")
+    require(NAIVE_VIEW, "测试全部")
+    require(NAIVE_VIEW, "data-naive-health-test")
+    require(NAIVE_VIEW, "Mihomo 接入未验证")
+    require(NAIVE_VIEW, "loopback-available")
+    require(HEALTH, "HEALTH_TARGET=\"https://www.gstatic.com/generate_204\"")
+    require(HEALTH, "health_mihomo_probe")
+    require(HEALTH, "proxies/$encoded/delay")
+    require(HEALTH, "--proxy \"socks5h://127.0.0.1:${port}\"")
+    require(HEALTH, "final-yaml-missing-node")
+    require(HEALTH, "final-yaml-missing-group-reference")
+    require(HEALTH, "loopback-available")
+    require(HEALTH, "health_procd_state")
+    require(HEALTH, 'health_append_node "$sid" procd')
+    require(HEALTH, "HEALTH_LOCK")
+    require(HEALTH, "task-start")
+    require(HEALTH, "task-status")
+    assert "DIRECT" not in health, "health worker must not silently fall back to DIRECT"
+    assert 'health_append_node "$sid" password' not in health, "health output must not expose credential fields"
     require(TBLSECTION, 'self.extedit:gsub("%%s", section, 1)')
     assert ':format(section)' not in TBLSECTION.read_text(encoding="utf-8"), "encoded file query must not pass through string.format"
     require(CONTROLLER, 'operation == "task-status"')
@@ -179,7 +206,7 @@ def main() -> None:
     require(server_url, "naive-quick-link-")
 
     if shutil.which("wsl.exe"):
-        for path in (HELPER, METADATA, GENERATOR, INIT):
+        for path in (HELPER, METADATA, GENERATOR, INIT, HEALTH, PRUNE_CSS):
             result = subprocess.run(
                 ["wsl.exe", "sh", "-n", path.as_posix().replace("D:", "/mnt/d").replace("\\", "/")],
                 capture_output=True,

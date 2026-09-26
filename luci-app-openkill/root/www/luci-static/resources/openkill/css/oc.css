@@ -10194,6 +10194,122 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
     overflow-wrap: anywhere;
 }
 
+#cbi-openkill.openkill-settings .openkill-naive-health {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+    padding: 10px;
+    border: 1px solid var(--ok-border);
+    border-radius: 6px;
+    background: var(--ok-surface-muted);
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-head strong {
+    color: var(--ok-text);
+    font-size: 13px;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-head p,
+#cbi-openkill.openkill-settings .openkill-naive-health-summary,
+#cbi-openkill.openkill-settings .openkill-naive-health-task {
+    margin: 3px 0 0;
+    color: var(--ok-muted);
+    font-size: 12px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-actions {
+    display: flex;
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-actions .cbi-button {
+    margin: 0;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-table-wrap {
+    min-width: 0;
+    overflow-x: auto;
+    border: 1px solid var(--ok-border);
+    border-radius: 5px;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-table {
+    width: 100%;
+    min-width: 720px;
+    border-collapse: collapse;
+    color: var(--ok-text);
+    font-size: 12px;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-table th,
+#cbi-openkill.openkill-settings .openkill-naive-health-table td {
+    padding: 7px 8px;
+    border-bottom: 1px solid var(--ok-border);
+    text-align: left;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-table tr:last-child td {
+    border-bottom: 0;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-table th {
+    color: var(--ok-muted);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-name small {
+    display: block;
+    margin-top: 2px;
+    color: var(--ok-muted);
+    font-size: 10px;
+    overflow-wrap: anywhere;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border: 1px solid var(--ok-border);
+    border-radius: 999px;
+    white-space: nowrap;
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-badge.status-available,
+#cbi-openkill.openkill-settings .openkill-naive-health-badge.status-loopback-available {
+    color: var(--ok-success, #34d399);
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-badge.status-testing {
+    color: var(--ok-warning, #fbbf24);
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-badge.status-unknown,
+#cbi-openkill.openkill-settings .openkill-naive-health-badge.status-disabled {
+    color: var(--ok-muted);
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-table details {
+    margin-top: 5px;
+    color: var(--ok-muted);
+}
+
+#cbi-openkill.openkill-settings .openkill-naive-health-table details summary {
+    cursor: pointer;
+}
+
 #cbi-openkill.openkill-settings .openkill-naive-compatibility-links {
     display: flex;
     flex-wrap: wrap;
@@ -10272,6 +10388,14 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
 
     #cbi-openkill.openkill-settings .openkill-naive-compatibility-facts {
         grid-template-columns: minmax(0, 1fr);
+    }
+
+    #cbi-openkill.openkill-settings .openkill-naive-health-head {
+        display: block;
+    }
+
+    #cbi-openkill.openkill-settings .openkill-naive-health-actions {
+        margin-top: 8px;
     }
 
     #cbi-openkill.openkill-settings .openkill-naive-node-modal { padding: 0; }

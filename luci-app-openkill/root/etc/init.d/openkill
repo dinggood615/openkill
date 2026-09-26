@@ -126,6 +126,10 @@ add_cron()
       [ "$(uci_bool_value auto_restart)" -eq 1 ] && echo "0 $(uci_get_config "auto_restart_day_time" || 1) * * $(uci_get_config "auto_restart_week_time" || 0) /etc/init.d/openkill restart #openkill-cron-task" >> $CRON_FILE
    }
 
+   [ -z "$(grep "openkill_naive_health.sh" "$CRON_FILE" 2>/dev/null)" ] && {
+      [ "$(uci_bool_value naive_health_enabled)" -eq 1 ] && echo "*/5 * * * * /usr/share/openkill/openkill_naive_health.sh scheduled #openkill-naive-health" >> $CRON_FILE
+   }
+
    config_load "openkill"
    config_foreach add_overwrite_cron "config_overwrite"
 
@@ -137,6 +141,7 @@ del_cron()
 {
    sed -i '/#openkill-cron-task/d' $CRON_FILE
    sed -i '/#openkill-overwrite-download/d' $CRON_FILE
+   sed -i '/#openkill-naive-health/d' $CRON_FILE
    /etc/init.d/cron restart
 } >/dev/null 2>&1
 

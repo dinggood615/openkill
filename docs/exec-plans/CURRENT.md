@@ -17,6 +17,29 @@
   integration suite, POSIX checks, local-gate and diff review before any
   release. Device and remote endpoint tests remain separate evidence.
 
+## NaiveProxy per-node health checks (2026-09-26)
+
+- Scope: add credential-free per-node health state, bounded HTTPS probes and
+  latency display inside the compatibility card. Automatic mode tests the
+  exact Mihomo SOCKS5 node through its controller delay endpoint; self-managed
+  YAML mode tests only the matching loopback SOCKS5 entry and reports Mihomo
+  integration separately. No DNS, routing, firewall, parser or ABI behavior
+  changes are included.
+- Contract: every result is bound to a stable UCI node ID and current helper
+  port/config generation. Missing component, listener, Mihomo node, strategy
+  reference, timeout and HTTP/TLS errors are distinct states. A failed probe
+  never falls back to DIRECT. Procd remains responsible for bounded local
+  process respawn; health checks do not restart all OpenKill services.
+- Scheduling: manual single/all-node tasks use one deduplicated backend job;
+  optional periodic checks run from the existing cron boundary at a bounded
+  interval (default 300 seconds), with atomic mode-600 state and expiry.
+  Probe targets, redirect policy, response size and timeouts are restricted;
+  credentials and response bodies are never persisted.
+- Verification boundary: use offline fixtures and a local fake controller or
+  SOCKS endpoint for behavior tests. No packet-path test or device/remote
+  endpoint claim is made until a separately authorized device phase supplies
+  evidence.
+
 ### 2026-1155 delivery evidence
 
 - Source fix commit: `dcc16b54fe7a31819dbe319594eefbbdb8b6da76`;

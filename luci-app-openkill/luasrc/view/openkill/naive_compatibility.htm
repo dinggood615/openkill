@@ -25,6 +25,7 @@ end
      data-naive-metadata-url="<%=dispatcher.build_url('admin','services','openkill','naive_metadata')%>"
      data-naive-component-url="<%=dispatcher.build_url('admin','services','openkill','naive_component')%>"
      data-naive-bridge-url="<%=dispatcher.build_url('admin','services','openkill','naive_bridge')%>"
+     data-naive-health-url="<%=dispatcher.build_url('admin','services','openkill','naive_health')%>"
      data-naive-node-add-url="<%=node_add_url%>"
      data-naive-node-import-url="<%=node_import_url%>"
      data-naive-node-manage-url="<%=node_manage_url%>">
@@ -60,6 +61,23 @@ end
   </p>
   <div class="openkill-naive-compatibility-status" data-naive-component-status aria-live="polite">组件状态待检测。</div>
   <div class="openkill-naive-generation-status" data-naive-generation-status aria-live="polite">自动接入链路待应用。</div>
+  <section class="openkill-naive-health" data-naive-health>
+    <div class="openkill-naive-health-head">
+      <div><strong>节点连通性</strong><p>自动模式测试指定 Mihomo 节点；自管模式成功时显示“辅助链路可用 · Mihomo 接入未验证”。结果会过期。</p></div>
+      <div class="openkill-naive-health-actions">
+        <button type="button" class="cbi-button" data-naive-health-action="test-all">测试全部</button>
+        <button type="button" class="cbi-button" data-naive-health-action="refresh">刷新</button>
+      </div>
+    </div>
+    <div class="openkill-naive-health-summary" data-naive-health-summary aria-live="polite">尚未检测。</div>
+    <div class="openkill-naive-health-table-wrap">
+      <table class="openkill-naive-health-table">
+        <thead><tr><th>节点</th><th>状态</th><th>本地入口</th><th>Mihomo</th><th>延迟</th><th>最近检测</th><th>操作</th></tr></thead>
+        <tbody data-naive-health-rows><tr><td colspan="7">尚未检测启用节点。</td></tr></tbody>
+      </table>
+    </div>
+    <div class="openkill-naive-health-task" data-naive-health-task aria-live="polite"></div>
+  </section>
   <section class="openkill-naive-bridge" data-naive-bridge>
     <div class="openkill-naive-bridge-head">
       <div><strong>本地 SOCKS5 YAML</strong><p>仅含回环地址和端口，可复制到自定义 YAML。</p></div>
@@ -91,6 +109,7 @@ end
   var metadataUrl = root.getAttribute('data-naive-metadata-url');
   var componentUrl = root.getAttribute('data-naive-component-url');
   var bridgeUrl = root.getAttribute('data-naive-bridge-url');
+  var healthUrl = root.getAttribute('data-naive-health-url');
   var nodeAddUrl = root.getAttribute('data-naive-node-add-url');
   var nodeImportUrl = root.getAttribute('data-naive-node-import-url');
   var nodeManageUrl = root.getAttribute('data-naive-node-manage-url');
@@ -100,9 +119,13 @@ end
   var generationState = root.querySelector('[data-naive-generation-status]');
   var bridgeOutput = root.querySelector('[data-naive-bridge-output]');
   var bridgeState = root.querySelector('[data-naive-bridge-status]');
+  var healthSummary = root.querySelector('[data-naive-health-summary]');
+  var healthRows = root.querySelector('[data-naive-health-rows]');
+  var healthTask = root.querySelector('[data-naive-health-task]');
   var metaFields = root.querySelectorAll('[data-naive-meta]');
   var nodeModal = root.querySelector('[data-naive-node-modal]');
   var nodeFrame = root.querySelector('[data-naive-node-frame]');
+  var healthPollTimer = null;
 
   function field(name) {
     return document.querySelector('[name="cbid.openkill.config.' + name + '"]');
@@ -225,6 +248,7 @@ end
     if (nodeFrame) nodeFrame.src = 'about:blank';
     refreshComponent();
     refreshBridge();
+    refreshHealth();
   }
   function openNodeModal(kind) {
     var url = kind === 'add' ? nodeAddUrl : (kind === 'import' ? nodeImportUrl : nodeManageUrl);
@@ -247,6 +271,116 @@ end
         bridgeState.textContent = data && data.count ? ('已生成 ' + data.count + ' 个回环 SOCKS5 节点 · ' + mode + ' · UDP 未启用。' + (missingGroup && data.mode !== 'manual' ? ' 尚未加入策略组。' : '')) : ('暂无已启用的 NaiveProxy 节点 · ' + mode + '。');
       })
       .catch(function () { bridgeState.textContent = '节点读取失败，请重试。'; });
+  }
+  function healthEscape(value) {
+    return String(value == null ? '' : value).replace(/[&<>\"']/g, function (c) {
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function healthLabel(status) {
+    var labels = {
+      available: '可用', 'loopback-available': '辅助链路可用', testing: '测试中', disabled: '已禁用', unknown: '未验证',
+      'component-missing': '组件未安装', 'config-incomplete': '配置不完整',
+      'config-not-ready': '配置未就绪', 'port-failed': '端口失败',
+      'local-not-ready': '本地入口未就绪', 'mihomo-not-loaded': '未接入 Mihomo',
+      'mihomo-auth-failed': 'Mihomo 认证失败', 'mihomo-unreachable': 'Mihomo 不可达',
+      'mihomo-probe-failed': '探测失败', 'probe-failed': '探测失败',
+      'final-yaml-missing': '最终 YAML 缺少节点', 'no-strategy-group': '未加入策略组', 'expired': '结果已过期',
+      'remote-auth-failed': '远端认证失败'
+    };
+    return labels[status] || status || '未知';
+  }
+  function healthReason(item) {
+    var reasons = {
+      'component-not-installed': '先安装 NaiveProxy 组件。',
+      'missing-node-field': '补齐节点字段后重新应用。',
+      'protected-config-not-ready': '重新保存并应用节点。',
+      'loopback-port-unavailable': '检查回环端口分配。',
+      'loopback-listener-not-ready': '检查辅助进程和本地监听。',
+      'mihomo-not-loaded': '检查最终 YAML 和策略组引用。',
+      'final-yaml-missing-node': '重新应用配置并检查最终 YAML。',
+      'no-strategy-group': '选择目标策略组后重新应用。',
+      'final-yaml-missing-group-reference': '检查策略组名称是否完全匹配。',
+      'node-disabled': '启用节点后保存并应用。',
+      'mihomo-auth-failed': '检查 Mihomo 控制接口认证。',
+      'mihomo-unreachable': '检查 Mihomo 是否已启动。',
+      'remote-auth-failed': '检查节点凭据后重新应用。',
+      'probe-failed': '检查辅助链路和远端服务。'
+    };
+    return reasons[item && item.reason] || (item && item.reason) || '查看诊断详情。';
+  }
+  function renderHealth(data) {
+    data = data || {};
+    var nodes = data.nodes || {};
+    var ids = Object.keys(nodes);
+    var summary = data.summary || {};
+    if (!ids.length) {
+      healthSummary.textContent = data.exists ? '没有可展示的 NaiveProxy 节点结果。' : '尚未检测启用节点。';
+      healthRows.innerHTML = '<tr><td colspan="7">尚未检测启用节点。</td></tr>';
+      return;
+    }
+    var expiry = data.expired ? ' · 结果已过期' : '';
+    var modeText = data.mode === 'manual' ? '自管 YAML' : (data.mode === 'auto' ? '自动接入 Mihomo' : '模式未知');
+    healthSummary.textContent = !data.exists ?
+      (modeText + ' · 已配置 ' + ids.length + ' 个 · 尚未检测，点击“测试全部”') :
+      (modeText + ' · 启用 ' + (summary.enabled || 0) + ' 个 · 可用 ' + (summary.available || 0) + ' 个 · 异常 ' + (summary.failed || 0) + ' 个' + expiry);
+    healthRows.innerHTML = ids.map(function (sid) {
+      var item = nodes[sid] || {};
+      var displayStatus = item.status || (item.enabled === false ? 'disabled' : 'unknown');
+      var latency = item.latency_ms && item.latency_ms !== 'unknown' ? item.latency_ms + ' ms' : '—';
+      var checked = item.checked_at && item.checked_at !== 'unknown' ? new Date(Number(item.checked_at) * 1000).toLocaleString() : '—';
+      var local = item.local_port && item.local_port !== 'unknown' ? '127.0.0.1:' + item.local_port : '—';
+      var groups = item.groups && typeof item.groups.join === 'function' && item.groups.length ? item.groups.join('、') : (item.groups || '未加入策略组');
+      var details = '阶段：' + (item.failure_stage || '—') + '；路径：' + (item.path || '—') + '；策略组：' + groups + '；Mihomo：' + (item.mihomo || '未验证') + '；最终 YAML：' + (item.final_yaml || '未检查') + '；辅助实例：' + (item.procd || '未检查') + '；原因：' + healthReason(item) + '；连续失败：' + (item.fail_count || '0') + '；恢复：' + (item.recovery || '—');
+      if (data.expired && displayStatus !== 'disabled') displayStatus = 'expired';
+      return '<tr>' +
+        '<td class="openkill-naive-health-name">' + healthEscape(item.name || sid) + '<small>' + healthEscape(sid) + '</small></td>' +
+        '<td><span class="openkill-naive-health-badge status-' + healthEscape(displayStatus) + '">' + healthEscape(healthLabel(displayStatus)) + '</span></td>' +
+        '<td>' + healthEscape(local) + '</td>' +
+        '<td>' + healthEscape(item.mihomo === 'not-tested' ? '未测试' : (item.mihomo || '未验证')) + '</td>' +
+        '<td>' + healthEscape(latency) + '</td>' +
+        '<td>' + healthEscape(checked) + '</td>' +
+        '<td><button type="button" class="cbi-button" data-naive-health-test="' + healthEscape(sid) + '">测试</button> <button type="button" class="cbi-button" data-naive-health-detail="' + healthEscape(sid) + '">诊断</button><details data-naive-health-details="' + healthEscape(sid) + '"><summary>详情</summary><span>' + healthEscape(details) + '</span></details></td>' +
+        '</tr>';
+    }).join('');
+  }
+  function refreshHealth() {
+    if (!healthUrl || !healthSummary) return Promise.resolve();
+    healthSummary.textContent = '正在读取检测结果…';
+    return fetchJson(healthUrl + '?operation=status&_=' + Date.now(), {credentials: 'same-origin', cache: 'no-store'})
+      .then(renderHealth)
+      .catch(function () { healthSummary.textContent = '检测结果读取失败，请重试。'; });
+  }
+  function pollHealthTask(taskId) {
+    var started = Date.now();
+    if (healthPollTimer) window.clearTimeout(healthPollTimer);
+    function read() {
+      if (Date.now() - started > 240000) throw new Error('health-task-timeout');
+      return fetchJson(healthUrl + '?operation=task-status&task_id=' + encodeURIComponent(taskId), {credentials: 'same-origin', cache: 'no-store'})
+        .then(function (data) {
+          healthTask.textContent = '检测任务 ' + taskId + '：' + (data && data.stage === 'probing' ? '探测中' : (data && data.state || '处理中'));
+          if (data && data.health) renderHealth(data.health);
+          if (data && (data.state === 'succeeded' || data.state === 'failed')) {
+            healthTask.textContent = data.state === 'succeeded' ? '检测完成。' : '检测失败，请查看节点诊断。';
+            return data;
+          }
+          return new Promise(function (resolve) { healthPollTimer = window.setTimeout(function () { read().then(resolve, function (error) { resolve(Promise.reject(error)); }); }, 1000); });
+        });
+    }
+    return read().catch(function () { healthTask.textContent = '检测任务超时或读取失败，请刷新后重试。'; });
+  }
+  function startHealthTest(scope, sid) {
+    if (!healthUrl) return Promise.resolve();
+    var body = new URLSearchParams({operation: scope === 'one' ? 'test' : 'test-all'});
+    if (scope === 'one') body.set('sid', sid);
+    setBusy('[data-naive-health-action], [data-naive-health-test]', true);
+    healthTask.textContent = '正在创建检测任务…';
+    return fetchJson(healthUrl, {method: 'POST', credentials: 'same-origin', headers: {'Content-Type': 'application/x-www-form-urlencoded'}, body: body})
+      .then(function (data) {
+        if (!data || !data.ok || !data.task_id) throw new Error('health-task-start-failed');
+        return pollHealthTask(data.task_id);
+      })
+      .then(function (value) { setBusy('[data-naive-health-action], [data-naive-health-test]', false); return value; }, function (error) { setBusy('[data-naive-health-action], [data-naive-health-test]', false); throw error; });
   }
   function pollTask(taskId) {
     var started = Date.now();
@@ -322,6 +456,17 @@ end
     }).catch(function () { return null; }).then(function () { setBusy('[data-naive-meta-action], [data-naive-component-action], [data-naive-auto-install]', false); });
   }
   root.addEventListener('click', function (event) {
+    var healthTestSid = event.target.getAttribute('data-naive-health-test');
+    var healthDetailSid = event.target.getAttribute('data-naive-health-detail');
+    var healthAction = event.target.getAttribute('data-naive-health-action');
+    if (healthTestSid) { startHealthTest('one', healthTestSid).catch(function () {}); return; }
+    if (healthDetailSid) {
+      var detail = root.querySelector('[data-naive-health-details="' + healthDetailSid.replace(/[^A-Za-z0-9_-]/g, '') + '"]');
+      if (detail) detail.open = !detail.open;
+      return;
+    }
+    if (healthAction === 'test-all') { startHealthTest('all', '').catch(function () {}); return; }
+    if (healthAction === 'refresh') { refreshHealth(); return; }
     var nodeAction = event.target.getAttribute('data-naive-node-action');
     if (nodeAction) { openNodeModal(nodeAction); return; }
     if (event.target.hasAttribute('data-naive-node-close')) { closeNodeModal(); return; }
@@ -348,5 +493,6 @@ end
   requestMetadata('cached', false);
   refreshComponent();
   refreshBridge();
+  refreshHealth();
 }());
 </script>
