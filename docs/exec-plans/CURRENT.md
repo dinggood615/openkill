@@ -1,5 +1,17 @@
 # Current status
 
+## 2026-1161 release preparation (2026-09-26)
+
+- Source implementation is on master commit `8adb826` and its exact
+  Development CI run passed (`36239900863`). The next release increments the
+  package and installer metadata to `2026-1161`.
+- The release scope is limited to the VPN policy layout and independent
+  NaiveProxy control card already recorded below. No device or VPS test is
+  authorized in this iteration; browser rendering is also pending.
+- Next action: run local gates on the versioned source, push the release
+  preparation commit, verify its exact Development CI, then run the RC Build
+  and Formal Release gates. Record their links and package hashes here.
+
 ## NaiveProxy controls and VPN policy layout (2026-09-26)
 
 - Scope: move the existing device and bypass-router compatibility fields into
