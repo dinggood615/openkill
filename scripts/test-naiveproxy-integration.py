@@ -50,6 +50,12 @@ def main() -> None:
     require(generator, 'server: "127.0.0.1"')
     require(generator, "udp: false")
     require(generator, "naive_bridge_mode")
+    require(generator, "NAIVE_GENERATION_STATE")
+    require(generator, "naive_generation_record")
+    require(generator, "no-strategy-group")
+    require(generator, "component-not-executable")
+    require(generator, "final-yaml-missing-node")
+    require(generator, "final-yaml-missing-group-reference")
     assert 'type: naiveproxy' not in "\n".join(line for line in generator.splitlines() if not line.lstrip().startswith("#")), "unsupported native Mihomo type leaked into generator"
     require(helper, '"listen": "socks://127.0.0.1:%s"')
     require(helper, 'chmod 600 "$tmp"')
@@ -94,6 +100,8 @@ def main() -> None:
     require(CONTROLLER, 'server = "127.0.0.1"')
     require(CONTROLLER, "udp = false")
     require(CONTROLLER, 'mode = fs.uci_get_config("config", "naive_bridge_mode")')
+    require(CONTROLLER, 'generation_state = fs.readfile("/tmp/openkill-naive-generation.state")')
+    require(CONTROLLER, 'result.generation_state = fs.readfile("/tmp/openkill-naive-generation.state")')
     bridge_section = CONTROLLER.read_text(encoding="utf-8").split("function action_naive_bridge()", 1)[1].split("function action_naive_redirect", 1)[0]
     assert "naive_username" not in bridge_section and "naive_password" not in bridge_section, "bridge preview must not expose credentials"
     require(CONTROLLER, "action_naive_redirect")
@@ -132,6 +140,8 @@ def main() -> None:
     require(NAIVE_VIEW, "data-naive-bridge-url")
     require(NAIVE_VIEW, "本地 SOCKS5 YAML")
     require(NAIVE_VIEW, "data-naive-bridge-copy")
+    require(NAIVE_VIEW, "data-naive-generation-status")
+    require(NAIVE_VIEW, "尚未加入策略组")
     require(NAIVE_VIEW, "导入分享链接")
     require(TBLSECTION, 'self.extedit:gsub("%%s", section, 1)')
     assert ':format(section)' not in TBLSECTION.read_text(encoding="utf-8"), "encoded file query must not pass through string.format"

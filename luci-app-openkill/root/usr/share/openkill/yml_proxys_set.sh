@@ -32,6 +32,41 @@ FEATURE_BBR3=$(uci_get_config "feature_bbr3" || echo 0)
 FEATURE_ZEROTIER=$(uci_get_config "feature_zerotier" || echo 0)
 servers_name="/tmp/servers_name.list"
 proxy_provider_name="/tmp/provider_name.list"
+NAIVE_GENERATION_STATE="/tmp/openkill-naive-generation.state"
+
+# Keep the automatic bridge observable without writing credentials or remote
+# endpoint details.  Each key is scoped by the stable UCI section ID so the
+# compatibility page can explain why a node was omitted or has no group.
+naive_generation_reset() {
+   : > "$NAIVE_GENERATION_STATE" 2>/dev/null || true
+   chmod 600 "$NAIVE_GENERATION_STATE" 2>/dev/null || true
+}
+
+naive_generation_record() {
+   local sid="$1" stage="$2" reason="$3" groups="$4"
+   [ -n "$sid" ] || return 0
+   sid=$(printf '%s' "$sid" | sed 's/[^A-Za-z0-9_]/_/g')
+   reason=$(printf '%s' "$reason" | tr '\r\n' '  ' | cut -c1-120)
+   groups=$(printf '%s' "$groups" | tr '\r\n' '  ' | cut -c1-240)
+   {
+      printf 'node_%s_stage=%s\n' "$sid" "$stage"
+      printf 'node_%s_reason=%s\n' "$sid" "$reason"
+      printf 'node_%s_groups=%s\n' "$sid" "$groups"
+      printf 'updated=%s\n' "$(date +%s)"
+   } >> "$NAIVE_GENERATION_STATE" 2>/dev/null || true
+}
+
+naive_group_marker() {
+   [ -n "$1" ] || return 0
+   naive_group_count=$((naive_group_count + 1))
+   if [ -n "$naive_group_names" ]; then
+      naive_group_names="$naive_group_names,$1"
+   else
+      naive_group_names="$1"
+   fi
+}
+
+naive_generation_reset
 set_lock
 
 if [ ! -z "$UPDATE_CONFIG_FILE" ]; then
@@ -229,7 +264,15 @@ yml_servers_set()
    config_get "server" "$section" "server" ""
    config_get "port" "$section" "port" ""
 
+   if [ "$type" = "naiveproxy" ]; then
+      naive_group_count=0
+      naive_group_names=""
+      config_list_foreach "$section" "groups" naive_group_marker
+      naive_generation_record "$section" "seen" "pending" "$naive_group_names"
+   fi
+
    if [ "$enabled" = "0" ]; then
+      [ "$type" = "naiveproxy" ] && naive_generation_record "$section" "skipped" "node-disabled" "$naive_group_names"
       return
    fi
 
@@ -238,14 +281,17 @@ yml_servers_set()
    fi
 
    if [ -z "$name" ]; then
+      [ "$type" = "naiveproxy" ] && naive_generation_record "$section" "skipped" "missing-name" "$naive_group_names"
       return
    fi
 
    if [ -z "$server" ] && [ "$type" != "direct" ] && [ "$type" != "dns" ] && [ "$type" != "zerotier" ]; then
+      [ "$type" = "naiveproxy" ] && naive_generation_record "$section" "skipped" "missing-server" "$naive_group_names"
       return
    fi
 
    if [ -z "$port" ] && [ "$type" != "direct" ] && [ "$type" != "dns" ] && [ "$type" != "zerotier" ]; then
+      [ "$type" = "naiveproxy" ] && naive_generation_record "$section" "skipped" "missing-port" "$naive_group_names"
       return
    fi
 
@@ -260,21 +306,23 @@ yml_servers_set()
     # malformed or unavailable nodes out of the generated profile and expose
     # only the helper's loopback SOCKS5 endpoint to Mihomo.
     if [ "$type" = "naiveproxy" ]; then
-        [ "$(uci -q get openkill.config.naive_enabled 2>/dev/null || echo 0)" = "1" ] || return
-        [ "$(uci -q get openkill.config.naive_auto_start 2>/dev/null || echo 1)" = "1" ] || return
-        [ "$(uci -q get openkill.config.naive_bridge_mode 2>/dev/null || echo auto)" = "auto" ] || return
+        [ "$(uci -q get openkill.config.naive_enabled 2>/dev/null || echo 0)" = "1" ] || { naive_generation_record "$section" "skipped" "bridge-disabled" "$naive_group_names"; return; }
+        [ "$(uci -q get openkill.config.naive_auto_start 2>/dev/null || echo 1)" = "1" ] || { naive_generation_record "$section" "skipped" "helper-autostart-disabled" "$naive_group_names"; return; }
+        [ "$(uci -q get openkill.config.naive_bridge_mode 2>/dev/null || echo auto)" = "auto" ] || { naive_generation_record "$section" "skipped" "manual-bridge-mode" "$naive_group_names"; return; }
         naive_component_path="$(uci -q get openkill.config.naive_component_path 2>/dev/null || echo /etc/openkill/core/naive)"
-        case "$naive_component_path" in /etc/openkill/core/*) ;; *) return ;; esac
-        [ -x "$naive_component_path" ] || return
+        case "$naive_component_path" in /etc/openkill/core/*) ;; *) naive_generation_record "$section" "skipped" "invalid-component-path" "$naive_group_names"; return ;; esac
+        [ -x "$naive_component_path" ] || { naive_generation_record "$section" "skipped" "component-not-executable" "$naive_group_names"; return; }
         naive_listen_port="$(/usr/share/openkill/openkill_naive.sh port "$section" 2>/dev/null || true)"
         if [ -z "$naive_listen_port" ]; then
+            naive_generation_record "$section" "skipped" "loopback-port-unavailable" "$naive_group_names"
             return
         fi
         config_get "naive_username" "$section" "naive_username" ""
         config_get "naive_password" "$section" "naive_password" ""
         config_get "naive_transport" "$section" "naive_transport" "https"
-        case "$naive_transport" in https|quic) ;; *) return ;; esac
+        case "$naive_transport" in https|quic) ;; *) naive_generation_record "$section" "skipped" "unsupported-transport" "$naive_group_names"; return ;; esac
         if [ -z "$naive_username" ] || [ -z "$naive_password" ]; then
+            naive_generation_record "$section" "skipped" "missing-credentials" "$naive_group_names"
             return
         fi
     fi
@@ -1689,6 +1737,11 @@ cat >> "$SERVER_FILE" <<-EOF
     port: $naive_listen_port
     udp: false
 EOF
+    if [ "$naive_group_count" -eq 0 ] 2>/dev/null; then
+       naive_generation_record "$section" "emitted" "no-strategy-group" "$naive_group_names"
+    else
+       naive_generation_record "$section" "emitted" "ok" "$naive_group_names"
+    fi
 fi
 
 #http
@@ -2322,6 +2375,32 @@ yml_proxy_provider_name_get()
    }
 }
 
+naive_generation_finalize() {
+   local section="$1" enabled type name mode group_count group_names
+   config_get_bool enabled "$section" enabled 0
+   config_get type "$section" type ""
+   config_get name "$section" name ""
+   [ "$enabled" = "1" ] && [ "$type" = "naiveproxy" ] && [ -n "$name" ] || return 0
+   mode=$(uci -q get openkill.config.naive_bridge_mode 2>/dev/null || echo auto)
+   [ "$mode" = "auto" ] || return 0
+   group_count=0
+   group_names=""
+   naive_group_count=0
+   naive_group_names=""
+   config_list_foreach "$section" "groups" naive_group_marker
+   group_count="$naive_group_count"
+   group_names="$naive_group_names"
+   if ! grep -Fq "name: \"$name\"" "$CONFIG_FILE" 2>/dev/null; then
+      naive_generation_record "$section" "final" "final-yaml-missing-node" "$group_names"
+   elif [ "$group_count" -eq 0 ] 2>/dev/null; then
+      naive_generation_record "$section" "final" "no-strategy-group" "$group_names"
+   elif ! grep -Fq -- "- \"$name\"" "$CONFIG_FILE" 2>/dev/null; then
+      naive_generation_record "$section" "final" "final-yaml-missing-group-reference" "$group_names"
+   else
+      naive_generation_record "$section" "final" "ok" "$group_names"
+   fi
+}
+
 #创建配置文件
 config_load "openkill"
 config_foreach yml_servers_name_get "servers"
@@ -2383,6 +2462,11 @@ end
 if [ "$config_hash" != "OK" ]; then
     cat "$SERVER_FILE" "$PROXY_PROVIDER_FILE" "/tmp/yaml_groups.yaml" > "$CONFIG_FILE" 2>/dev/null
 fi
+
+# Verify the result after the merge, not only the temporary proxy fragment.
+# This catches later writer/overlay failures while keeping the diagnostic
+# credential-free.
+config_foreach naive_generation_finalize "servers"
 
 rm -rf $SERVER_FILE 2>/dev/null
 rm -rf $PROXY_PROVIDER_FILE 2>/dev/null

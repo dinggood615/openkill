@@ -1,5 +1,22 @@
 # Current status
 
+## NaiveProxy automatic bridge diagnostics (2026-09-26)
+
+- Scope: repair the automatic Mihomo bridge path without changing NaiveProxy,
+  DNS, routing, firewall, legacy parser or ABI semantics. The change covers
+  generator failure reporting, bridge-node presence checks and strategy-group
+  diagnostics. Credentials and private node data remain outside logs, tests,
+  reports and package artifacts.
+- Contract: an enabled NaiveProxy node in automatic mode must either produce a
+  credential-free `type: socks5` entry and an explicit strategy-group
+  reference, or record a redacted, stage-specific reason. It must never be
+  silently omitted or replaced with DIRECT. Manual mode continues to expose
+  only the loopback snippet for user-managed YAML.
+- Verification: exercise component/path, node validation, helper readiness,
+  final YAML and group-reference states with offline fixtures; run the Naive
+  integration suite, POSIX checks, local-gate and diff review before any
+  release. Device and remote endpoint tests remain separate evidence.
+
 ## NaiveProxy node editor runtime error (2026-09-25)
 
 - Device phase is authorized for the supplied NaiveProxy node on

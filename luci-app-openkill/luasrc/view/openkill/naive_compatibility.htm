@@ -59,6 +59,7 @@ end
     <button type="button" class="cbi-button" data-naive-node-action="manage">管理节点与策略组</button>
   </p>
   <div class="openkill-naive-compatibility-status" data-naive-component-status aria-live="polite">组件状态待检测。</div>
+  <div class="openkill-naive-generation-status" data-naive-generation-status aria-live="polite">自动接入链路待应用。</div>
   <section class="openkill-naive-bridge" data-naive-bridge>
     <div class="openkill-naive-bridge-head">
       <div><strong>本地 SOCKS5 YAML</strong><p>仅含回环地址和端口，可复制到自定义 YAML。</p></div>
@@ -96,6 +97,7 @@ end
   var metaState = root.querySelector('[data-naive-meta-state]');
   var reason = root.querySelector('[data-naive-meta-reason]');
   var componentState = root.querySelector('[data-naive-component-status]');
+  var generationState = root.querySelector('[data-naive-generation-status]');
   var bridgeOutput = root.querySelector('[data-naive-bridge-output]');
   var bridgeState = root.querySelector('[data-naive-bridge-status]');
   var metaFields = root.querySelectorAll('[data-naive-meta]');
@@ -191,6 +193,25 @@ end
     } else {
       componentState.textContent = 'NaiveProxy 辅助组件未安装（OpenKill 插件本体可独立运行） · ' + (map.reason || '请先检测并填写组件信息');
     }
+    if (generationState) {
+      var generation = String(data && data.generation_state || '');
+      if (!generation) {
+        generationState.textContent = '自动接入链路待应用。保存并应用后将检查最终 YAML 和策略组引用。';
+      } else if (generation.indexOf('reason=no-strategy-group') >= 0) {
+        generationState.textContent = '节点已生成，但尚未加入策略组，请在节点编辑器中选择目标策略组。';
+      } else if (generation.indexOf('reason=final-yaml-missing-node') >= 0) {
+        generationState.textContent = '辅助配置已生成，但最终 YAML 中没有该节点，请重新应用并查看诊断。';
+      } else if (generation.indexOf('reason=final-yaml-missing-group-reference') >= 0) {
+        generationState.textContent = '节点已写入 YAML，但策略组引用缺失，请检查组名是否完全匹配。';
+      } else if (generation.indexOf('stage=skipped') >= 0) {
+        var reasonMatch = generation.match(/reason=([^\\n]+)/);
+        generationState.textContent = '自动接入未生成节点：' + (reasonMatch ? reasonMatch[1] : '请查看诊断');
+      } else if (generation.indexOf('reason=ok') >= 0) {
+        generationState.textContent = '自动接入已生成 SOCKS5 节点；远端连接仍需单独验证。';
+      } else {
+        generationState.textContent = '自动接入链路已记录，等待下一次应用结果。';
+      }
+    }
   }
   function refreshComponent() {
     fetchJson(componentUrl + '?operation=status', {credentials: 'same-origin', cache: 'no-store'})
@@ -221,7 +242,9 @@ end
       .then(function (data) {
         bridgeOutput.value = data && data.yaml ? data.yaml : '';
         var mode = data && data.mode === 'manual' ? '自管 YAML 模式' : '自动接入模式';
-        bridgeState.textContent = data && data.count ? ('已生成 ' + data.count + ' 个回环 SOCKS5 节点 · ' + mode + ' · UDP 未启用。') : ('暂无已启用的 NaiveProxy 节点 · ' + mode + '。');
+        var missingGroup = false;
+        if (data && data.entries) data.entries.forEach(function (entry) { if (!entry.groups || !entry.groups.length) missingGroup = true; });
+        bridgeState.textContent = data && data.count ? ('已生成 ' + data.count + ' 个回环 SOCKS5 节点 · ' + mode + ' · UDP 未启用。' + (missingGroup && data.mode !== 'manual' ? ' 尚未加入策略组。' : '')) : ('暂无已启用的 NaiveProxy 节点 · ' + mode + '。');
       })
       .catch(function () { bridgeState.textContent = '节点读取失败，请重试。'; });
   }

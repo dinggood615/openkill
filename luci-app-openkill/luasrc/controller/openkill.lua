@@ -1616,6 +1616,7 @@ function action_status()
 		naive_state = naive_value("state", "not-started"),
 		naive_reason = naive_value("reason", "not-started"),
 		naive_updated = naive_value("updated", "unknown"),
+		naive_generation_state = fs.readfile("/tmp/openkill-naive-generation.state") or "",
 		openvpn_compatibility = fs.uci_get_config("config", "openvpn_compatibility") == "1",
 		openvpn_transport_bypass = fs.uci_get_config("config", "openvpn_transport_bypass") == "1",
 		openvpn_role = fs.uci_get_config("config", "openvpn_role") or "router-client",
@@ -1695,7 +1696,7 @@ end
 -- The helper owns the remote credentials; this endpoint only exposes the
 -- loopback address and stable port that yml_proxys_set.sh writes.
 function action_naive_bridge()
-	local payload = { ok = true, entries = {}, yaml = "", generated_at = os.time(), mode = fs.uci_get_config("config", "naive_bridge_mode") or "auto" }
+	local payload = { ok = true, entries = {}, yaml = "", generated_at = os.time(), mode = fs.uci_get_config("config", "naive_bridge_mode") or "auto", generation_state = fs.readfile("/tmp/openkill-naive-generation.state") or "" }
 	local current_path = fs.uci_get_config("config", "config_path") or ""
 	local current_name = fs.basename(current_path or "") or ""
 	local function yaml_quote(value)
@@ -1712,7 +1713,13 @@ function action_naive_bridge()
 				port = port:gsub("[^0-9].*$", ""):gsub("^%s+", ""):gsub("%s+$", "")
 				if sid ~= "" and port:match("^[1-9][0-9]*$") then
 					local name = section.name or sid
-					local item = { id = sid, name = name, server = "127.0.0.1", port = tonumber(port), udp = false }
+					local groups = {}
+					if type(section.groups) == "table" then
+						for _, group in ipairs(section.groups) do
+							if group and group ~= "" then table.insert(groups, group) end
+						end
+					end
+					local item = { id = sid, name = name, server = "127.0.0.1", port = tonumber(port), udp = false, groups = groups }
 					item.yaml = "- name: " .. yaml_quote(name) .. "\n" ..
 						"  type: socks5\n  server: \"127.0.0.1\"\n" ..
 						"  port: " .. port .. "\n  udp: false"
@@ -1829,6 +1836,7 @@ function action_naive_component()
 			end
 		end
 		result.state = fs.readfile("/tmp/openkill-naive.state") or ""
+		result.generation_state = fs.readfile("/tmp/openkill-naive-generation.state") or ""
 	elseif operation == "install" then
 		local url = HTTP.formvalue("url") or ""
 		local sha = HTTP.formvalue("sha256") or ""
