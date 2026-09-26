@@ -172,6 +172,13 @@
   pre-change OpenKill configuration backup before reapplying any user-managed
   YAML. Do not remove or overwrite existing release tags or assets.
 
+### Post-release evidence update
+
+- Evidence commit `15cc1fecf877cab0fe03651aec2fe863da669ac7` was pushed to
+  `master` after the formal release to record the RC, package, browser and
+  verification boundary. Its exact Development CI passed as run `36222180876`:
+  https://github.com/dinggood615/openkill/actions/runs/36222180876
+
 ### 2026-1155 delivery evidence
 
 - Source fix commit: `dcc16b54fe7a31819dbe319594eefbbdb8b6da76`;
