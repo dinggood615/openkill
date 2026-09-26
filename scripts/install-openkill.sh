@@ -816,6 +816,16 @@ if install_naive_standalone_component; then
 else
   NAIVE_COMPONENT_RESULT=failed
 fi
+if [ -x /usr/share/openkill/naiveproxy-standalone.sh ]; then
+  if /usr/share/openkill/naiveproxy-standalone.sh control <<'EOF'
+operation=legacy_cleanup
+EOF
+  then
+    detail "Retired OpenKill NaiveProxy settings were safely cleaned when present"
+  else
+    detail "Legacy NaiveProxy cleanup was not completed; protected backup was retained and independent service remains separate"
+  fi
+fi
 detail "OpenKill package result: installed; NaiveProxy independent component result: $NAIVE_COMPONENT_RESULT"
 download_databases
 # Remove credentials and generated files left by older oixCloud-based builds.

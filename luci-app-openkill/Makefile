@@ -96,6 +96,11 @@ define Package/$(PKG_NAME)/postinst
 		[ -x /usr/share/openkill/openkill_config_normalize.sh ] && /usr/share/openkill/openkill_config_normalize.sh >/dev/null 2>&1 || true
 		mkdir -p /etc/naiveproxy/nodes /var/run/naiveproxy >/dev/null 2>&1 || true
 		chmod 700 /etc/naiveproxy /etc/naiveproxy/nodes /var/run/naiveproxy >/dev/null 2>&1 || true
+		# Retired OpenKill-owned Naive fields are never a source for the
+		# independent service. Keep a protected local backup if cleanup finds any.
+		if [ -x /usr/share/openkill/naiveproxy-standalone.sh ]; then
+			printf '%s\n' 'operation=legacy_cleanup' | /usr/share/openkill/naiveproxy-standalone.sh control >/dev/null 2>&1 || true
+		fi
 		rm -f /tmp/openkill.change /tmp/openkill/openkill.change /tmp/openkill/capabilities.env >/dev/null 2>&1 || true
 		rm -rf /tmp/luci-indexcache /tmp/luci-indexcache.* /tmp/luci-modulecache /var/luci-modulecache >/dev/null 2>&1 || true
 	fi

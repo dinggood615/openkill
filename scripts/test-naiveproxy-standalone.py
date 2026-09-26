@@ -83,6 +83,17 @@ esac
             assert (run_dir / "config" / "n1.json").stat().st_mode & 0o777 == 0o600
         assert not (root / "openkill.config").exists()
 
+        imported = subprocess.run(
+            [BASH, git_path(SCRIPT), "control"], env=env, text=True, input=(
+                "operation=import\nshare=naive+https://fixture-user:fixture-secret@import.example.test:443?security=tls&type=tcp&headerType=none#Imported\nenabled=1\n"
+            ), capture_output=True,
+        )
+        assert imported.returncode == 0, (imported.stdout, imported.stderr)
+        assert "fixture-secret" not in (run_dir / "manifest").read_text(encoding="utf-8")
+        invalid = subprocess.run([BASH, git_path(SCRIPT), "control"], env=env, text=True,
+                                 input="operation=import\nshare=naive+https://bad\n", capture_output=True)
+        assert invalid.returncode != 0
+
     # Exercise the independent installer with an offline, locally staged
     # official-shaped asset.  The fake downloader exists only in this fixture.
     if Path("/bin/true").exists() and shutil.which("tar"):

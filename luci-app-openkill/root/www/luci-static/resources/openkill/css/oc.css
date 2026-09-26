@@ -10527,7 +10527,11 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
 #cbi-openkill.openkill-settings .openkill-naive-import-field { display: grid; gap: 6px; color: var(--oc-text-primary, #f1f4f8); font-weight: 600; }
 #cbi-openkill.openkill-settings .openkill-naive-form-grid input,
 #cbi-openkill.openkill-settings .openkill-naive-form-grid select,
-#cbi-openkill.openkill-settings .openkill-naive-import-field textarea { min-width: 0; box-sizing: border-box; width: 100%; }
+#cbi-openkill.openkill-settings .openkill-naive-import-field textarea,
+#cbi-openkill.openkill-settings .openkill-naive-import-start textarea { min-width: 0; box-sizing: border-box; width: 100%; }
+#cbi-openkill.openkill-settings .openkill-naive-import-start { display: grid; gap: 10px; }
+#cbi-openkill.openkill-settings .openkill-naive-import-start label { display: grid; gap: 6px; color: var(--oc-text-primary, #f1f4f8); font-weight: 600; }
+#cbi-openkill.openkill-settings .openkill-naive-import-start p { margin: 0; color: var(--oc-text-muted, #a8b1c2); font-size: .9em; }
 #cbi-openkill.openkill-settings .openkill-naive-form-check { display: flex; align-items: center; gap: 8px; }
 #cbi-openkill.openkill-settings .openkill-naive-form-check input { width: auto; }
 #cbi-openkill.openkill-settings .openkill-naive-import-field { margin-top: 12px; }

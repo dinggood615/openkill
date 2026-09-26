@@ -480,7 +480,8 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-se
  * oc.css; all existing status classes and DOM hooks stay in place. */
 .openkill-status-page .dashboard-v1-layout {
     grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
-    align-items: start;
+    align-items: stretch;
+    grid-auto-flow: row;
     gap: var(--ok-layout-card-gap, 12px);
 }
 
@@ -618,6 +619,8 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-se
 #cbi-openkill.openkill-settings .openkill-settings-card {
     min-width: 0;
     max-width: 100%;
+    display: flex;
+    flex-direction: column;
 }
 
 #cbi-openkill.openkill-settings .openkill-settings-card-full-width,
@@ -629,6 +632,7 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-se
 
 #cbi-openkill.openkill-settings .openkill-settings-card-body {
     min-width: 0;
+    flex: 1 1 auto;
 }
 
 #cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value {

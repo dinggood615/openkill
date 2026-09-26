@@ -1,5 +1,43 @@
 # Current status
 
+## Standalone NaiveProxy card placement and legacy-config removal (2026-09-26)
+
+- Scope: place the `NaiveProxy 独立服务` card in the compatibility tab's
+  two-column grid to the right of `OpenVPN 精确兼容`, with equal-width rows
+  and a single-column mobile fallback. Keep CBI fields and service actions in
+  one card; do not alter network policy fields or runtime semantics.
+- Legacy contract: remove the old OpenKill Naive migration warning and old
+  UCI/server-section read path from the visible service status. Add an
+  explicit, permission-checked and idempotent cleanup operation that backs up
+  only legacy Naive UCI values and `type: naiveproxy` sections before removal;
+  it never copies credentials to the standalone service, modifies user YAML,
+  or deletes unrelated nodes. The operation is covered by local fixtures but
+  is not executed on a device during this local-only iteration.
+- Import contract: make the standalone card's import action open a dedicated
+  link-first form. A supported `naive+https://`/`naiveproxy://` link is parsed
+  structurally, previewed with redacted credentials, and maps supported
+  fields before the user saves to the independent service. Unknown parameters
+  remain visible as warnings and no credential is returned to OpenKill.
+- Install contract: keep the one-click standalone stage ahead of any service
+  start; resolve architecture/libc/loader/dependency metadata from the
+  official asset resolver and never use legacy OpenKill fields as defaults.
+- Verification boundary: local UI contracts, cleanup/install/import-parser
+  behavior, shell syntax and local-gate are required. Browser rendering is
+  required against a local preview when available; device state and real VPS
+  authentication remain unverified under the current plan.
+- Local implementation evidence: the compatibility card builder now moves the
+  standalone DummyValue before it creates the two-column grid; the retired
+  status scanner no longer reads legacy UCI values. The explicit cleanup
+  command creates a mode-600 local backup before deleting only named legacy
+  options and `servers` sections of type `naiveproxy`. The one-click script
+  and package post-install invoke that idempotent cleanup without using it as
+  an independent-service input. The import dialog is link-first and the
+  standalone service reparses the submitted link before persisting it.
+- Local verification: standalone fixture, import behavior, integration and UI
+  contract tests passed; `scripts/local-gate.sh` and `git diff --check`
+  passed. The browser suite reported `PLAYWRIGHT_UNAVAILABLE`; device and VPS
+  checks remain unverified and are not authorized by this plan.
+
 ## NaiveProxy legacy cleanup and one-click standalone component (2026-09-26)
 
 - Scope: remove the retired `NaiveProxy 辅助组件` presentation and old

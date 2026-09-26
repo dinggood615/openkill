@@ -545,6 +545,11 @@
             }
         }
         moveExplicitFieldsToCategory(map, tabItems, 'compatibility', DEVICE_COMPATIBILITY_KEYS);
+        /* LuCI versions which render a DummyValue template below the tab
+         * section leave it outside directFields().  Move the original row
+         * before card construction so the independent service is a peer of
+         * VPN, remote access and OpenVPN instead of a full-width orphan. */
+        moveExplicitFieldsToCategory(map, tabItems, 'compatibility', ['_naive_component_info']);
         keepSourceTrafficInNetwork(map, tabItems);
         // Build only the visible category before the first paint.  The CBI
         // fields remain in their original panels until their tab is needed,

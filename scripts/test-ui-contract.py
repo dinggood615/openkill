@@ -178,6 +178,15 @@ class LuCIContractTests(unittest.TestCase):
         self.assertIn('[id="container.openkill.config.network"] .openkill-settings-card-stack', css)
         self.assertIn('[id="container.openkill.config.network"] .openkill-settings-card-body', css)
 
+    def test_standalone_naive_card_stays_in_the_compatibility_grid(self) -> None:
+        theme = SETTINGS_THEME.read_text(encoding="utf-8")
+        css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css").read_text(encoding="utf-8")
+        self.assertIn("{id: 'openvpn-compatibility'", theme)
+        self.assertIn("{id: 'naiveproxy-compatibility'", theme)
+        self.assertIn("moveExplicitFieldsToCategory(map, tabItems, 'compatibility', ['_naive_component_info'])", theme)
+        self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", css)
+        self.assertIn("align-items: stretch;", css)
+
     def test_dashboard_status_labels_require_backend_evidence(self) -> None:
         source = STATUS.read_text(encoding="utf-8")
         controller = (ROOT / "luci-app-openkill/luasrc/controller/openkill.lua").read_text(encoding="utf-8")

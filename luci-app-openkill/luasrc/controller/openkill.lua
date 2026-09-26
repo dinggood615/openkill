@@ -13,11 +13,6 @@ function index()
 	entry({"admin", "services", "openkill", "client"},form("openkill/client"),_("Overviews"), 20).leaf = true
 	entry({"admin", "services", "openkill", "conn_status"},call("action_conn_status")).leaf=true
 	entry({"admin", "services", "openkill", "status"},call("action_status")).leaf=true
-	entry({"admin", "services", "openkill", "naive_status"},call("action_naive_status")).leaf=true
-	entry({"admin", "services", "openkill", "naive_component"},call("action_naive_component")).leaf=true
-	entry({"admin", "services", "openkill", "naive_metadata"},call("action_naive_metadata")).leaf=true
-	entry({"admin", "services", "openkill", "naive_bridge"},call("action_naive_bridge")).leaf=true
-	entry({"admin", "services", "openkill", "naive_health"},call("action_naive_health")).leaf=true
 	entry({"admin", "services", "openkill", "naive_standalone_status"},call("action_naive_standalone_status")).leaf=true
 	entry({"admin", "services", "openkill", "naive_bridge_control"},call("action_naive_bridge_control")).leaf=true
 	entry({"admin", "services", "openkill", "startlog"},call("action_start")).leaf=true
@@ -70,17 +65,12 @@ function index()
 	entry({"admin", "services", "openkill", "core_download"}, call("core_download"))
 	entry({"admin", "services", "openkill", "announcement"}, call("action_announcement"))
 	entry({"admin", "services", "openkill", "settings"},cbi("openkill/settings"),_("Plugin Settings"), 30).leaf = true
-	-- Keep the former dedicated URL as a migration redirect.  There must be
-	-- only one CBI editor for naive_* so saves cannot diverge between pages.
-	-- Keep the former dedicated URL as a migration redirect, but do not expose
-	-- it as a second visible LuCI menu item.  The compatibility tab is the
-	-- single owner of all naive_* settings.
+	-- Old bookmarks now point to the independent-service card.  They never
+	-- create a second credential-bearing OpenKill editor.
 	entry({"admin", "services", "openkill", "naive"},call("action_naive_redirect")).leaf = true
 	entry({"admin", "services", "openkill", "config-overwrite"},cbi("openkill/config-overwrite"),_("Overwrite Settings"), 40).leaf = true
 	entry({"admin", "services", "openkill", "config-subscribe"},cbi("openkill/config-subscribe"),_("Config Subscribe"), 60).leaf = true
 	entry({"admin", "services", "openkill", "servers"},cbi("openkill/servers"),nil).leaf = true
-	-- Create a NaiveProxy section and open its editor directly.  The
-	-- compatibility card must not send users through the generic server list.
 	entry({"admin", "services", "openkill", "naive_node"},call("action_naive_node")).leaf = true
 	entry({"admin", "services", "openkill", "other-rules-edit"},cbi("openkill/other-rules-edit"), nil).leaf = true
 	entry({"admin", "services", "openkill", "custom-dns-edit"},cbi("openkill/custom-dns-edit"), nil).leaf = true
@@ -1691,27 +1681,6 @@ function action_naive_standalone_status()
 	local count = 0
 	for _ in pairs(result.nodes) do count = count + 1 end
 	result.count = count
-	-- Legacy OpenKill Naive fields are read only migration evidence.  Count
-	-- sections/options without returning any credential-bearing value; the
-	-- standalone service remains the sole owner of nodes and lifecycle.
-	local legacy_nodes, legacy_options = 0, false
-	local ok_uci, uci = pcall(require, "luci.model.uci")
-	if ok_uci and uci then
-		local cursor = uci.cursor()
-		for option, _ in pairs({ naive_enabled = true, naive_auto_start = true,
-			naive_bridge_mode = true, naive_component_path = true,
-			naive_component_url = true, naive_component_sha256 = true,
-			naive_health_enabled = true, naive_health_interval = true,
-			naive_health_timeout = true, naive_port_base = true }) do
-			if cursor:get("openkill", "config", option) ~= nil then legacy_options = true end
-		end
-		cursor:foreach("openkill", "servers", function(section)
-			if section.type == "naiveproxy" then legacy_nodes = legacy_nodes + 1 end
-		end)
-	end
-	result.legacy_migration = legacy_options or legacy_nodes > 0
-	result.legacy_nodes = legacy_nodes
-	result.legacy_note = result.legacy_migration and "检测到旧版 OpenKill Naive 配置；请迁移到独立服务并手动加入 SOCKS5 YAML。" or nil
 	result.health_target = "restricted-https"
 	result.health_note = "HTTPS 探测耗时包含 SOCKS5 与 TLS；不代表 Mihomo 已加载或策略组已选择。"
 	HTTP.prepare_content("application/json")
@@ -1724,7 +1693,7 @@ end
 function action_naive_bridge_control()
 	local method = HTTP.getenv("REQUEST_METHOD") or "GET"
 	local operation = HTTP.formvalue("operation") or ""
-	local allowed = { add = true, import = true, remove = true, start = true, stop = true, health = true }
+	local allowed = { add = true, import = true, remove = true, start = true, stop = true, health = true, legacy_cleanup = true }
 	local result = { ok = false, operation = operation, stage = "request" }
 	if method ~= "POST" or not allowed[operation] then
 		HTTP.status(400, "Bad Request")
@@ -1733,7 +1702,7 @@ function action_naive_bridge_control()
 		HTTP.write_json(result)
 		return
 	end
-	local fields = { "operation", "id", "name", "server", "port", "username", "password", "transport", "enabled" }
+	local fields = { "operation", "id", "name", "server", "port", "username", "password", "transport", "enabled", "share" }
 	local pipe = io.popen("/usr/share/openkill/naiveproxy-standalone.sh control", "w")
 	if not pipe then
 		HTTP.status(503, "Service Unavailable")

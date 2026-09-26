@@ -15,13 +15,21 @@ metadata_now() {
 }
 
 metadata_arch() {
-    local machine suffix distro_arch distro_target
+    local machine suffix distro_arch distro_target package_arch
     machine=$(uname -m 2>/dev/null || printf 'unknown')
     distro_arch=
     distro_target=
     if [ -r /etc/openwrt_release ]; then
         distro_arch=$(sed -n "s/^DISTRIB_ARCH=['\"]\([^'\"]*\)['\"].*/\1/p" /etc/openwrt_release | sed -n '1p')
         distro_target=$(sed -n "s/^DISTRIB_TARGET=['\"]\([^'\"]*\)['\"].*/\1/p" /etc/openwrt_release | sed -n '1p')
+    fi
+    if command -v opkg >/dev/null 2>&1; then
+        package_arch=$(opkg print-architecture 2>/dev/null | awk '$2 != "all" {print $2; exit}')
+    elif command -v apk >/dev/null 2>&1; then
+        package_arch=$(apk --print-arch 2>/dev/null | sed -n '1p')
+    else
+        printf 'ok=0\nreason=package-manager-unavailable\narchitecture=%s\n' "$machine"
+        return 0
     fi
     case "$machine" in
         x86_64|amd64) suffix=x86_64 ;;
@@ -41,8 +49,13 @@ metadata_arch() {
             return 0
             ;;
     esac
-    printf 'ok=1\narchitecture=%s\ndistrib_arch=%s\ndistrib_target=%s\ntarget=%s\n' \
-        "$machine" "$distro_arch" "$distro_target" "$suffix"
+    case "$machine:$package_arch" in
+        x86_64:*x86_64*|amd64:*x86_64*|aarch64:*aarch64*|arm64:*aarch64*|riscv64:*riscv64*|loongarch64:*loongarch64*) ;;
+        armv7*:*arm*|armhf:*arm*|armv6*:*arm*|armv5*:*arm*|mipsel:*mipsel*) ;;
+        *) printf 'ok=0\nreason=package-architecture-mismatch\narchitecture=%s\npackage_arch=%s\n' "$machine" "$package_arch"; return 0 ;;
+    esac
+    printf 'ok=1\narchitecture=%s\npackage_arch=%s\ndistrib_arch=%s\ndistrib_target=%s\ntarget=%s\n' \
+        "$machine" "$package_arch" "$distro_arch" "$distro_target" "$suffix"
 }
 
 metadata_value() {

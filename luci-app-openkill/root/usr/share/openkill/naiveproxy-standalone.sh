@@ -25,6 +25,11 @@ np_safe() { printf '%s' "$1" | tr '\r\n|=' '    ' | cut -c1-160; }
 np_valid_id() { case "$1" in ''|*[!A-Za-z0-9_-]*) return 1 ;; esac; }
 np_valid_port() { case "$1" in ''|*[!0-9]*) return 1 ;; esac; [ "$1" -ge 1 ] 2>/dev/null && [ "$1" -le 65535 ] 2>/dev/null; }
 np_enabled() { case "$1" in 1|true|yes|on) return 0 ;; esac; return 1; }
+np_valid_text() { [ -n "$1" ] && [ "${#1}" -le "$2" ] 2>/dev/null && ! printf '%s' "$1" | grep -q '[[:cntrl:]]'; }
+np_valid_server() {
+    case "$1" in ''|*' '*|*'/'*|*'@'*|*'['*']'*'['*) return 1 ;; esac
+    np_valid_text "$1" 253
+}
 
 np_dirs() {
     mkdir -p "$NP_NODE_DIR" "$NP_CONFIG_DIR" "$NP_STATE_DIR" || return 1
@@ -347,7 +352,7 @@ np_yaml() {
 np_control_read() {
     NP_CTL_action=""; NP_CTL_id=""; NP_CTL_name=""; NP_CTL_server=""
     NP_CTL_port=""; NP_CTL_username=""; NP_CTL_password=""
-    NP_CTL_transport="https"; NP_CTL_enabled="1"
+    NP_CTL_transport="https"; NP_CTL_enabled="1"; NP_CTL_share=""
     local line key value cr
     cr=$(printf '\r')
     while IFS= read -r line; do
@@ -358,10 +363,44 @@ np_control_read() {
             name) NP_CTL_name="$value" ;; server) NP_CTL_server="$value" ;;
             port) NP_CTL_port="$value" ;; username) NP_CTL_username="$value" ;;
             password) NP_CTL_password="$value" ;; transport) NP_CTL_transport="$value" ;;
-            enabled) NP_CTL_enabled="$value" ;;
+            enabled) NP_CTL_enabled="$value" ;; share) NP_CTL_share="$value" ;;
         esac
     done
     [ -n "$NP_CTL_action" ] || return 1
+}
+
+# The service parses an import itself.  The browser preview is convenience
+# only; accepting client-filled credentials would make the link importer
+# ambiguous.  This intentionally accepts only the documented HTTPS aliases.
+np_import_link() {
+    local raw="$NP_CTL_share" normalized authority fragment query userpass hostport host port
+    raw=$(printf '%s' "$raw" | tr -d '\r\n')
+    case "$raw" in naive+https://*|naiveproxy://*) ;; *) return 40 ;; esac
+    normalized=${raw#naive+https://}; [ "$normalized" = "$raw" ] && normalized=${raw#naiveproxy://}
+    fragment=${normalized#*#}; [ "$fragment" = "$normalized" ] && fragment=""
+    normalized=${normalized%%#*}; query=${normalized#*\?}; [ "$query" = "$normalized" ] && query=""
+    authority=${normalized%%\?*}
+    userpass=${authority%@*}; [ "$userpass" != "$authority" ] || return 41
+    hostport=${authority#*@}; [ -n "$hostport" ] || return 41
+    user=${userpass%%:*}; NP_CTL_password=${userpass#*:}; [ "$NP_CTL_password" != "$userpass" ] || return 41
+    case "$hostport" in
+        \[*\]:*) host=${hostport%%]*}; host=${host#\[}; port=${hostport##*:} ;;
+        *:*) host=${hostport%:*}; port=${hostport##*:} ;;
+        *) return 42 ;;
+    esac
+    case "$query" in
+        *security=tls*|"") ;; *) return 43 ;;
+    esac
+    case "$query" in
+        *type=tcp*|"") ;; *) return 43 ;;
+    esac
+    case "$query" in
+        *headerType=none*|"") ;; *) return 43 ;;
+    esac
+    # Reject query keys other than the documented compatibility hints.
+    [ -z "$query" ] || printf '%s' "$query" | tr '&' '\n' | grep -Ev '^(security=tls|type=tcp|headerType=none)$' | grep -q . && return 43
+    NP_CTL_name=${fragment:-$host}; NP_CTL_server=$host; NP_CTL_port=$port
+    NP_CTL_username=$user; NP_CTL_transport=https
 }
 
 np_json_quote() {
@@ -389,6 +428,7 @@ np_node_matches() {
 np_control_add() {
     local id file tmp duplicate
     [ -n "$NP_CTL_name" ] && [ -n "$NP_CTL_server" ] && [ -n "$NP_CTL_username" ] && [ -n "$NP_CTL_password" ] || return 10
+    np_valid_text "$NP_CTL_name" 120 && np_valid_server "$NP_CTL_server" && np_valid_text "$NP_CTL_username" 512 && np_valid_text "$NP_CTL_password" 1024 || return 10
     np_valid_port "$NP_CTL_port" || return 11
     case "$NP_CTL_transport" in tls|https) NP_CTL_transport=https ;; quic) ;; *) return 12 ;; esac
     duplicate=$(np_node_matches 2>/dev/null || true)
@@ -419,10 +459,41 @@ np_control_remove() {
     np_manifest >/dev/null || return 23
 }
 
+# Explicit upgrade cleanup for retired OpenKill-owned Naive settings.  It is
+# idempotent and intentionally never imports credentials into this service.
+# The protected backup is local recovery material, not a status/log payload.
+np_legacy_cleanup() {
+    local backup_dir backup option value section found=0
+    command -v uci >/dev/null 2>&1 || return 50
+    backup_dir="$NP_ROOT/legacy-backups"; mkdir -p "$backup_dir" || return 51
+    chmod 700 "$backup_dir" 2>/dev/null || true
+    backup="$backup_dir/openkill-naive.$(date +%s).backup"
+    : > "$backup" || return 51; chmod 600 "$backup" || return 51
+    for option in naive_enabled naive_auto_start naive_bridge_mode naive_component_path naive_component_url naive_component_sha256 naive_health_enabled naive_health_interval naive_health_timeout naive_port_base; do
+        value=$(uci -q get "openkill.config.$option" 2>/dev/null || true)
+        if [ -n "$value" ]; then printf 'openkill.config.%s=%s\n' "$option" "$value" >> "$backup" || return 51; found=1; fi
+    done
+    for section in $(uci -q show openkill 2>/dev/null | sed -n "s/^openkill\.\([^.=]*\)=servers$/\1/p"); do
+        [ "$(uci -q get "openkill.$section.type" 2>/dev/null || true)" = naiveproxy ] || continue
+        uci -q show "openkill.$section" >> "$backup" || return 51
+        found=1
+    done
+    [ "$found" -eq 1 ] || { rm -f "$backup"; return 0; }
+    for option in naive_enabled naive_auto_start naive_bridge_mode naive_component_path naive_component_url naive_component_sha256 naive_health_enabled naive_health_interval naive_health_timeout naive_port_base; do
+        uci -q delete "openkill.config.$option" >/dev/null 2>&1 || true
+    done
+    for section in $(uci -q show openkill 2>/dev/null | sed -n "s/^openkill\.\([^.=]*\)=servers$/\1/p"); do
+        [ "$(uci -q get "openkill.$section.type" 2>/dev/null || true)" = naiveproxy ] && uci -q delete "openkill.$section" || true
+    done
+    uci -q commit openkill || return 52
+    printf 'legacy_backup=%s\n' "$backup"
+}
+
 np_control() {
     np_control_read || return 30
     case "$NP_CTL_action" in
-        add|import) np_control_add ;;
+        add) np_control_add ;;
+        import) np_import_link || return $?; np_control_add ;;
         remove) np_control_remove ;;
         start) /etc/init.d/naiveproxy-bridge start >/dev/null 2>&1; rc=$?; np_manifest >/dev/null 2>&1 || true; return "$rc" ;;
         stop) /etc/init.d/naiveproxy-bridge stop >/dev/null 2>&1; rc=$?; np_manifest >/dev/null 2>&1 || true; return "$rc" ;;
@@ -435,6 +506,7 @@ np_control() {
                 return "$rc"
             fi
             np_health_all; return $? ;;
+        legacy_cleanup) np_legacy_cleanup ;;
         *) return 32 ;;
     esac
 }

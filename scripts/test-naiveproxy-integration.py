@@ -35,7 +35,9 @@ def main() -> None:
     require(STANDALONE, "NP_HEALTH_LOCK")
     require(STANDALONE, "np_component_install")
     require(STANDALONE, "install URL SHA256 [SIZE]")
-    assert "openkill.config" not in standalone and "uci" not in standalone
+    # UCI appears only in the explicit, protected legacy cleanup command;
+    # ordinary node/config/health paths remain independent.
+    assert "np_legacy_cleanup" in standalone
     bridge = require(BRIDGE_INIT, "USE_PROCD=1")
     require(BRIDGE_INIT, "procd_set_param respawn 300 5 3")
     require(BRIDGE_INIT, "group nogroup")
@@ -53,7 +55,7 @@ def main() -> None:
     require(CONTROLLER, "/var/run/naiveproxy/manifest")
     require(CONTROLLER, "/var/run/naiveproxy/snippets.yaml")
     require(CONTROLLER, "action_naive_bridge_control")
-    require(CONTROLLER, "legacy_migration")
+    assert "legacy_migration" not in controller
     require(CONTROLLER, 'HTTP.formvalue("operation")')
     assert "cursor:set(\"openkill\", sid, \"naive_password\"" not in controller
     assert "cursor:set(\"openkill\", sid, \"naive_username\"" not in controller
@@ -67,6 +69,8 @@ def main() -> None:
     require(VIEW, "生成 SOCKS5 YAML")
     require(VIEW, "启动服务")
     require(VIEW, "导入链接")
+    require(VIEW, "粘贴 NaiveProxy 分享链接")
+    require(VIEW, "data-naive-parse-link")
     require(VIEW, "data-naive-node-health")
     require(VIEW, "data-naive-node-remove")
     assert "data-naive-node-action" not in view
@@ -79,6 +83,8 @@ def main() -> None:
     assert "set_default naive_enabled" not in normalize
     assert "uci -q set openkill.config.naive_bridge_mode" not in normalize
     assert "type: naiveproxy" not in generator
+    require(STANDALONE, "np_legacy_cleanup")
+    require(STANDALONE, "np_import_link")
 
     if shutil.which("wsl.exe"):
         for path in (STANDALONE, BRIDGE_INIT, OPENKILL_INIT):
