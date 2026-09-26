@@ -204,13 +204,10 @@ o.rmempty = false
 o:depends("naive_enabled", "1")
 o.description = "仅影响 NaiveProxy 辅助进程；Mihomo 仍由 OpenKill 原有生命周期管理。"
 
-o = s:taboption("compatibility", ListValue, "naive_bridge_mode", "NaiveProxy 接入方式")
-o:value("auto", "自动接入 Mihomo（推荐）")
-o:value("manual", "仅生成自管 YAML")
-o.default = "auto"
-o.rmempty = false
+o = s:taboption("compatibility", DummyValue, "_naive_bridge_mode_manual", "NaiveProxy 接入方式")
+o.default = "手动接入 YAML"
 o:depends("naive_enabled", "1")
-o.description = "自动模式写入最终 Mihomo 配置；自管模式只生成回环 SOCKS5 片段，避免重复节点。"
+o.description = "本组件只维护远端连接和 127.0.0.1 SOCKS5；请将下方片段放入 YAML 的 proxies，并自行加入策略组。旧版自动模式会提示迁移，不会改写现有 YAML。"
 
 o = s:taboption("compatibility", Value, "naive_component_path", "NaiveProxy 组件路径")
 o.default = "/etc/openkill/core/naive"

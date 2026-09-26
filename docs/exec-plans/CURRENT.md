@@ -1,5 +1,39 @@
 # Current status
 
+## NaiveProxy manual YAML mode and shared OpenKill theme (2026-09-26)
+
+- Scope: move the NaiveProxy contract to manual YAML ownership, keep the
+  helper responsible only for protected per-node configuration and loopback
+  SOCKS5 listeners, add per-node health evidence and bounded local recovery,
+  and unify the OpenKill page surfaces and theme tokens. This supersedes the
+  previous automatic bridge *injection* contract for new applications while
+  retaining the legacy UCI value for migration visibility.
+- Contract: the UI no longer offers automatic Mihomo injection. An enabled
+  NaiveProxy node is prepared and supervised independently; the generated
+  credential-free SOCKS5 snippet is the only Mihomo hand-off. Existing YAML
+  and user strategy groups are preserved. If a legacy `auto` value is found,
+  the page reports that manual migration is required and does not rewrite the
+  user's YAML or silently fall back to DIRECT.
+- Lifecycle: each stable node ID owns one 127.0.0.1 TCP SOCKS5 port, a mode-
+  600 helper JSON file and one procd instance. Port ownership, PID and
+  configuration generation are checked before reporting local readiness.
+  Recovery is limited to the affected instance with cooling and bounded
+  retries; a remote probe failure never restarts the whole proxy or changes a
+  policy selection.
+- Health: probes use the matching loopback SOCKS5 path with a fixed HTTPS
+  target/strict redirect and size limits. Results are per node, expire after
+  bounded time, and expose auxiliary-chain evidence separately from any
+  read-only Mihomo/YAML diagnostic. Credentials and response bodies are not
+  persisted.
+- UI: OpenKill pages share scoped light/dark surface variables, card borders,
+  controls and spacing. No DNS, IPv6, TUN, firewall, legacy-writer parser or
+  ABI semantics are changed. Temporary artifacts remain under
+  `D:\openkill-cache` and no device or packet-path test is part of this local
+  iteration.
+- Verification gate: update the manual-mode fixtures, health and UI contract
+  tests, run POSIX checks, `scripts/local-gate.sh` and `git diff --check`,
+  then verify the exact Development CI commit before RC/Formal Release.
+
 ## NaiveProxy automatic bridge diagnostics (2026-09-26)
 
 - Scope: repair the automatic Mihomo bridge path without changing NaiveProxy,

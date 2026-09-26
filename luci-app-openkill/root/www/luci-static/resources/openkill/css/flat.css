@@ -260,6 +260,65 @@
     padding-right: var(--ok-layout-page-padding, 12px);
 }
 
+/* OpenKill page shell: use one scoped background and surface hierarchy on
+ * status, CBI settings, configuration, subscription, log and diagnostic
+ * routes.  The selector is limited to OpenKill's LuCI page prefix so other
+ * plugins keep their theme-owned background. */
+:root {
+    --ok-page-bg: #f7f8fb;
+    --ok-page-surface: #ffffff;
+    --ok-page-surface-muted: #f5f6fa;
+    --ok-page-border: #e1e5ec;
+    --ok-page-text: #252936;
+    --ok-page-muted: #6d7483;
+}
+
+html[data-darkmode="true"] {
+    --ok-page-bg: #1e2025;
+    --ok-page-surface: #25282e;
+    --ok-page-surface-muted: #2d3037;
+    --ok-page-border: #414650;
+    --ok-page-text: #e8eaf0;
+    --ok-page-muted: #a9afbc;
+}
+
+body[data-page^="admin-services-openkill"] {
+    background-color: var(--ok-page-bg);
+    background-image: none;
+    color: var(--ok-page-text);
+}
+
+body[data-page^="admin-services-openkill"] #maincontent,
+body[data-page^="admin-services-openkill"] .main,
+body[data-page^="admin-services-openkill"] .cbi-map,
+body[data-page^="admin-services-openkill"] .cbi-map-descr,
+body[data-page^="admin-services-openkill"] #cbi-openkill {
+    background-color: transparent;
+    color: var(--ok-page-text);
+}
+
+body[data-page^="admin-services-openkill"] .cbi-section,
+body[data-page^="admin-services-openkill"] .cbi-section-card,
+body[data-page^="admin-services-openkill"] .openkill-page-panel {
+    border-color: var(--ok-page-border);
+    background: var(--ok-page-surface);
+    color: var(--ok-page-text);
+}
+
+body[data-page^="admin-services-openkill"] .cbi-section-descr,
+body[data-page^="admin-services-openkill"] .cbi-value-description,
+body[data-page^="admin-services-openkill"] .openkill-page-help {
+    color: var(--ok-page-muted);
+}
+
+body[data-page^="admin-services-openkill"] input,
+body[data-page^="admin-services-openkill"] select,
+body[data-page^="admin-services-openkill"] textarea {
+    border-color: var(--ok-page-border);
+    background-color: var(--ok-page-surface-muted);
+    color: var(--ok-page-text);
+}
+
 .oc.openkill-status-page .main-cards-container,
 #cbi-openkill.openkill-settings .openkill-settings-card-stack {
     gap: var(--ok-layout-card-gap, 12px);
@@ -803,6 +862,24 @@ body[data-page="admin-services-openkill-client"] .myip-content-grid {
 .openkill-naive-compatibility .openkill-naive-compatibility-links {
     gap: 6px;
     flex-wrap: wrap;
+}
+
+.openkill-naive-compatibility .openkill-naive-migration-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 8px 0;
+    padding: 8px 10px;
+    border: 1px solid var(--ok-warning-border, #c6922d);
+    border-radius: var(--ok-radius-sm, 6px);
+    background: var(--ok-warning-surface, rgba(198,146,45,.12));
+    color: var(--ok-warning-text, #9a6700);
+}
+
+.openkill-naive-compatibility .openkill-naive-migration-actions span,
+.openkill-naive-compatibility .openkill-naive-migration-status {
+    overflow-wrap: anywhere;
 }
 
 #cbi-openkill.openkill-settings .openkill-naive-health {

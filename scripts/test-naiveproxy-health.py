@@ -1,8 +1,8 @@
 """Offline behavior fixture for the NaiveProxy per-node health worker.
 
-The fixture provides a fake UCI database, loopback listener table and Mihomo
-controller.  It exercises one successful exact-node delay probe and one
-independent not-loaded result without contacting a device or an internet host.
+The fixture provides a fake UCI database and loopback listener table.  It
+exercises one successful per-node SOCKS5 probe and one independent failure
+without contacting a device or an internet host.
 """
 
 from __future__ import annotations
@@ -52,8 +52,12 @@ def main() -> None:
             'proxies:\n'
             '  - name: "Node One"\n'
             '    type: socks5\n'
+            '    server: 127.0.0.1\n'
+            '    port: 11080\n'
             '  - name: "Node Bad"\n'
             '    type: socks5\n'
+            '    server: 127.0.0.1\n'
+            '    port: 11081\n'
             'proxy-groups:\n'
             '  - name: "Proxy"\n'
             '    proxies:\n'
@@ -97,7 +101,7 @@ config_list_foreach() { [ "$2" = groups ] && "$3" Proxy; }
             f"""#!/bin/sh
 case "$*" in
   *'-X show openkill'*) printf '%s\\n' 'openkill.node_ok=servers' 'openkill.node_bad=servers' ;;
-  *'get openkill.config.naive_bridge_mode'*) printf '%s\\n' auto ;;
+  *'get openkill.config.naive_bridge_mode'*) printf '%s\\n' manual ;;
   *'get openkill.config.naive_health_timeout'*) printf '%s\\n' 3 ;;
   *'get openkill.config.naive_health_interval'*) printf '%s\\n' 300 ;;
   *'get openkill.config.naive_port_base'*) printf '%s\\n' 11080 ;;
@@ -120,18 +124,19 @@ esac
 printf '%s\\n' "$*" >> '{posix_path(root / "curl.calls")}'
 out=/dev/null
 url=
+proxy=
 for arg in "$@"; do
     case "$arg" in
       -o) next=output ;;
+      socks5h://*) proxy=$arg ;;
       http://*|https://*) url=$arg ;;
       *) if [ "${{next:-}}" = output ]; then out=$arg; next=; fi ;;
     esac
 done
-case "$url" in
-  *Node%20One/delay) printf '%s' '{{"delay":42}}' > "$out"; printf '200' ;;
-  *Node%20One) printf '%s' '{{}}' > "$out"; printf '200' ;;
-  *Node%20Bad*) printf '%s' '{{}}' > "$out"; printf '404' ;;
-  *) printf '%s' '{{}}' > "$out"; printf '500' ;;
+case "$proxy" in
+  *:11080) printf '204\\t0.042' ;;
+  *:11081) printf '000\\t3.000' ;;
+  *) printf '500\\t0.000' ;;
 esac
 """,
         )
@@ -162,10 +167,11 @@ esac
         result = subprocess.run(command, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         assert result.returncode == 0, repr(result.stderr or result.stdout)
         content = state.read_text(encoding="utf-8")
-        assert "node.node_ok.status=available" in content
+        assert "node.node_ok.status=loopback-available" in content, content
         assert "node.node_ok.latency_ms=42" in content
         assert "node.node_ok.final_yaml=loaded-candidate" in content
-        assert "node.node_bad.status=mihomo-not-loaded" in content
+        assert "node.node_ok.path=loopback-socks" in content
+        assert "node.node_bad.status=probe-failed" in content
         assert "fixture-secret" not in content
         assert "fixture-user" not in content
 

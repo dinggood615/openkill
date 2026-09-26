@@ -1681,23 +1681,32 @@ function action_naive_status()
 			if reason == "missing" then reason = candidate_reason end
 		end
 	end
+	local configured_mode = fs.uci_get_config("config", "naive_bridge_mode") or "manual"
 	local payload = {
 		enabled = fs.uci_get_config("config", "naive_enabled") == "1",
 		component = component_path,
 		version = version,
 		installed = installed,
 		component_reason = reason,
+		mode = "manual",
+		legacy_mode = configured_mode,
+		migration_required = configured_mode == "auto",
 		state = fs.readfile("/tmp/openkill-naive.state") or "",
 	}
 	HTTP.prepare_content("application/json")
 	HTTP.write_json(payload)
 end
 
--- Return the credential-free Mihomo boundary for enabled NaiveProxy nodes.
--- The helper owns the remote credentials; this endpoint only exposes the
--- loopback address and stable port that yml_proxys_set.sh writes.
+-- Return credential-free manual YAML snippets for enabled NaiveProxy nodes.
+-- The helper owns remote credentials; this endpoint never injects a node into
+-- Mihomo and only exposes the loopback address and stable port for copying.
 function action_naive_bridge()
-	local payload = { ok = true, entries = {}, yaml = "", generated_at = os.time(), mode = fs.uci_get_config("config", "naive_bridge_mode") or "auto", generation_state = fs.readfile("/tmp/openkill-naive-generation.state") or "" }
+	local configured_mode = fs.uci_get_config("config", "naive_bridge_mode") or "manual"
+	local payload = {
+		ok = true, entries = {}, yaml = "", generated_at = os.time(), mode = "manual",
+		legacy_mode = configured_mode, migration_required = configured_mode == "auto",
+		generation_state = fs.readfile("/tmp/openkill-naive-generation.state") or ""
+	}
 	local current_path = fs.uci_get_config("config", "config_path") or ""
 	local current_name = fs.basename(current_path or "") or ""
 	local function yaml_quote(value)
@@ -1780,7 +1789,10 @@ function action_naive_health()
 			end
 		end)
 		local now = os.time()
-		if result.mode == "unknown" then result.mode = fs.uci_get_config("config", "naive_bridge_mode") or "unknown" end
+		if result.mode == "unknown" then result.mode = "manual" end
+		local configured_mode = fs.uci_get_config("config", "naive_bridge_mode") or "manual"
+		result.legacy_mode = configured_mode
+		result.migration_required = configured_mode == "auto"
 		result.expired = result.expires_at > 0 and now >= result.expires_at
 		result.exists = raw ~= ""
 		return result
@@ -1940,6 +1952,18 @@ function action_naive_component()
 		end
 		result.state = fs.readfile("/tmp/openkill-naive.state") or ""
 		result.generation_state = fs.readfile("/tmp/openkill-naive-generation.state") or ""
+		result.legacy_mode = fs.uci_get_config("config", "naive_bridge_mode") or "manual"
+		result.migration_required = result.legacy_mode == "auto"
+	elseif operation == "migrate-manual" then
+		local mode = fs.uci_get_config("config", "naive_bridge_mode") or "manual"
+		if mode == "auto" then
+			uci:set("openkill", "config", "naive_bridge_mode", "manual")
+			result.ok = uci:commit("openkill")
+			result.migrated = result.ok
+		else
+			result.ok = true
+			result.migrated = false
+		end
 	elseif operation == "install" then
 		local url = HTTP.formvalue("url") or ""
 		local sha = HTTP.formvalue("sha256") or ""

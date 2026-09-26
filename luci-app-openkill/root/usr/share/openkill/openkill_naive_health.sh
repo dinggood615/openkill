@@ -1,8 +1,8 @@
 #!/bin/sh
 # Bounded, credential-free NaiveProxy health probes.
-# Automatic mode asks Mihomo to test the exact generated SOCKS5 node. Manual
-# mode tests only the matching loopback SOCKS5 listener. No probe is allowed
-# to use a direct connection or to persist a response body.
+# The helper now owns only the matching loopback SOCKS5 path. Mihomo/YAML
+# presence is read-only diagnostic context; no automatic injection or direct
+# fallback is performed. No probe persists credentials or a response body.
 
 umask 077
 [ -r "${OPENKILL_LIB_FUNCTIONS:-/lib/functions.sh}" ] && . "${OPENKILL_LIB_FUNCTIONS:-/lib/functions.sh}"
@@ -45,25 +45,6 @@ health_append_node() {
     printf 'node.%s.%s=%s\n' "$sid" "$key" "$value" >> "$HEALTH_TMP"
 }
 
-health_urlencode() {
-    local value="$1" out="" i c hex
-    LC_ALL=C
-    i=1
-    while [ "$i" -le "${#value}" ]; do
-        c=$(printf '%s' "$value" | cut -b "$i")
-        case "$c" in
-            [A-Za-z0-9._~-]) out="${out}${c}" ;;
-            *)
-                hex=$(printf '%s' "$c" | od -An -tx1 2>/dev/null | tr -d ' \n\r')
-                [ -n "$hex" ] || return 1
-                out="${out}%${hex}"
-                ;;
-        esac
-        i=$((i + 1))
-    done
-    printf '%s' "$out"
-}
-
 health_group_marker() {
     [ -n "$1" ] || return 0
     if [ -n "${HEALTH_GROUPS:-}" ]; then
@@ -74,23 +55,26 @@ health_group_marker() {
 }
 
 health_final_yaml_state() {
-    local name="$1" config_path group
+    local name="$1" port="$2" config_path group yaml_entry
     HEALTH_FINAL_YAML=unknown
     config_path=$(uci -q get openkill.config.config_path 2>/dev/null || true)
-    [ -n "$config_path" ] && [ -r "$config_path" ] || { HEALTH_FINAL_YAML=not-found; return 0; }
-    if ! grep -Fq -- "name: \"$name\"" "$config_path" 2>/dev/null; then
-        HEALTH_FINAL_YAML=node-missing
+    [ -n "$config_path" ] && [ -r "$config_path" ] || { HEALTH_FINAL_YAML=final-yaml-not-found; return 0; }
+    yaml_entry=$(grep -A8 -F -- "name: \"$name\"" "$config_path" 2>/dev/null | head -n 9)
+    if [ -z "$yaml_entry" ] || ! printf '%s\n' "$yaml_entry" | grep -Fq -- 'type: socks5' ||
+       ! printf '%s\n' "$yaml_entry" | grep -Fq -- 'server: 127.0.0.1' ||
+       ! printf '%s\n' "$yaml_entry" | grep -Fq -- "port: $port"; then
+        HEALTH_FINAL_YAML=final-yaml-missing-node
         return 0
     fi
     if [ -z "${HEALTH_GROUPS:-}" ]; then
-        HEALTH_FINAL_YAML=node-without-group
+        HEALTH_FINAL_YAML=final-yaml-missing-group
         return 0
     fi
     for group in $(printf '%s' "$HEALTH_GROUPS" | tr ',' ' '); do
         [ -n "$group" ] || continue
         grep -Fq -- "- \"$name\"" "$config_path" 2>/dev/null && { HEALTH_FINAL_YAML=loaded-candidate; return 0; }
     done
-    HEALTH_FINAL_YAML=node-without-group-reference
+    HEALTH_FINAL_YAML=final-yaml-missing-group-reference
 }
 
 health_procd_state() {
@@ -122,84 +106,6 @@ health_interval() {
     local interval
     interval=$(uci -q get openkill.config.naive_health_interval 2>/dev/null || true)
     case "$interval" in 300|600|900|1800) printf '%s' "$interval" ;; *) printf '300' ;; esac
-}
-
-health_api_setup() {
-    HEALTH_API_BASE=""
-    HEALTH_API_SECRET=""
-    if command -v openkill_load_context >/dev/null 2>&1; then
-        openkill_load_context >/dev/null 2>&1 || true
-        HEALTH_API_BASE="${OPENKILL_API_ENDPOINT:-}"
-        HEALTH_API_SECRET="${OPENKILL_API_SECRET:-}"
-    fi
-    case "$HEALTH_API_BASE" in
-        http://*|https://*) ;;
-        *)
-            local port
-            port=$(uci -q get openkill.config.cn_port 2>/dev/null || echo 9090)
-            case "$port" in ''|*[!0-9]*) port=9090 ;; esac
-            HEALTH_API_BASE="http://127.0.0.1:${port}"
-            ;;
-    esac
-    HEALTH_API_BASE="${HEALTH_API_BASE%/}"
-}
-
-health_api_request() {
-    local url="$1" output="$2" timeout="$3"
-    HEALTH_HTTP_CODE=000
-    if [ -n "$HEALTH_API_SECRET" ]; then
-        HEALTH_HTTP_CODE=$(curl --noproxy '*' -sS -m "$timeout" --max-filesize 16384 \
-            -H "Authorization: Bearer $HEALTH_API_SECRET" "$url" -o "$output" -w '%{http_code}' 2>/dev/null) || HEALTH_HTTP_CODE=000
-    else
-        HEALTH_HTTP_CODE=$(curl --noproxy '*' -sS -m "$timeout" --max-filesize 16384 \
-            "$url" -o "$output" -w '%{http_code}' 2>/dev/null) || HEALTH_HTTP_CODE=000
-    fi
-    case "$HEALTH_HTTP_CODE" in 2??) return 0 ;; *) return 1 ;; esac
-}
-
-health_mihomo_probe() {
-    local name="$1" encoded response delay timeout
-    timeout=$(health_timeout)
-    health_api_setup
-    encoded=$(health_urlencode "$name" 2>/dev/null || true)
-    [ -n "$encoded" ] || { HEALTH_STATUS=mihomo-name-invalid; HEALTH_STAGE=mihomo; return; }
-    response="/tmp/openkill-naive-health.$$"
-    : > "$response" 2>/dev/null || { HEALTH_STATUS=probe-storage-failed; HEALTH_STAGE=probe; return; }
-    chmod 600 "$response" 2>/dev/null || true
-    # Probe the exact node first. This prevents a missing Mihomo node from
-    # being reported as a generic remote timeout.
-    health_api_request "$HEALTH_API_BASE/proxies/$encoded" "$response" "$timeout" || true
-    case "$HEALTH_HTTP_CODE" in
-        401|403) HEALTH_STATUS=mihomo-auth-failed; HEALTH_STAGE=mihomo; rm -f "$response"; return ;;
-        404) HEALTH_STATUS=mihomo-not-loaded; HEALTH_STAGE=mihomo; rm -f "$response"; return ;;
-        2??) ;;
-        *) HEALTH_STATUS=mihomo-unreachable; HEALTH_STAGE=mihomo; rm -f "$response"; return ;;
-    esac
-    : > "$response"
-    if [ -n "$HEALTH_API_SECRET" ]; then
-        HEALTH_HTTP_CODE=$(curl --noproxy '*' -sS -m "$timeout" --max-filesize 16384 \
-            -H "Authorization: Bearer $HEALTH_API_SECRET" -G \
-            --data-urlencode "url=$HEALTH_TARGET" --data-urlencode "timeout=$((timeout * 1000))" \
-            "$HEALTH_API_BASE/proxies/$encoded/delay" -o "$response" -w '%{http_code}' 2>/dev/null) || HEALTH_HTTP_CODE=000
-    else
-        HEALTH_HTTP_CODE=$(curl --noproxy '*' -sS -m "$timeout" --max-filesize 16384 -G \
-            --data-urlencode "url=$HEALTH_TARGET" --data-urlencode "timeout=$((timeout * 1000))" \
-            "$HEALTH_API_BASE/proxies/$encoded/delay" -o "$response" -w '%{http_code}' 2>/dev/null) || HEALTH_HTTP_CODE=000
-    fi
-    if [ "$HEALTH_HTTP_CODE" = 401 ] || [ "$HEALTH_HTTP_CODE" = 403 ]; then
-        HEALTH_STATUS=mihomo-auth-failed; HEALTH_STAGE=mihomo; rm -f "$response"; return
-    fi
-    case "$HEALTH_HTTP_CODE" in
-        404) HEALTH_STATUS=mihomo-not-loaded; HEALTH_STAGE=mihomo-delay; rm -f "$response"; return ;;
-        2??) ;;
-        *) HEALTH_STATUS=mihomo-probe-failed; HEALTH_STAGE=mihomo-delay; rm -f "$response"; return ;;
-    esac
-    delay=$(jsonfilter -i "$response" -e '@.delay' 2>/dev/null || true)
-    rm -f "$response"
-    case "$delay" in ''|*[!0-9]*) HEALTH_STATUS=mihomo-probe-failed; HEALTH_STAGE=mihomo-delay ;; *)
-        [ "$delay" -gt 0 ] 2>/dev/null || { HEALTH_STATUS=mihomo-probe-failed; HEALTH_STAGE=mihomo-delay; return; }
-        HEALTH_STATUS=available; HEALTH_STAGE=remote; HEALTH_LATENCY="$delay"; HEALTH_PATH=mihomo-delay ;;
-    esac
 }
 
 health_socks_probe() {
@@ -235,7 +141,7 @@ health_copy_node() {
 }
 
 health_node() {
-    local sid="$1" enabled type name server port user pass transport listen config_file generation old_generation old_fail last_success mode
+    local sid="$1" enabled type name server port user pass transport listen config_file generation old_generation old_fail last_success
     config_get enabled "$sid" enabled 0
     config_get type "$sid" type ""
     [ "$type" = naiveproxy ] || return 0
@@ -247,7 +153,6 @@ health_node() {
     config_get transport "$sid" naive_transport https
     HEALTH_GROUPS=""
     config_list_foreach "$sid" groups health_group_marker
-    mode=$(uci -q get openkill.config.naive_bridge_mode 2>/dev/null || echo auto)
     listen=$(naive_port_for_section "$sid" 2>/dev/null || true)
     config_file="${NAIVE_RUNTIME:-/tmp/openkill-naive}/${sid}.json"
     generation=$(stat -c '%Y:%s' "$config_file" 2>/dev/null || echo missing)
@@ -272,20 +177,14 @@ health_node() {
     elif ! naive_port_listening "$listen"; then
         health_procd_state "$sid"
         HEALTH_STATUS=local-not-ready; HEALTH_STAGE=local; HEALTH_REASON=loopback-listener-not-ready
-    elif [ "$mode" = manual ]; then
-        health_procd_state "$sid"
-        HEALTH_MIHOMO=not-tested
-        health_socks_probe "$listen"
     else
+        # YAML membership and strategy-group references are diagnostics only.
+        # The actual health result always comes from this node's loopback
+        # SOCKS5 entry, so a manually managed YAML cannot cause a direct probe.
         health_procd_state "$sid"
-        health_final_yaml_state "$name"
+        health_final_yaml_state "$name" "$listen"
         HEALTH_MIHOMO="$HEALTH_FINAL_YAML"
-        case "$HEALTH_FINAL_YAML" in
-            node-missing|not-found) HEALTH_STATUS=final-yaml-missing; HEALTH_STAGE=final-yaml; HEALTH_REASON=final-yaml-missing-node ;;
-            node-without-group) HEALTH_STATUS=no-strategy-group; HEALTH_STAGE=final-yaml; HEALTH_REASON=no-strategy-group ;;
-            node-without-group-reference) HEALTH_STATUS=no-strategy-group; HEALTH_STAGE=final-yaml; HEALTH_REASON=final-yaml-missing-group-reference ;;
-            *) health_mihomo_probe "$name"; HEALTH_MIHOMO="$HEALTH_STATUS" ;;
-        esac
+        health_socks_probe "$listen"
     fi
 
     if [ "$HEALTH_STATUS" = available ] || [ "$HEALTH_STATUS" = loopback-available ]; then
@@ -313,7 +212,7 @@ health_node() {
     health_append_node "$sid" config_generation "$generation"
     health_append_node "$sid" fail_count "$old_fail"
     health_append_node "$sid" last_success "${last_success:-unknown}"
-    health_append_node "$sid" recovery procd-respawn
+    health_append_node "$sid" recovery bounded-procd-respawn
 }
 
 health_run() {
@@ -324,8 +223,10 @@ health_run() {
     HEALTH_NOW=$(date +%s)
     HEALTH_ENABLED=0; HEALTH_AVAILABLE=0; HEALTH_FAILED=0; HEALTH_EXPIRED=0
     : > "$HEALTH_TMP" || return 1
-    printf 'version=1\nupdated=%s\nmode=%s\ntarget=restricted-https\ntimeout=%s\ninterval=%s\n' \
-        "$HEALTH_NOW" "$(uci -q get openkill.config.naive_bridge_mode 2>/dev/null || echo auto)" \
+    configured_mode=$(uci -q get openkill.config.naive_bridge_mode 2>/dev/null || echo manual)
+    legacy_mode=0; [ "$configured_mode" = auto ] && legacy_mode=1
+    printf 'version=2\nupdated=%s\nmode=manual\nlegacy_mode=%s\ntarget=restricted-https\ntimeout=%s\ninterval=%s\n' \
+        "$HEALTH_NOW" "$legacy_mode" \
         "$(health_timeout)" "$(health_interval)" >> "$HEALTH_TMP"
     config_load openkill 2>/dev/null || return 1
     for sid in $(uci -q -X show openkill 2>/dev/null | sed -n 's/^openkill\.\([^.=]*\)=servers$/\1/p'); do
@@ -359,12 +260,28 @@ health_task_write() {
 }
 health_task_new_id() { printf 'task-%s-%s\n' "$(date +%s)" "$$"; }
 health_task_start() {
-    local scope="$1" sid="$2" id old state
+    local scope="$1" sid="$2" id old state updated now stale_after
     mkdir -p "$HEALTH_TASK_ROOT" || return 1
     if [ -s "$HEALTH_TASK_LOCK/id" ]; then
         old=$(cat "$HEALTH_TASK_LOCK/id" 2>/dev/null || true)
         state=$(grep -m1 '^state=' "$(health_task_file "$old" 2>/dev/null)" 2>/dev/null | cut -d= -f2-)
-        case "$state" in queued|running) printf 'task_id=%s\nstate=%s\n' "$old" "$state"; return 0 ;; esac
+        updated=$(grep -m1 '^updated=' "$(health_task_file "$old" 2>/dev/null)" 2>/dev/null | cut -d= -f2-)
+        now=$(date +%s); stale_after=$(( $(health_timeout) + 30 ))
+        case "$updated" in ''|*[!0-9]*) updated=0 ;; esac
+        case "$state" in
+            queued|running)
+                if [ "$updated" -gt 0 ] 2>/dev/null && [ $((now - updated)) -lt "$stale_after" ]; then
+                    printf 'task_id=%s\nstate=%s\n' "$old" "$state"
+                    return 0
+                fi
+                ;;
+            *)
+                if [ "$updated" -gt 0 ] 2>/dev/null && [ $((now - updated)) -lt "$stale_after" ]; then
+                    printf 'task_id=%s\nstate=%s\n' "$old" "${state:-unknown}"
+                    return 0
+                fi
+                ;;
+        esac
         rm -rf "$HEALTH_TASK_LOCK"
     fi
     mkdir "$HEALTH_TASK_LOCK" 2>/dev/null || return 1

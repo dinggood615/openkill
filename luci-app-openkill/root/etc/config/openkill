@@ -66,7 +66,9 @@ config openkill 'config'
 	# created by these settings.
 	option naive_enabled '0'
 	option naive_auto_start '1'
-	option naive_bridge_mode 'auto'
+	# New installations use manual YAML ownership. Existing `auto` values are
+	# retained by upgrades so the UI can show a migration notice safely.
+	option naive_bridge_mode 'manual'
 	option naive_component_path '/etc/openkill/core/naive'
 	option naive_component_url ''
 	option naive_component_sha256 ''
