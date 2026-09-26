@@ -29,6 +29,16 @@
   all pass. Browser rendering, device state and VPS authentication remain
   pending by design.
 
+## 2026-1162 release preparation (2026-09-26)
+
+- Observed implementation baseline: `af6ac6eef83b74b1e5a36d3bac3165da9ddd9652`
+  on `master`; its exact OpenKill Development CI run `36243366039` passed.
+- Version metadata and release notes now target `2026-1162`; this version
+  change is intentionally separate from the implementation commit and is the
+  only planned source-version increment for this delivery.
+- Next action: commit and push the version metadata, verify its exact
+  Development CI, then run the manual RC Build and Formal Release gates.
+
 ## 2026-1161 release preparation (2026-09-26)
 
 - Source implementation is on master commit `8adb826` and its exact
