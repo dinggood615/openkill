@@ -2886,3 +2886,15 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   rendering was unavailable because Playwright is not installed in this
   environment; device and VPS/remote authentication were not run under the
   current plan and remain unverified.
+
+## 2026-1164 ZeroTier card placement correction (2026-09-27)
+
+- Follow-up layout correction keeps ZeroTier in the compatibility tab as its
+  own card. The compatibility grid order is now VPN access policy and remote
+  access on the first row, followed by OpenVPN on the left and ZeroTier on the
+  right; NaiveProxy remains its own subsequent card. ZeroTier fields are no
+  longer grouped inside the remote-access card, and their UCI category and
+  behavior are unchanged.
+- Local UI and NaiveProxy integration contracts pass after the correction;
+  browser rendering remains unavailable in this environment and no device or
+  VPS verification was performed.
