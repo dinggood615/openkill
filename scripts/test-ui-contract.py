@@ -183,6 +183,8 @@ class LuCIContractTests(unittest.TestCase):
         css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css").read_text(encoding="utf-8")
         self.assertIn("{id: 'openvpn-compatibility'", theme)
         self.assertIn("{id: 'naiveproxy-compatibility'", theme)
+        self.assertIn("'zerotier_status', 'feature_zerotier'", theme)
+        self.assertNotIn("{id: 'zerotier'", theme)
         self.assertIn("moveExplicitFieldsToCategory(map, tabItems, 'compatibility', ['_naive_component_info'])", theme)
         self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", css)
         self.assertIn("align-items: stretch;", css)

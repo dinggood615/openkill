@@ -2,6 +2,25 @@
 
 ## Standalone NaiveProxy card placement and legacy-config removal (2026-09-26)
 
+### Follow-up: import diagnostics and compatibility card placement
+
+- Scope: repair independent NaiveProxy share-link decoding and component
+  diagnostics, and move the existing ZeroTier fields into the compatibility
+  page's `远程访问绕过` card. The system-maintenance fields remain owned by
+  the maintenance tab and occupy the former ZeroTier card position beside
+  Mihomo capabilities. UCI names, defaults, validation and service behavior
+  are unchanged.
+- Import contract: percent-encoded userinfo and fragments are decoded only by
+  the independent service after the browser's redacted preview; credentials
+  remain outside OpenKill state, logs and responses.
+- Component contract: the standalone manifest now records whether the binary
+  is missing, non-executable or failed its loader/version probe. The page no
+  longer describes an unavailable component as merely having a registered
+  path.
+- Verification boundary: local fixture, shell syntax, UI contracts and local
+  gate are required. Device and real VPS status remain unverified and no
+  device-side cleanup or packet-path test is authorized.
+
 - Scope: place the `NaiveProxy 独立服务` card in the compatibility tab's
   two-column grid to the right of `OpenVPN 精确兼容`, with equal-width rows
   and a single-column mobile fallback. Keep CBI fields and service actions in

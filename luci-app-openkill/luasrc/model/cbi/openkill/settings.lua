@@ -71,7 +71,7 @@ local tab_groups = {
 	auto_restart = "stability",
 	health = "stability",
 	mihomo_features = "advanced",
-	zerotier = "advanced",
+	zerotier = "compatibility",
 	-- The former developer/avatar page was removed. Custom firewall rules are
 	-- now part of the System Maintenance group below.
 }

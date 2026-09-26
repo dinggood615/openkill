@@ -93,6 +93,12 @@ esac
         invalid = subprocess.run([BASH, git_path(SCRIPT), "control"], env=env, text=True,
                                  input="operation=import\nshare=naive+https://bad\n", capture_output=True)
         assert invalid.returncode != 0
+        encoded = subprocess.run(
+            [BASH, git_path(SCRIPT), "control"], env=env, text=True, input=(
+                "operation=import\nshare=naive+https://fixture%40user:fixture%21secret@example.test:443?security=tls&type=tcp&headerType=none#Encoded%20Name\n"
+            ), capture_output=True,
+        )
+        assert encoded.returncode == 0, (encoded.stdout, encoded.stderr)
 
     # Exercise the independent installer with an offline, locally staged
     # official-shaped asset.  The fake downloader exists only in this fixture.

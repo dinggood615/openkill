@@ -76,6 +76,13 @@ np_urlencode() {
     printf '%s' "$out"
 }
 
+np_urldecode() {
+    # Share links use percent encoding for credentials and display names.
+    # BusyBox printf implements %b; decode only well-formed %HH bytes and
+    # leave literal backslashes untouched by first escaping them.
+    printf '%b' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/+/ /g; s/%/\\\\x/g')"
+}
+
 np_port() {
     local id="$1" line port
     np_valid_id "$id" || return 1
@@ -100,8 +107,12 @@ np_port() {
 }
 
 np_probe_component() {
-    [ -x "$NP_BIN" ] || return 1
-    "$NP_BIN" --version >/dev/null 2>&1
+    NP_PROBE_REASON=""
+    if [ ! -e "$NP_BIN" ]; then NP_PROBE_REASON=component-missing; return 1; fi
+    if [ ! -x "$NP_BIN" ]; then NP_PROBE_REASON=component-not-executable; return 1; fi
+    if ! "$NP_BIN" --version >/dev/null 2>&1; then NP_PROBE_REASON=loader-or-version-probe-failed; return 1; fi
+    NP_PROBE_REASON=available
+    return 0
 }
 
 # Install the independently-owned component without touching OpenKill UCI or
@@ -313,13 +324,13 @@ np_health_all() {
 }
 
 np_manifest() {
-    local now id file name enabled port config pid health_status latency checked expires reason state component_version
+    local now id file name enabled port config pid health_status latency checked expires reason state component_version component_reason
     np_dirs || return 1; now=$(date +%s)
     component_version=$(sed -n 's/^version=//p' "$NP_ROOT/component.meta" 2>/dev/null | head -n1)
     [ -n "$component_version" ] || component_version=unknown
     {
         printf 'version=1\nmode=standalone\nupdated=%s\ncomponent=%s\ncomponent_version=%s\n' "$now" "$NP_BIN" "$(np_safe "$component_version")"
-        if np_probe_component; then printf 'component_status=available\n'; else printf 'component_status=unavailable\n'; fi
+        if np_probe_component; then printf 'component_status=available\ncomponent_reason=available\n'; else component_reason=${NP_PROBE_REASON:-unavailable}; printf 'component_status=unavailable\ncomponent_reason=%s\n' "$component_reason"; fi
         for id in $(np_ids); do
             file=$(np_node_file "$id") || continue; name=$(np_node_value "$file" name); [ -n "$name" ] || name="$id"
             enabled=$(np_node_value "$file" enabled); port=$(np_port "$id" 2>/dev/null || true); config="$NP_CONFIG_DIR/$id.json"
@@ -399,8 +410,8 @@ np_import_link() {
     esac
     # Reject query keys other than the documented compatibility hints.
     [ -z "$query" ] || printf '%s' "$query" | tr '&' '\n' | grep -Ev '^(security=tls|type=tcp|headerType=none)$' | grep -q . && return 43
-    NP_CTL_name=${fragment:-$host}; NP_CTL_server=$host; NP_CTL_port=$port
-    NP_CTL_username=$user; NP_CTL_transport=https
+    NP_CTL_name=$(np_urldecode "${fragment:-$host}"); NP_CTL_server=$(np_urldecode "$host"); NP_CTL_port=$port
+    NP_CTL_username=$(np_urldecode "$user"); NP_CTL_password=$(np_urldecode "$NP_CTL_password"); NP_CTL_transport=https
 }
 
 np_json_quote() {

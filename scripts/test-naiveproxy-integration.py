@@ -85,6 +85,10 @@ def main() -> None:
     assert "type: naiveproxy" not in generator
     require(STANDALONE, "np_legacy_cleanup")
     require(STANDALONE, "np_import_link")
+    require(STANDALONE, "component_reason=")
+    require(CONTROLLER, "component_reason")
+    require(CONTROLLER, "component_detail")
+    assert "zerotier = \"advanced\"" not in SETTINGS.read_text(encoding="utf-8")
 
     if shutil.which("wsl.exe"):
         for path in (STANDALONE, BRIDGE_INIT, OPENKILL_INIT):

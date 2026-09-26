@@ -1519,6 +1519,7 @@ function action_status()
 	local naive_manifest = fs.readfile("/var/run/naiveproxy/manifest") or ""
 	local naive_component_path = naive_manifest:match("component=([^\n]+)") or "/etc/naiveproxy/naive"
 	local naive_component_reason = naive_manifest:match("component_status=([^\n]+)") or "unavailable"
+	local naive_component_detail = naive_manifest:match("component_reason=([^\n]+)") or naive_component_reason
 	local naive_component_installed = naive_component_reason == "available"
 	local naive_component_version = naive_manifest:match("component_version=([^\n]+)") or "unknown"
 	local naive_configured, naive_generated, naive_local_ready, naive_remote_verified = 0, 0, 0, 0
@@ -1584,6 +1585,7 @@ function action_status()
 		naive_component_version = naive_component_version,
 		naive_component_installed = naive_component_installed,
 		naive_component_reason = naive_component_reason,
+		naive_component_detail = naive_component_detail,
 		naive_configured = naive_configured,
 		naive_generated = naive_generated,
 		naive_local_ready = naive_local_ready > 0 and "1" or "0",
@@ -1661,6 +1663,10 @@ function action_naive_standalone_status()
 		if key then
 			if key == "component_status" then
 				result.component_status = value
+			elseif key == "component_reason" then
+				result.component_reason = value
+			elseif key == "component_version" then
+				result.component_version = value
 			elseif key == "component" then
 				result.component = value
 			elseif key == "updated" then
