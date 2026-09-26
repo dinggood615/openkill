@@ -37,6 +37,18 @@
   contract tests passed; `scripts/local-gate.sh` and `git diff --check`
   passed. The browser suite reported `PLAYWRIGHT_UNAVAILABLE`; device and VPS
   checks remain unverified and are not authorized by this plan.
+- Delivery evidence: implementation commit `ca60159c4808f8f28aa8b07b4332ac6c3c4b9474`
+  passed [Development CI](https://github.com/dinggood615/openkill/actions/runs/36248595925).
+  Versioned source `37421e6f34afa4a9827c81826f5338ea1a349933` passed exact
+  [Development CI](https://github.com/dinggood615/openkill/actions/runs/36248749481).
+  The [RC Build](https://github.com/dinggood615/openkill/actions/runs/36248842311)
+  passed from that source; its IPK SHA256 was
+  `8df405a491a1285645a215cd8b258a23510be7222bfabdb5dc7b77b69d86454d`.
+  The [Formal Release](https://github.com/dinggood615/openkill/actions/runs/36249211506)
+  passed with both required gates and published
+  [v2026-1163-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1163-ipk).
+  The downloaded formal IPK SHA256 is
+  `6b80d107eb0182b669574e86e76541c3f426334fc23a49a1d6a9861f66e11b58`.
 
 ## NaiveProxy legacy cleanup and one-click standalone component (2026-09-26)
 
