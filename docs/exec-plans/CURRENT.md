@@ -119,6 +119,59 @@
   UDP, IPv6, streaming or permanent availability. Device and remote status
   remain pending a separately authorized phase.
 
+### 2026-1157 delivery evidence
+
+- Manual-YAML implementation commit `dfb48dbb37d666c7e443de9451eb28c6d9b3b767`
+  removes new automatic Mihomo injection, preserves the legacy bridge value for
+  migration reporting, keeps one protected helper instance and loopback port
+  per stable node, and adds credential-free per-node probe state. The scoped
+  light/dark OpenKill surface tokens are included in the final CSS. Existing
+  YAML, subscriptions, strategy groups and non-Naive protocol writers remain
+  outside this change.
+- The exact implementation Development CI passed as run
+  `36221193378`:
+  https://github.com/dinggood615/openkill/actions/runs/36221193378
+- Version preparation commit `2bf2321c201f67f1e91d8f8333f3c52441db465e`
+  advances the source metadata and release notes to `2026-1157`. Its exact
+  Development CI passed as run `36221357063`:
+  https://github.com/dinggood615/openkill/actions/runs/36221357063
+- The matching RC Build passed from the version commit as run `36221457511`:
+  https://github.com/dinggood615/openkill/actions/runs/36221457511
+  It produced `luci-app-openkill_2026-1157_all.ipk` with SHA256
+  `1693212c5b19ffb7c2ea44a6f1b4a937caf703faf63a585c37de28dca59501e2`.
+  The RC audit confirmed package metadata, conffile preservation, maintainer
+  script safety, ownership/mode checks, stale-reference checks and the absence
+  of credentials or test-machine data. The downloaded RC archive is retained
+  under `D:\openkill-cache\rc-2026-1157`.
+- Formal Release completed with `release_gate=true` and `publish=true` as run
+  `36221712197`:
+  https://github.com/dinggood615/openkill/actions/runs/36221712197
+  Published release:
+  https://github.com/dinggood615/openkill/releases/tag/v2026-1157-ipk
+  targets the version commit and contains
+  `luci-app-openkill_2026-1157_all.ipk`. The published package SHA256 is
+  `954a40f3f3cf6c90ca0e57b7473b453e2b5ae4c028ad0658d76684cd0f2f74fb`.
+  The RC and formal package hashes are recorded separately because the formal
+  workflow rebuilds the release asset; each hash was checked against its own
+  downloaded package and release checksum.
+- Local evidence: NaiveProxy integration, per-node health fixtures, UI contract,
+  interaction and preview tests, POSIX/BusyBox syntax checks,
+  `scripts/local-gate.sh`, and `git diff --check` passed. The fixture covers
+  manual-mode markers, loopback `socks5h` probing, stale-task cleanup, bounded
+  state and credential absence. A local browser preview loaded the final CSS
+  and showed the unified surface and aligned status cards at the desktop
+  viewport; the Playwright browser runner is unavailable in this workstation,
+  so the full automated multi-viewport matrix is not claimed.
+- Device and remote evidence: no device, packet-path, WAN, central nft or real
+  Naive authentication test was run, in accordance with the current plan and
+  AGENTS.md. The release therefore does not claim remote connectivity, UDP,
+  IPv6, streaming, or permanent availability. A later authorized device phase
+  must re-detect the component, add a node without exposing its credentials,
+  copy the generated loopback YAML, and verify the helper and probe state.
+- Rollback: install the retained `v2026-1156-ipk` package and restore the
+  pre-change OpenKill configuration backup before reapplying any user-managed
+  YAML. Do not remove or overwrite existing release tags or assets.
+
 ### 2026-1155 delivery evidence
 
 - Source fix commit: `dcc16b54fe7a31819dbe319594eefbbdb8b6da76`;
