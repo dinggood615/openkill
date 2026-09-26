@@ -2657,3 +2657,36 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   passed. The device still cannot reach public GitHub/jsDelivr through its
   current Fake-IP/TLS bootstrap path; component download and remote Naive
   authentication remain device-pending.
+
+## 2026-1160 standalone NaiveProxy bridge release evidence (2026-09-26)
+
+- The standalone migration is implemented in source commit
+  `d7aacef60ed4a1a4912cda3b2f164ebd65650ed0`; version metadata and release
+  notes were finalized in `6cf5cec505133785cb46da62b48044c716ef68b6` on
+  `master`. OpenKill no longer owns NaiveProxy credentials, starts or stops
+  the bridge, probes nodes, or injects Naive nodes into Mihomo. The bridge
+  owns `/etc/naiveproxy`, `/var/run/naiveproxy`, per-node protected JSON,
+  loopback listeners, health state and the `naiveproxy-bridge` procd service.
+- Local verification passed: standalone fixture, integration contracts, UI
+  contracts and interactions, Python compilation, POSIX syntax, YAML and
+  credential-redaction checks, `sh scripts/local-gate.sh`, and
+  `git diff --check`. `scripts/test-installer.py` could not run on the Windows
+  host because the optional `yaml` module is absent; browser, device and
+  real-VPS packet/remote authentication tests remain unverified by plan.
+- Exact Development CI passed for the implementation commit:
+  [run 36237005619](https://github.com/dinggood615/openkill/actions/runs/36237005619),
+  and for the release-preparation commit:
+  [run 36237152719](https://github.com/dinggood615/openkill/actions/runs/36237152719).
+- RC Build passed from the exact release-preparation commit:
+  [run 36237326633](https://github.com/dinggood615/openkill/actions/runs/36237326633).
+  The RC IPK is 7,695,999 bytes with SHA256
+  `722e1483442a896f932a7430a326012be6099f57d57f890990ae7ed02085e013`.
+- Formal Release passed with `release_gate=true` and `publish=true`:
+  [run 36237633490](https://github.com/dinggood615/openkill/actions/runs/36237633490).
+  It published [v2026-1160-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1160-ipk)
+  from commit `6cf5cec505133785cb46da62b48044c716ef68b6`.
+  The formal `luci-app-openkill_2026-1160_all.ipk` SHA256 is
+  `3cb809939e5f1eb1c47213be0099dc2fdbe635dbbe9b087c25a4f68df1821a4e`.
+- Rollback remains `v2026-1159-ipk`; preserve `/etc/naiveproxy` before
+  changing packages, stop the independent bridge if needed, reinstall the
+  previous IPK, and leave user-managed YAML untouched.
