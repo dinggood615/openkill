@@ -22,6 +22,56 @@
   case and prove it does not suppress loopback health; device/remote causes
   remain pending a separately authorized plan.
 
+### 2026-1158 delivery evidence
+
+- Diagnosis: in manual YAML mode, `final-yaml-missing-node` is an independent
+  Mihomo/YAML membership diagnostic. It means the credential-free loopback
+  snippet has not been copied into the selected YAML and strategy group. The
+  screenshot's `探测失败` remains the separate bounded loopback HTTPS probe
+  result; the exact helper, credential or remote cause requires a device phase
+  and is not inferred from the YAML diagnostic.
+- Fix commit `929e27301ae8bc181396292e890d3d825947d46f` keeps the loopback
+  probe authoritative, preserves the separate Mihomo detail, moves component
+  metadata and maintenance actions behind accessible details, shortens the
+  default controls, removes the duplicate Mihomo table column and adds a
+  no-horizontal-scroll mobile card layout. Its exact Development CI passed as
+  run `36230543078`:
+  https://github.com/dinggood615/openkill/actions/runs/36230543078
+- Version commit `f1109692182c91f93b5181bb2286f5bfc8c7fdcb` advances the source
+  metadata and release notes to `2026-1158`. Its exact Development CI passed as
+  run `36230738478`:
+  https://github.com/dinggood615/openkill/actions/runs/36230738478
+- RC Build run `36230857780` passed from `f110969` and produced
+  `luci-app-openkill_2026-1158_all.ipk` (7,703,994 bytes), SHA256
+  `c0fd65f5fb4f755b9f6f7f0378c7ae80f76de33c37abcc875d55676e4482fbc7`.
+  The artifact digest is
+  `sha256:26b5631318ea8f737e0ee02ceff0dae2839a91b401e76f84829c0536c8781b81`;
+  the downloaded audit is retained under
+  `D:\\openkill-cache\\rc-2026-1158`.
+- Formal Release run `36231157068` passed with `release_gate=true` and
+  `publish=true` from `f110969`:
+  https://github.com/dinggood615/openkill/actions/runs/36231157068
+  Published release:
+  https://github.com/dinggood615/openkill/releases/tag/v2026-1158-ipk
+  contains `luci-app-openkill_2026-1158_all.ipk` (9,245,110 bytes), SHA256
+  `dc68ef2a978f6f5227396073e215a5274b094436150c64cc913fb8f88ed31753`.
+  The formal artifact digest is
+  `sha256:71f02df3fdc35edbe927f86423cc7f6c5d3427c45626d9afd9ab213b82dc922d`;
+  the downloaded package and extracted audit are retained under
+  `D:\\openkill-cache\\formal-2026-1158`.
+- Package audit confirmed version `2026-1158`, architecture `all`, the
+  `/etc/config/openkill` conffile, root-owned executable helper scripts, the
+  final `oc.css` and health script, and no private-node markers. Local health,
+  integration/UI contract, interaction/preview, POSIX syntax, local-gate and
+  diff checks passed. The browser preview was inspected; Playwright is not
+  available on this workstation, so a complete automated viewport matrix is
+  not claimed.
+- Device, packet-path and real Naive endpoint tests remain pending because
+  AGENTS.md and this iteration's plan forbid device access. No CENTRAL_ACTIVE,
+  central nft, WAN, gateway, DNS, IPv6 or TUN change was made. Rollback is the
+  retained `v2026-1157-ipk` package plus the user's existing configuration and
+  manual YAML backups.
+
 ## NaiveProxy manual YAML mode and shared OpenKill theme (2026-09-26)
 
 - Scope: move the NaiveProxy contract to manual YAML ownership, keep the
