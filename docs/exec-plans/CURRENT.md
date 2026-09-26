@@ -57,14 +57,18 @@
   advances the source metadata and release notes to `2026-1156`. Its exact
   Development CI passed as run `36217481855`:
   https://github.com/dinggood615/openkill/actions/runs/36217481855
-- RC Build run `36216937032` passed from `348ac4b`. The audited candidate
-  `luci-app-openkill_2026-1155_all.ipk` is cached under
-  `D:\openkill-cache\rc-36216937032` with SHA256
-  `a94f12363f0ba0aff184f04b0ac55687eb4e1552333729d60c3c5bddb9666151`;
-  the artifact ZIP digest is
-  `bce335181efc5d7ecd5980154f606e173259771c093b09d31ced80a72d1e0b4e`.
-  The package audit confirmed the health script is root-owned mode 0755 and
-  the NaiveProxy view, controller and final CSS are present.
+- An initial RC Build run `36216937032` passed from the implementation
+  commit `348ac4b` and was retained as a pre-version smoke artifact. The
+  final-version RC Build run `36217990716` passed from `26314f2` (the
+  documentation-only child of the formal source commit) and produced
+  `luci-app-openkill_2026-1156_all.ipk` with SHA256
+  `f9ce6831c86fe30b0010992920689ac6fe736dfd59772d0cbab12e95965d5818`.
+  Its artifact ZIP is cached under
+  `D:\openkill-cache\rc-36217990716` with digest
+  `ea9edc510469832af945ada3375c0566b2cd89fefe7b141c8ce20d561b4be137`.
+  The final candidate audit confirmed the health script is root-owned mode
+  0755, the controller/view and final CSS are present, and package metadata
+  reports version `2026-1156`.
 - Formal Release run `36217561587` passed with `release_gate=true` and
   `publish=true` from `533b460`. Published release:
   https://github.com/dinggood615/openkill/releases/tag/v2026-1156-ipk
