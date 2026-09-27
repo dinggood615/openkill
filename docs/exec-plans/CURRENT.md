@@ -2938,3 +2938,7 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
 - Scope is presentation-only. Maintenance controls, capability fields, CBI
   IDs, defaults, persistence and mobile single-column fallback remain
   unchanged.
+- The first 2026-1166 Development CI exposed a stale installer contract test
+  that still required the removed full-width marker; the implementation was
+  correct but the test was not updated. The test contract is being repaired
+  before RC and Formal Release are retried.
