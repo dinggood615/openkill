@@ -2942,3 +2942,17 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   that still required the removed full-width marker; the implementation was
   correct but the test was not updated. The test contract is being repaired
   before RC and Formal Release are retried.
+
+- The repaired source commit `d433d5e3f44a2473fa6f5355a72b9a47d0d5ef29`
+  passed exact Development CI:
+  [run 36282586838](https://github.com/dinggood615/openkill/actions/runs/36282586838).
+  The earlier failed run was not released.
+- RC Build passed from the repaired source:
+  [run 36282638400](https://github.com/dinggood615/openkill/actions/runs/36282638400).
+  The audited RC IPK SHA256 is
+  `b3d2198ac37628b069ce746e6f8c3a2742aa8674b608bd3080add7e02e286c49`.
+- Formal Release passed with `release_gate=true` and `publish=true`:
+  [run 36282866935](https://github.com/dinggood615/openkill/actions/runs/36282866935).
+  It published [v2026-1166-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1166-ipk)
+  from the repaired source. The formal IPK SHA256 is
+  `d97b19aa6fbaf661624139037e88c4fd5dad8ff11116cb4d0b7c5a5a95054af0`.
