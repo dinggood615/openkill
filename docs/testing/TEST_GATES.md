@@ -64,6 +64,31 @@ fail the case. Missing Playwright or a browser is reported as the explicit
 `PLAYWRIGHT_UNAVAILABLE`/`PLAYWRIGHT_BROWSER_UNAVAILABLE` environment result,
 never as a generic pass.
 
+## Local Playwright bootstrap
+
+When the gate runs in WSL, the browser case needs both the Python Playwright
+package and a compatible Chromium runtime. Keep these developer-only files
+outside the repository, for example under `D:\\openkill-cache` (or the
+equivalent `/mnt/d/openkill-cache` path in WSL):
+
+```sh
+mkdir -p /mnt/d/openkill-cache/wsl-playwright /mnt/d/openkill-cache/wsl-browsers
+python3 -m pip install --target=/mnt/d/openkill-cache/wsl-playwright playwright
+PYTHONPATH=/mnt/d/openkill-cache/wsl-playwright \
+  PLAYWRIGHT_BROWSERS_PATH=/mnt/d/openkill-cache/wsl-browsers \
+  python3 -m playwright install chromium
+```
+
+If Chromium exits with `libnspr4.so` or another shared-library error, install
+the distro's Playwright/Chromium runtime dependencies with the administrator's
+normal package mechanism, then rerun the browser test. Do not copy those
+libraries into the OpenKill package. A valid local run sets
+`PYTHONPATH`, `PLAYWRIGHT_BROWSERS_PATH` and any required library path only in
+the test shell, then executes `python3 scripts/test-ui-browser.py`. The test
+must print `UI_BROWSER=PASS`, `UI_PRODUCTION_JS=PASS`, `UI_DIMENSIONS=4/4` and
+`UI_LOCAL_REQUESTS=PASS`; an environment-limit line remains a skip and is not
+evidence of a rendered browser pass.
+
 The same UI contract now covers the conditional controls that share the
 status-page interaction pattern: the custom CDN row in `update.htm`, the
 privacy and mode icons in `myip.htm`, the legacy merge editor tabs/help

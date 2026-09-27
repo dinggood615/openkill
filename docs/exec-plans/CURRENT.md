@@ -3701,3 +3701,34 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   completed successfully (static and runtime/compatibility jobs). A final
   documentation-only evidence commit will record this result without changing
   the 2026-1171 version.
+
+## Playwright dependency follow-up (2026-09-27)
+
+- The previously skipped local browser case was caused by the host/WSL test
+  environments, not by an OpenKill page failure. Windows had no Node
+  `playwright` module at the time of the original probe; WSL had neither the
+  Python package nor a browser runtime. After installing developer-only
+  dependencies under `D:\\openkill-cache`, the WSL browser initially exited
+  with `libnspr4.so` missing. The required WSL shared libraries were then
+  provisioned in the same cache and loaded only for the test shell; no OpenKill
+  package or production filesystem was changed.
+- The real production-template browser run now passes in both environments.
+  Windows `scripts/test-ui-browser.py` reports `UI_BROWSER=PASS`,
+  `UI_PRODUCTION_JS=PASS`, `UI_DIMENSIONS=4/4` and `UI_LOCAL_REQUESTS=PASS`.
+  WSL reports the same result with the isolated Playwright package,
+  Chromium 153.0.8010.12 (Playwright v1.63.0) and the cache-only library
+  path. The test covered the production template, light/dark surfaces,
+  1920/1366/768/390 CSS-pixel viewports, request races, keyboard controls and
+  local-request blocking.
+- The Node-based interaction harness passes with the Windows Node 24.19.0
+  runtime. WSL cannot execute that Windows binary against a WSL temporary path,
+  so the WSL Node case remains a separate environment limitation; it does not
+  affect the real-browser result. This path mismatch is documented rather than
+  changing production JavaScript or introducing a Node runtime into the IPK.
+- The fast matrix's UI cases are green after the bootstrap. Two unrelated
+  pre-existing host checks remain outside this UI follow-up: the Windows
+  canonical fixture requires PyYAML, and the production-shadow suite reports
+  its existing OpenVPN command/fixture drift. The bounded local gate,
+  UI/browser suites, NaiveProxy fixtures, POSIX checks and diff checks remain
+  the release evidence for this change; no device, package-install, WAN/DNS,
+  packet-path or VPS test was performed.
