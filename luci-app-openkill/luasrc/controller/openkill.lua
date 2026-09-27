@@ -1518,9 +1518,10 @@ function action_status()
 	-- do not inspect legacy UCI credentials or infer health from OpenKill state.
 	local naive_manifest = fs.readfile("/var/run/naiveproxy/manifest") or ""
 	local naive_component_path = naive_manifest:match("component=([^\n]+)") or "/etc/naiveproxy/naive"
-	local naive_component_reason = naive_manifest:match("component_status=([^\n]+)") or "unavailable"
-	local naive_component_detail = naive_manifest:match("component_reason=([^\n]+)") or naive_component_reason
-	local naive_component_installed = naive_component_reason == "available"
+	local naive_component_status = naive_manifest:match("component_status=([^\n]+)") or "unavailable"
+	local naive_component_reason = naive_manifest:match("component_reason=([^\n]+)") or "unknown"
+	local naive_component_detail = naive_component_reason
+	local naive_component_installed = naive_component_status == "available"
 	local naive_component_version = naive_manifest:match("component_version=([^\n]+)") or "unknown"
 	local naive_configured, naive_generated, naive_local_ready, naive_remote_verified = 0, 0, 0, 0
 	local naive_failed = false
@@ -1585,6 +1586,7 @@ function action_status()
 		naive_component_version = naive_component_version,
 		naive_component_installed = naive_component_installed,
 		naive_component_reason = naive_component_reason,
+		naive_component_status = naive_component_status,
 		naive_component_detail = naive_component_detail,
 		naive_configured = naive_configured,
 		naive_generated = naive_generated,
@@ -1676,7 +1678,10 @@ function action_naive_standalone_status()
 				if sid and field then
 					result.nodes[sid] = result.nodes[sid] or { id = sid }
 					if field == "port" or field == "pid" or field == "latency_ms" or field == "checked_at" or field == "expires_at" then
-						result.nodes[sid][field] = tonumber(value) or 0
+						-- Preserve an unknown value as unknown; converting a missing
+						-- field to zero makes the UI claim a port, PID or timestamp
+						-- that the standalone service never proved.
+						result.nodes[sid][field] = tonumber(value) or (value ~= "" and value or "unknown")
 					else
 						result.nodes[sid][field] = value
 					end
@@ -1733,12 +1738,17 @@ function action_naive_bridge_control()
 			end
 		end
 		local closed, why, code = pipe:close()
+		local control_result = fs.readfile("/var/run/naiveproxy/control.result") or ""
+		local control_stage = control_result:match("stage=([^\n]+)")
+		local control_id = control_result:match("id=([%w_-]+)")
+		if control_stage then result.stage = control_stage end
+		if control_id then result.id = control_id end
 		if closed == true or code == 0 then
 			result.ok = true
-			result.stage = "accepted"
+			result.stage = result.stage == "request" and "accepted" or result.stage
 		else
 			HTTP.status(422, "Unprocessable Entity")
-			result.stage = "bridge-rejected"
+			result.stage = result.stage == "request" and "bridge-rejected" or result.stage
 			result.error = "operation-failed"
 		end
 	end

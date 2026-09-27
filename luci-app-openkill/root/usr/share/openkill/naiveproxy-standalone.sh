@@ -20,6 +20,7 @@ NP_TIMEOUT="${NAIVEPROXY_HEALTH_TIMEOUT:-8}"
 NP_PORT_BASE="${NAIVEPROXY_PORT_BASE:-11080}"
 NP_PORT_LIMIT=100
 NP_HEALTH_LOCK="$NP_RUN/health.lock"
+NP_CONTROL_RESULT="$NP_RUN/control.result"
 
 np_safe() { printf '%s' "$1" | tr '\r\n|=' '    ' | cut -c1-160; }
 np_valid_id() { case "$1" in ''|*[!A-Za-z0-9_-]*) return 1 ;; esac; }
@@ -81,6 +82,36 @@ np_urldecode() {
     # BusyBox printf implements %b; decode only well-formed %HH bytes and
     # leave literal backslashes untouched by first escaping them.
     printf '%b' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/+/ /g; s/%/\\\\x/g')"
+}
+
+np_valid_encoded() {
+    # Reject malformed percent escapes before BusyBox printf interprets them.
+    # A malformed escape must never be silently retained as a credential or
+    # node name.  Literal control characters are rejected by the caller too.
+    case "$1" in *%*)
+        printf '%s' "$1" | grep -Eq '%[^0-9A-Fa-f]|%[0-9A-Fa-f]?$' && return 1
+    esac
+    ! printf '%s' "$1" | grep -q '[[:cntrl:]]'
+}
+
+np_validate_query() {
+    local query="$1" old_ifs pair key value seen=""
+    [ -z "$query" ] && return 0
+    case "$query" in '&'*|*'&'|*'&&'*) return 1 ;; esac
+    old_ifs=$IFS; IFS='&'; set -- $query; IFS=$old_ifs
+    for pair do
+        key=${pair%%=*}
+        [ "$pair" != "$key" ] || return 1
+        value=${pair#*=}
+        case "$key" in
+            security) [ "$value" = tls ] || return 1 ;;
+            type) [ "$value" = tcp ] || return 1 ;;
+            headerType) [ "$value" = none ] || return 1 ;;
+            *) return 1 ;;
+        esac
+        case "$seen" in *"|$key|"*) return 1 ;; esac
+        seen="${seen}|${key}|"
+    done
 }
 
 np_port() {
@@ -327,7 +358,10 @@ np_health_one() {
     now=$(date +%s); old_fail=$(sed -n 's/^fail_count=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1)
     case "$old_fail" in ''|*[!0-9]*) old_fail=0 ;; esac
     if ! np_enabled "$(np_node_value "$file" enabled)"; then status=disabled; reason=node-disabled; latency=unknown
-    elif ! np_probe_component; then status=component-missing; reason=component-not-executable; latency=unknown
+    elif ! np_probe_component; then
+        reason=${NP_PROBE_REASON:-component-unavailable}
+        case "$reason" in component-missing) status=component-missing ;; *) status=component-unavailable ;; esac
+        latency=unknown
     elif ! np_prepare "$id" >/dev/null; then status=config-invalid; reason=node-config-invalid; latency=unknown
     elif ! np_listener "$port"; then status=local-not-ready; reason=loopback-listener-not-ready; latency=unknown
     elif ! command -v curl >/dev/null 2>&1; then status=probe-failed; reason=curl-missing; latency=unknown
@@ -398,6 +432,7 @@ np_control_read() {
     NP_CTL_action=""; NP_CTL_id=""; NP_CTL_name=""; NP_CTL_server=""
     NP_CTL_port=""; NP_CTL_username=""; NP_CTL_password=""
     NP_CTL_transport="https"; NP_CTL_enabled="1"; NP_CTL_share=""
+    NP_CTL_RESULT_ID=""
     local line key value cr
     cr=$(printf '\r')
     while IFS= read -r line; do
@@ -418,8 +453,8 @@ np_control_read() {
 # only; accepting client-filled credentials would make the link importer
 # ambiguous.  This intentionally accepts only the documented HTTPS aliases.
 np_import_link() {
-    local raw="$NP_CTL_share" normalized authority fragment query userpass hostport host port
-    raw=$(printf '%s' "$raw" | tr -d '\r\n')
+    local raw="$NP_CTL_share" normalized authority fragment query userpass hostport host port user
+    printf '%s' "$raw" | grep -q '[[:cntrl:]]' && return 44
     case "$raw" in naive+https://*|naiveproxy://*) ;; *) return 40 ;; esac
     normalized=${raw#naive+https://}; [ "$normalized" = "$raw" ] && normalized=${raw#naiveproxy://}
     fragment=${normalized#*#}; [ "$fragment" = "$normalized" ] && fragment=""
@@ -428,22 +463,14 @@ np_import_link() {
     userpass=${authority%@*}; [ "$userpass" != "$authority" ] || return 41
     hostport=${authority#*@}; [ -n "$hostport" ] || return 41
     user=${userpass%%:*}; NP_CTL_password=${userpass#*:}; [ "$NP_CTL_password" != "$userpass" ] || return 41
+    np_valid_encoded "$user" && np_valid_encoded "$NP_CTL_password" || return 41
     case "$hostport" in
         \[*\]:*) host=${hostport%%]*}; host=${host#\[}; port=${hostport##*:} ;;
         *:*) host=${hostport%:*}; port=${hostport##*:} ;;
         *) return 42 ;;
     esac
-    case "$query" in
-        *security=tls*|"") ;; *) return 43 ;;
-    esac
-    case "$query" in
-        *type=tcp*|"") ;; *) return 43 ;;
-    esac
-    case "$query" in
-        *headerType=none*|"") ;; *) return 43 ;;
-    esac
-    # Reject query keys other than the documented compatibility hints.
-    [ -z "$query" ] || printf '%s' "$query" | tr '&' '\n' | grep -Ev '^(security=tls|type=tcp|headerType=none)$' | grep -q . && return 43
+    np_valid_encoded "$fragment" && np_valid_encoded "$host" || return 42
+    np_validate_query "$query" || return 43
     NP_CTL_name=$(np_urldecode "${fragment:-$host}"); NP_CTL_server=$(np_urldecode "$host"); NP_CTL_port=$port
     NP_CTL_username=$(np_urldecode "$user"); NP_CTL_password=$(np_urldecode "$NP_CTL_password"); NP_CTL_transport=https
 }
@@ -492,6 +519,7 @@ np_control_add() {
     mv -f "$tmp" "$file" || return 15
     np_port "$id" >/dev/null || return 16
     np_manifest >/dev/null || return 17
+    NP_CTL_RESULT_ID="$id"
     printf 'id=%s\n' "$id"
 }
 
@@ -534,14 +562,48 @@ np_legacy_cleanup() {
     printf 'legacy_backup=%s\n' "$backup"
 }
 
+np_control_result() {
+    local rc="$1" stage="$2" tmp
+    np_dirs >/dev/null 2>&1 || return 0
+    tmp="$NP_CONTROL_RESULT.new.$$"
+    {
+        printf 'stage=%s\n' "$(np_safe "$stage")"
+        [ -n "$NP_CTL_RESULT_ID" ] && printf 'id=%s\n' "$(np_safe "$NP_CTL_RESULT_ID")"
+    } > "$tmp" || return 0
+    chmod 600 "$tmp" 2>/dev/null || true
+    mv -f "$tmp" "$NP_CONTROL_RESULT" 2>/dev/null || true
+    return "$rc"
+}
+
 np_control() {
     np_control_read || return 30
+    rm -f "$NP_CONTROL_RESULT" 2>/dev/null || true
     case "$NP_CTL_action" in
-        add) np_control_add ;;
-        import) np_import_link || return $?; np_control_add ;;
+        add)
+            np_control_add; rc=$?
+            [ "$rc" -eq 0 ] && stage=accepted || stage=node-save-failed
+            np_control_result "$rc" "$stage"; return "$rc" ;;
+        import)
+            np_import_link; rc=$?
+            if [ "$rc" -ne 0 ]; then np_control_result "$rc" import-parse-failed; return "$rc"; fi
+            np_control_add; rc=$?
+            [ "$rc" -eq 0 ] && stage=accepted || stage=node-save-failed
+            np_control_result "$rc" "$stage"; return "$rc" ;;
         remove) np_control_remove ;;
-        start) /etc/init.d/naiveproxy-bridge start >/dev/null 2>&1; rc=$?; np_manifest >/dev/null 2>&1 || true; return "$rc" ;;
-        stop) /etc/init.d/naiveproxy-bridge stop >/dev/null 2>&1; rc=$?; np_manifest >/dev/null 2>&1 || true; return "$rc" ;;
+        start)
+            if [ -n "$NP_CTL_id" ]; then
+                /etc/init.d/naiveproxy-bridge start_node "$NP_CTL_id" >/dev/null 2>&1
+            else
+                /etc/init.d/naiveproxy-bridge start >/dev/null 2>&1
+            fi
+            rc=$?; np_manifest >/dev/null 2>&1 || true; return "$rc" ;;
+        stop)
+            if [ -n "$NP_CTL_id" ]; then
+                /etc/init.d/naiveproxy-bridge stop_node "$NP_CTL_id" >/dev/null 2>&1
+            else
+                /etc/init.d/naiveproxy-bridge stop >/dev/null 2>&1
+            fi
+            rc=$?; np_manifest >/dev/null 2>&1 || true; return "$rc" ;;
         health)
             if [ -n "$NP_CTL_id" ]; then
                 np_health_begin || return 31

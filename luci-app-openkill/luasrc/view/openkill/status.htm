@@ -615,12 +615,16 @@
         function setSecurityDetail(element, summary, fullText) {
             if (!element) return;
             element.textContent = summary;
+            var card = element.closest ? element.closest('.security-status-card') : null;
+            var value = card && card.querySelector ? card.querySelector('.security-status-value') : null;
             if (fullText && fullText !== summary) {
                 element.title = fullText;
                 element.setAttribute('aria-label', fullText);
+                if (value) value.title = fullText;
             } else {
                 element.removeAttribute('title');
                 element.removeAttribute('aria-label');
+                if (value) value.removeAttribute('title');
             }
         }
         var running = !!(status && status.clash === true);
@@ -746,12 +750,12 @@
                 (naiveRemote ? 'is-success' : 'is-pending')));
         }
         var naiveFullDetail = !naiveInstalled ? 'OpenKill 插件本体已安装；一键安装会尝试安装 NaiveProxy 独立组件' :
-            (naiveComponentReason === 'version-probe-failed' ? '组件可执行但版本探测失败 · 版本未知' :
+            (naiveComponentReason === 'version-probe-failed' || naiveComponentReason === 'loader-or-version-probe-failed' ? '组件存在但版本探测失败 · 版本未知' :
             (!naiveEnabled ? '未创建辅助进程 · 现有节点行为不变' :
             (naiveConfigured ? ('已生成 ' + naiveGenerated + '/' + naiveConfigured + ' 个回环 SOCKS5 入口 · ' + naiveReason) :
             '组件可用 · ' + naiveComponentVersion + ' · 未配置 NaiveProxy 节点')));
         var naiveSummary = !naiveInstalled ? '组件未安装' :
-            (naiveComponentReason === 'version-probe-failed' ? '组件可执行 · 版本未知' :
+            (naiveComponentReason === 'version-probe-failed' || naiveComponentReason === 'loader-or-version-probe-failed' ? '组件可执行 · 版本未知' :
             (!naiveEnabled ? '辅助进程未启用' :
             (naiveConfigured ? ('回环入口 ' + naiveGenerated + '/' + naiveConfigured) :
             '节点未配置')));

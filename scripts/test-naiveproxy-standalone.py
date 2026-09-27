@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 import hashlib
+import json
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -89,6 +90,21 @@ esac
             ), capture_output=True,
         )
         assert imported.returncode == 0, (imported.stdout, imported.stderr)
+        control_result = (run_dir / "control.result").read_text(encoding="utf-8")
+        assert "stage=accepted" in control_result and "id=" in control_result
+        imported_id = next((line.split("=", 1)[1] for line in imported.stdout.splitlines()
+                            if line.startswith("id=")), "")
+        assert imported_id, imported.stdout
+        imported_file = root / "nodes" / f"{imported_id}.json"
+        imported_data = json.loads(imported_file.read_text(encoding="utf-8"))
+        assert imported_data["name"] == "Imported"
+        assert imported_data["server"] == "import.example.test"
+        assert imported_data["port"] == 443
+        assert imported_data["username"] == "fixture-user"
+        assert imported_data["password"] == "fixture-secret"
+        assert imported_data["transport"] == "https"
+        imported_port = (run(["port", imported_id], env).stdout.strip())
+        assert imported_port.isdigit() and imported_port != "11080"
         assert "fixture-secret" not in (run_dir / "manifest").read_text(encoding="utf-8")
         invalid = subprocess.run([BASH, git_path(SCRIPT), "control"], env=env, text=True,
                                  input="operation=import\nshare=naive+https://bad\n", capture_output=True)
@@ -99,6 +115,18 @@ esac
             ), capture_output=True,
         )
         assert encoded.returncode == 0, (encoded.stdout, encoded.stderr)
+        duplicate = subprocess.run([BASH, git_path(SCRIPT), "control"], env=env, text=True,
+                                    input=("operation=import\nshare=naive+https://fixture-user:fixture-secret@import.example.test:443?security=tls&type=tcp&headerType=none#Again\n"),
+                                    capture_output=True)
+        assert duplicate.returncode != 0
+        unknown = subprocess.run([BASH, git_path(SCRIPT), "control"], env=env, text=True,
+                                 input=("operation=import\nshare=naive+https://fixture-user:fixture-secret@unknown.example.test:443?security=tls&unknown=x#Unknown\n"),
+                                 capture_output=True)
+        assert unknown.returncode != 0
+        malformed = subprocess.run([BASH, git_path(SCRIPT), "control"], env=env, text=True,
+                                   input=("operation=import\nshare=naive+https://fixture%ZZ:fixture-secret@example.test:443#Bad\n"),
+                                   capture_output=True)
+        assert malformed.returncode != 0
 
     # Exercise the independent installer with an offline, locally staged
     # official-shaped asset.  The fake downloader exists only in this fixture.

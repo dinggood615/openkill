@@ -19,8 +19,11 @@ if (result.name !== 'Fixture' || result.server !== 'example.test' || result.port
 }
 result = parse('naiveproxy://fixture-user:fixture-secret@[2001:db8::1]:443?security=tls&type=tcp&headerType=none#IPv6');
 if (result.server !== '[2001:db8::1]' && result.server !== '2001:db8::1') throw new Error('IPv6 import was not preserved');
-if (!parse('naive+https://fixture-user:fixture-secret@example.test:443?unknown=x#Fixture').warning.includes('unknown')) {
-  throw new Error('unknown parameter was hidden');
+try { parse('naive+https://fixture-user:fixture-secret@example.test:443?unknown=x#Fixture'); throw new Error('unknown parameter accepted'); } catch (error) {
+  if (error.message === 'unknown parameter accepted') throw error;
+}
+try { parse('naive+https://fixture-user:fixture-secret@example.test:443?security=tls&security=tls#Fixture'); throw new Error('duplicate parameter accepted'); } catch (error) {
+  if (error.message === 'duplicate parameter accepted') throw error;
 }
 try { parse('https://fixture-user:fixture-secret@example.test:443#Fixture'); throw new Error('unsupported scheme accepted'); } catch (error) {
   if (error.message === 'unsupported scheme accepted') throw error;

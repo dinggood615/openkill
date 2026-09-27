@@ -3635,3 +3635,63 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   its exact-source Development CI [run 36302923885](https://github.com/dinggood615/openkill/actions/runs/36302923885)
   completed successfully. No version metadata was changed by that evidence
   commit.
+
+## Naive import, startup diagnostics and status-card UI follow-up (2026-09-27)
+
+- Baseline is clean `master` at `a8e4af1c2d9c8c0c26ca21863176cadd22954e74`,
+  version `2026-1171`. The repository's local standalone, health, integration,
+  import, installer and POSIX/BusyBox fixtures pass, but they do not prove a
+  live LuCI request or a real official binary on the test target.
+- The active plan still forbids device access and writes. No SSH session,
+  service start, package install, UCI/YAML change, CENTRAL_ACTIVE, central nft,
+  WAN/DNS change or packet-path test is permitted in this follow-up. Device
+  diagnosis and real Naive/VPS connectivity remain explicitly pending.
+- Baseline review found the browser importer normalizes `naive+https` to a
+  generic HTTPS URL and uses client-side query matching, while the service
+  parser uses substring checks. The save-and-start path also starts the whole
+  bridge instead of binding the requested node, and the status card collapses
+  missing, non-executable, loader and version failures into one message.
+- This follow-up will keep the independent-service boundary and credential
+  protection, add a shared structured import contract with stable field
+  persistence, bind save-and-start to the requested node, expose redacted
+  component/startup evidence, and simplify dashboard cards to project name plus
+  one truthful status. UI changes remain scoped to OpenKill and retain CBI/UCI,
+  API, validation and save/apply semantics.
+- Required local evidence is the importer behavior suite (including encoded
+  credentials, IPv6 and query rejection), standalone persistence and startup
+  state fixtures, UI contract checks, final CSS checks, `sh scripts/local-gate.sh`
+  and `git diff --check`. Browser rendering and test-device/VPS results must be
+  recorded separately; no screenshot or fixture may be called device evidence.
+
+## Follow-up implementation evidence (2026-09-27)
+
+- The independent importer now rejects control characters, malformed percent
+  escapes, unknown or duplicate query keys, and unsupported values on both the
+  browser and service sides. Supported compatibility hints are validated as
+  exact pairs; the saved node JSON remains the source of truth and keeps the
+  decoded name, host, remote port, credentials, transport, enabled flag,
+  stable ID and stable local port.
+- The bridge health path now preserves the actual component probe reason
+  (`component-missing`, `component-not-executable` or
+  `loader-or-version-probe-failed`) instead of reporting every failure as
+  non-executable. The init service exposes node-scoped `start_node` and
+  `stop_node` actions; global start/stop behavior remains available.
+- The read-only LuCI adapter no longer converts missing numeric evidence to
+  zero. The dashboard status card keeps the project name and one live status
+  in its default view; longer details remain available through the status
+  title/accessible label. The change is scoped to OpenKill and uses the
+  existing light/dark variables and content-sized grid.
+- Local behavior evidence passed: `scripts/test-naiveproxy-standalone.py`
+  (including field persistence, duplicate/unknown/malformed-link rejection),
+  `scripts/test-naiveproxy-integration.py`, `scripts/test-naiveproxy-import.js`,
+  `scripts/test-installer.py` (15 tests, 1 environment skip), UI contract (29),
+  UI preview (2), POSIX syntax, `git diff --check`, and
+  `sh scripts/local-gate.sh`. The UI interaction test ran with its documented
+  Node/Playwright skip because the local browser dependency was unavailable.
+- No live LuCI rendering, test-device write, official binary installation,
+  process/PID/listener check or VPS probe was performed in this iteration;
+  those remain `设备待验证／远端待验证`. The local fixture does not prove a
+  component is installed or a node is remotely reachable.
+- The save-and-start request now receives only a redacted stable node ID from
+  the independent service's protected runtime result and invokes the
+  node-scoped procd action; it no longer needs to start every configured node.

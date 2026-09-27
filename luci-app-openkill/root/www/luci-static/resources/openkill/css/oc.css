@@ -9030,6 +9030,25 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
     line-height: 1.35;
 }
 
+/* Security overview cards keep the default view to a project name and one
+ * live status.  The longer explanation remains available through the status
+ * title/accessible label and the detailed page controls. */
+.oc.openkill-status-page .dashboard-security-section .security-status-card {
+    height: auto;
+    min-height: 0;
+    align-self: stretch;
+}
+
+.oc.openkill-status-page .dashboard-security-section .security-status-detail {
+    display: none;
+}
+
+.oc.openkill-status-page .dashboard-security-section .security-status-card .card-title {
+    word-break: keep-all;
+    overflow-wrap: normal;
+    hyphens: none;
+}
+
 @media (max-width: 1200px) {
     .oc.openkill-status-page .dashboard-v1-layout {
         grid-template-columns: repeat(2, minmax(0, 1fr));

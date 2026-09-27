@@ -15,6 +15,8 @@ CONTROLLER = ROOT / "luci-app-openkill/luasrc/controller/openkill.lua"
 SETTINGS = ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua"
 SERVERS = ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua"
 VIEW = ROOT / "luci-app-openkill/luasrc/view/openkill/naive_compatibility.htm"
+STATUS_VIEW = ROOT / "luci-app-openkill/luasrc/view/openkill/status.htm"
+OC_CSS = ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/oc.css"
 GENERATOR = ROOT / "luci-app-openkill/root/usr/share/openkill/yml_proxys_set.sh"
 CONFIG = ROOT / "luci-app-openkill/root/etc/config/openkill"
 NORMALIZE = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_config_normalize.sh"
@@ -103,10 +105,19 @@ def main() -> None:
     assert "type: naiveproxy" not in generator
     require(STANDALONE, "np_legacy_cleanup")
     require(STANDALONE, "np_import_link")
+    require(STANDALONE, "np_validate_query")
+    require(STANDALONE, "control.result")
+    require(STANDALONE, "component-unavailable")
+    require(BRIDGE_INIT, "start_node()")
     require(STANDALONE, "component_reason=")
     require(STANDALONE, "sed 's/^naiveproxy-\\(v.*\\)-openwrt-.*/\\1/'")
     require(CONTROLLER, "component_reason")
     require(CONTROLLER, "component_detail")
+    require(CONTROLLER, "control_result")
+    require(CONTROLLER, "naive_component_status")
+    require(STATUS_VIEW, "security-status-detail")
+    require(STATUS_VIEW, "element.closest('.security-status-card')")
+    require(OC_CSS, ".security-status-detail")
     assert "zerotier = \"advanced\"" not in SETTINGS.read_text(encoding="utf-8")
 
     if shutil.which("wsl.exe"):
