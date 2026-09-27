@@ -114,12 +114,6 @@
     --tight-gap: 6px;
     --version-right: 8px;
 
-    /* ── Row Heights (status page) ── */
-    --row-1-height: 160px;
-    --row-2-height: 140px;
-    --row-3-height: 140px;
-    --row-4-height: 280px;
-
     /* ── Stripe ── */
     --stripe-color: rgba(255,255,255,0.24);
     --stripe-opacity: 0.5;
@@ -1209,7 +1203,8 @@ html[data-darkmode="true"] .oc svg {
     box-shadow: var(--shadow-sm);
     transition: all var(--transition-fast);
     display: grid;
-    grid-template-rows: var(--row-1-height) var(--row-2-height) var(--row-3-height) var(--row-4-height);
+    grid-auto-rows: max-content;
+    align-content: start;
     gap: var(--card-grid-gap);
     overflow: visible;
     grid-row: 1;
@@ -1230,26 +1225,11 @@ html[data-darkmode="true"] .oc svg {
     display: flex;
     gap: var(--section-gap);
     align-items: stretch;
-    height: 100%;
+    height: auto;
+    min-height: 0;
     max-width: 100%;
     box-sizing: border-box;
     min-width: 250px;
-}
-
-.oc .card-row:nth-child(1) {
-    min-height: var(--row-1-height);
-}
-
-.oc .card-row:nth-child(2) {
-    min-height: var(--row-2-height);
-}
-
-.oc .card-row:nth-child(3) {
-    min-height: var(--row-3-height);
-}
-
-.oc .card-row:nth-child(4) {
-    min-height: var(--row-4-height);
 }
 
 .oc .card-row.full-width .sub-card {
@@ -7511,7 +7491,7 @@ html[data-darkmode=true] .oc #addCustomOption:hover {
         max-width: 95%;
         width: 95%;
     }
-    .oc .main-card { grid-column: 1; grid-template-rows: auto auto auto auto; max-width: 100%; width: 100%; }
+    .oc .main-card { grid-column: 1; max-width: 100%; width: 100%; }
     .oc .main-card:first-of-type { grid-column: 1; grid-row: 1; }
     .oc .main-card:last-of-type  { grid-column: 1; grid-row: 2; }
     .oc .card-row.dual-cards { grid-template-columns: 1fr 1fr; }
@@ -7519,8 +7499,6 @@ html[data-darkmode=true] .oc #addCustomOption:hover {
     .oc .config-selector { min-width: 200px; flex: 1; }
     .oc .config-select { min-width: 200px; font-size: 14px; }
     .oc .config-select option { font-size: 14px; max-width: 100%; }
-    .oc .card-row:nth-child(1), .oc .card-row:nth-child(2),
-    .oc .card-row:nth-child(3), .oc .card-row:nth-child(4) { min-height: auto; }
 
     /* oixcloud.htm */
     .oc .oix-main-container { width: calc(100% - 32px); }
@@ -7568,7 +7546,6 @@ html[data-darkmode=true] .oc #addCustomOption:hover {
     #debug-rendered code { font-size: 0.85em; }
     /* status.htm - main cards */
     .oc .main-cards-container { max-width: 98%; width: 98%; gap: 10px; }
-    .oc .main-card { grid-template-rows: auto auto auto auto; }
     .oc .sub-card { padding: var(--card-outer-padding); min-height: auto; }
     .oc .card-row { gap: 12px; }
     .oc .card-row.stats-grid { grid-template-columns: repeat(2, 2fr); }
@@ -7576,8 +7553,6 @@ html[data-darkmode=true] .oc #addCustomOption:hover {
     .oc .card-value { font-size: 13px; }
     .oc .value-indicator { font-size: 11px; padding: 5px 5px; }
     .oc .cbi-button-option { padding: 6px 6px; font-size: 11px; }
-    .oc .card-row:nth-child(1), .oc .card-row:nth-child(2),
-    .oc .card-row:nth-child(3), .oc .card-row:nth-child(4) { min-height: auto; }
     .oc .config-file-content { flex-direction: column; gap: 5px; }
     .oc .config-selector { min-width: 150px; flex: 1; }
     .oc .config-select { min-width: 150px; font-size: 13px; padding: 4px 10px; }
@@ -7729,8 +7704,6 @@ html[data-darkmode=true] .oc #addCustomOption:hover {
     .oc .subscription-info-header { gap: 6px; }
     .oc .file-info { gap: 4px; font-size: 8px; }
     .oc .mode-row .sub-card:first-child .card-content { flex-direction: row; gap: 8px; }
-    .oc .card-row:nth-child(1), .oc .card-row:nth-child(2),
-    .oc .card-row:nth-child(3), .oc .card-row:nth-child(4) { min-height: auto; }
     .oc .config-selector { min-width: 110px; flex: 1; }
     .oc .config-select { min-width: 110px; font-size: 12px; padding: 4px 8px; }
     .oc .config-select option { font-size: 12px; padding: 5px 8px; }
@@ -10041,15 +10014,10 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
 }
 
 .oc.openkill-status-page .dashboard-v1-layout > .main-card {
-    grid-template-rows: none;
-    grid-auto-rows: minmax(min-content, auto);
-    align-content: start;
     min-width: 0;
 }
 
 .oc.openkill-status-page .dashboard-v1-layout > .main-card > .card-row {
-    height: auto;
-    min-height: 0;
     align-self: stretch;
     min-width: 0;
 }

@@ -50,7 +50,9 @@
     max-width: min(1920px, 100%);
     margin: 0 auto;
     gap: var(--openkill-page-gap);
-    grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    overflow: visible;
+    align-items: stretch;
 }
 
 .openkill-status-page .main-card,
@@ -81,11 +83,23 @@
     border-radius: 8px;
     background: var(--ok-flat-surface-muted, #f5f6fa);
     box-sizing: border-box;
+    grid-auto-rows: max-content;
+    align-content: start;
+    height: auto;
+    min-height: 0;
 }
 
 .openkill-status-page .card-row {
     width: 100%;
     gap: var(--openkill-card-gap);
+    height: auto;
+    min-height: 0;
+}
+
+.openkill-status-page .sub-card,
+.openkill-status-page .stat-item {
+    height: auto;
+    min-height: 0;
 }
 
 .openkill-status-page .card-row.dual-cards {
@@ -535,24 +549,6 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-se
 }
 
 /* ===== OpenKill Stage 3: Runtime Dashboard Layout End ===== */
-
-/* ===== OpenKill UI defect fix: content-sized dashboard rows =====
- * The base theme gives .main-card four fixed tracks for an older desktop
- * layout.  The status page contains live badges, action labels and a config
- * selector whose height can legitimately exceed those tracks.  Let the page
- * content determine each row so headings and controls cannot be clipped or
- * overlap at non-default zoom levels. */
-.oc.openkill-status-page .dashboard-v1-layout > .main-card {
-    grid-template-rows: none;
-    grid-auto-rows: max-content;
-    align-content: start;
-}
-
-.oc.openkill-status-page .dashboard-v1-layout > .main-card > .card-row {
-    height: auto;
-    min-height: 0;
-    align-self: start;
-}
 
 .oc.openkill-status-page .dashboard-v1-layout .sub-card,
 .oc.openkill-status-page .dashboard-v1-layout .card-content,
@@ -1724,27 +1720,6 @@ body[data-page="admin-services-openkill-config"] #cbi-openkill > .cbi-section-ca
 /* ===== OpenKill final theme/layout precedence =====
  * Keep this short terminal layer so older compatibility rules above cannot
  * reintroduce fixed dashboard rows or theme-specific surfaces. */
-.oc.openkill-status-page .main-cards-container {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    overflow: visible;
-    align-items: stretch;
-}
-
-.oc.openkill-status-page .main-card {
-    grid-template-rows: none;
-    grid-auto-rows: max-content;
-    align-content: start;
-    height: auto;
-    min-height: 0;
-}
-
-.oc.openkill-status-page .card-row,
-.oc.openkill-status-page .sub-card,
-.oc.openkill-status-page .stat-item {
-    height: auto;
-    min-height: 0;
-}
-
 .oc.openkill-status-page .main-card,
 .oc.openkill-status-page .sub-card,
 .oc.openkill-status-page .stat-item,

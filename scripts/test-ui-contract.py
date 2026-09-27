@@ -153,8 +153,11 @@ class LuCIContractTests(unittest.TestCase):
                 self.assertRegex(myip, rf'id="{element_id}"[^>]+aria-label=')
         self.assertIn('body[data-page="admin-services-openkill-client"] .myip-main-card', css)
         self.assertIn('grid-template-columns: repeat(2, minmax(0, 1fr));', css)
-        self.assertIn('grid-template-rows: none;', css)
-        self.assertIn('content-sized dashboard rows', css)
+        status_css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/oc.css").read_text(encoding="utf-8")
+        self.assertIn('grid-auto-rows: max-content;', css)
+        self.assertIn('grid-auto-rows: max-content;', status_css)
+        self.assertNotIn('--row-1-height:', status_css)
+        self.assertNotIn('grid-template-rows: var(--row-1-height)', status_css)
 
     def test_dashboard_promotes_equal_width_entry_row_and_settings_grid(self) -> None:
         source = STATUS.read_text(encoding="utf-8")

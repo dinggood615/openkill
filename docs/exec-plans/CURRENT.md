@@ -1,5 +1,41 @@
 # Current status
 
+## CSS ownership refactor: baseline and runtime-status phase (2026-09-27)
+
+- Scope: this staged change is limited to OpenKill-scoped CSS variables, rule
+  ownership, load order, responsive layout and accessibility presentation.
+  It must preserve CBI field identities, UCI values, controller endpoints,
+  DOM event bindings, validation and save/apply semantics.  It must not change
+  DNS, proxy, node or network behavior.
+- Baseline source: `master` at
+  `40773210d49770dbc55faec15fddeecd14b2cce0`, with a clean worktree before this
+  phase. `oc.css` is 9,482 lines / 305,557 bytes and `flat.css` is 1,588 lines /
+  59,202 bytes.  `status.htm` and `settings_theme.htm` load `oc.css` then
+  `flat.css`; the package Makefile currently prunes only staged `oc.css`.
+- Inventory: `oc.css` declares 488 custom-property assignments and 260
+  `!important` uses, including legacy `--row-1-height` through
+  `--row-4-height`, fixed dashboard tracks and row minimums.  `flat.css`
+  declares 26 custom-property assignments and one `!important`, but contains
+  multiple later dashboard overrides, including a terminal fixed-row repair.
+  The first phase moves the content-sized runtime contract to its primary
+  status rules and removes the retired row tokens and duplicate repair layer;
+  it does not change status markup or scripts.
+- Style contract: LuCI theme values are read first, OpenKill variables are
+  scoped to `.oc` / `#cbi-openkill`, common components follow, then page layout
+  and responsive rules.  Old variables remain only while referenced.  New
+  selectors must not style LuCI system pages or other applications.
+- Verification plan: rebuild the preview from the real templates and final
+  CSS, capture an available-browser desktop baseline, and record its limits.
+  Run UI contracts, preview and interaction checks, CSS/package checks,
+  `sh scripts/local-gate.sh`, and `git diff --check` for every phase.  Exact
+  viewport/zoom and light-theme checks require browser controls not currently
+  exposed by the local preview environment and remain explicitly unverified if
+  unavailable.  Device access, CENTRAL_ACTIVE, central nft, WAN/default route
+  and packet-path tests remain forbidden.
+- Next action: implement only the runtime-status ownership cleanup, validate
+  it, commit and push it independently, then verify its exact Development CI
+  before beginning the plugin-settings phase.
+
 ## LuCI theme-aligned UI refresh (2026-09-27)
 
 - Scope: visual and layout work only. The change may adjust page structure,
