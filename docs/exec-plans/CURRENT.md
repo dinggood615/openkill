@@ -35,8 +35,14 @@
   override API in this environment, so exact 1920/1366/1200/768/390 CSS-pixel
   and 125% measurements, light-theme rendering, and device/LuCI integration
   remain unverified.  No device or packet-path test was run.
-- Next action: review the final diff, commit this UI-only change, and leave
-  formal release/version work for an explicit release request.
+- Exact source commit: `115dda30ca6e69335cc405cf9644609d2503431f`
+  (`ui: align OpenKill pages with LuCI theme`) is pushed to `master`.
+- Development CI: OpenKill Development CI #279 passed for that exact commit:
+  https://github.com/dinggood615/openkill/actions/runs/36291313754 .  The
+  accompanying cache cleanup run #344 also passed.
+- No version bump, RC build or Formal Release was run in this UI review; the
+  current formal release remains 2026-1168.  A later release must rerun the
+  full RC and release gates from the then-current source commit.
 
 ## Release build acceleration and version 2026-1168 (2026-09-27)
 
