@@ -196,6 +196,7 @@ class LuCIContractTests(unittest.TestCase):
         theme = SETTINGS_THEME.read_text(encoding="utf-8")
         advanced = theme.split("advanced: [", 1)[1].split("TAB_CATEGORY_ALIASES", 1)[0]
         self.assertLess(advanced.index("{id: 'maintenance-tools'"), advanced.index("{id: 'mihomo-capabilities'"))
+        self.assertNotIn("card.classList.add('openkill-settings-card-version-update')", theme)
         self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css").read_text(encoding="utf-8"))
 
     def test_dashboard_status_labels_require_backend_evidence(self) -> None:

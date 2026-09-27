@@ -320,7 +320,6 @@
         fields.forEach(function(field) { body.appendChild(field); });
         card.appendChild(header);
         card.appendChild(body);
-        if (definition.id === 'maintenance-tools') card.classList.add('openkill-settings-card-version-update');
         if (host) host.appendChild(card);
         else content.appendChild(card);
 

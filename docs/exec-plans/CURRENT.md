@@ -2926,3 +2926,15 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
 - Browser rendering, device verification and real Mihomo/NaiveProxy network
   tests remain outside this local-only iteration; no device state or private
   configuration was accessed.
+
+## 2026-1166 maintenance card full-width regression (2026-09-27)
+
+- Root cause: `createCard()` added the `openkill-settings-card-version-update`
+  class to the maintenance card after the card-order change. The shared CSS
+  mapped that class to `grid-column: 1 / -1`, so the maintenance card consumed
+  the entire row and pushed Mihomo capabilities below it. The fix removes the
+  special class and its full-width CSS rule; the maintenance card now follows
+  the advanced layout order and participates in the same equal-width grid.
+- Scope is presentation-only. Maintenance controls, capability fields, CBI
+  IDs, defaults, persistence and mobile single-column fallback remain
+  unchanged.
