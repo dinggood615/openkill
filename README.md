@@ -2,7 +2,7 @@
 
 OpenKill 是面向 OpenWrt 的轻量化 Mihomo（Meta）客户端 LuCI 插件，基于 OpenClash 兼容架构重构，提供稳定的代理接管、规则分流、双栈 DNS/IPv6 与可回滚运行管理。
 
-当前版本：`2026-1169`
+当前版本：`2026-1170`
 
 ## 一键安装
 
@@ -18,7 +18,7 @@ curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh 
 curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh -s -- --uninstall
 ```
 
-安装器会自动识别 `opkg`/`apk`、设备架构和防火墙环境；短入口、依赖源和软件包源均会按可用性选择有效镜像，安装完整运行依赖，校验软件包 SHA256，并下载当前架构对应的官方稳定版 Mihomo/Meta 内核。安装完成后会自动刷新 GeoIP、GeoSite、ASN、IPv4/IPv6 大陆路由数据库，并在下载失败时保留软件包内的可用副本。更新会保留配置和上一份可用内核；卸载会移除 OpenKill 数据但不删除共享依赖。
+安装器会自动识别 `opkg`/`apk`、设备架构和防火墙环境；短入口、依赖源和软件包源均会按可用性选择有效镜像，安装完整运行依赖，校验软件包 SHA256，并下载当前架构对应的官方稳定版 Mihomo/Meta 内核。OpenKill 本体安装后还会独立检查 OpenWrt 包架构、CPU、libc、loader、依赖和空间，匹配 NaiveProxy 官方稳定制品，完成 HTTPS、大小、SHA256、归档、ELF 与版本验证后再安装到独立服务目录；组件失败会单独报告，不伪装成整套安装成功。安装完成后会自动刷新 GeoIP、GeoSite、ASN、IPv4/IPv6 大陆路由数据库，并在下载失败时保留软件包内的可用副本。更新会保留配置和上一份可用内核；卸载会移除 OpenKill 数据但不删除共享依赖。
 
 ## 功能
 
@@ -31,7 +31,7 @@ curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh 
 - 原生接管安全切换：切换到 Mihomo `auto-route`/`auto-redirect` 前先清理 OpenKill 规则，校验 fw4 语义检查、真实重载和 nft 表状态；不满足条件时自动回退并记录原因，运行状态会显示“稳定兼容（原生回退）”。
 - 规则与订阅管理：支持 GeoIP/GeoSite、大陆白名单、代理组分流、订阅更新、配置检查和安全回滚。
 - 可选协议能力：按内核能力探测启用 H2C/ShadowQUIC、QUIC v2、MASQUE、AmneziaWG、AnyTLS、BBR3 和 ZeroTier 相关字段。
-- LuCI 界面：运行状态页显示当前接管策略；设置页提供运行与服务、网络与分流、规则与订阅、性能与稳定、兼容设置、系统维护分类；采用适配 Argon 深浅色模式的扁平卡片、统一间距和低干扰状态提示。
+- LuCI 界面：运行状态页显示当前接管策略；设置页提供运行与服务、网络与分流、NaiveProxy 与服务、规则与订阅、性能与稳定、兼容设置、系统维护分类；OpenKill 页面继承当前 LuCI 主题的深浅色语义，并提供有界的浅色/深色回退、统一间距和低干扰状态提示。
 - 轻量资源策略：基础包只内置 MetaCubeXD；Zashboard、Yacd 和其他面板保留为按需下载，避免首次安装携带重复前端资源。
 - 构建清理：安装包不再携带已移除的 OixCloud 页面样式和旧 Smart/LGBM 覆写入口，减少无效资源与配置分支。
 - 兼容迁移：旧配置中的 Smart/LightGBM 策略组会自动转换为 Mihomo 原生 `url-test`，废弃的 Smart、LightGBM 与云端凭据字段只执行一次清理，不影响现有订阅节点。

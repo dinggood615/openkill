@@ -48,6 +48,14 @@
   passes in the repository's WSL environment. The browser fixture is local and
   uses a mock backend only. No device write or real VPS probe was run because
   this plan's device phase remains read-only/local-only.
+- Implementation baseline commit `173d24ffa1625f359eeb3a48807ffc89dfa1bf49`
+  was pushed to `master`; its exact Development CI run
+  `36300769551` completed successfully at
+  `https://github.com/dinggood615/openkill/actions/runs/36300769551`.
+- The next release commit will advance the synchronized source version once to
+  `2026-1170`, add reviewed release notes, and then use the manual RC and
+  Formal Release gates. The release remains local/browser verified only for
+  this iteration; device installation and real VPS connectivity remain pending.
 
 ## Authorized read-only NaiveProxy device diagnosis (2026-09-27)
 
