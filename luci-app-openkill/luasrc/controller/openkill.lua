@@ -1701,59 +1701,100 @@ end
 -- Mutations are handed to the independent bridge through stdin.  No secret is
 -- placed in a command argument, UCI value, log message or OpenKill state.
 -- The bridge validates and persists the request under /etc/naiveproxy.
-function action_naive_bridge_control()
+local function naive_bridge_response(result, status, message)
+	if status then HTTP.status(status, message or "NaiveProxy bridge request failed") end
+	HTTP.prepare_content("application/json; charset=utf-8")
+	HTTP.write_json(result)
+end
+
+-- Keep the controller boundary JSON-only.  Some LuCI/OpenWrt builds disable
+-- io.popen in the embedded Lua runtime; allowing that exception to escape
+-- produces an HTML error page, which the browser then reports as
+-- "Unexpected token '<'".  The fallback uses a mode-600, one-shot request
+-- file with a fixed path and never places credentials in command arguments.
+local function naive_bridge_request(fields)
+	local command = "/usr/share/openkill/naiveproxy-standalone.sh control"
+	if type(io) == "table" and type(io.popen) == "function" then
+		local popen_ok, pipe = pcall(io.popen, command, "w")
+		if popen_ok and pipe then
+			for _, item in ipairs(fields) do pipe:write(item.key .. "=" .. item.value .. "\n") end
+			local ok, why, code = pipe:close()
+			return (ok == true or code == 0), why or "", code
+		end
+		-- Some vendor LuCI builds expose io.popen but reject it at runtime.
+		-- Fall through to the protected request-file path in that case.
+	end
+	local pid = (nixio and type(nixio.getpid) == "function") and nixio.getpid() or os.time()
+	local request = "/var/run/naiveproxy/control.request." .. tostring(pid)
+	-- The standalone script normally creates its run directory itself.  The
+	-- request-file path is used before that script can start, so create only
+	-- this fixed runtime directory when the platform exposes nixio mkdir.
+	if type(nixio) == "table" and type(nixio.fs) == "table" and type(nixio.fs.mkdir) == "function" then
+		pcall(nixio.fs.mkdir, "/var/run/naiveproxy", 448) -- 0700
+	end
+	local open_ok, file, open_error = pcall(function()
+		return io and io.open and io.open(request, "w")
+	end)
+	if not open_ok then file, open_error = nil, "request-file-open-failed" end
+	if not file then return false, open_error or "request-file-unavailable", nil end
+	for _, item in ipairs(fields) do file:write(item.key .. "=" .. item.value .. "\n") end
+	file:close()
+	if type(nixio) == "table" and type(nixio.fs) == "table" and type(nixio.fs.chmod) == "function" then nixio.fs.chmod(request, 384) end -- 0600
+	local rc = os.execute(command .. " < " .. request)
+	-- os.remove is available on the supported Lua runtimes and avoids relying
+	-- on an optional nixio.fs unlink spelling here.
+	os.remove(request)
+	return rc == true or rc == 0, "fallback", rc
+end
+
+local function action_naive_bridge_control_impl()
 	local method = HTTP.getenv("REQUEST_METHOD") or "GET"
 	local operation = HTTP.formvalue("operation") or ""
 	local allowed = { add = true, import = true, remove = true, start = true, stop = true, health = true, update = true, legacy_cleanup = true }
 	local result = { ok = false, operation = operation, stage = "request" }
 	if method ~= "POST" or not allowed[operation] then
-		HTTP.status(400, "Bad Request")
 		result.error = "post-and-supported-operation-required"
-		HTTP.prepare_content("application/json")
-		HTTP.write_json(result)
-		return
+		return result, 400, "Bad Request"
 	end
-	local fields = { "operation", "id", "name", "server", "port", "username", "password", "transport", "enabled", "share" }
-	local pipe = io.popen("/usr/share/openkill/naiveproxy-standalone.sh control", "w")
-	if not pipe then
-		HTTP.status(503, "Service Unavailable")
-		result.stage = "bridge-unavailable"
-		result.error = "independent-service-unavailable"
-	else
-		for _, key in ipairs(fields) do
-			local value = HTTP.formvalue(key)
-			if value ~= nil then
-				-- The bridge consumes one line per value. Reject control characters
-				-- before handing the request across; this also bounds log/state data.
-				if #value > 4096 or value:find("[\r\n]") then
-					pipe:close()
-					HTTP.status(400, "Bad Request")
-					result.stage = "request-validation"
-					result.error = "invalid-field"
-					HTTP.prepare_content("application/json")
-					HTTP.write_json(result)
-					return
-				end
-				pipe:write(key .. "=" .. value .. "\n")
+	local fields = {}
+	for _, key in ipairs({ "operation", "id", "name", "server", "port", "username", "password", "transport", "enabled", "share" }) do
+		local value = HTTP.formvalue(key)
+		if value ~= nil then
+			if #value > 4096 or value:find("[\r\n]") then
+				result.stage = "request-validation"
+				result.error = "invalid-field"
+				return result, 400, "Bad Request"
 			end
-		end
-		local closed, why, code = pipe:close()
-		local control_result = fs.readfile("/var/run/naiveproxy/control.result") or ""
-		local control_stage = control_result:match("stage=([^\n]+)")
-		local control_id = control_result:match("id=([%w_-]+)")
-		if control_stage then result.stage = control_stage end
-		if control_id then result.id = control_id end
-		if closed == true or code == 0 then
-			result.ok = true
-			result.stage = result.stage == "request" and "accepted" or result.stage
-		else
-			HTTP.status(422, "Unprocessable Entity")
-			result.stage = result.stage == "request" and "bridge-rejected" or result.stage
-			result.error = "operation-failed"
+			table.insert(fields, { key = key, value = value })
 		end
 	end
-	HTTP.prepare_content("application/json")
-	HTTP.write_json(result)
+	-- Do not consume a result left by an earlier request when the bridge could
+	-- not be launched this time.
+	os.remove("/var/run/naiveproxy/control.result")
+	local launched, why, code = naive_bridge_request(fields)
+	local control_result = fs.readfile("/var/run/naiveproxy/control.result") or ""
+	local control_stage = control_result:match("stage=([^\n]+)")
+	local control_id = control_result:match("id=([%w_-]+)")
+	if control_stage then result.stage = control_stage end
+	if control_id then result.id = control_id end
+	if launched then
+		result.ok = true
+		result.stage = result.stage == "request" and "accepted" or result.stage
+		return result, nil, nil
+	end
+	result.stage = result.stage == "request" and "bridge-rejected" or result.stage
+	result.error = (why == "popen-unavailable" or why == "request-file-unavailable") and "independent-service-unavailable" or "operation-failed"
+	result.detail = result.error == "operation-failed" and "control-exit-failed" or nil
+	return result, 422, "Unprocessable Entity"
+end
+
+function action_naive_bridge_control()
+	local protected_ok, result, status, message = pcall(action_naive_bridge_control_impl)
+	if not protected_ok then
+		result = { ok = false, operation = HTTP.formvalue("operation") or "", stage = "controller-error", error = "independent-service-unavailable" }
+		status, message = 503, "Service Unavailable"
+	end
+	naive_bridge_response(result, status, message)
 end
 
 function action_naive_status()

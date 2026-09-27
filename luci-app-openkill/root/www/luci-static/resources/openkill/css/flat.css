@@ -226,6 +226,129 @@
     }
 }
 
+body[data-page^="admin-services-openkill"] .oc.openkill-status-page .security-status-card .card-title {
+    white-space: normal;
+    word-break: normal;
+    overflow-wrap: break-word;
+    hyphens: none;
+}
+
+/* ===== OpenKill theme hand-off closeout =====
+ * A few legacy blocks still use --bg-gray/--ok-surface/--oc-surface.  Map
+ * those names at the page boundary so a light LuCI theme cannot inherit the
+ * old dark navigation and NaiveProxy dialog, while dark themes keep their
+ * existing contrast.  These selectors are limited to OpenKill routes. */
+body[data-page^="admin-services-openkill"] .oc,
+body[data-page^="admin-services-openkill"] #cbi-openkill.openkill-settings {
+    --bg-white: var(--ok-ui-surface, #ffffff);
+    --bg-light: var(--ok-ui-surface-muted, #f5f6fa);
+    --bg-gray: var(--ok-ui-surface-muted, #f5f6fa);
+    --text-primary: var(--ok-ui-text, #252936);
+    --text-secondary: var(--ok-ui-muted, #687386);
+    --text-title: var(--ok-ui-text, #252936);
+    --border-light: var(--ok-ui-border, #d7dce5);
+    --border-color: var(--ok-ui-border, #d7dce5);
+    --primary-color: var(--ok-ui-link, #2563eb);
+    --info-color: var(--ok-ui-link, #2563eb);
+    --success-color: var(--ok-ui-success, #15803d);
+    --error-color: var(--ok-ui-danger, #b91c1c);
+    --ok-flat-page: var(--ok-bg-page, #f8fafc);
+    --ok-flat-surface: var(--ok-ui-surface, #ffffff);
+    --ok-flat-surface-muted: var(--ok-ui-surface-muted, #f5f6fa);
+    --ok-flat-text: var(--ok-ui-text, #252936);
+    --ok-flat-muted: var(--ok-ui-muted, #687386);
+    --ok-flat-border: var(--ok-ui-border, #d7dce5);
+    --ok-surface: var(--ok-ui-surface, #ffffff);
+    --ok-surface-muted: var(--ok-ui-surface-muted, #f5f6fa);
+    --ok-text: var(--ok-ui-text, #252936);
+    --ok-muted: var(--ok-ui-muted, #687386);
+    --ok-border: var(--ok-ui-border, #d7dce5);
+    --oc-surface: var(--ok-ui-surface, #ffffff);
+    --oc-surface-subtle: var(--ok-ui-surface-muted, #f5f6fa);
+    --oc-text-primary: var(--ok-ui-text, #252936);
+    --oc-text-secondary: var(--ok-ui-muted, #687386);
+    --oc-border: var(--ok-ui-border, #d7dce5);
+}
+
+html[data-darkmode="true"] body[data-page^="admin-services-openkill"] .oc,
+html[data-darkmode="true"] body[data-page^="admin-services-openkill"] #cbi-openkill.openkill-settings,
+html[data-theme="dark"] body[data-page^="admin-services-openkill"] .oc,
+html[data-theme="dark"] body[data-page^="admin-services-openkill"] #cbi-openkill.openkill-settings,
+body.theme-dark[data-page^="admin-services-openkill"] .oc,
+body.theme-dark[data-page^="admin-services-openkill"] #cbi-openkill.openkill-settings {
+    --bg-white: var(--ok-ui-surface, #252a33);
+    --bg-light: var(--ok-ui-surface-muted, #303640);
+    --bg-gray: var(--ok-ui-surface-muted, #303640);
+    --text-primary: var(--ok-ui-text, #e8ebf2);
+    --text-secondary: var(--ok-ui-muted, #aab2c0);
+    --text-title: var(--ok-ui-text, #e8ebf2);
+    --border-light: var(--ok-ui-border, #4a5361);
+    --border-color: var(--ok-ui-border, #4a5361);
+    --primary-color: var(--ok-ui-link, #79a9ff);
+    --info-color: var(--ok-ui-link, #79a9ff);
+    --success-color: var(--ok-ui-success, #65c58a);
+    --error-color: var(--ok-ui-danger, #ff8a8a);
+    --ok-flat-page: var(--ok-bg-page, #111827);
+    --ok-flat-surface: var(--ok-ui-surface, #252a33);
+    --ok-flat-surface-muted: var(--ok-ui-surface-muted, #303640);
+    --ok-flat-text: var(--ok-ui-text, #e8ebf2);
+    --ok-flat-muted: var(--ok-ui-muted, #aab2c0);
+    --ok-flat-border: var(--ok-ui-border, #4a5361);
+    --ok-surface: var(--ok-ui-surface, #252a33);
+    --ok-surface-muted: var(--ok-ui-surface-muted, #303640);
+    --ok-text: var(--ok-ui-text, #e8ebf2);
+    --ok-muted: var(--ok-ui-muted, #aab2c0);
+    --ok-border: var(--ok-ui-border, #4a5361);
+    --oc-surface: var(--ok-ui-surface, #252a33);
+    --oc-surface-subtle: var(--ok-ui-surface-muted, #303640);
+    --oc-text-primary: var(--ok-ui-text, #e8ebf2);
+    --oc-text-secondary: var(--ok-ui-muted, #aab2c0);
+    --oc-border: var(--ok-ui-border, #4a5361);
+}
+
+body[data-page^="admin-services-openkill"] #tab-header,
+body[data-page^="admin-services-openkill"] #tab-header ul.oc-tabmenu {
+    background: var(--ok-ui-surface-muted, #f5f6fa);
+    color: var(--ok-ui-text, #252936);
+    border-color: var(--ok-ui-border, #d7dce5);
+}
+
+body[data-page^="admin-services-openkill"] #tab-header ul.oc-tabmenu li {
+    background: transparent;
+    color: var(--ok-ui-muted, #687386);
+    border-color: var(--ok-ui-border, #d7dce5);
+}
+
+body[data-page^="admin-services-openkill"] #tab-header ul.oc-tabmenu li a {
+    color: inherit !important;
+}
+
+body[data-page^="admin-services-openkill"] #tab-header ul.oc-tabmenu li.oc-tab {
+    background: var(--ok-ui-link, #2563eb);
+    color: #fff;
+    border-color: var(--ok-ui-link, #2563eb);
+}
+
+body[data-page^="admin-services-openkill"] #cbi-openkill.openkill-settings .openkill-naive-dialog {
+    background: color-mix(in srgb, var(--ok-ui-text, #252936) 36%, transparent);
+}
+
+body[data-page^="admin-services-openkill"] #cbi-openkill.openkill-settings .openkill-naive-dialog-panel,
+body[data-page^="admin-services-openkill"] #cbi-openkill.openkill-settings .openkill-naive-preview,
+body[data-page^="admin-services-openkill"] #cbi-openkill.openkill-settings .openkill-naive-standalone-help,
+body[data-page^="admin-services-openkill"] #cbi-openkill.openkill-settings .openkill-naive-standalone-status,
+body[data-page^="admin-services-openkill"] #cbi-openkill.openkill-settings .openkill-naive-standalone-yaml {
+    background: var(--ok-ui-surface, #ffffff);
+    color: var(--ok-ui-text, #252936);
+    border-color: var(--ok-ui-border, #d7dce5);
+}
+
+@supports not (background: color-mix(in srgb, black 10%, transparent)) {
+    body[data-page^="admin-services-openkill"] #cbi-openkill.openkill-settings .openkill-naive-dialog {
+        background: rgba(15, 23, 42, .36);
+    }
+}
+
 /* Final LuCI theme hand-off.  oc.css owns the semantic adapter; this file
  * only maps the layout layer's flat tokens and page surfaces after all legacy
  * rules have loaded.  The selectors stay inside OpenKill routes. */

@@ -3761,3 +3761,42 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   The package branch records `v2026-1172`; `v2026-1171-ipk` remains the
   rollback target. No device, package-install, WAN/DNS, packet-path or VPS
   test was performed.
+
+## UI and Naive import follow-up (2026-09-27)
+
+- The import dialog symptom was traced to an unconditional `response.json()`:
+  when a LuCI controller exception or expired session returned an HTML
+  document, the browser surfaced `Unexpected token '<'` instead of a stage.
+  The controller now keeps this boundary JSON-only, catches bridge dispatch
+  failures, and has a protected one-shot request-file fallback when the
+  embedded Lua runtime has no `io.popen`. The request file is mode 600 and is
+  removed after the call; credentials are never command arguments or response
+  fields.
+- The dialog sends an explicit JSON request preference and maps non-JSON
+  responses to `controller-html-response` with a refresh/retry hint. Successful
+  imports still pass the share link to the independent bridge, which remains
+  the source of truth for decoded fields, stable ID and port; OpenKill UCI and
+  user YAML remain unchanged.
+- The fallback creates only the fixed mode-0700 runtime directory when the
+  platform exposes `nixio.fs.mkdir`, removes any stale control result before
+  dispatch, and keeps the one-shot request mode 600. The status dashboard now
+  changes an unresolved first poll to truthful `未知` after 12 seconds rather
+  than leaving every card on an endless loading label; a later valid poll
+  still restores live values.
+- The light-theme symptom was caused by legacy `--bg-gray`, `--ok-surface`
+  and `--oc-surface` aliases plus `#tab-header` retaining older dark fallback
+  values after semantic theme tokens were defined. A page-scoped terminal hand-
+  off in `flat.css` maps those aliases to LuCI-derived OpenKill tokens and
+  covers Naive dialogs, status navigation and settings controls in both light
+  and dark markers. No network or form semantics changed.
+- Local evidence: `scripts/test-naiveproxy-integration.py`,
+  `node scripts/test-naiveproxy-import.js`, `scripts/test-ui-preview.py`,
+  `scripts/test-ui-browser.py`, `scripts/test-ui-interactions.py`, WSL
+  `python3 scripts/test-naiveproxy-standalone.py`, POSIX syntax checks,
+  `wsl.exe sh scripts/local-gate.sh` and `git diff --check` pass. The native
+  Windows standalone fixture was not used as release evidence because its Git
+  Bash child process does not terminate in this host; the same fixture passes
+  under WSL. Browser evidence is local/mock-backend only.
+- No live LuCI device, package installation, official binary probe, process or
+  listener check, node credential import, or VPS test was performed. Device and
+  remote connectivity remain `设备待验证／远端待验证` under the active plan.
