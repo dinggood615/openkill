@@ -3844,3 +3844,19 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   Naive/UI suites, POSIX/BusyBox checks, local gate and diff check. No device,
   package-install, WAN/DNS, packet-path or VPS test is authorized in this
   iteration.
+
+### Development evidence and release preparation (2026-09-27)
+
+- The bounded implementation commit is `b14bd903dbe8c498b331060699cc3ca3c415ed06`.
+  Its exact OpenKill Development CI run
+  [36313761351](https://github.com/dinggood615/openkill/actions/runs/36313761351)
+  completed successfully.
+- The clean local fast matrix run `20260927T104335Z-21592` passed all 19
+  cases, including production shadow, NaiveProxy integration, UI contract,
+  browser and preview suites. `wsl.exe sh scripts/local-gate.sh` and
+  `git diff --check` also passed. Browser evidence remains local/mock-backend
+  only; no device or remote endpoint was contacted.
+- The release candidate increments the synchronized source version once from
+  `2026-1172` to `2026-1173`. The previous `v2026-1172-ipk` package remains
+  the rollback target. RC and Formal Release are still pending and must use
+  the exact post-version-bump commit after its Development CI succeeds.
