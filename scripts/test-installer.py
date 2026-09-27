@@ -170,10 +170,11 @@ chosen=$(select_newest_manifest "$WORK_DIR/rows")
         self.assertNotRegex(SHADOW_SOURCE, r"(?m)^\s*(?:uci|ubus|ip|ip6tables|iptables|nft|fw4|service|nslookup|resolveip|curl)\b")
         self.assertNotRegex(SHADOW_SOURCE, r"nft\s+(?:-f|add|insert|delete|replace|flush)\b")
 
-    def test_settings_keep_six_categories_and_embedded_update(self):
+    def test_settings_keep_plugin_categories_and_embedded_update(self):
         expected = (
             's:tab("basic", translate("Runtime & Services"))',
             's:tab("network", translate("Network & Routing"))',
+            's:tab("naive_service", "NaiveProxy与服务")',
             's:tab("compatibility", "兼容与辅助")',
             's:tab("rules", translate("Rules & Subscriptions"))',
             's:tab("stability", translate("Performance & Stability"))',
@@ -181,7 +182,7 @@ chosen=$(select_newest_manifest "$WORK_DIR/rows")
         )
         for marker in expected:
             self.assertIn(marker, SETTINGS_SOURCE)
-        self.assertEqual(SETTINGS_SOURCE.count('s:tab("'), 6)
+        self.assertEqual(SETTINGS_SOURCE.count('s:tab("'), 7)
         self.assertNotIn('s:tab("version_update"', SETTINGS_SOURCE)
         self.assertIn('version_update_panel = s:taboption("advanced"', SETTINGS_SOURCE)
         self.assertIn("local native_taboption = s.taboption", SETTINGS_SOURCE)
@@ -193,7 +194,7 @@ chosen=$(select_newest_manifest "$WORK_DIR/rows")
         self.assertIn("data-openkill-cards-ready", SETTINGS_THEME)
         self.assertIn("var CARD_LAYOUTS = {", SETTINGS_THEME)
         self.assertIn("var TAB_CATEGORY_ALIASES = {", SETTINGS_THEME)
-        for category in ("basic", "network", "rules", "stability", "compatibility", "advanced"):
+        for category in ("basic", "network", "naive_service", "rules", "stability", "compatibility", "advanced"):
             self.assertIn(f"{category}: [", SETTINGS_THEME)
         self.assertIn("function buildCards(tabItems, activeOnly)", SETTINGS_THEME)
         self.assertIn("var layout = category ? CARD_LAYOUTS[category] : null;", SETTINGS_THEME)
