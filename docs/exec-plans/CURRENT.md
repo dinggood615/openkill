@@ -79,6 +79,57 @@
   installation.  No package, service, configuration, route, DNS, firewall or
   packet-path mutation was made.
 
+## Authorized current test-IPK installation (2026-09-27)
+
+- The user explicitly authorized installing the current source test IPK on the
+  existing test target `192.168.1.103`. This is a package-installation test,
+  not authorization for packet-path, WAN, DNS, firewall, CENTRAL_ACTIVE,
+  central nft, Mihomo, NaiveProxy, or VPS tests.
+- Before mutation, record the installed-package list, relevant OpenKill paths,
+  free space and the package control scripts. Transfer only the IPK built from
+  the exact source commit under test. Install only `luci-app-openkill`; do not
+  install unrelated dependencies or browser runtimes and do not invoke service
+  start/restart commands. Preserve any pre-existing `/etc/config/openkill`,
+  `/usr/share/openkill`, user YAML and independent-service data.
+- The rollback record must include the pre-install inventory, package SHA256,
+  install result and a reversible `opkg remove`/previous-package restore path.
+  Any package-created defaults are test state and must be reported separately
+  from user data; no credentials may enter logs or evidence.
+- After installation, use local Playwright/Chrome only for authenticated,
+  read-only LuCI DOM/layout/accessibility checks at the authorized target.
+  Do not click OpenKill save/apply, service, network or configuration actions.
+
+## Whole-repository simplification audit (2026-09-27)
+
+- The user requested a new end-to-end review of the OpenKill source and
+  removal of unnecessary project content. This supersedes the in-progress
+  test-IPK build, which was stopped before an IPK was produced.
+- Scope: map tracked files to source imports, LuCI routes/templates, packaging
+  manifests, install scripts, workflows and tests; remove only material that
+  has no live runtime, packaging, upgrade, documentation or test purpose.
+  Preserve user configuration, compatibility/upgrade paths, release evidence,
+  license notices and unknown working-tree changes.
+- Method: first produce a reference inventory and identify candidates with
+  evidence. Each deletion must have an explicit replacement or a zero-reference
+  result, with focused tests and package-manifest checks. Do not remove content
+  merely because it appears old or is not exercised by one UI page.
+- Boundaries: local repository work only. No device package installation,
+  service action, network, DNS, firewall, CENTRAL_ACTIVE, central nft,
+  packet-path or VPS operation is part of this audit.
+- First verified removal batch: the build recipe already excluded the checked-in
+  Zashboard bundle while the runtime downloader fetches it on demand. Removed
+  those 21 source-only assets and the now-redundant build-time deletion. Also
+  removed five root-level images with no source, documentation, installer or
+  package reference. The removed tracked content totals 26 files and
+  6,048,491 bytes. MetaCubeXD, dashboard routes and the Zashboard downloader
+  remain intact.
+- Validation: `test-openkill-optimization.py`, `test-ui-contract.py`,
+  `test-ui-preview.py`, POSIX shell syntax checks, `local-gate.sh` and both
+  staged/unstaged `git diff --check` passed. Next candidates require separate
+  evidence: legacy CSS that is currently pruned only during packaging, and
+  unused controller/template pairs. Do not remove them until their references
+  and final-package behavior are independently verified.
+
 ## CSS ownership refactor: baseline and runtime-status phase (2026-09-27)
 
 - Scope: this staged change is limited to OpenKill-scoped CSS variables, rule
