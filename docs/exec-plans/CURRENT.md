@@ -2950,6 +2950,22 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   The global CBI label/field/description layout and all other settings cards
   remain unchanged.
 
+- Source `7543ffbce5bea9751cb7dcc0e459960a2c4d7e4a` passed exact Development
+  CI: [run 36283422605](https://github.com/dinggood615/openkill/actions/runs/36283422605).
+- RC Build passed from that source:
+  [run 36283477998](https://github.com/dinggood615/openkill/actions/runs/36283477998).
+  The audited RC IPK SHA256 is
+  `18b2a520ad2e34135376a208385b8db0993799be53331a806cfb650c5696261d`.
+- Formal Release passed with `release_gate=true` and `publish=true`:
+  [run 36283660794](https://github.com/dinggood615/openkill/actions/runs/36283660794).
+  It published [v2026-1167-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1167-ipk)
+  from the exact source above. The formal IPK SHA256 is
+  `f5cb0ceb01c3ab505469dcefb3066e4521fd1f65f0ca845ed5969dccb433473b`.
+- `test-installer.py` is not runnable on this Windows host because the local
+  Python environment lacks the optional `yaml` module; the exact CI passed
+  after its dependency installation. Browser, device and VPS verification
+  remain unperformed.
+
 - The repaired source commit `d433d5e3f44a2473fa6f5355a72b9a47d0d5ef29`
   passed exact Development CI:
   [run 36282586838](https://github.com/dinggood615/openkill/actions/runs/36282586838).
