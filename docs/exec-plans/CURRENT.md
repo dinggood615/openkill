@@ -18,12 +18,13 @@
   GitHub RC/Formal workflows and package publication are remote gates; no
   router/device access, `CENTRAL_ACTIVE`, central nft state, WAN/default
   gateway changes or packet-path tests are authorized in this iteration.
-- Implementation evidence on observed baseline `343b79b7cd23c9d90e4086a58d206f566e3e7205`:
-  RC and Formal workflows now use content-keyed SDK caches, reuse validated
-  SDK trees and feed/host preparation markers, cache CodeMirror dependencies,
-  and invoke the package makefile directly for both IPK and optional APK.
-  Version checks, package-selection guards, artifact audits and the explicit
-  release gates remain in place.
+- Implementation evidence on the resulting source `753e465e618b2de58055b0c17c79469d401d3f98`:
+  RC and Formal workflows use content-keyed SDK caches, reuse validated SDK
+  trees and feed/host preparation markers, cache CodeMirror dependencies, and
+  invoke the OpenKill package makefile directly. Version checks,
+  package-selection guards, artifact audits and the explicit release gates
+  remain in place. APK remains an optional target and was disabled for this
+  IPK-only release.
 - Local verification: `python scripts/test-autonomous-workflow.py -v`,
   `sh scripts/local-gate.sh` (via WSL), and `git diff --check` passed. The
   first exact commit `091ef87809120436c69748e59607616e86317147` reached the
@@ -32,19 +33,23 @@
   commit `d0e88b229c8baccb8a556cadc8086808536382ef`, which records the already
   present seven-tab layout contract. Development CI Run 274 for that exact
   commit passed; the earlier failure was not a workflow/build regression.
-- Next action: commit the prepared source metadata and 2026-1168 release note,
-  verify that exact versioned commit's Development CI, and run the RC/Formal
-  release gates.
-- Formal gate evidence: RC Run 98 passed and produced the audited
-  `luci-app-openkill_2026-1168_all.ipk` (SHA256 recorded in the local release
-  cache). Formal Run 191 passed Get-Version and both runtime matrices but its
-  compile job stopped before make because the new direct command did not set
-  `SDK_DIR`; the repair defines it from the matrix SDK directory before the
-  package-only build. Formal Run 192 then reached the build but its cached SDK
-  lacked feed/host preparation, so `make compile` produced no IPK and the UI
-  asset audit stopped. The follow-up adds cache-aware feeds and host helper
-  preparation and removes stale package source before copying. No release was
-  published by either failed run.
+- Exact source Development CI Run 277 passed for the resulting commit.
+- RC Build Run 100 passed from that exact source. Its audited candidate
+  `luci-app-openkill_2026-1168_all.ipk` has SHA256
+  `f58f1be0de7bf9932d596258c397adf761d8c083e20b19719d5b26235d3deb45`.
+  Package metadata, conffile preservation, maintainer-script deletion,
+  stale-reference and runtime-sensitive-content audits passed.
+- Formal Release Run 193 passed with `release_gate=true` and `publish=true`.
+  It published [v2026-1168-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1168-ipk)
+  from the exact source commit. The downloaded formal IPK matches the
+  published asset and has SHA256
+  `c11a927188583bab82766da57a7cbfc651f507d284687396ebeb3a2db39f4fb6`.
+  The package contains version `2026-1168`, `/etc/config/openkill` as a
+  conffile, and executable init/service scripts with no private test-node
+  material. The previous v2026-1167 release remains available for rollback.
+- The two earlier formal attempts (Runs 191 and 192) failed before publication
+  due to SDK path and cached feed/host preparation gaps; both were repaired
+  before Run 193. No device, router, VPS or packet-path validation was run.
 
 ## NaiveProxy service tab and stable component update (2026-09-27)
 
