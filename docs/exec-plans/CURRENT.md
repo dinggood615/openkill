@@ -3368,3 +3368,19 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   It published [v2026-1166-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1166-ipk)
   from the repaired source. The formal IPK SHA256 is
   `d97b19aa6fbaf661624139037e88c4fd5dad8ff11116cb4d0b7c5a5a95054af0`.
+
+## Formal release preparation 2026-1169 (2026-09-27)
+
+- The published IPK channel is `v2026-1168`; the release workflow requires a
+  strictly newer aligned source version. This release-preparation change bumps
+  the synchronized source metadata exactly once to `2026-1169` and adds the
+  reviewed version-specific release notes. It does not change runtime or
+  network semantics.
+- Release scope is the already reviewed repository cleanup and UI/CSS audit
+  recorded above. User configuration, compatibility endpoints, OpenKill
+  settings and private data remain preserved; no device, WAN, CENTRAL_ACTIVE,
+  central nft or packet-path operation is authorized here.
+- Required gates, in order: local gate and diff review, exact-source
+  Development CI, manual RC Build and candidate audit, then Formal Release
+  with `release_gate=true` and `publish=true`. The previous `v2026-1168-ipk`
+  assets remain the rollback target until the new release is verified.
