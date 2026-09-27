@@ -3524,3 +3524,41 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
 - The formal package retained the previous `v2026-1168-ipk` release as the
   rollback target. No router, test-device, VPS, WAN, CENTRAL_ACTIVE, central
   nft or packet-path validation was performed.
+
+## Formal release 2026-1170 completed (2026-09-27)
+
+- The synchronized source version is `2026-1170`. The scoped implementation
+  commit `173d24ffa1625f359eeb3a48807ffc89dfa1bf49` passed Development CI
+  [run 36300769551](https://github.com/dinggood615/openkill/actions/runs/36300769551);
+  the release-preparation commit
+  `24f3064bf9d51691ab5f2813ff7288818d561aec` passed the exact-source
+  Development CI [run 36300909417](https://github.com/dinggood615/openkill/actions/runs/36300909417).
+- RC Build [run 36301179952](https://github.com/dinggood615/openkill/actions/runs/36301179952)
+  passed from `24f3064bf9d51691ab5f2813ff7288818d561aec`. The candidate
+  audit produced `luci-app-openkill_2026-1170_all.ipk` with SHA256
+  `042b233dccfbb85d0f6fbb5041d5424269f1cc882a54d49b2082b74923c66d68`.
+  The uploaded audit artifact digest is
+  `sha256:1ec58b5ef57c906c506ebc4b0d7626fe96898fb2a679addfea1a8a7767710340`.
+- Formal Release [run 36301308811](https://github.com/dinggood615/openkill/actions/runs/36301308811)
+  passed with `release_gate=true` and `publish=true` from the exact source
+  commit. It published
+  [v2026-1170-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1170-ipk).
+  The formal release asset `luci-app-openkill_2026-1170_all.ipk` has SHA256
+  `c505ac3459f755f9238660f875e169e87f67651188a6be48a843aa05d7df247a`
+  and remains alongside all previous release assets.
+- The formal package audit confirmed version `2026-1170`, architecture
+  `all`, `/etc/config/openkill` conffile preservation, no destructive
+  persistent-path removal, no stale development references, and the scoped
+  OpenKill CSS plus official NaiveProxy metadata/installer files. The release
+  workflow's runtime and compatibility matrix completed successfully.
+- UI evidence remains local/browser only: production-template Chrome checks
+  covered 1920/1366/768/390 CSS px with no horizontal overflow and distinct
+  light/dark computed surfaces. Installer, NaiveProxy integration/standalone,
+  health, import, UI contract/interaction and POSIX/BusyBox fixtures passed;
+  Windows direct installer tests still require the repository WSL Python
+  environment for PyYAML. No device write, package installation, real VPS
+  probe or packet-path test was performed; those remain device/VPS pending.
+- Rollback is the existing `v2026-1169-ipk` release (or the prior package
+  channel) followed by restoring the previous OpenKill package. The new
+  catalog and installer changes do not modify user YAML, subscriptions or
+  NaiveProxy node credentials.
