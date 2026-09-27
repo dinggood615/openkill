@@ -66,6 +66,10 @@ def main() -> None:
                     if line and not line.startswith("#")]
     assert catalog_rows and all(len(line.split("\t")) == 6 for line in catalog_rows)
     controller = require(CONTROLLER, "action_naive_standalone_status")
+    # Current LuCI builds can expose io.popen but reject its controller use;
+    # status must rebuild the redacted manifest through the established runner
+    # instead of presenting a stale loader failure.
+    require(CONTROLLER, "pcall(SYS.exec, command)")
     require(CONTROLLER, "/var/run/naiveproxy/manifest")
     require(CONTROLLER, "/var/run/naiveproxy/snippets.yaml")
     require(CONTROLLER, "action_naive_bridge_control")

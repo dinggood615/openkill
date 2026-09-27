@@ -1655,6 +1655,16 @@ local function naive_read_manifest()
 			if read_ok and output and output ~= "" then return output end
 		end
 	end
+	-- Some current LuCI builds expose io.popen but deny it when a controller
+	-- executes.  Falling straight back to an old manifest then leaves the UI
+	-- reporting a previous loader failure even after a valid binary has been
+	-- installed.  luci.sys.exec is the established controller runner and the
+	-- command here is fixed: it only rebuilds the bridge's redacted runtime
+	-- manifest, never accepts user input or touches OpenKill configuration.
+	if SYS and type(SYS.exec) == "function" then
+		local ok, output = pcall(SYS.exec, command)
+		if ok and output and output ~= "" then return output end
+	end
 	return fs.readfile("/var/run/naiveproxy/manifest") or ""
 end
 

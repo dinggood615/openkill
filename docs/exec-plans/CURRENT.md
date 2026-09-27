@@ -3984,3 +3984,21 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   connectivity checks remain `设备待验证／远端待验证` under the active plan.
 - Rollback remains the published `v2026-1172-ipk`; installing it preserves the
   existing OpenKill configuration, independent NaiveProxy data and user YAML.
+
+### NaiveProxy status freshness repair (2026-09-27)
+
+- User-visible evidence showed `loader-or-version-probe-failed` after the
+  controller refresh.  The authorised diagnostic confirmed the installed
+  binary is executable and `naive --version` exits successfully; the current
+  bridge manifest rebuild reports `component_status=available`.
+- Root cause: on this LuCI build `io.popen` is exposed but may be rejected in
+  controller context.  `naive_read_manifest()` then read a stale runtime
+  manifest whose former failure reason survived after the component became
+  usable.  The bounded repair falls back to the fixed, local
+  `luci.sys.exec()` manifest command before using the cached file.  It accepts
+  no request data and does not alter OpenKill UCI, YAML, network policy or a
+  node process.
+- Next: run focused Naive/UI tests and the local gate, commit/push the repair,
+  then replace the pending 2026-1175 release candidate with the exact repaired
+  source commit.  The already completed RC run for `306aea6` is evidence for
+  the earlier token-only candidate and is not release evidence for this repair.
