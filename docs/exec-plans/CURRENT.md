@@ -18,6 +18,22 @@
   review the diff, then commit the bounded change. Browser rendering remains
   subject to local browser-tool availability.
 
+### Implementation evidence
+
+- Source commit `293632aaeabd43f1d1f4f02d086a0819d23d3dae` moves the service
+  DummyValue into a dedicated `naive_service` Plugin Settings tab between
+  Network & Routing and Compatibility, updates legacy redirects, and removes
+  the duplicate compatibility layout entry.
+- The card now exposes an official-stable-component update operation. The
+  bridge resolves official metadata, requires a complete URL/SHA256/size set,
+  and delegates to the existing verified atomic installer; failures retain
+  the previous component and node data.
+- Local UI contract, import behavior, optimization, integration, shell syntax,
+  `sh scripts/local-gate.sh`, and `git diff --check` passed. The standalone
+  health test was not completed because the Windows host cannot provide its
+  network timing fixture; browser rendering and device/VPS validation remain
+  unverified. Development CI for the exact commit is pending inspection.
+
 ## Standalone NaiveProxy card placement and legacy-config removal (2026-09-26)
 
 ### Follow-up: import diagnostics and compatibility card placement
