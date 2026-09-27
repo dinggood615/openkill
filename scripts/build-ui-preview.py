@@ -181,6 +181,18 @@ def _extract_status_visibility_helper() -> str:
     return _clean_markup(source[start:end].strip()) + "\nwindow.openkillSetStatusVisibility = setStatusVisibility;"
 
 
+def _extract_theme_controller() -> str:
+    """Execute the production status theme button in the local browser preview."""
+    source = (VIEW_ROOT / "status.htm").read_text(encoding="utf-8")
+    dark_start = source.index("    var DarkModeDetector = {")
+    dark_end = source.index("\n    var StateManager = {", dark_start)
+    toggle_start = source.index("    function toggleThemeMode()")
+    toggle_end = source.index("\n//]]></script>", toggle_start)
+    return _clean_markup(
+        source[dark_start:dark_end].strip() + "\n" + source[toggle_start:toggle_end].strip()
+    )
+
+
 def _extract_config_uploader() -> str:
     """Extract the production mode/conditional-control coordinator.
 
@@ -210,14 +222,14 @@ def _extract_myip() -> str:
 
 
 PREVIEW_STYLE = r"""
-        :root { color-scheme: dark; }
+        :root { color-scheme: light dark; }
         html, body { min-height: 100%; }
         body {
             margin: 0;
             padding: 18px;
             box-sizing: border-box;
-            background: #17191d;
-            color: #e8eaf0;
+            background: var(--ok-theme-page, #17191d);
+            color: var(--ok-theme-text, #e8eaf0);
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "Microsoft YaHei", sans-serif;
         }
         .openkill-preview-banner {
@@ -229,25 +241,25 @@ PREVIEW_STYLE = r"""
             margin: 0 auto 12px;
             max-width: 1920px;
             padding: 8px 12px;
-            border: 1px solid #3d4655;
+            border: 1px solid var(--ok-theme-border, #3d4655);
             border-radius: 7px;
-            background: #202b3a;
-            color: #c8d0df;
+            background: var(--ok-theme-surface, #202b3a);
+            color: var(--ok-theme-muted, #c8d0df);
             font-size: 12px;
         }
-        .openkill-preview-banner strong { color: #9b8cff; }
+        .openkill-preview-banner strong { color: var(--ok-theme-link, #9b8cff); }
         .openkill-preview-controls { display: inline-flex; flex-wrap: wrap; gap: 4px; }
         .openkill-preview-controls button {
             min-height: 28px;
             padding: 3px 8px;
-            border: 1px solid #414650;
+            border: 1px solid var(--ok-theme-border, #414650);
             border-radius: 5px;
-            background: #25282e;
-            color: #e8eaf0;
+            background: var(--ok-theme-surface-muted, #25282e);
+            color: var(--ok-theme-text, #e8eaf0);
             cursor: pointer;
         }
         .openkill-preview-controls button:hover,
-        .openkill-preview-controls button:focus-visible { border-color: #9b8cff; outline: 2px solid rgba(155,140,255,.28); }
+        .openkill-preview-controls button:focus-visible { border-color: var(--ok-theme-link, #9b8cff); outline: 2px solid var(--ok-theme-link, #9b8cff); }
         .cbi-section { margin: 0; padding: 0; border: 0; background: transparent; }
         .cbi-section > table { width: 100%; border-collapse: collapse; }
         .cbi-section > table > tbody > tr > td { padding: 0; border: 0; }
@@ -511,6 +523,7 @@ def build_preview(output: Path) -> Path:
   <script src="/luci-app-openkill/root/www/luci-static/resources/openkill/js/common.js"></script>
   <script>__PREVIEW_CONFIG_BOOTSTRAP__</script>
   <script>__PRODUCTION_STATUS_VISIBILITY_HELPER__</script>
+  <script>__PRODUCTION_THEME_CONTROLLER__</script>
   <script>__PRODUCTION_CONFIG_UPLOADER__</script>
   <script>__PRODUCTION_CONFIG_EDITOR__</script>
   <script>__PRODUCTION_CONFIG_FILE_MANAGER__</script>
@@ -524,6 +537,7 @@ def build_preview(output: Path) -> Path:
     html = html.replace("__PREVIEW_SCRIPT__", PREVIEW_SCRIPT.strip())
     html = html.replace("__PREVIEW_CONFIG_BOOTSTRAP__", PREVIEW_CONFIG_BOOTSTRAP.strip())
     html = html.replace("__PRODUCTION_STATUS_VISIBILITY_HELPER__", _extract_status_visibility_helper())
+    html = html.replace("__PRODUCTION_THEME_CONTROLLER__", _extract_theme_controller())
     html = html.replace("__PRODUCTION_CONFIG_UPLOADER__", _extract_config_uploader())
     html = html.replace("__PRODUCTION_CONFIG_EDITOR__", _extract_config_editor())
     html = html.replace("__PRODUCTION_CONFIG_FILE_MANAGER__", _extract_config_file_manager())

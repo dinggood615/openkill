@@ -1,5 +1,39 @@
 # Current status
 
+## 2026-09-27 OpenKill UI theme toggle and light/dark consistency
+
+- This iteration is limited to OpenKill-scoped presentation: the runtime
+  status theme control, light/dark token handoff, card/control contrast and
+  responsive layout. CBI field names, UCI values, controller routes, DOM
+  events, validation, save/apply semantics, network/DNS/proxy behaviour and
+  user configuration remain unchanged.
+- The runtime status theme button keeps the existing `oc-theme` preference
+  key and applies an explicit page-scoped `light` or `dark` mode. The host
+  LuCI theme remains untouched; OpenKill's page root receives the resolved
+  mode so stale host `data-theme` markers cannot override an explicit choice.
+  Auto detection remains the initial fallback for existing users, while a
+  button click chooses the opposite visible mode.
+- CSS changes are restricted to OpenKill routes and use the existing
+  `oc.css` -> `flat.css` load order. Terminal token rules will provide
+  readable page, card, input, border, text, link, focus and state colours in
+  both modes without changing layout semantics or adding network behaviour.
+- Validation is local and browser-only in this iteration. Use the production
+  status template/CSS preview, test the button and persistence in Chromium,
+  cover desktop and narrow viewports, then run UI tests, POSIX/BusyBox checks,
+  `sh scripts/local-gate.sh` and `git diff --check`. Device and VPS checks
+  remain outside this plan. Rollback is the bounded source commit.
+- Implementation and evidence: the status control now switches directly
+  between explicit light and dark preferences while preserving the existing
+  `auto` fallback for users who already have it stored. The resolved mode is
+  mirrored to page-scoped `data-openkill-theme` markers and the final
+  OpenKill CSS layer supplies both theme token sets without changing host
+  LuCI markers. Real Chromium validation used the production preview at
+  1920, 1366, 768 and 390 CSS px; all four sizes had no horizontal overflow,
+  the toggle persisted `light`/`dark`, and console, page-error and external
+  request checks were clean. Screenshots and JSON evidence are under
+  `artifacts/test-evidence/ui-preview/`. UI contract, preview, interaction,
+  browser and local-gate checks passed. No device or VPS evidence is claimed.
+
 ## 2026-1170 UI theme bridge and official NaiveProxy installer (2026-09-27)
 
 - Scope for this iteration is limited to OpenKill-scoped visual adaptation and

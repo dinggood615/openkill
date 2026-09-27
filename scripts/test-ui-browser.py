@@ -137,6 +137,8 @@ def main() -> int:
                       if (!pageRoot) throw new Error('THEME_PAGE_ROOT_MISSING');
                       const read = (mode) => {
                         root.setAttribute('data-darkmode', mode);
+                        root.setAttribute('data-openkill-theme', mode === 'true' ? 'dark' : 'light');
+                        document.body.setAttribute('data-openkill-theme', mode === 'true' ? 'dark' : 'light');
                         root.removeAttribute('data-theme');
                         const style = getComputedStyle(pageRoot);
                         return {
@@ -150,6 +152,8 @@ def main() -> int:
                       const dark = read('true');
                       const light = read('false');
                       root.setAttribute('data-darkmode', 'true');
+                      root.setAttribute('data-openkill-theme', 'dark');
+                      document.body.setAttribute('data-openkill-theme', 'dark');
                       return {dark, light};
                     }
                     """
@@ -157,9 +161,67 @@ def main() -> int:
                 if theme_evidence["dark"] == theme_evidence["light"]:
                     raise AssertionError(f"UI_THEME_MODES_NOT_DISTINCT:{json.dumps(theme_evidence)}")
                 page.screenshot(path=str(EVIDENCE_DIR / "theme-dark-1366.png"), full_page=True)
-                page.evaluate("document.documentElement.setAttribute('data-darkmode', 'false')")
+                page.evaluate("document.documentElement.setAttribute('data-darkmode', 'false'); document.documentElement.setAttribute('data-openkill-theme', 'light'); document.body.setAttribute('data-openkill-theme', 'light')")
                 page.screenshot(path=str(EVIDENCE_DIR / "theme-light-1366.png"), full_page=True)
-                page.evaluate("document.documentElement.setAttribute('data-darkmode', 'true')")
+                page.evaluate("document.documentElement.setAttribute('data-darkmode', 'true'); document.documentElement.setAttribute('data-openkill-theme', 'dark'); document.body.setAttribute('data-openkill-theme', 'dark')")
+
+                theme_toggle = page.evaluate(
+                    """
+                    () => {
+                      const button = document.getElementById('theme-toggle');
+                      const pageRoot = document.querySelector('.oc.openkill-status-page');
+                      if (!button || !pageRoot || typeof window.toggleThemeMode !== 'function') {
+                        throw new Error('THEME_TOGGLE_CONTROLLER_MISSING');
+                      }
+                      localStorage.removeItem('oc-theme');
+                      document.documentElement.setAttribute('data-darkmode', 'true');
+                      document.documentElement.setAttribute('data-theme', 'dark');
+                      localStorage.setItem('oc-theme', 'light');
+                      window.ocUpdateTheme();
+                      window.DarkModeDetector.init();
+                      const hostMarkerIgnored = {
+                        surface: getComputedStyle(pageRoot).getPropertyValue('--ok-ui-surface').trim(),
+                        text: getComputedStyle(pageRoot).getPropertyValue('--ok-ui-text').trim(),
+                        body: document.body.getAttribute('data-openkill-theme')
+                      };
+                      const light = {
+                        preference: localStorage.getItem('oc-theme'),
+                        root: document.documentElement.getAttribute('data-openkill-theme'),
+                        body: document.body.getAttribute('data-openkill-theme'),
+                        surface: getComputedStyle(pageRoot).getPropertyValue('--ok-ui-surface').trim(),
+                        text: getComputedStyle(pageRoot).getPropertyValue('--ok-ui-text').trim(),
+                        title: button.getAttribute('title'),
+                        pressed: button.getAttribute('aria-pressed')
+                      };
+                      button.click();
+                      const dark = {
+                        preference: localStorage.getItem('oc-theme'),
+                        root: document.documentElement.getAttribute('data-openkill-theme'),
+                        body: document.body.getAttribute('data-openkill-theme'),
+                        surface: getComputedStyle(pageRoot).getPropertyValue('--ok-ui-surface').trim(),
+                        text: getComputedStyle(pageRoot).getPropertyValue('--ok-ui-text').trim(),
+                        title: button.getAttribute('title'),
+                        pressed: button.getAttribute('aria-pressed')
+                      };
+                      return {hostMarkerIgnored, light, dark, distinct: light.surface !== dark.surface && light.text !== dark.text};
+                    }
+                    """
+                )
+                if (
+                    not theme_toggle["distinct"]
+                    or theme_toggle["hostMarkerIgnored"]["surface"] != "#ffffff"
+                    or theme_toggle["hostMarkerIgnored"]["text"] != "#1f2937"
+                    or theme_toggle["hostMarkerIgnored"]["body"] != "light"
+                    or theme_toggle["light"]["preference"] != "light"
+                    or theme_toggle["light"]["root"] != "light"
+                    or theme_toggle["light"]["body"] != "light"
+                    or theme_toggle["dark"]["preference"] != "dark"
+                    or theme_toggle["dark"]["root"] != "dark"
+                    or theme_toggle["dark"]["body"] != "dark"
+                    or theme_toggle["light"]["pressed"] != "false"
+                    or theme_toggle["dark"]["pressed"] != "true"
+                ):
+                    raise AssertionError(f"UI_THEME_TOGGLE_FAILED:{json.dumps(theme_toggle, ensure_ascii=False)}")
 
                 probe = page.evaluate(
                     """
@@ -582,6 +644,7 @@ def main() -> int:
                     "dimensions": dimensions,
                     "probe": probe,
                     "theme": theme_evidence,
+                    "theme_toggle": theme_toggle,
                     "visibility": visibility,
                     "conditional": conditional,
                     "editor_race": editor_race,

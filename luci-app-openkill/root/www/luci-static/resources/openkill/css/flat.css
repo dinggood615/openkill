@@ -1971,6 +1971,144 @@ body[data-page^="admin-services-openkill"] .cbi-section-table tbody tr {
     }
 }
 
+/* Final precedence for the explicit runtime light/dark switch.  This is
+ * intentionally small: component rules above consume these shared tokens,
+ * so one page-scoped declaration fixes the stale host-theme override without
+ * duplicating every component selector. */
+html[data-openkill-theme="light"] body[data-page^="admin-services-openkill"],
+body[data-page^="admin-services-openkill"][data-openkill-theme="light"] {
+    background: #f8fafc;
+    background-image: none;
+    color: #1f2937;
+    color-scheme: light;
+}
+
+html[data-openkill-theme="dark"] body[data-page^="admin-services-openkill"],
+body[data-page^="admin-services-openkill"][data-openkill-theme="dark"] {
+    background: #111827;
+    background-image: none;
+    color: #f3f4f6;
+    color-scheme: dark;
+}
+
+html[data-openkill-theme="light"] body[data-page^="admin-services-openkill"] .oc,
+html[data-openkill-theme="light"] body[data-page^="admin-services-openkill"] #cbi-openkill.openkill-settings,
+body[data-page^="admin-services-openkill"][data-openkill-theme="light"] .oc,
+body[data-page^="admin-services-openkill"][data-openkill-theme="light"] #cbi-openkill.openkill-settings {
+    --ok-ui-surface: #ffffff;
+    --ok-ui-surface-muted: #f1f5f9;
+    --ok-ui-text: #1f2937;
+    --ok-ui-muted: #64748b;
+    --ok-ui-border: #cbd5e1;
+    --ok-ui-link: #2563eb;
+    --ok-ui-focus: #2563eb;
+    --ok-ui-success: #15803d;
+    --ok-ui-warning: #a16207;
+    --ok-ui-danger: #b91c1c;
+    --ok-bg-page: #f8fafc;
+    --ok-bg-surface: #ffffff;
+    --ok-bg-surface-muted: #f1f5f9;
+    --ok-text-primary: #1f2937;
+    --ok-text-secondary: #64748b;
+    --ok-text-muted: #64748b;
+    --ok-border-subtle: #cbd5e1;
+    --ok-border-default: #cbd5e1;
+    --ok-border-focus: #2563eb;
+    --ok-color-primary: #2563eb;
+    --ok-color-primary-hover: #1d4ed8;
+    --ok-color-primary-active: #1d4ed8;
+    --ok-color-success: #15803d;
+    --ok-color-warning: #a16207;
+    --ok-color-danger: #b91c1c;
+    --bg-white: #ffffff;
+    --bg-light: #f8fafc;
+    --bg-gray: #f1f5f9;
+    --text-primary: #1f2937;
+    --text-secondary: #64748b;
+    --text-title: #1f2937;
+    --primary-color: #2563eb;
+    --info-color: #2563eb;
+    --success-color: #15803d;
+    --error-color: #b91c1c;
+    --warning-color: #a16207;
+    --border-color: #cbd5e1;
+    --border-light: #cbd5e1;
+    --hover-bg: #eef4ff;
+    --select-hover: #eef4ff;
+    --editor-bg: #f1f5f9;
+    --divider: #cbd5e1;
+}
+
+html[data-openkill-theme="dark"] body[data-page^="admin-services-openkill"] .oc,
+html[data-openkill-theme="dark"] body[data-page^="admin-services-openkill"] #cbi-openkill.openkill-settings,
+body[data-page^="admin-services-openkill"][data-openkill-theme="dark"] .oc,
+body[data-page^="admin-services-openkill"][data-openkill-theme="dark"] #cbi-openkill.openkill-settings {
+    --ok-ui-surface: #1f2937;
+    --ok-ui-surface-muted: #273449;
+    --ok-ui-text: #f3f4f6;
+    --ok-ui-muted: #cbd5e1;
+    --ok-ui-border: #4b5563;
+    --ok-ui-link: #93c5fd;
+    --ok-ui-focus: #93c5fd;
+    --ok-ui-success: #34d399;
+    --ok-ui-warning: #fbbf24;
+    --ok-ui-danger: #f87171;
+    --ok-bg-page: #111827;
+    --ok-bg-surface: #1f2937;
+    --ok-bg-surface-muted: #273449;
+    --ok-text-primary: #f3f4f6;
+    --ok-text-secondary: #cbd5e1;
+    --ok-text-muted: #cbd5e1;
+    --ok-border-subtle: #4b5563;
+    --ok-border-default: #4b5563;
+    --ok-border-focus: #93c5fd;
+    --ok-color-primary: #93c5fd;
+    --ok-color-primary-hover: #bfdbfe;
+    --ok-color-primary-active: #bfdbfe;
+    --ok-color-success: #34d399;
+    --ok-color-warning: #fbbf24;
+    --ok-color-danger: #f87171;
+    --bg-white: #1f2937;
+    --bg-light: #111827;
+    --bg-gray: #273449;
+    --text-primary: #f3f4f6;
+    --text-secondary: #cbd5e1;
+    --text-title: #f3f4f6;
+    --primary-color: #93c5fd;
+    --info-color: #93c5fd;
+    --success-color: #34d399;
+    --error-color: #f87171;
+    --warning-color: #fbbf24;
+    --border-color: #4b5563;
+    --border-light: #4b5563;
+    --hover-bg: #334155;
+    --select-hover: #334155;
+    --editor-bg: #273449;
+    --divider: #4b5563;
+}
+
+html[data-openkill-theme="light"] body[data-page^="admin-services-openkill"] #cbi-openkill > fieldset.cbi-section > table .oc .myip-main-card,
+html[data-openkill-theme="light"] body[data-page^="admin-services-openkill"] #cbi-openkill > fieldset.cbi-section > table .oc .myip-content-grid,
+html[data-openkill-theme="light"] body[data-page^="admin-services-openkill"] .oc .myip-main-card,
+html[data-openkill-theme="light"] body[data-page^="admin-services-openkill"] .oc .myip-content-grid,
+body[data-page^="admin-services-openkill"][data-openkill-theme="light"] #cbi-openkill > fieldset.cbi-section > table .oc .myip-main-card,
+body[data-page^="admin-services-openkill"][data-openkill-theme="light"] #cbi-openkill > fieldset.cbi-section > table .oc .myip-content-grid {
+    background-color: #ffffff;
+    color: #1f2937;
+    border-color: #cbd5e1;
+}
+
+html[data-openkill-theme="dark"] body[data-page^="admin-services-openkill"] #cbi-openkill > fieldset.cbi-section > table .oc .myip-main-card,
+html[data-openkill-theme="dark"] body[data-page^="admin-services-openkill"] #cbi-openkill > fieldset.cbi-section > table .oc .myip-content-grid,
+html[data-openkill-theme="dark"] body[data-page^="admin-services-openkill"] .oc .myip-main-card,
+html[data-openkill-theme="dark"] body[data-page^="admin-services-openkill"] .oc .myip-content-grid,
+body[data-page^="admin-services-openkill"][data-openkill-theme="dark"] #cbi-openkill > fieldset.cbi-section > table .oc .myip-main-card,
+body[data-page^="admin-services-openkill"][data-openkill-theme="dark"] #cbi-openkill > fieldset.cbi-section > table .oc .myip-content-grid {
+    background-color: #1f2937;
+    color: #f3f4f6;
+    border-color: #4b5563;
+}
+
 @media (max-width: 640px) {
     .oc.openkill-status-page .main-cards-container,
     .oc.openkill-status-page .dashboard-content-layout,

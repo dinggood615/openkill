@@ -112,7 +112,16 @@ function ocApplyRootTheme() {
     } else {
         d = document.body ? isDarkBackground(document.body) : detectInitialAutoDark();
     }
+    var resolved = d ? 'dark' : 'light';
+    /* Keep the legacy marker for existing editor/theme integrations.  The
+     * page-scoped marker is the authoritative OpenKill state: a LuCI host can
+     * retain data-theme="dark" while the user explicitly chooses light. */
     document.documentElement.setAttribute('data-darkmode', d ? 'true' : 'false');
+    document.documentElement.setAttribute('data-openkill-theme', resolved);
+    if (document.body && document.body.getAttribute('data-page') &&
+        document.body.getAttribute('data-page').indexOf('admin-services-openkill') === 0) {
+        document.body.setAttribute('data-openkill-theme', resolved);
+    }
     var m = document.querySelector('meta[name="color-scheme"]');
     if (!m) {
         m = document.createElement('meta');
@@ -131,11 +140,11 @@ function ocInitTheme() {
 
 	ocApplyRootTheme();
 
-	var needsCorrection = (localStorage.getItem('oc-theme') || 'auto') === 'auto';
-
-	function _ocDomReady() {
-		if (needsCorrection) ocApplyRootTheme();
-		ocApplyEditorTheme();
+    function _ocDomReady() {
+        /* Run once after the body exists so the page-scoped marker is present
+         * before cards and controls are painted. */
+        ocApplyRootTheme();
+        ocApplyEditorTheme();
 		ocHideEmptyCbiElements();
 		ocCenterCbiActions();
 	}

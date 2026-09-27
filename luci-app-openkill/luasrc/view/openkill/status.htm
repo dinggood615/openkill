@@ -68,7 +68,7 @@
                                     </div>
                                 </div>
                                 <div class="card-actions">
-                                    <button type="button" class="icon-btn theme-toggle-btn" id="theme-toggle" aria-label="<%:Auto Theme%>" title="<%:Auto Theme%>" onclick="toggleThemeMode()">
+                                    <button type="button" class="icon-btn theme-toggle-btn" id="theme-toggle" data-theme-toggle="light-dark" aria-label="<%:Auto Theme%>" title="<%:Auto Theme%>" aria-pressed="false" onclick="toggleThemeMode()">
                                         <svg id="sun-icon" width="14" height="14"><use href="#oc-icon-sun"/></svg>
                                         <svg id="moon-icon" width="14" height="14" class="oc-hidden"><use href="#oc-icon-moon"/></svg>
                                         <svg id="auto-icon" width="14" height="14" class="oc-hidden"><use href="#oc-icon-auto-theme"/></svg>
@@ -868,16 +868,29 @@
             var autoIcon = document.getElementById('auto-icon');
             if (sunIcon && moonIcon && autoIcon) {
                 var theme = localStorage.getItem('oc-theme') || 'auto';
+                var isDark = document.documentElement.getAttribute('data-darkmode') === 'true';
+                var toggle = document.getElementById('theme-toggle');
                 setStatusVisibility(sunIcon, false, undefined, 'oc-hidden');
                 setStatusVisibility(moonIcon, false, undefined, 'oc-hidden');
                 setStatusVisibility(autoIcon, false, undefined, 'oc-hidden');
 
-                if (theme === 'light') {
-                    setStatusVisibility(sunIcon, true, undefined, 'oc-hidden');
-                } else if (theme === 'dark') {
+                /* The button is an explicit light/dark switch.  Auto remains
+                 * a valid stored preference for existing users, but its
+                 * resolved icon reflects the actual page mode so it never
+                 * looks like a third visual theme. */
+                if (isDark) {
                     setStatusVisibility(moonIcon, true, undefined, 'oc-hidden');
                 } else {
-                    setStatusVisibility(autoIcon, true, undefined, 'oc-hidden');
+                    setStatusVisibility(sunIcon, true, undefined, 'oc-hidden');
+                }
+                if (toggle) {
+                    var lightLabel = '<%:Light Theme%>';
+                    var darkLabel = '<%:Dark Theme%>';
+                    var nextLabel = isDark ? lightLabel : darkLabel;
+                    toggle.setAttribute('aria-label', nextLabel);
+                    toggle.setAttribute('title', nextLabel);
+                    toggle.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+                    toggle.setAttribute('data-theme-mode', theme);
                 }
             }
         }
@@ -4310,15 +4323,15 @@
     }
 
     function toggleThemeMode() {
-        var themes = ['light', 'dark', 'auto'];
-        var currentTheme = localStorage.getItem('oc-theme') || 'auto';
-        var currentIndex = themes.indexOf(currentTheme);
-        if (currentIndex === -1) currentIndex = 2;
-        var newIndex = (currentIndex + 1) % themes.length;
-        var newTheme = themes[newIndex];
+        var currentlyDark = document.documentElement.getAttribute('data-darkmode') === 'true';
+        /* Treat auto as the currently rendered mode and switch to its
+         * opposite.  This makes the control a predictable black/white
+         * toggle instead of a three-step cycle with an invisible state. */
+        var newTheme = currentlyDark ? 'light' : 'dark';
         localStorage.setItem('oc-theme', newTheme);
         ocUpdateTheme();
         DarkModeDetector.init();
+        return false;
     }
 //]]></script>
 </html>
