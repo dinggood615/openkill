@@ -3860,3 +3860,30 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   `2026-1172` to `2026-1173`. The previous `v2026-1172-ipk` package remains
   the rollback target. RC and Formal Release are still pending and must use
   the exact post-version-bump commit after its Development CI succeeds.
+
+### 2026-1173 release evidence (2026-09-27)
+
+- Source commit `5e2970ac32ac367bc67d15998d3838deb49157ad` passed the exact
+  Development CI run
+  [36314239111](https://github.com/dinggood615/openkill/actions/runs/36314239111).
+- The manual RC Build for that exact source passed as run
+  [36314303797](https://github.com/dinggood615/openkill/actions/runs/36314303797).
+  Candidate IPK SHA256:
+  `181fdc19698505f4e5939c5284e31c894c30ee6e9e012ef8e8cb95d483cacfb9`.
+  Its audit reported valid package metadata, conffile preservation,
+  maintainer-script deletion safety, no stale development references and no
+  runtime sensitive/test-machine content.
+- Formal Release run
+  [36314524580](https://github.com/dinggood615/openkill/actions/runs/36314524580)
+  completed successfully with `release_gate=true` and `publish=true`. The
+  published package is
+  [v2026-1173-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1173-ipk),
+  asset `luci-app-openkill_2026-1173_all.ipk`, SHA256
+  `9502a61918ff787272f1febeb8b485676bfd172f6f6a59ef0e60b61201c774b9`.
+- The local fast matrix `20260927T105252Z-18244` passed 19/19, and the WSL
+  local gate and diff check passed on the release commit. The browser run is
+  local production-template/mock-backend evidence only. Device, independent
+  binary installation, process/PID/listener, node credential, VPS and remote
+  connectivity checks remain `设备待验证／远端待验证` under the active plan.
+- Rollback remains the published `v2026-1172-ipk`; installing it preserves the
+  existing OpenKill configuration, independent NaiveProxy data and user YAML.
