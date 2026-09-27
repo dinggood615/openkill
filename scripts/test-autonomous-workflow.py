@@ -50,6 +50,11 @@ class AutonomousWorkflowTests(unittest.TestCase):
     def test_rc_build_resets_sdk_package_selection(self):
         source = self.read(".github/workflows/build-openkill.yml")
         self.assertIn("timeout-minutes: 20", source)
+        self.assertIn("actions/cache@v4", source)
+        self.assertIn("Compute content-keyed SDK cache key", source)
+        self.assertIn("Using cached SDK tree", source)
+        self.assertIn(".openkill-feeds-ready", source)
+        self.assertIn(".openkill-host-tools-ready", source)
         self.assertIn("[ -f .config ] || : > .config", source)
         self.assertIn("/^CONFIG_PACKAGE_[^=]*=/d", source)
         self.assertIn("selected_package_count", source)
@@ -75,12 +80,17 @@ class AutonomousWorkflowTests(unittest.TestCase):
 
     def test_formal_ipk_build_resets_sdk_package_selection(self):
         source = self.read(".github/workflows/compile_new_ipk.yml")
+        self.assertIn("actions/cache@v4", source)
+        self.assertIn("Compute fixed IPK SDK cache key", source)
+        self.assertIn("Using cached OpenWrt IPK SDK tree", source)
         self.assertIn("[ -f .config ] || : > .config", source)
         self.assertIn("/^CONFIG_PACKAGE_[^=]*=/d", source)
         self.assertIn("for symbol in CONFIG_ALL CONFIG_ALL_KMODS", source)
         self.assertIn("selected_package_count", source)
         self.assertIn('Refusing an unexpectedly broad package selection', source)
-        self.assertIn('make -j"$(nproc)" package/luci-app-openkill/compile', source)
+        self.assertIn('make -C "$SDK_DIR/package/luci-app-openkill" TOPDIR="$SDK_DIR" CONFIG_USE_APK= compile V=99', source)
+        self.assertIn('make -C "$SDK_DIR/package/luci-app-openkill" TOPDIR="$SDK_DIR" CONFIG_USE_APK=y compile V=99', source)
+        self.assertNotIn('make -j"$(nproc)" package/luci-app-openkill/compile', source)
 
     def test_missing_release_notes_fail_before_external_commands(self):
         with tempfile.TemporaryDirectory() as directory:

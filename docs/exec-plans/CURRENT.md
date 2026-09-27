@@ -1,5 +1,37 @@
 # Current status
 
+## Release build acceleration and version 2026-1168 (2026-09-27)
+
+- Scope: optimize only the RC/Formal Release build and publication path. The
+  package source and runtime/network behavior are unchanged. Both workflows
+  will reuse a content-keyed OpenWrt SDK cache, skip redundant SDK download and
+  extraction when the cached tree is valid, and invoke the OpenKill package
+  makefile directly so unrelated SDK packages are never compiled.
+- Release contract: retain the explicit `release_gate=true` and
+  `publish=true` Formal Release gate, exact-source checkout, version/release
+  note checks, package audit, SHA256 and channel publication. Cache hits may
+  shorten preparation but may not bypass source validation, package selection
+  checks or artifact audit. The source version will advance once to
+  `2026-1168` only after the optimized path passes local gates and exact-commit
+  Development CI.
+- Verification boundary: local workflow-contract and shell checks are required.
+  GitHub RC/Formal workflows and package publication are remote gates; no
+  router/device access, `CENTRAL_ACTIVE`, central nft state, WAN/default
+  gateway changes or packet-path tests are authorized in this iteration.
+- Implementation evidence on observed baseline `343b79b7cd23c9d90e4086a58d206f566e3e7205`:
+  RC and Formal workflows now use content-keyed SDK caches, reuse validated
+  SDK trees and feed/host preparation markers, cache CodeMirror dependencies,
+  and invoke the package makefile directly for both IPK and optional APK.
+  Version checks, package-selection guards, artifact audits and the explicit
+  release gates remain in place.
+- Local verification: `python scripts/test-autonomous-workflow.py -v`,
+  `sh scripts/local-gate.sh` (via WSL), and `git diff --check` passed. The
+  workflow files were not executed on a GitHub runner yet; exact-commit CI,
+  RC timing/cache-hit evidence and Formal Release remain the next gates.
+- Next action: commit and push the bounded workflow optimization, verify the
+  exact Development CI, then bump the source metadata once to 2026-1168 and
+  run the RC/Formal release gates.
+
 ## NaiveProxy service tab and stable component update (2026-09-27)
 
 - Scope: move the independent NaiveProxy service into the `插件设置` tab

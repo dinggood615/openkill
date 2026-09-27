@@ -176,12 +176,32 @@ jobs:
           sudo apt-get update
           sudo apt-get -y install curl git tar unzip zstd jq python3 python3-pyelftools python3-setuptools
 
-      - name: Cache fixed IPK SDK
+      - name: Compute fixed IPK SDK cache key
+        if: ${{ matrix.target.name == 'ipk' }}
+        id: sdk_cache_key
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sdk_url_hash=$(printf '%s' '${{ matrix.target.sdk_url }}' | sha256sum | cut -c1-16)
+          # A version-only release must reuse the prepared SDK; workflow
+          # changes remain the explicit cache invalidation boundary.
+          source_hash="${{ hashFiles('.github/workflows/compile_new_ipk.yml') }}"
+          printf 'key=openkill-formal-ipk-sdk-%s-%s\n' "$sdk_url_hash" "$source_hash" >> "$GITHUB_OUTPUT"
+
+      - name: Cache fixed IPK SDK, feeds and host tools
         if: ${{ matrix.target.name == 'ipk' }}
         uses: actions/cache@v4
         with:
-          path: tmp/sdk-cache
-          key: openkill-ipk-sdk-22.03-${{ hashFiles('.github/workflows/compile_new_ipk.yml') }}
+          path: |
+            tmp/sdk-cache
+            tmp/SDK
+          key: ${{ steps.sdk_cache_key.outputs.key }}
+
+      - name: Cache CodeMirror dependencies
+        uses: actions/cache@v4
+        with:
+          path: tmp/codemirror-cache
+          key: openkill-codemirror-${{ hashFiles('luci-app-openkill/tools/codemirror/package.json') }}
 
       - name: Download SDK
         run: |
@@ -196,10 +216,15 @@ jobs:
             else
               echo "Using cached OpenWrt IPK SDK: $SDK_CACHE"
             fi
-            cp "$SDK_CACHE" "./tmp/${{ matrix.target.sdk_tar }}"
-            cd tmp
-            tar xf ${{ matrix.target.sdk_tar }}
-            mv openwrt-sdk-* ${{ matrix.target.sdk_dir }}
+            if [ -d "./tmp/${{ matrix.target.sdk_dir }}/staging_dir" ] && [ -f "./tmp/${{ matrix.target.sdk_dir }}/Makefile" ]; then
+              echo "Using cached OpenWrt IPK SDK tree: ./tmp/${{ matrix.target.sdk_dir }}"
+            else
+              cp "$SDK_CACHE" "./tmp/${{ matrix.target.sdk_tar }}"
+              cd tmp
+              rm -rf "${{ matrix.target.sdk_dir }}"
+              tar xf "${{ matrix.target.sdk_tar }}"
+              mv openwrt-sdk-* "${{ matrix.target.sdk_dir }}"
+            fi
           else
             BASE_URL="https://downloads.openwrt.org/snapshots/targets/x86/64/"
             SDK_NAME=$(curl -sf $BASE_URL | grep -oE 'openwrt-sdk-x86-64[^"]+\.tar\.zst' | head -n 1)
@@ -282,8 +307,17 @@ jobs:
       - name: Build CodeMirror 6 Bundle & Minify CSS/JS
         run: |
           cd tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/tools/codemirror
-          # Install dependencies
-          npm install --prefer-offline --no-audit --no-fund
+          # Reuse the immutable dependency tree when the manifest is unchanged;
+          # npm remains the integrity-checked fallback on a cache miss.
+          rm -rf node_modules
+          if [ -d "$GITHUB_WORKSPACE/tmp/codemirror-cache/node_modules" ]; then
+            cp -a "$GITHUB_WORKSPACE/tmp/codemirror-cache/node_modules" ./node_modules
+            echo 'Using cached CodeMirror dependencies.'
+          else
+            npm install --prefer-offline --no-audit --no-fund
+            mkdir -p "$GITHUB_WORKSPACE/tmp/codemirror-cache"
+            cp -a ./node_modules "$GITHUB_WORKSPACE/tmp/codemirror-cache/node_modules"
+          fi
           # Build CodeMirror 6 JS
           npx esbuild entry.js --bundle --format=iife --global-name=CM6 --minify --target=es2019 --outfile=../../root/www/luci-static/resources/openkill/js/cm6.min.js --legal-comments=none --loader:.css=text
           # Minify other JS files (exclude cm6.min.js which is already built)
@@ -315,7 +349,9 @@ jobs:
         run: |
           set -Eeuo pipefail
           cd tmp/${{ matrix.target.sdk_dir }}
-          if [ -f ../${{ matrix.target.sdk_tar }} ]; then
+          # Always re-apply the package-only selection, including when the SDK
+          # tree came from the cache and its archive is stored separately.
+          if [ -f .config ]; then
             # SDK archives often carry every package as a module.  Leaving
             # those stale selections in place makes a single-package release
             # compile LLVM and the rest of the toolchain.  Reset package
@@ -363,7 +399,16 @@ jobs:
               exit 1
             fi
           fi
-          make -j"$(nproc)" package/luci-app-openkill/compile V=99
+          # Build only this package.  The aggregate package/compile target can
+          # expand the SDK's kernel/module graph and defeat the package-only
+          # selection guard above.
+          if [ "${{ matrix.target.name }}" = "apk" ]; then
+            make -C "$SDK_DIR/package/luci-app-openkill" TOPDIR="$SDK_DIR" CONFIG_USE_APK=y clean V=99
+            make -C "$SDK_DIR/package/luci-app-openkill" TOPDIR="$SDK_DIR" CONFIG_USE_APK=y compile V=99
+          else
+            make -C "$SDK_DIR/package/luci-app-openkill" TOPDIR="$SDK_DIR" CONFIG_USE_APK= clean V=99
+            make -C "$SDK_DIR/package/luci-app-openkill" TOPDIR="$SDK_DIR" CONFIG_USE_APK= compile V=99
+          fi
           if [ ! -f bin/packages/x86_64/base/${{ matrix.target.artifact_pattern }} ]; then
             mkdir -p bin/packages/x86_64/base
             find bin -name "luci-app-openkill_*.ipk" -exec cp {} bin/packages/x86_64/base/ \; 2>/dev/null || true

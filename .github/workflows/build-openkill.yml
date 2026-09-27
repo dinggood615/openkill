@@ -79,28 +79,55 @@ jobs:
             exit 1
           fi
 
+      - name: Compute content-keyed SDK cache key
+        id: sdk_cache_key
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sdk_url_hash=$(printf '%s' "$OPENWRT_SDK_URL" | sha256sum | cut -c1-16)
+          # The SDK/feed cache is independent of the package version.  Keeping
+          # the source hash to the workflow lets a version-only release reuse
+          # the prepared toolchain instead of unpacking it again.
+          source_hash="${{ hashFiles('.github/workflows/build-openkill.yml') }}"
+          printf 'key=openkill-rc-sdk-%s-%s-%s\n' "$OPENWRT_VERSION" "$sdk_url_hash" "$source_hash" >> "$GITHUB_OUTPUT"
+
+      - name: Cache SDK archive, feeds and host tools
+        id: sdk_cache
+        uses: actions/cache@v4
+        with:
+          path: sdk-download
+          key: ${{ steps.sdk_cache_key.outputs.key }}
+
       - name: Download and unpack the OpenWrt SDK
         shell: bash
         run: |
           set -Eeuo pipefail
           mkdir -p "$GITHUB_WORKSPACE/sdk-download" "$GITHUB_WORKSPACE/artifact"
           sdk_archive="$GITHUB_WORKSPACE/sdk-download/$(basename "${OPENWRT_SDK_URL%%\?*}")"
-          curl -fL --retry 3 --retry-all-errors --connect-timeout 30 \
-            "$OPENWRT_SDK_URL" -o "$sdk_archive"
+          if [ ! -s "$sdk_archive" ]; then
+            curl -fL --retry 3 --retry-all-errors --connect-timeout 30 \
+              "$OPENWRT_SDK_URL" -o "$sdk_archive"
+          else
+            echo "Using cached SDK archive: $(basename "$sdk_archive")"
+          fi
           test -s "$sdk_archive"
           file "$sdk_archive"
           echo "SDK archive: $(basename "$sdk_archive")"
 
-          case "$sdk_archive" in
-            *.tar.xz) tar -xJf "$sdk_archive" -C "$GITHUB_WORKSPACE/sdk-download" ;;
-            *.tar.gz|*.tgz) tar -xzf "$sdk_archive" -C "$GITHUB_WORKSPACE/sdk-download" ;;
-            *.tar.zst) tar --zstd -xf "$sdk_archive" -C "$GITHUB_WORKSPACE/sdk-download" ;;
-            *) echo 'Unsupported SDK archive format.' >&2; exit 1 ;;
-          esac
-
           sdk_top="$(tar -tf "$sdk_archive" | sed -n '1s#/.*##p')"
           test -n "$sdk_top"
           sdk_dir="$GITHUB_WORKSPACE/sdk-download/$sdk_top"
+          if [ ! -f "$sdk_dir/Makefile" ] || [ ! -d "$sdk_dir/scripts" ] || [ ! -d "$sdk_dir/staging_dir" ]; then
+            rm -rf "$sdk_dir"
+            case "$sdk_archive" in
+              *.tar.xz) tar -xJf "$sdk_archive" -C "$GITHUB_WORKSPACE/sdk-download" ;;
+              *.tar.gz|*.tgz) tar -xzf "$sdk_archive" -C "$GITHUB_WORKSPACE/sdk-download" ;;
+              *.tar.zst) tar --zstd -xf "$sdk_archive" -C "$GITHUB_WORKSPACE/sdk-download" ;;
+              *) echo 'Unsupported SDK archive format.' >&2; exit 1 ;;
+            esac
+          else
+            echo "Using cached SDK tree: $sdk_dir"
+          fi
           test -d "$sdk_dir"
           test -f "$sdk_dir/Makefile"
           test -d "$sdk_dir/scripts"
@@ -114,8 +141,13 @@ jobs:
         run: |
           set -Eeuo pipefail
           cd "$SDK_DIR"
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
+          if [ ! -f .openkill-feeds-ready ]; then
+            ./scripts/feeds update -a
+            ./scripts/feeds install -a
+            : > .openkill-feeds-ready
+          else
+            echo 'Using cached OpenWrt feed metadata.'
+          fi
           rm -rf package/luci-app-openkill
           cp -a "$GITHUB_WORKSPACE/luci-app-openkill" package/luci-app-openkill
 
@@ -128,7 +160,12 @@ jobs:
           # Prime the host-side LuCI helper from the SDK before its package
           # metadata is scrubbed.  The package has no source compile step,
           # but its translation build needs po2lmo in the host staging tree.
-          make package/luci-base/host/compile V=s
+          if [ ! -f .openkill-host-tools-ready ]; then
+            make package/luci-base/host/compile V=s
+            : > .openkill-host-tools-ready
+          else
+            echo 'Using cached SDK host tools.'
+          fi
 
           # SDK archives commonly ship with broad package selectors.  Load
           # feed metadata once, then scrub every package/all-build selector
