@@ -162,6 +162,15 @@
 - For CSS, compare selectors against all LuCI templates, inline hooks,
   generated preview markup and runtime JavaScript before removing them. Record
   the selector evidence and rerun UI contract/preview and package-path gates.
+- OixCloud translation audit result: 16 message blocks in each retained
+  Chinese and Spanish catalog had no live source reference. They were removed;
+  `check-openkill-i18n.sh`, optimization/UI tests, local gate and diff checks
+  passed. The announcement endpoint remains a deliberate empty compatibility
+  response, and network/fallback no-op contracts remain in use.
+- The translation cleanup commit
+  `3abdfef6cf6bf6c8afdfb38d7d0f17649c202e73` was pushed and its exact
+  Development CI succeeded:
+  https://github.com/dinggood615/openkill/actions/runs/36295347743.
 
 ## CSS ownership refactor: baseline and runtime-status phase (2026-09-27)
 
