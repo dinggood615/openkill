@@ -21,11 +21,17 @@
   configuration, install packages, start or stop services, alter WAN, DNS,
   firewall, routes, CENTRAL_ACTIVE or packet paths. All test links and
   credentials are fictional.
-- Device diagnostic result: on 2026-09-27 the read-only SSH transport reached
-  `192.168.1.103`, but authentication was rejected before a remote command
-  ran. No router state, configuration, service, package or network setting was
-  read or changed. Resume requires a currently valid credential or approved
-  SSH key; then run only the listed read-only component/service/listener probe.
+- Device diagnostic result: on 2026-09-27 the first attempts failed because
+  the Windows password environment was not forwarded into WSL, not because of
+  a proven router credential failure. The corrected read-only probe found an
+  executable component with a successful version-probe exit, one mode-600
+  enabled node file, a matching port-map entry and the bridge init script.
+  The service reports active with no instances: there are no generated runtime
+  config or instance-state files, no NaiveProxy process, no procd instance and
+  no NaiveProxy loopback listener. This proves the node has not reached its
+  start phase; it does not prove a remote connection failure. No router state,
+  configuration, service, package or network setting was changed. Resume with
+  an explicitly authorized start action only after preserving this baseline.
 - Rollback: revert the bounded source commits. The component installer retains
   the previous executable, and node changes use mode-600 atomic files under
   `/etc/naiveproxy/nodes`; no OpenKill UCI or user YAML is touched.
