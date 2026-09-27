@@ -1699,7 +1699,7 @@ end
 function action_naive_bridge_control()
 	local method = HTTP.getenv("REQUEST_METHOD") or "GET"
 	local operation = HTTP.formvalue("operation") or ""
-	local allowed = { add = true, import = true, remove = true, start = true, stop = true, health = true, legacy_cleanup = true }
+	local allowed = { add = true, import = true, remove = true, start = true, stop = true, health = true, update = true, legacy_cleanup = true }
 	local result = { ok = false, operation = operation, stage = "request" }
 	if method ~= "POST" or not allowed[operation] then
 		HTTP.status(400, "Bad Request")
@@ -1766,7 +1766,7 @@ end
 function action_naive_redirect()
 	local dispatcher = require "luci.dispatcher"
 	local http = require "luci.http"
-	http.redirect(dispatcher.build_url("admin", "services", "openkill", "settings") .. "?tab=compatibility#openkill-naive-component-info")
+	http.redirect(dispatcher.build_url("admin", "services", "openkill", "settings") .. "?tab=naive_service#openkill-naive-component-info")
 end
 
 function action_naive_node()
@@ -1775,7 +1775,7 @@ function action_naive_node()
 	-- This legacy route used to create an OpenKill UCI draft.  Keep old
 	-- bookmarks useful, but never create or edit a credential-bearing node in
 	-- OpenKill; the standalone bridge owns that data now.
-	http.redirect(dispatcher.build_url("admin", "services", "openkill", "settings") .. "?tab=compatibility#openkill-naive-component-info")
+	http.redirect(dispatcher.build_url("admin", "services", "openkill", "settings") .. "?tab=naive_service#openkill-naive-component-info")
 end
 
 function action_naive_metadata()

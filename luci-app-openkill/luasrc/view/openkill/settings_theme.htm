@@ -48,6 +48,11 @@
                 'common_ports', 'china_ip_route', 'chnroute_pass'
             ]}
         ],
+        naive_service: [
+            {id: 'naiveproxy-service', title: 'NaiveProxy与服务', fullWidth: true, keys: [
+                '_naive_component_info'
+            ]}
+        ],
         rules: [
             {id: 'geo-databases', title: '<%:Geo Databases%>', fullWidth: true, keys: [
                 'geo_auto_update', 'geo_update_week_time', 'geo_update_day_time',
@@ -92,9 +97,6 @@
                 'zerotier_status', 'feature_zerotier', 'zerotier_network_id',
                 'zerotier_interface', 'zerotier_auto_start', 'zerotier_apply'
             ]},
-            {id: 'naiveproxy-compatibility', title: 'NaiveProxy 独立服务', keys: [
-                '_naive_component_info'
-            ]},
         ],
         advanced: [
             {id: 'maintenance-tools', title: '系统维护', keys: [
@@ -111,6 +113,7 @@
     var TAB_CATEGORY_ALIASES = {
         basic: /运行与服务|运行和服务|Operation\s*&\s*Services|Runtime\s*&\s*Services/i,
         network: /网络与分流|Network\s*&\s*Routing/i,
+        naive_service: /NaiveProxy与服务|NaiveProxy\s*&\s*Service/i,
         rules: /规则与订阅|Rules\s*&\s*Subscriptions/i,
         stability: /性能与稳定|Performance\s*&\s*Stability/i,
         compatibility: /兼容设置|兼容与辅助|Compatibility/i,
@@ -531,8 +534,9 @@
         }
         if (!requestedCategory) {
             var requestedHash = String(window.location.hash || '').toLowerCase();
-            if (requestedHash.indexOf('#openkill-naive-component-info') === 0 ||
-                requestedHash === '#compatibility') requestedCategory = 'compatibility';
+            if (requestedHash.indexOf('#openkill-naive-component-info') === 0)
+                requestedCategory = 'naive_service';
+            else if (requestedHash === '#compatibility') requestedCategory = 'compatibility';
         }
         if (requestedCategory) {
             requestedCategory = requestedCategory.toLowerCase();
@@ -548,7 +552,7 @@
          * section leave it outside directFields().  Move the original row
          * before card construction so the independent service is a peer of
          * VPN, remote access and OpenVPN instead of a full-width orphan. */
-        moveExplicitFieldsToCategory(map, tabItems, 'compatibility', ['_naive_component_info']);
+        moveExplicitFieldsToCategory(map, tabItems, 'naive_service', ['_naive_component_info']);
         keepSourceTrafficInNetwork(map, tabItems);
         // Build only the visible category before the first paint.  The CBI
         // fields remain in their original panels until their tab is needed,

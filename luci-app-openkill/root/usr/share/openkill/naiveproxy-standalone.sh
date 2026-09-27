@@ -517,6 +517,17 @@ np_control() {
                 return "$rc"
             fi
             np_health_all; return $? ;;
+        update)
+            metadata=/usr/share/openkill/naiveproxy-component-metadata.sh
+            [ -r "$metadata" ] || return 33
+            metadata_output=$(sh "$metadata" detect 2>/dev/null) || return 34
+            printf '%s\n' "$metadata_output" | grep -q '^ok=1$' || return 35
+            update_url=$(printf '%s\n' "$metadata_output" | sed -n 's/^url=//p' | sed -n '1p')
+            update_sha=$(printf '%s\n' "$metadata_output" | sed -n 's/^sha256=//p' | sed -n '1p')
+            update_size=$(printf '%s\n' "$metadata_output" | sed -n 's/^size=//p' | sed -n '1p')
+            [ -n "$update_url" ] && [ -n "$update_sha" ] && [ -n "$update_size" ] || return 36
+            np_component_install "$update_url" "$update_sha" "$update_size"
+            ;;
         legacy_cleanup) np_legacy_cleanup ;;
         *) return 32 ;;
     esac

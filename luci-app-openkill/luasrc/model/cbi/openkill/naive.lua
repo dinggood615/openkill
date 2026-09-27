@@ -4,4 +4,4 @@
 local http = require "luci.http"
 local dispatcher = require "luci.dispatcher"
 
-http.redirect(dispatcher.build_url("admin", "services", "openkill", "settings") .. "?tab=compatibility#openkill-naive-component-info")
+http.redirect(dispatcher.build_url("admin", "services", "openkill", "settings") .. "?tab=naive_service#openkill-naive-component-info")

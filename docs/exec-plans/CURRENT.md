@@ -1,5 +1,23 @@
 # Current status
 
+## NaiveProxy service tab and stable component update (2026-09-27)
+
+- Scope: move the independent NaiveProxy service into the `插件设置` tab
+  sequence between `网络与分流` and `兼容与辅助`; remove its duplicate
+  compatibility-card layout entry while preserving the existing independent
+  service template and credential boundary.
+- Update contract: add a permission-checked service operation that resolves
+  only the official stable release metadata, verifies URL/size/SHA256/ELF and
+  loader before atomic replacement, retains the previous component on failure,
+  and never changes OpenKill UCI, user YAML, Mihomo or strategy groups.
+- Verification boundary: local source, shell, UI-contract and local-gate
+  checks are required. The current plan still does not authorize device writes,
+  package installation, remote VPS authentication or packet-path tests; those
+  remain pending unless a later plan explicitly authorizes a device phase.
+- Next action: run focused NaiveProxy/settings tests and the full local gate,
+  review the diff, then commit the bounded change. Browser rendering remains
+  subject to local browser-tool availability.
+
 ## Standalone NaiveProxy card placement and legacy-config removal (2026-09-26)
 
 ### Follow-up: import diagnostics and compatibility card placement

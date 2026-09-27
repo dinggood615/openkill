@@ -178,17 +178,18 @@ class LuCIContractTests(unittest.TestCase):
         self.assertIn('[id="container.openkill.config.network"] .openkill-settings-card-stack', css)
         self.assertIn('[id="container.openkill.config.network"] .openkill-settings-card-body', css)
 
-    def test_standalone_naive_card_stays_in_the_compatibility_grid(self) -> None:
+    def test_standalone_naive_service_has_its_own_plugin_settings_tab(self) -> None:
         theme = SETTINGS_THEME.read_text(encoding="utf-8")
         css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css").read_text(encoding="utf-8")
         self.assertIn("{id: 'openvpn-compatibility'", theme)
         self.assertIn("{id: 'zerotier'", theme)
-        self.assertIn("{id: 'naiveproxy-compatibility'", theme)
+        self.assertIn("{id: 'naiveproxy-service'", theme)
         remote = theme.split("{id: 'remote-service'", 1)[1].split("{id: 'openvpn-compatibility'", 1)[0]
-        zerotier = theme.split("{id: 'zerotier'", 1)[1].split("{id: 'naiveproxy-compatibility'", 1)[0]
+        zerotier = theme.split("{id: 'zerotier'", 1)[1].split("advanced:", 1)[0]
         self.assertNotIn("zerotier_status", remote)
         self.assertIn("'zerotier_status', 'feature_zerotier'", zerotier)
-        self.assertIn("moveExplicitFieldsToCategory(map, tabItems, 'compatibility', ['_naive_component_info'])", theme)
+        self.assertIn("s:tab(\"naive_service\", \"NaiveProxy与服务\")", (ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua").read_text(encoding="utf-8"))
+        self.assertIn("moveExplicitFieldsToCategory(map, tabItems, 'naive_service', ['_naive_component_info'])", theme)
         self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", css)
         self.assertIn("align-items: stretch;", css)
 
