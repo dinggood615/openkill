@@ -38,6 +38,11 @@
   link-import behavior and `git diff --check`. No version increment or release
   was performed because the required device/VPS phase is still outside the
   authorized boundary.
+- Resume condition: a future plan must explicitly authorize the test-device
+  phase and provide its permitted read/write scope before package installation,
+  component update, node start or VPS authentication can be attempted. Until
+  then the implementation remains on `master` at the observed HEAD and the
+  release gate stays intentionally pending.
 
 ## Standalone NaiveProxy card placement and legacy-config removal (2026-09-26)
 
