@@ -1,5 +1,30 @@
 # Current status
 
+## Authorized Playwright test-device phase (2026-09-27)
+
+- Authorization: the user explicitly approved continuing the Playwright and
+  test-device validation phase after the local browser fallback was verified.
+  The scope is limited to the existing OpenWrt target `192.168.1.103` and its
+  OpenKill LuCI page, using the already configured read-only SSH access.
+- Allowed: inspect the device's available runtime, install only the minimum
+  browser-test tooling if technically viable, serve or access the OpenKill UI,
+  and run read-only DOM/layout/accessibility checks.  Any temporary package or
+  cache must be recorded and removable without touching OpenKill user data.
+- Forbidden: CENTRAL_ACTIVE, central nft apply, packet-path or traffic tests,
+  WAN/default-gateway/DNS policy changes, OpenKill/Mihomo/Naive service
+  restarts, user configuration writes, credentials in commands/logs, and any
+  remote VPS authentication.  If the device cannot host a browser runtime,
+  use local Playwright against a read-only device UI endpoint and record that
+  split explicitly.
+- Rollback: remove only the test tooling/cache installed for this phase and
+  restore any temporary port-forward/process; do not remove packages or files
+  that predated this phase.  No package or service mutation is performed until
+  a read-only capability check identifies the exact target paths and space.
+- Resume evidence required: device capability inventory, browser/Playwright
+  execution result, viewport and overflow measurements, console/network error
+  report, and a clear list of checks not possible without packet-path or
+  authenticated UI access.
+
 ## Playwright local browser validation (2026-09-27)
 
 - Local capability: installed Python Playwright 1.63.0 and its Chromium
@@ -25,6 +50,26 @@
   its storage and rollback scope, and permit the requested OpenKill UI test.
   Until then, device browser validation remains `REAL_DEVICE_GATE` and remote
   Naive/VPS behavior remains unverified.
+
+### Authorized phase result
+
+- Read-only capability checks reached `192.168.1.103` over the configured SSH
+  key and HTTP.  The target is Kwrt/OpenWrt x86/64 with `opkg`, about 624 MB
+  free overlay and no installed Python, Node, Playwright, Chromium, Chrome or
+  Firefox.  Cached package metadata exposes no directly installable browser or
+  Playwright package, so device-side deployment is not technically viable
+  without introducing a large external runtime and its dependencies.
+- Local Playwright/Chrome opened the device LuCI endpoint at 1366 x 900 CSS px
+  (DPR 1), confirmed the LuCI login page rendered with no horizontal overflow,
+  and saved the read-only screenshot to
+  `D:\openkill-cache\device-ui-20260927.png`.  No credentials were entered and
+  no device configuration, package, service, route, DNS, firewall or packet
+  path was changed.
+- The device UI stopped at the LuCI login screen.  OpenKill page rendering,
+  authenticated CBI interactions and device-side browser execution require a
+  temporary LuCI test account/session or an existing browser runtime.  Those
+  remain unverified; the local preview and local Playwright suite are the
+  authoritative results for this iteration.
 
 ## CSS ownership refactor: baseline and runtime-status phase (2026-09-27)
 
