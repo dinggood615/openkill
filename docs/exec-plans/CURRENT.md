@@ -30,6 +30,16 @@
   passes. `test-naiveproxy-import.js`, integration/runtime/UI contracts,
   POSIX syntax and `sh scripts/local-gate.sh` pass. No device, router or VPS
   action was performed under the repository boundary.
+- Delivery evidence: implementation commit `771adfda732be69e3204e2257f1a35b3f6814a05`
+  passed Development CI (run `36322321076`). Release source
+  `f6f1c5fd5165e4e4640d46be328dc6e2631318a0` passed its exact Development
+  CI (run `36322491754`), then RC Build and Formal Release. The published
+  `v2026-1174-ipk` tag resolves to that release source. Its IPK SHA256 is
+  `6dfef90c307251e4e62c7ad281a8f931349e1028e7db0eead3f7e32b40fcdadd`.
+  The RC candidate SHA256 was
+  `42721f7e68e93bc6dd4947e8159725d73956e5ced9005601d6e850aaf698bf01`.
+  Release delivery does not add device, router, component-install, PID,
+  listener or VPS evidence; those remain deferred by the repository guide.
 
 ## 2026-09-27 OpenKill UI theme toggle and light/dark consistency
 
