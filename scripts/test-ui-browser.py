@@ -84,22 +84,31 @@ def main() -> int:
         browser = None
         try:
             with sync_playwright() as playwright:
-                executable = Path(playwright.chromium.executable_path)
-                if not executable.is_file():
-                    candidates = (
-                        Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
-                        Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
-                        Path(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
-                        Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
-                    )
-                    executable = next((path for path in candidates if path.is_file()), Path())
-                if not executable.is_file():
+                candidates = [Path(playwright.chromium.executable_path)]
+                candidates.extend((
+                    Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
+                    Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
+                    Path(r"C:\Program Files\Microsoft\Edge\Application\msedge.exe"),
+                    Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
+                ))
+                candidates = list(dict.fromkeys(path for path in candidates if path.is_file()))
+                if not candidates:
                     print("OPENKILL_ENVIRONMENT_LIMIT=PLAYWRIGHT_BROWSER_UNAVAILABLE")
                     return 0
-                try:
-                    browser = playwright.chromium.launch(headless=True, executable_path=str(executable))
-                except Exception as error:  # launch is an environment boundary
-                    print(f"UI_BROWSER=FAIL\nPLAYWRIGHT_LAUNCH_ERROR={type(error).__name__}")
+                launch_errors: list[str] = []
+                executable = candidates[0]
+                for candidate in candidates:
+                    try:
+                        browser = playwright.chromium.launch(headless=True, executable_path=str(candidate))
+                        executable = candidate
+                        break
+                    except Exception as error:  # launch is an environment boundary
+                        launch_errors.append(f"{candidate.name}:{type(error).__name__}")
+                if browser is None:
+                    print(
+                        "UI_BROWSER=FAIL\n"
+                        f"PLAYWRIGHT_LAUNCH_ERROR={','.join(launch_errors) or 'unknown'}"
+                    )
                     return 1
                 page = browser.new_page(viewport={"width": 1366, "height": 900})
                 console_errors: list[str] = []

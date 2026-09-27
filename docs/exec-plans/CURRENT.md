@@ -1,5 +1,31 @@
 # Current status
 
+## Playwright local browser validation (2026-09-27)
+
+- Local capability: installed Python Playwright 1.63.0 and its Chromium
+  browser under the user environment.  The bundled browser executable returned
+  Windows `spawn UNKNOWN`, so `scripts/test-ui-browser.py` now tries the
+  installed Playwright browser first and then verified local Chrome/Edge
+  executables.  No production page, network setting or device configuration
+  is changed by this fallback.
+- Local result: UI contract (28 tests), preview (2), interaction (1), browser
+  validation and `sh scripts/local-gate.sh` passed.  The browser suite reports
+  `UI_BROWSER=PASS`, `UI_PRODUCTION_JS=PASS`, `UI_DIMENSIONS=4/4` and
+  `UI_LOCAL_REQUESTS=PASS`; it exercised 1920, 1366, 768 and 390 CSS-pixel
+  viewports and wrote screenshots/evidence only under the ignored
+  `artifacts/test-evidence/ui-preview/` directory.  The run used local Chrome
+  after the bundled executable failed to spawn.
+- Test-device read-only preflight: the authorized OpenWrt target reports
+  x86/64, has no `python3`, Playwright module or Chromium/Chrome executable.
+  The current approved device phase explicitly forbids package installation,
+  service restart and packet-path testing, so Playwright cannot be deployed or
+  run there in this iteration.  No device state was changed.
+- Gate: a separate device plan must explicitly authorize installing the
+  required runtime/browser (or provide an existing supported browser), define
+  its storage and rollback scope, and permit the requested OpenKill UI test.
+  Until then, device browser validation remains `REAL_DEVICE_GATE` and remote
+  Naive/VPS behavior remains unverified.
+
 ## CSS ownership refactor: baseline and runtime-status phase (2026-09-27)
 
 - Scope: this staged change is limited to OpenKill-scoped CSS variables, rule
