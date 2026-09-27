@@ -47,6 +47,37 @@
   card-stack/card layout declarations into the documented layout layer and
   removing containment that can defer an expanded card's content.
 
+## CSS ownership refactor: settings-card phase evidence (2026-09-27)
+
+- Completed: `flat.css` now has one canonical settings-card layout section.
+  It owns the two-column grid, content-sized rows, card flex flow and desktop
+  stretch behavior.  Earlier duplicate stack/card declarations and the late
+  precedence copy were removed.  The change does not alter `settings_theme.htm`
+  or any CBI field, tab, event, validation or save/apply code.
+- Source evidence: `61bebfdb7700ebe16723b6297f3e73a1445bc2b3`
+  (`ui: consolidate settings card layout rules`) is pushed to `master`.
+  `test-ui-contract.py` (28 tests), preview and interaction tests,
+  `git diff --check`, CSS/package validation and `sh scripts/local-gate.sh`
+  passed. Development CI #282 passed for that exact source:
+  https://github.com/dinggood615/openkill/actions/runs/36292702542 .
+- Baseline delta after the two phases: `oc.css` is 9,455 lines / 304,427 bytes
+  and `flat.css` is 1,546 lines / 57,639 bytes, down 27 lines / 1,130 bytes
+  and 42 lines / 1,563 bytes respectively. `!important` counts remain 260 in
+  `oc.css` and one in `flat.css`; those remaining uses require page-by-page
+  ownership review rather than broad removal.
+- Browser evidence: the local preview is built from the real status template
+  and final CSS.  In available Chrome it rendered the runtime dashboard at
+  1536 x 730 CSS px, DPR 1.25, dark-theme mode, with two 724 px cards in a
+  1461 px grid and no horizontal overflow before and after the status change.
+  The preview generator does not render a router-backed CBI settings map, and
+  Playwright is unavailable; settings-card browser screenshots, exact target
+  viewport/zoom runs, light theme and router integration remain unverified.
+- Next action: use the same measured, single-page approach for configuration
+  management, then subscription, overwrite, node/policy, logs, diagnostics,
+  component management and dialogs.  Each page requires its own baseline,
+  bounded commit and exact-commit Development CI.  No RC build, version bump
+  or formal release is authorized for this partial CSS refactor.
+
 ## LuCI theme-aligned UI refresh (2026-09-27)
 
 - Scope: visual and layout work only. The change may adjust page structure,
