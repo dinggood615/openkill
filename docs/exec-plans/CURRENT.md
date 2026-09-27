@@ -2943,6 +2943,13 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   correct but the test was not updated. The test contract is being repaired
   before RC and Formal Release are retried.
 
+## 2026-1167 maintenance editor layout (2026-09-27)
+
+- Follow-up scope: within the maintenance card only, make the custom firewall
+  editor use the full card width and place its description below the editor.
+  The global CBI label/field/description layout and all other settings cards
+  remain unchanged.
+
 - The repaired source commit `d433d5e3f44a2473fa6f5355a72b9a47d0d5ef29`
   passed exact Development CI:
   [run 36282586838](https://github.com/dinggood615/openkill/actions/runs/36282586838).

@@ -848,6 +848,30 @@ body[data-page="admin-services-openkill-client"] .myip-content-grid {
     margin-top: 3px;
 }
 
+/* The maintenance card contains a large custom-firewall editor.  Keep its
+ * editor and explanation in one vertical flow so the textarea can use the
+ * full card width instead of competing with the description column. */
+#cbi-openkill.openkill-settings
+.openkill-settings-card[data-openkill-card="maintenance-tools"] .cbi-value {
+    display: block;
+}
+
+#cbi-openkill.openkill-settings
+.openkill-settings-card[data-openkill-card="maintenance-tools"] .cbi-value-title,
+#cbi-openkill.openkill-settings
+.openkill-settings-card[data-openkill-card="maintenance-tools"] .cbi-value-field,
+#cbi-openkill.openkill-settings
+.openkill-settings-card[data-openkill-card="maintenance-tools"] .cbi-value-description {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+}
+
+#cbi-openkill.openkill-settings
+.openkill-settings-card[data-openkill-card="maintenance-tools"] .cbi-value-description {
+    margin-top: 6px;
+}
+
 .openkill-naive-compatibility p {
     margin-top: 6px;
     margin-bottom: 6px;
