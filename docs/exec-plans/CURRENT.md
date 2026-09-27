@@ -4002,3 +4002,19 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   then replace the pending 2026-1175 release candidate with the exact repaired
   source commit.  The already completed RC run for `306aea6` is evidence for
   the earlier token-only candidate and is not release evidence for this repair.
+
+### 2026-1175 release evidence (2026-09-27)
+
+- Source commit `0e1b98dce39dc69d7a28dc0bac6d61bb72966015` passed exact
+  Development CI run [36326267531](https://github.com/dinggood615/openkill/actions/runs/36326267531).
+- The replacement RC audit passed as run
+  [36326385147](https://github.com/dinggood615/openkill/actions/runs/36326385147),
+  building `luci-app-openkill_2026-1175_all.ipk` (candidate SHA256
+  `04bde69d1e3ea11cfdd43948132273857ce05bcdf59ca9edf35f11fcc123c82a`).
+- Formal Release run [36326495615](https://github.com/dinggood615/openkill/actions/runs/36326495615)
+  completed successfully with `release_gate=true` and `publish=true`.  Tag
+  `v2026-1175-ipk` points to the exact source commit.  The published package
+  SHA256 is `77433b384d99c3eab60d1934fcdca0a148bfbc1b92d0c25042056be04108ded1`.
+- The test device was only read for diagnosis: its binary is executable and
+  the version probe succeeds.  Package deployment, node start, owned listener
+  verification and SOCKS5 HTTPS/VPS verification remain pending.
