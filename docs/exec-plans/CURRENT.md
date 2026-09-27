@@ -2901,3 +2901,11 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
 - The correction commit `5ce2a9a0950cce4250cff928d09c8530b389d567` was pushed
   to `master`; its exact Development CI passed:
   [run 36280949804](https://github.com/dinggood615/openkill/actions/runs/36280949804).
+
+## 2026-1165 maintenance and Mihomo card order (2026-09-27)
+
+- Requested scope: in the system-maintenance tab, place the `系统维护` card
+  before and beside `Mihomo 能力` in the same two-column grid. This is a
+  presentation-only ordering change; fields, defaults, save behavior and
+  capability checks remain unchanged. Desktop rows stretch naturally and the
+  existing single-column mobile fallback remains in effect.
