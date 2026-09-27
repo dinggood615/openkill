@@ -3803,3 +3803,24 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
 - Development commit `38749047b74dbc1454d761d0da5d0acc8c198487` was pushed to
   `master`; exact-commit Development CI run `36310410689` completed
   successfully. No RC or Formal Release was run for this UI/import-only fix.
+
+## Full-project fault audit and release follow-up (2026-09-27)
+
+- Scope: reproduce local failures across installation, startup, configuration
+  generation, Mihomo validation, NaiveProxy import/control, status polling and
+  OpenKill-scoped UI styling before making bounded repairs. Preserve all
+  protocol, DNS, proxy, node, subscription and user-YAML semantics.
+- Risk boundary: controller and standalone-service changes must remain
+  credential-free at the OpenKill boundary; UI changes must remain scoped to
+  OpenKill routes. No legacy writer, parser grammar, ABI constant or network
+  policy may change without direct evidence and a named contract.
+- Validation: use local fixtures, behavior tests, the production-template
+  browser harness, POSIX/BusyBox syntax checks, `sh scripts/local-gate.sh` and
+  `git diff --check`. Temporary artifacts belong under `D:\openkill-cache`.
+- Device boundary: the active plan forbids device, package-install, WAN/DNS,
+  packet-path and VPS testing. Device and remote evidence remain pending even
+  if local tests pass.
+- Release boundary: after local gates and exact-commit Development CI pass,
+  prepare one version increment, run the manual RC audit, then Formal Release
+  with `release_gate=true` and `publish=true`. Preserve `v2026-1172-ipk` and
+  its package as the rollback target.
