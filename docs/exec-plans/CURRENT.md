@@ -3732,3 +3732,15 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   UI/browser suites, NaiveProxy fixtures, POSIX checks and diff checks remain
   the release evidence for this change; no device, package-install, WAN/DNS,
   packet-path or VPS test was performed.
+
+## Release preparation 2026-1172 (2026-09-27)
+
+- The synchronized source version is now `2026-1172` in the package Makefile,
+  installer and README, with release notes at
+  `docs/release/notes/2026-1172.md`. The previous `v2026-1171-ipk` remains the
+  rollback target.
+- The version-bump check passes against the published `2026-1171` channel.
+  WSL installer tests (15 tests, one documented environment skip), UI/browser
+  tests, `sh scripts/local-gate.sh` and `git diff --check` pass for the release
+  candidate source. Formal release is still gated on the exact source commit,
+  the RC audit and the manual `release_gate=true`/`publish=true` workflow.
