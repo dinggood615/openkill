@@ -34,6 +34,8 @@ def main() -> None:
     require(STANDALONE, "remote-auth-failed")
     require(STANDALONE, "NP_HEALTH_LOCK")
     require(STANDALONE, "np_component_install")
+    require(STANDALONE, "metadata=/usr/share/openkill/naiveproxy-component-metadata.sh")
+    require(STANDALONE, "update)")
     require(STANDALONE, "install URL SHA256 [SIZE]")
     # UCI appears only in the explicit, protected legacy cleanup command;
     # ordinary node/config/health paths remain independent.
@@ -57,9 +59,11 @@ def main() -> None:
     require(CONTROLLER, "action_naive_bridge_control")
     assert "legacy_migration" not in controller
     require(CONTROLLER, 'HTTP.formvalue("operation")')
+    require(CONTROLLER, "update = true")
     assert "cursor:set(\"openkill\", sid, \"naive_password\"" not in controller
     assert "cursor:set(\"openkill\", sid, \"naive_username\"" not in controller
     settings = require(SETTINGS, "_naive_component_info")
+    require(SETTINGS, 's:tab("naive_service", "NaiveProxy与服务")')
     require(SETTINGS, "openkill/naive_compatibility")
     servers = require(SERVERS, 'o:value("naiveproxy", "NaiveProxy")')
     assert '"naive_username"' not in servers and '"naive_password"' not in servers

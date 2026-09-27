@@ -33,6 +33,11 @@
   health test was not completed because the Windows host cannot provide its
   network timing fixture; browser rendering and device/VPS validation remain
   unverified. Development CI for the exact commit is pending inspection.
+- Follow-up local verification passed the updated standalone integration
+  contract (including the stable-component update operation), UI contract,
+  link-import behavior and `git diff --check`. No version increment or release
+  was performed because the required device/VPS phase is still outside the
+  authorized boundary.
 
 ## Standalone NaiveProxy card placement and legacy-config removal (2026-09-26)
 
