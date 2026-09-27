@@ -3593,3 +3593,10 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   `git diff --check` and `sh scripts/local-gate.sh` pass. An isolated install
   fixture with `od` absent and only `hexdump` available completed the verified
   archive, ELF and architecture path successfully (`NAIVE_NO_OD_FALLBACK=PASS`).
+- The bounded fix commit `26249e3d8b7efd4e8c7b8679b2ee99518febe2a8` passed
+  the exact Development CI [run 36302301830](https://github.com/dinggood615/openkill/actions/runs/36302301830).
+  Because the published `v2026-1170-ipk` contains the preflight that rejects
+  this BusyBox target, the next release will advance the synchronized source
+  version once to `2026-1171`, retain `v2026-1170-ipk` as rollback, and use
+  the normal RC then Formal Release gates. This version change does not grant
+  device write or VPS testing permission.
