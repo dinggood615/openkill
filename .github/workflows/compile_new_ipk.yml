@@ -242,8 +242,31 @@ jobs:
             mv "$SDK_DIR" "${{ matrix.target.sdk_dir }}"
           fi
 
+      - name: Prepare SDK feeds and host helper
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          SDK_DIR="$GITHUB_WORKSPACE/tmp/${{ matrix.target.sdk_dir }}"
+          cd "$SDK_DIR"
+          if [ ! -f .openkill-feeds-ready ]; then
+            ./scripts/feeds update -a
+            ./scripts/feeds install -a
+            : > .openkill-feeds-ready
+          else
+            echo 'Using cached OpenWrt feed metadata.'
+          fi
+          [ -f .config ] || : > .config
+          make defconfig
+          if [ ! -f .openkill-host-tools-ready ]; then
+            make package/luci-base/host/compile V=s
+            : > .openkill-host-tools-ready
+          else
+            echo 'Using cached SDK host tools.'
+          fi
+
       - name: Copy OpenKill Source Codes
         run: |
+          rm -rf tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill
           mkdir -p tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill
           cp -rf ./luci-app-openkill/. tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/
           if [ "${{ matrix.target.name }}" = "apk" ]; then

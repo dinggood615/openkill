@@ -40,7 +40,11 @@
   cache). Formal Run 191 passed Get-Version and both runtime matrices but its
   compile job stopped before make because the new direct command did not set
   `SDK_DIR`; the repair defines it from the matrix SDK directory before the
-  package-only build. No release was published by the failed run.
+  package-only build. Formal Run 192 then reached the build but its cached SDK
+  lacked feed/host preparation, so `make compile` produced no IPK and the UI
+  asset audit stopped. The follow-up adds cache-aware feeds and host helper
+  preparation and removes stale package source before copying. No release was
+  published by either failed run.
 
 ## NaiveProxy service tab and stable component update (2026-09-27)
 
