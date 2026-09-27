@@ -70,6 +70,14 @@
   temporary LuCI test account/session or an existing browser runtime.  Those
   remain unverified; the local preview and local Playwright suite are the
   authoritative results for this iteration.
+- Follow-up with the user-provided temporary LuCI credentials succeeded
+  without storing them.  The authenticated target still returns LuCI 404 for
+  `/admin/services/openkill/settings`; read-only SSH checks show no installed
+  `luci-app-openkill`, no `/etc/config/openkill`, and only a residual
+  `/usr/share/openkill` directory.  The device OpenKill UI therefore cannot
+  be exercised until a current test IPK is explicitly authorized for
+  installation.  No package, service, configuration, route, DNS, firewall or
+  packet-path mutation was made.
 
 ## CSS ownership refactor: baseline and runtime-status phase (2026-09-27)
 
