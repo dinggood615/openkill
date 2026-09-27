@@ -3562,3 +3562,6 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   channel) followed by restoring the previous OpenKill package. The new
   catalog and installer changes do not modify user YAML, subscriptions or
   NaiveProxy node credentials.
+- The post-release evidence-only commit `fc5f2877ae1df50af6aec34bec6c80591dc012cf`
+  was pushed without a version change and passed Development CI
+  [run 36301560954](https://github.com/dinggood615/openkill/actions/runs/36301560954).
