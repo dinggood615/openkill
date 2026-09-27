@@ -2909,3 +2909,20 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   presentation-only ordering change; fields, defaults, save behavior and
   capability checks remain unchanged. Desktop rows stretch naturally and the
   existing single-column mobile fallback remains in effect.
+
+- Source `3a8ac4e28e78d3d94cd7d0ca166407045b7e6e5b` passed exact Development
+  CI: [run 36281567007](https://github.com/dinggood615/openkill/actions/runs/36281567007).
+- RC Build passed from that source:
+  [run 36281650248](https://github.com/dinggood615/openkill/actions/runs/36281650248).
+  The audited RC IPK SHA256 is
+  `6cba456230e6e5be66a9abc06891ce9ba135edcc837c8131900da40c01445e37`;
+  package metadata, conffile preservation, maintainer deletion, stale
+  references and sensitive-content audits passed.
+- Formal Release passed with `release_gate=true` and `publish=true`:
+  [run 36281908283](https://github.com/dinggood615/openkill/actions/runs/36281908283).
+  It published [v2026-1165-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1165-ipk)
+  from the exact source above. The formal IPK SHA256 is
+  `7b0ec00012f0ebe4cc736a007b91e2e83b74e7324d7c2e71d9a82d8e6db8b87c`.
+- Browser rendering, device verification and real Mihomo/NaiveProxy network
+  tests remain outside this local-only iteration; no device state or private
+  configuration was accessed.
