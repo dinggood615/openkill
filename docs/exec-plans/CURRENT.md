@@ -1,5 +1,48 @@
 # Current status
 
+## Authorized read-only NaiveProxy device diagnosis (2026-09-27)
+
+- The user requested diagnosis on the existing test target `192.168.1.103`.
+  This phase is limited to read-only inspection of the installed OpenKill and
+  standalone NaiveProxy implementation: package/version inventory, init and
+  component metadata, redacted manifest and health state, process/listener
+  ownership, service logs, and import error stages.
+- The phase must not start, stop, reload or install any service, read or print
+  node credentials/share links, change UCI/YAML, touch WAN/DNS/firewall,
+  enable `CENTRAL_ACTIVE`, apply central nft state, run packet-path traffic,
+  or authenticate to a VPS. Any command output must redact secrets before it
+  is retained.
+- Resume evidence: exact installed package/source version, component probe,
+  service/init status, sanitized process/listener evidence, sanitized import
+  result, and a clear split between device-observed root causes and local-only
+  fixes. If a write or service action is required, stop and request a separate
+  authorized device phase.
+
+### Read-only findings and local repair (2026-09-27)
+
+- The target is running `luci-app-openkill` `2026-1169` on Kwrt/OpenWrt
+  x86/64. The standalone component probe found no executable at the managed
+  path (and no legacy fallback binary), so `naiveproxy-bridge` reports active
+  with no instances. No standalone node JSON or generated instance config is
+  present; therefore no NaiveProxy process could have started. The observed
+  `127.0.0.1:11080` listener belongs to another process and is not evidence of
+  a NaiveProxy instance.
+- Browser reproduction on the authenticated settings page showed the import
+  dialog, followed by `openDialog ... form.reset` with a null form. The CBI
+  page already supplies an outer form, so the nested `<form>` in the Naive
+  template is discarded by HTML parsing. This prevented both share-link
+  parsing and node persistence before the backend could receive an import.
+- The local repair removes the nested form, uses a form-like group with
+  explicit save/save-and-start handlers, clears sensitive fields when the
+  dialog closes, and keeps the outer CBI form untouched. The standalone
+  backend and control route remain unchanged; no device files, UCI, YAML,
+  service state or network settings were written during this diagnosis.
+- Local evidence: `scripts/test-naiveproxy-integration.py` passes and the
+  standalone fixture passes. The test device still needs a separately
+  installed compatible official NaiveProxy component and the resulting IPK
+  before import/start can be re-tested; that write phase is outside this
+  read-only authorization.
+
 ## Authorized Playwright test-device phase (2026-09-27)
 
 - Authorization: the user explicitly approved continuing the Playwright and

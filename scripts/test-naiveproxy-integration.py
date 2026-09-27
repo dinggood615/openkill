@@ -77,6 +77,10 @@ def main() -> None:
     require(VIEW, "data-naive-parse-link")
     require(VIEW, "data-naive-node-health")
     require(VIEW, "data-naive-node-remove")
+    require(VIEW, 'role="group" aria-labelledby="openkill-naive-dialog-title" data-naive-node-form')
+    require(VIEW, "function submitNode(start)")
+    assert '<form data-naive-node-form>' not in view
+    assert "form.addEventListener('submit'" not in view
     assert "data-naive-node-action" not in view
     assert "naive_username" not in view and "naive_password" not in view
     generator = require(GENERATOR, "independent service")
