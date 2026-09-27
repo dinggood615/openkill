@@ -69,7 +69,7 @@ np_urlencode() {
         c=$(printf '%s' "$value" | cut -b "$i")
         case "$c" in
             [A-Za-z0-9._~-]) out="${out}${c}" ;;
-            *) hex=$(printf '%s' "$c" | od -An -tx1 2>/dev/null | tr -d ' \n\r'); [ -n "$hex" ] || return 1; out="${out}%${hex}" ;;
+            *) hex=$(printf '%s' "$c" | np_hex_stdin) || return 1; [ -n "$hex" ] || return 1; out="${out}%${hex}" ;;
         esac
         i=$((i + 1))
     done
@@ -122,15 +122,49 @@ np_probe_component() {
 NP_INSTALL_ERROR=""
 np_install_error() { NP_INSTALL_ERROR="$1"; return 1; }
 
-np_read_byte() {
-    local file="$1" offset="$2"
+np_hex_stdin() {
+    local value
     if command -v od >/dev/null 2>&1; then
-        od -An -j"$offset" -N1 -tu1 "$file" 2>/dev/null | tr -d ' '
-    elif command -v hexdump >/dev/null 2>&1; then
-        dd if="$file" bs=1 skip="$offset" count=1 2>/dev/null | hexdump -v -e '1/1 "%u"'
-    else
-        return 1
+        value=$(od -An -tx1 2>/dev/null) || value=
+        [ -n "$value" ] && { printf '%s' "$value" | tr -d ' \n\r'; return 0; }
     fi
+    if command -v hexdump >/dev/null 2>&1; then
+        value=$(hexdump -v -e '1/1 "%02x"' 2>/dev/null) || value=
+        [ -n "$value" ] && { printf '%s' "$value"; return 0; }
+    fi
+    if command -v busybox >/dev/null 2>&1; then
+        value=$(busybox od -An -tx1 2>/dev/null) || value=
+        [ -n "$value" ] && { printf '%s' "$value" | tr -d ' \n\r'; return 0; }
+        value=$(busybox hexdump -v -e '1/1 "%02x"' 2>/dev/null) || value=
+        [ -n "$value" ] && { printf '%s' "$value"; return 0; }
+    fi
+    return 1
+}
+
+np_hex_file() {
+    local file="$1" offset="$2" count="$3" value
+    if command -v od >/dev/null 2>&1; then
+        value=$(od -An -j"$offset" -N"$count" -tx1 "$file" 2>/dev/null) || value=
+        [ -n "$value" ] && { printf '%s' "$value" | tr -d ' \n\r'; return 0; }
+    fi
+    if command -v hexdump >/dev/null 2>&1; then
+        value=$(dd if="$file" bs=1 skip="$offset" count="$count" 2>/dev/null | hexdump -v -e '1/1 "%02x"') || value=
+        [ -n "$value" ] && { printf '%s' "$value"; return 0; }
+    fi
+    if command -v busybox >/dev/null 2>&1; then
+        value=$(busybox od -An -j"$offset" -N"$count" -tx1 "$file" 2>/dev/null) || value=
+        [ -n "$value" ] && { printf '%s' "$value" | tr -d ' \n\r'; return 0; }
+        value=$(dd if="$file" bs=1 skip="$offset" count="$count" 2>/dev/null | busybox hexdump -v -e '1/1 "%02x"') || value=
+        [ -n "$value" ] && { printf '%s' "$value"; return 0; }
+    fi
+    return 1
+}
+
+np_read_byte() {
+    local hex
+    hex=$(np_hex_file "$1" "$2" 1) || return 1
+    [ -n "$hex" ] || return 1
+    printf '%d\n' "0x$hex"
 }
 
 np_elf_arch_ok() {
@@ -180,7 +214,7 @@ np_component_install() {
     [ -z "$expected_size" ] || [ "$size" -eq "$expected_size" ] 2>/dev/null || { rm -f "$tmp"; np_install_error size-mismatch; return 5; }
     actual=$(sha256sum "$tmp" 2>/dev/null | awk '{print tolower($1)}')
     [ "$actual" = "$(printf '%s' "$expected" | tr 'A-F' 'a-f')" ] || { rm -f "$tmp"; np_install_error digest-mismatch; return 5; }
-    magic=$(od -An -tx1 -N4 "$tmp" 2>/dev/null | tr -d ' \n\r')
+    magic=$(np_hex_file "$tmp" 0 4) || { rm -f "$tmp"; np_install_error byte-reader-missing; return 8; }
     if [ "$magic" = 7f454c46 ]; then
         candidate="$tmp"
     else
@@ -200,7 +234,7 @@ np_component_install() {
     fi
     cp "$candidate" "$NP_BIN.new" || { rm -rf "$extract" "$tmp" "$archive"; np_install_error stage-copy-failed; return 7; }
     rm -rf "$extract"; rm -f "$tmp" "$archive"; chmod 755 "$NP_BIN.new" || { rm -f "$NP_BIN.new"; np_install_error permission-failed; return 7; }
-    magic=$(od -An -tx1 -N4 "$NP_BIN.new" 2>/dev/null | tr -d ' \n\r')
+    magic=$(np_hex_file "$NP_BIN.new" 0 4) || { rm -f "$NP_BIN.new"; np_install_error byte-reader-missing; return 8; }
     [ "$magic" = 7f454c46 ] || { rm -f "$NP_BIN.new"; np_install_error not-elf; return 8; }
     np_elf_arch_ok "$NP_BIN.new" || { rm -f "$NP_BIN.new"; np_install_error wrong-architecture; return 8; }
     "$NP_BIN.new" --version >/dev/null 2>&1 || { rm -f "$NP_BIN.new"; np_install_error loader-or-version-probe-failed; return 8; }

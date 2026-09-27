@@ -3565,3 +3565,31 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
 - The post-release evidence-only commit `fc5f2877ae1df50af6aec34bec6c80591dc012cf`
   was pushed without a version change and passed Development CI
   [run 36301560954](https://github.com/dinggood615/openkill/actions/runs/36301560954).
+
+## 2026-1170 follow-up: BusyBox byte-reader compatibility (2026-09-27)
+
+- The user supplied a fresh one-click installation log from the test target.
+  OpenKill `2026-1170` and Mihomo installed, but the independent component
+  stage stopped before metadata/download with `preflight failed
+  (missing-od)`. This is a tool-capability failure in the installer: the
+  target's BusyBox build does not expose an `od` command name. It is not
+  evidence that the official NaiveProxy asset, digest, or node credentials
+  are invalid. The captured log contained no node credentials and is not
+  copied into the repository.
+- The bounded repair will keep ELF/archive verification mandatory while using
+  an `od`/`hexdump`/BusyBox-app-let byte reader selected at runtime. If no
+  byte reader exists, installation must fail with the named
+  `missing-byte-reader` stage. No architecture or digest check may be skipped.
+  The standalone library's URL encoding, ELF magic and architecture checks
+  must use the same fallback helper.
+- Scope is installer and standalone-component compatibility plus isolated
+  tests and documentation. No device write, service start/stop, UCI/YAML
+  change, CENTRAL_ACTIVE, central nft, WAN/DNS change or VPS probe is
+  authorized by this follow-up. After the local fix and exact-commit CI pass,
+  the test target may retry the public installer separately under an explicit
+  device phase.
+- Local follow-up evidence: `test-naiveproxy-standalone.py`,
+  `test-naiveproxy-integration.py`, `test-installer.py`, POSIX syntax checks,
+  `git diff --check` and `sh scripts/local-gate.sh` pass. An isolated install
+  fixture with `od` absent and only `hexdump` available completed the verified
+  archive, ELF and architecture path successfully (`NAIVE_NO_OD_FALLBACK=PASS`).

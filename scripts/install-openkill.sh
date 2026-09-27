@@ -418,6 +418,16 @@ validate_install(){
   ruby -ryaml -e 'exit 0' || die "Ruby YAML runtime is incomplete"
 }
 
+naive_byte_reader_available(){
+  if command -v od >/dev/null 2>&1; then return 0; fi
+  if command -v hexdump >/dev/null 2>&1; then return 0; fi
+  if command -v busybox >/dev/null 2>&1; then
+    busybox od -An -tx1 -N1 /bin/sh >/dev/null 2>&1 && return 0
+    busybox hexdump -v -e '1/1 "%02x"' /bin/sh >/dev/null 2>&1 && return 0
+  fi
+  return 1
+}
+
 install_naive_standalone_component(){
   local metadata_script metadata_output ok reason url sha size asset current_sha install_output install_reason tool available_kb
   step "Resolving and installing the NaiveProxy independent component"
@@ -426,12 +436,16 @@ install_naive_standalone_component(){
   # Keep these checks separate from OpenKill package validation so a missing
   # component is reported as a partial installation rather than a false
   # all-success result.
-  for tool in sha256sum tar xz od find awk sed; do
+  for tool in sha256sum tar xz find awk sed; do
     if ! command -v "$tool" >/dev/null 2>&1; then
       detail "NaiveProxy independent component: preflight failed (missing-$tool)"
       return 1
     fi
   done
+  if ! naive_byte_reader_available; then
+    detail "NaiveProxy independent component: preflight failed (missing-byte-reader)"
+    return 1
+  fi
   if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
     detail "NaiveProxy independent component: preflight failed (downloader-missing)"
     return 1

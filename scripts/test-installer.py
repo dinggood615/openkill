@@ -136,6 +136,9 @@ grep -q 'deadline reached' "$WORK_DIR/detail"
         self.assertIn("package-architecture-mismatch", METADATA_SOURCE)
         self.assertIn("aarch64_cortex-a53", METADATA_SOURCE)
         self.assertIn("preflight failed", SOURCE)
+        self.assertIn("naive_byte_reader_available", SOURCE)
+        self.assertIn("missing-byte-reader", SOURCE)
+        self.assertNotIn("sha256sum tar xz od find awk sed", SOURCE)
         self.assertIn("NaiveProxy independent component failed", SOURCE)
         self.assertIn("exit 2", SOURCE)
 
