@@ -129,6 +129,19 @@
   evidence: legacy CSS that is currently pruned only during packaging, and
   unused controller/template pairs. Do not remove them until their references
   and final-package behavior are independently verified.
+- Second verified removal batch: the first-release source stylesheet contained
+  1,019 lines that the package recipe deterministically removed on every
+  build. Applied that same transform to the source, removed the redundant
+  `prune-ui-css.sh` build helper, and changed the validation gate to reject
+  retired OixCloud styling directly in the shipped stylesheet. The transformed
+  stylesheet has the exact SHA256 produced by the prior package-time transform
+  (`7de52948ce987ee3884dc0048f794350fac9013183ed49ae40a8d20c8f3ac192`),
+  so this does not alter the delivered CSS semantics.
+- Second-batch validation: the local policy gate, UI contract (28), UI preview
+  (2), optimization test, CSS equivalence comparison and `git diff --check`
+  passed. The first removal commit `5a68e6be41136cdabff7d20b84c1d8c750b59c49`
+  was pushed and its exact OpenKill Development CI succeeded:
+  https://github.com/dinggood615/openkill/actions/runs/36294816940.
 
 ## CSS ownership refactor: baseline and runtime-status phase (2026-09-27)
 

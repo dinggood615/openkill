@@ -56,7 +56,6 @@ define Build/Prepare
 	$(CP) $(CURDIR)/luasrc $(PKG_BUILD_DIR)
 	# MetaCubeXD is the bundled dashboard. Zashboard is downloaded on demand
 	# and is deliberately not retained in the source package tree.
-	sh $(CURDIR)/tools/prune-ui-css.sh $(PKG_BUILD_DIR)/root/www/luci-static/resources/openkill/css/oc.css
 	$(foreach po,$(wildcard ${CURDIR}/po/zh-cn/*.po), \
 		po2lmo $(po) $(PKG_BUILD_DIR)/$(patsubst %.po,%.lmo,$(notdir $(po)));)
 	chmod 0755 $(PKG_BUILD_DIR)/root/etc/init.d/openkill
