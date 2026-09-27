@@ -3987,9 +3987,6 @@ msgstr "Fallo en intento de descifrado con una clave encontrada:"
 msgid "Encrypt attempt failed:"
 msgstr "Fallo en intento de cifrado:"
 
-msgid "oixCloud Website"
-msgstr "Sitio web oficial"
-
 msgid "Login..."
 msgstr "Iniciando sesión..."
 
@@ -3999,23 +3996,8 @@ msgstr "Cerrando sesión..."
 msgid "Checkin..."
 msgstr "Registrando..."
 
-msgid "oixCloud Login Successful"
-msgstr "Inicio de sesión en oixCloud exitoso"
-
-msgid "Note: oixCloud need a specific core installed, OpenKill will auto download, After the core start, an oixCloud nodes provider will be added, which you can customize as needed"
-msgstr "Nota: oixCloud requiere un núcleo específico. OpenKill lo descargará y añadirá un proveedor de nodos personalizable."
-
-msgid "oixCloud Login Failed"
-msgstr "Fallo al iniciar sesión en oixCloud"
-
 msgid "Login Account"
 msgstr "Iniciar sesión en la cuenta"
-
-msgid "oixCloud Logout Successful"
-msgstr "Cierre de sesión en oixCloud exitoso"
-
-msgid "oixCloud Logout Failed"
-msgstr "Fallo al cerrar sesión en oixCloud"
 
 msgid "Logout Account"
 msgstr "Cerrar sesión en la cuenta"
@@ -4065,12 +4047,6 @@ msgstr "Tráfico restante"
 msgid "Plan Traffic"
 msgstr "Tráfico del plan"
 
-msgid "oixCloud Account Login Failed! Please Check And Try Again..."
-msgstr "¡Fallo al iniciar sesión en oixCloud! Verifica los datos e inténtalo de nuevo."
-
-msgid "oixCloud Account Login Failed, The Error Info is"
-msgstr "Fallo al iniciar sesión en oixCloud, el error es"
-
 msgid "invalid token"
 msgstr "token inválido"
 
@@ -4079,9 +4055,6 @@ msgstr "inicio de sesión fallido"
 
 msgid "email or passwd is wrong"
 msgstr "correo electrónico o contraseña incorrectos"
-
-msgid "oixCloud Checkin Failed! Please Check And Try Again..."
-msgstr "¡Fallo al registrar en oixCloud! Inténtalo de nuevo más tarde."
 
 msgid "Account Email Address"
 msgstr "Correo electrónico de la cuenta"
@@ -4215,12 +4188,6 @@ msgstr "Mi pregunta es:"
 msgid "Copied!"
 msgstr "¡Copiado!"
 
-msgid "oixCloud Checkin Successful, Result:"
-msgstr "Registro en oixCloud exitoso, resultado:"
-
-msgid "oixCloud Checkin Failed, Result:"
-msgstr "Fallo al registrar en oixCloud, resultado:"
-
 msgid "Checking backend version..."
 msgstr "Comprobando la versión del backend..."
 
@@ -4241,9 +4208,6 @@ msgstr "No se pudo detectar la versión del backend"
 
 msgid "Token Login"
 msgstr "Acceso por token"
-
-msgid "Please enter your oixCloud token"
-msgstr "Ingresa tu token de oixCloud"
 
 msgid "Show Password"
 msgstr "Mostrar contraseña"
@@ -4278,9 +4242,6 @@ msgstr "Registro"
 msgid "Auto Checkin"
 msgstr "Registro automático"
 
-msgid "Auto check in for oixCloud account daily bonus"
-msgstr "Registro automático para bonificación diaria de oixCloud"
-
 msgid "Auto check-in for traffic rewards and penalties"
 msgstr "Registro automático para recompensas y penalizaciones de tráfico"
 
@@ -4311,9 +4272,6 @@ msgstr "Error de respuesta del servidor, inténtelo más tarde"
 msgid "Show on Overview"
 msgstr "Mostrar en resumen"
 
-msgid "Display oixCloud account info on the overview page"
-msgstr "Mostrar información de cuenta oixCloud en la página de resumen"
-
 msgid "Display account info on the main page"
 msgstr "Mostrar información de cuenta en la página principal"
 
@@ -4322,12 +4280,6 @@ msgstr "Configuración guardada"
 
 msgid "Announcement"
 msgstr "Anuncio"
-
-msgid "oixCloud Login Failed:"
-msgstr "Error de inicio de sesión en oixCloud:"
-
-msgid "oixCloud Logout Failed:"
-msgstr "Error de cierre de sesión en oixCloud:"
 
 msgid "Checkin Failed:"
 msgstr "Error en el registro:"

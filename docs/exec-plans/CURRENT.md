@@ -147,6 +147,22 @@
   gates. Its exact OpenKill Development CI succeeded:
   https://github.com/dinggood615/openkill/actions/runs/36294955817.
 
+## Follow-up audit: retired translations and compatibility surfaces (2026-09-27)
+
+- Audit targets are the remaining OixCloud translation entries, the
+  announcement compatibility endpoint and other explicit no-op/fallback
+  contracts, plus CSS selectors not referenced by current templates or
+  scripts.
+- Keep the announcement endpoint as an empty compatibility response for cached
+  frontends unless its callers and upgrade behavior are removed together.
+  Keep network/parser no-op and fallback functions that protect continuity or
+  BusyBox compatibility. A translation entry is removable only when its
+  message ID has no live source reference and is not needed by a retained
+  compatibility page.
+- For CSS, compare selectors against all LuCI templates, inline hooks,
+  generated preview markup and runtime JavaScript before removing them. Record
+  the selector evidence and rerun UI contract/preview and package-path gates.
+
 ## CSS ownership refactor: baseline and runtime-status phase (2026-09-27)
 
 - Scope: this staged change is limited to OpenKill-scoped CSS variables, rule

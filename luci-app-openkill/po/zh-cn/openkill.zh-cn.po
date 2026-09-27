@@ -4062,9 +4062,6 @@ msgstr "使用找到的私钥解密尝试失败:"
 msgid "Encrypt attempt failed:"
 msgstr "加密尝试失败:"
 
-msgid "oixCloud Website"
-msgstr "官方网站"
-
 msgid "Login..."
 msgstr "登录中..."
 
@@ -4074,23 +4071,8 @@ msgstr "退出中..."
 msgid "Checkin..."
 msgstr "签到中..."
 
-msgid "oixCloud Login Successful"
-msgstr "oixCloud 登录成功"
-
-msgid "Note: oixCloud need a specific core installed, OpenKill will auto download, After the core start, an oixCloud nodes provider will be added, which you can customize as needed"
-msgstr "注意：oixCloud 需要安装专用内核才能使用，插件会自动识别并进行内核下载，专用内核启动后，会添加一个 oixCloud 节点组到配置文件，供您自定义使用"
-
-msgid "oixCloud Login Failed"
-msgstr "oixCloud 登录失败"
-
 msgid "Login Account"
 msgstr "登录账号"
-
-msgid "oixCloud Logout Successful"
-msgstr "oixCloud 已成功退出"
-
-msgid "oixCloud Logout Failed"
-msgstr "oixCloud 退出失败"
 
 msgid "Logout Account"
 msgstr "退出账号"
@@ -4140,12 +4122,6 @@ msgstr "剩余流量"
 msgid "Plan Traffic"
 msgstr "套餐流量"
 
-msgid "oixCloud Account Login Failed! Please Check And Try Again..."
-msgstr "oixCloud 账户登录失败！请检查账户信息并重试..."
-
-msgid "oixCloud Account Login Failed, The Error Info is"
-msgstr "oixCloud 账户登录失败，错误信息"
-
 msgid "invalid token"
 msgstr "无效的令牌"
 
@@ -4154,9 +4130,6 @@ msgstr "登录失败"
 
 msgid "email or passwd is wrong"
 msgstr "邮箱或密码错误"
-
-msgid "oixCloud Checkin Failed! Please Check And Try Again..."
-msgstr "oixCloud 签到失败，请稍后再试！"
 
 msgid "Account Email Address"
 msgstr "账号地址"
@@ -4290,12 +4263,6 @@ msgstr "我的问题是："
 msgid "Copied!"
 msgstr "已复制！"
 
-msgid "oixCloud Checkin Successful, Result:"
-msgstr "oixCloud 签到成功，结果："
-
-msgid "oixCloud Checkin Failed, Result:"
-msgstr "oixCloud 签到失败，结果："
-
 msgid "Checking backend version..."
 msgstr "正在检测后端版本..."
 
@@ -4316,9 +4283,6 @@ msgstr "无法检测后端版本"
 
 msgid "Token Login"
 msgstr "Token 登录"
-
-msgid "Please enter your oixCloud token"
-msgstr "请输入您的 oixCloud Token"
 
 msgid "Show Password"
 msgstr "显示密码"
@@ -4353,9 +4317,6 @@ msgstr "试试手气"
 msgid "Auto Checkin"
 msgstr "自动签到"
 
-msgid "Auto check in for oixCloud account daily bonus"
-msgstr "自动签到来获取 oixCloud 每日奖励"
-
 msgid "Auto check-in for traffic rewards and penalties"
 msgstr "自动签到来获取流量奖励（惩罚）"
 
@@ -4386,9 +4347,6 @@ msgstr "服务器响应异常，请稍后重试"
 msgid "Show on Overview"
 msgstr "主页显示"
 
-msgid "Display oixCloud account info on the overview page"
-msgstr "在概览页面显示 oixCloud 账户信息"
-
 msgid "Display account info on the main page"
 msgstr "在主页显示账户信息"
 
@@ -4397,12 +4355,6 @@ msgstr "设置已保存"
 
 msgid "Announcement"
 msgstr "公告"
-
-msgid "oixCloud Login Failed:"
-msgstr "oixCloud 登录失败："
-
-msgid "oixCloud Logout Failed:"
-msgstr "oixCloud 退出失败："
 
 msgid "Checkin Failed:"
 msgstr "签到失败："
