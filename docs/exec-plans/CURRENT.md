@@ -3384,3 +3384,16 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   Development CI, manual RC Build and candidate audit, then Formal Release
   with `release_gate=true` and `publish=true`. The previous `v2026-1168-ipk`
   assets remain the rollback target until the new release is verified.
+
+### Release attempt 194 repair
+
+- Formal Release run `36296020962` correctly stopped before publication. The
+  IPK compile step exposed a malformed section-divider comment in `oc.css`
+  (`4568:12`), which the local text checks had not parsed with the release
+  CSS minifier. The fix restores the intended multi-line comment only; no
+  selector, layout, or runtime behavior changes.
+- After the repair, the full local UI/workflow/POSIX/i18n checks and
+  `scripts/local-gate.sh` passed again. The same `2026-1169` source version is
+  retained; it will use a new exact source commit for Development CI, RC and
+  the retried Formal Release. Run 194 produced no release tag or package
+  publication.
