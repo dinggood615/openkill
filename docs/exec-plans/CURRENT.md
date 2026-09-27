@@ -3600,3 +3600,33 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   version once to `2026-1171`, retain `v2026-1170-ipk` as rollback, and use
   the normal RC then Formal Release gates. This version change does not grant
   device write or VPS testing permission.
+
+## Formal release 2026-1171 completed (2026-09-27)
+
+- The release-preparation commit `6b14d01cefac183fd9943fe65c442757a8689391`
+  passed the exact-source Development CI [run 36302424538](https://github.com/dinggood615/openkill/actions/runs/36302424538).
+- RC Build [run 36302499502](https://github.com/dinggood615/openkill/actions/runs/36302499502)
+  passed from that commit. The candidate audit produced
+  `luci-app-openkill_2026-1171_all.ipk` with SHA256
+  `6e4277258da079393150380eb60919c03936218d55288e618749ad3cc0c6cd83`.
+  The uploaded RC audit artifact digest is
+  `sha256:4d36a075eaedbb64b7cbce964473c44d6ca9d3dbe02ee64f98c60f27e14cf03b`.
+- Formal Release [run 36302668502](https://github.com/dinggood615/openkill/actions/runs/36302668502)
+  passed all version, compatibility, build and package-audit jobs with
+  `release_gate=true` and `publish=true` from the exact source commit. It
+  published [v2026-1171-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1171-ipk).
+  The formal asset `luci-app-openkill_2026-1171_all.ipk` has SHA256
+  `31f6d30e9eb7bb860872bf9be86efc824b1637224ca904937ba26b5e50f7c057`.
+- The formal package contains the BusyBox-compatible byte-reader fallback in
+  the installer and standalone component library. The audit retained the
+  `/etc/config/openkill` conffile, found no destructive persistent-path
+  deletion, stale development references or test-machine content, and kept
+  the independent component's security checks mandatory.
+- Local evidence remains green: standalone, health, integration, installer,
+  import, POSIX/BusyBox syntax, no-`od` isolated installation, local gate and
+  diff checks. No device write, package installation, real VPS probe or
+  packet-path test was performed; the supplied target must retry the public
+  installer before device and remote connectivity can be reported.
+- Rollback is `v2026-1170-ipk`, followed by restoring the prior OpenKill IPK
+  and preserving the user's existing configuration. The fix does not modify
+  user YAML, subscriptions, DNS, routing policy or NaiveProxy credentials.
