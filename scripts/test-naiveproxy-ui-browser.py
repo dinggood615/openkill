@@ -28,7 +28,7 @@ def rendered_view() -> str:
     source = re.sub(r"<%.*?%>", "", source, flags=re.DOTALL)
     source = source.replace('data-naive-standalone-url=""', 'data-naive-standalone-url="/naive-status"')
     source = source.replace('data-naive-control-url=""', 'data-naive-control-url="/naive-control"')
-    return """<!doctype html><html><head><meta charset=\"utf-8\"><style>""" + OC_CSS.read_text(encoding="utf-8") + "\n" + FLAT_CSS.read_text(encoding="utf-8") + "</style></head><body><main id=\"cbi-openkill\" class=\"openkill-settings openkill-page\">" + source + "</main></body></html>"
+    return """<!doctype html><html><head><meta charset=\"utf-8\"><script>window.L={env:{token:'fixture-token'}};</script><style>""" + OC_CSS.read_text(encoding="utf-8") + "\n" + FLAT_CSS.read_text(encoding="utf-8") + "</style></head><body><main id=\"cbi-openkill\" class=\"openkill-settings openkill-page\">" + source + "</main></body></html>"
 
 
 def main() -> int:
@@ -71,6 +71,9 @@ def main() -> int:
                 return
             length = int(self.headers.get("Content-Length", "0"))
             fields = {key: values[-1] for key, values in parse_qs(self.rfile.read(length).decode("utf-8")).items()}
+            if fields.get("token") != "fixture-token":
+                self.response(403, "application/json", '{"ok":false,"stage":"request","error":"missing-token"}')
+                return
             operation = fields.get("operation", "")
             state["operations"].append(operation)
             if operation == "get":

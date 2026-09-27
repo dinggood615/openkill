@@ -32,6 +32,14 @@
   start phase; it does not prove a remote connection failure. No router state,
   configuration, service, package or network setting was changed. Resume with
   an explicitly authorized start action only after preserving this baseline.
+- LuCI import diagnostic: the installed 2026-1174 controller and view contain
+  the independent-control route, but this LuCI generation adds its session
+  token to normal POST helpers. The NaiveProxy view used `fetch` directly and
+  omitted that token, so the dispatcher returned an HTML login/error response
+  which the page correctly labelled `controller-html-response`. The bounded
+  fix appends `L.env.token` to the form body when available. Its production
+  template Playwright test now rejects a missing token and passes import and
+  protected edit with the token present. Device deployment is deferred.
 - Rollback: revert the bounded source commits. The component installer retains
   the previous executable, and node changes use mode-600 atomic files under
   `/etc/naiveproxy/nodes`; no OpenKill UCI or user YAML is touched.
