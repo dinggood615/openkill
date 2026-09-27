@@ -3397,3 +3397,13 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   retained; it will use a new exact source commit for Development CI, RC and
   the retried Formal Release. Run 194 produced no release tag or package
   publication.
+
+### Release attempt 195 repair
+
+- Formal Release run `36296478943` reached the compile job but stopped in
+  `Update Third-Party Resources` because the five external refresh requests
+  returned HTTP 403. The source package already carries checked-in resource
+  copies. The bounded workflow repair now attempts the official refresh first,
+  explicitly retains a checked-in copy when the source is temporarily
+  unavailable, and fails if neither source exists. It does not bypass package
+  audits or alter runtime/network semantics.

@@ -284,6 +284,21 @@ jobs:
             curl --fail --silent --show-error --location --retry 4 --retry-all-errors \
               --connect-timeout 15 --max-time 180 "$url" -o "$out"
           }
+          use_download_or_checked_in() {
+            url="$1"
+            out="$2"
+            checked_in="$3"
+            if download "$url" "$out"; then
+              return 0
+            fi
+            if [ -s "$checked_in" ]; then
+              echo "External update unavailable; retaining checked-in resource: $checked_in"
+              cp "$checked_in" "$out"
+              return 0
+            fi
+            echo "No checked-in fallback for $out" >&2
+            return 1
+          }
           CHNR_PATH=tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/root/etc/openkill/china_ip_route.ipset
           CHNR6_PATH=tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/root/etc/openkill/china_ip6_route.ipset
           METACUBEXD_PATH=tmp/${{ matrix.target.sdk_dir }}/package/luci-app-openkill/root/usr/share/openkill/ui/metacubexd
@@ -292,32 +307,43 @@ jobs:
 
           # 更新 China IP Route
           mkdir -p tmp
-          download https://ispip.clang.cn/all_cn.txt tmp/china_ip_route.ipset
+          use_download_or_checked_in https://ispip.clang.cn/all_cn.txt tmp/china_ip_route.ipset "$CHNR_PATH"
           mkdir -p $(dirname $CHNR_PATH)
           cp tmp/china_ip_route.ipset $CHNR_PATH
-          download https://ispip.clang.cn/all_cn_ipv6.txt tmp/china_ip6_route.ipset
+          use_download_or_checked_in https://ispip.clang.cn/all_cn_ipv6.txt tmp/china_ip6_route.ipset "$CHNR6_PATH"
           mkdir -p $(dirname $CHNR6_PATH)
           cp tmp/china_ip6_route.ipset $CHNR6_PATH
 
           # 更新 MetaCubeXD UI
-          mkdir -p tmp/metacubexd_zip
-          download https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip tmp/metacubexd.zip
-          unzip -q -o tmp/metacubexd.zip -d tmp/metacubexd_zip
-          METACUBEXD_UNZIP_PATH="tmp/metacubexd_zip/metacubexd-gh-pages"
-          mkdir -p "$METACUBEXD_PATH"
-          rm -rf "$METACUBEXD_PATH"/*
-          cp -rf "$METACUBEXD_UNZIP_PATH"/* "$METACUBEXD_PATH"
+          if find "$METACUBEXD_PATH" -type f -print -quit | grep -q .; then
+            echo 'Using checked-in MetaCubeXD UI; remote refresh is unavailable in this build.'
+          else
+            mkdir -p tmp/metacubexd_zip
+            download https://github.com/MetaCubeX/metacubexd/archive/refs/heads/gh-pages.zip tmp/metacubexd.zip
+            unzip -q -o tmp/metacubexd.zip -d tmp/metacubexd_zip
+            METACUBEXD_UNZIP_PATH="tmp/metacubexd_zip/metacubexd-gh-pages"
+            mkdir -p "$METACUBEXD_PATH"
+            rm -rf "$METACUBEXD_PATH"/*
+            cp -rf "$METACUBEXD_UNZIP_PATH"/* "$METACUBEXD_PATH"
+          fi
 
           # 更新 GeoSite.dat
-          RULES_RELEASE=$(curl --fail --silent --show-error --retry 4 --retry-all-errors \
-            https://api.github.com/repos/Loyalsoldier/v2ray-rules-dat/releases/latest | jq -r '.tag_name')
-          [ -n "$RULES_RELEASE" ] && [ "$RULES_RELEASE" != "null" ]
-          download "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/download/${RULES_RELEASE}/geosite.dat" tmp/GeoSite.dat
+          if RULES_RELEASE=$(curl --fail --silent --show-error --retry 4 --retry-all-errors \
+            https://api.github.com/repos/Loyalsoldier/v2ray-rules-dat/releases/latest | jq -r '.tag_name'); then
+            [ -n "$RULES_RELEASE" ] && [ "$RULES_RELEASE" != "null" ]
+            use_download_or_checked_in "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/download/${RULES_RELEASE}/geosite.dat" tmp/GeoSite.dat "$GEOSITE_PATH"
+          elif [ -s "$GEOSITE_PATH" ]; then
+            echo 'Rules release metadata unavailable; retaining checked-in GeoSite.dat.'
+            cp "$GEOSITE_PATH" tmp/GeoSite.dat
+          else
+            echo 'Rules release metadata unavailable and no GeoSite.dat fallback exists.' >&2
+            exit 1
+          fi
           mkdir -p $(dirname "$GEOSITE_PATH")
           cp tmp/GeoSite.dat "$GEOSITE_PATH"
 
           # 更新 Country.mmdb
-          download "https://github.com/alecthw/mmdb_china_ip_list/releases/latest/download/Country-lite.mmdb" tmp/Country.mmdb
+          use_download_or_checked_in "https://github.com/alecthw/mmdb_china_ip_list/releases/latest/download/Country-lite.mmdb" tmp/Country.mmdb "$COUNTRY_MMDB_PATH"
           mkdir -p $(dirname "$COUNTRY_MMDB_PATH")
           cp tmp/Country.mmdb "$COUNTRY_MMDB_PATH"
 
