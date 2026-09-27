@@ -142,6 +142,10 @@
   passed. The first removal commit `5a68e6be41136cdabff7d20b84c1d8c750b59c49`
   was pushed and its exact OpenKill Development CI succeeded:
   https://github.com/dinggood615/openkill/actions/runs/36294816940.
+- Delivery: the second cleanup commit
+  `b7768be37ed8ad5cd05ae6b4aa26fd3f8cc17a5b` was pushed after the same local
+  gates. Its exact OpenKill Development CI succeeded:
+  https://github.com/dinggood615/openkill/actions/runs/36294955817.
 
 ## CSS ownership refactor: baseline and runtime-status phase (2026-09-27)
 
