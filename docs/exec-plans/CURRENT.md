@@ -35,6 +35,12 @@
 - Next action: commit the prepared source metadata and 2026-1168 release note,
   verify that exact versioned commit's Development CI, and run the RC/Formal
   release gates.
+- Formal gate evidence: RC Run 98 passed and produced the audited
+  `luci-app-openkill_2026-1168_all.ipk` (SHA256 recorded in the local release
+  cache). Formal Run 191 passed Get-Version and both runtime matrices but its
+  compile job stopped before make because the new direct command did not set
+  `SDK_DIR`; the repair defines it from the matrix SDK directory before the
+  package-only build. No release was published by the failed run.
 
 ## NaiveProxy service tab and stable component update (2026-09-27)
 

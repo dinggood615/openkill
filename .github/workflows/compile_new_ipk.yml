@@ -348,7 +348,8 @@ jobs:
       - name: Compile OpenKill
         run: |
           set -Eeuo pipefail
-          cd tmp/${{ matrix.target.sdk_dir }}
+          SDK_DIR="$GITHUB_WORKSPACE/tmp/${{ matrix.target.sdk_dir }}"
+          cd "$SDK_DIR"
           # Always re-apply the package-only selection, including when the SDK
           # tree came from the cache and its archive is stored separately.
           if [ -f .config ]; then
