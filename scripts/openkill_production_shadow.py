@@ -435,7 +435,13 @@ def _stub_header(values: Mapping[str, Any], sandbox: str, *, node_apply: bool = 
         "chown(){ record chown \"$@\"; return 0; }",
         "mkdir(){ record mkdir \"$@\"; case \"$1\" in \"$SANDBOX\"/*|\"$SANDBOX\") command mkdir -p \"$@\";; *) return 1;; esac; }",
         "cat(){ record cat \"$@\"; for item in \"$@\"; do case \"$item\" in \"$SANDBOX\"/*) command cat \"$item\";; *) return 1;; esac; done; }",
-        "grep(){ record grep \"$@\"; while IFS= read -r _line; do :; done; return 1; }",
+        # Route-set validation is a read-only production check.  The previous
+        # fixture stub consumed every grep input and always returned failure,
+        # which made a populated sandbox route file look empty and caused the
+        # shadow harness to exercise the production "data unavailable" branch.
+        # Delegate only file reads that are provably inside SANDBOX; pipeline
+        # discovery without a sandbox file keeps the old fail-closed result.
+        "grep(){ record grep \"$@\"; local _file= _arg; for _arg in \"$@\"; do case \"$_arg\" in \"$SANDBOX\"/*) _file=\"$_arg\";; esac; done; if [ -n \"$_file\" ]; then command grep \"$@\" 2>/dev/null; return $?; fi; while IFS= read -r _line; do :; done; return 1; }",
         "awk(){ record awk \"$@\"; while IFS= read -r _line; do :; done; return 1; }",
         "sed(){ record sed \"$@\"; while IFS= read -r _line; do :; done; return 1; }",
         "sort(){ record sort \"$@\"; while IFS= read -r _line; do :; done; return 0; }",
@@ -454,6 +460,15 @@ def _stub_header(values: Mapping[str, Any], sandbox: str, *, node_apply: bool = 
         "start_fail(){ return 1; }",
         "LOG_TIP(){ :; }; LOG_WARN(){ :; }; LOG_ERROR(){ :; }; LOG_OUT(){ :; }",
         "prepare_openkill_include(){ :; }",
+        "render_nft_pass_set(){ local _family=\"$1\" _set=\"$2\" _output=\"$4\" _type=ipv4_addr _values=\"$CFG_china_pass4\"; record INTERNAL render_nft_pass_set \"$@\"; [ \"$_family\" = 6 ] && _type=ipv6_addr && _values=\"$CFG_china_pass6\"; case \"$_output\" in \"$SANDBOX\"/*) ;; *) return 1;; esac; { printf 'add set inet fw4 %s { type %s; flags interval; auto-merge; }\\n' \"$_set\" \"$_type\"; [ -z \"$_values\" ] || printf 'add element inet fw4 %s { %s }\\n' \"$_set\" \"$_values\"; } > \"$_output\"; return 0; }",
+        "apply_nft_set_file(){ local _family=\"$1\" _set=\"$2\" _source=\"$3\"; record INTERNAL apply_nft_set_file \"$@\"; [ -r \"$_source\" ] || return 1; record nft -f \"$_source\"; return 0; }",
+        # These are production helper APIs sourced by the init script.  They
+        # are intentionally record-only in this isolated harness so helper
+        # calls are distinguished from shell command typos without touching
+        # the host's OpenVPN or firewall state.
+        "openkill_openvpn_prepare(){ record INTERNAL openkill_openvpn_prepare \"$@\"; return 0; }",
+        "openkill_openvpn_apply_runtime(){ record INTERNAL openkill_openvpn_apply_runtime \"$@\"; return 0; }",
+        "openkill_openvpn_add_nft_rules(){ record INTERNAL openkill_openvpn_add_nft_rules \"$@\"; return 0; }",
         "openkill_render_nft_set_update_batch(){ return 1; }",
         "openkill_validate_nft_batch(){ return 1; }",
         "openkill_render_nft_set_batch(){ return 1; }",
@@ -1558,6 +1573,19 @@ def compare_current_case(
         # correctly emits no action.  This is a structural representation
         # difference, not a policy mismatch.
         classification = "SEMANTIC_EQUIVALENT_STRUCTURAL_DIFF"
+    elif (
+        not old_has
+        and reason == "CHINA_POLICY"
+        and not normalize_state(state).get("china4")
+        and not normalize_state(state).get("china6")
+    ):
+        # Production intentionally disables the effective China policy when
+        # its downloaded route set is empty or invalid.  The packet oracle
+        # still describes the configured policy, so the capture has no CHINA
+        # rule while the abstract renderer retains its marker.  Keep this
+        # safety fallback explicit as a bounded current gap instead of
+        # labelling the record-only harness defective.
+        classification = "KNOWN_CURRENT_GAP"
     elif not old_has:
         classification = "OLD_NORMALIZER_DEFECT"
     elif not new_has and reason not in {"TUN_INGRESS"}:

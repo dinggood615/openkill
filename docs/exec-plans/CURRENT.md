@@ -3824,3 +3824,23 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   prepare one version increment, run the manual RC audit, then Formal Release
   with `release_gate=true` and `publish=true`. Preserve `v2026-1172-ipk` and
   its package as the rollback target.
+
+### Fault-audit evidence (2026-09-27)
+
+- The first full fast-matrix run reproduced a production-shadow failure rather
+  than a device issue. The record-only harness always returned failure for
+  `grep`, so a populated `china_ip_route.ipset` fixture was treated as empty;
+  it also omitted the sourced OpenVPN helper APIs and the route-set rendering
+  helpers. This produced unknown-command records and hid the route set from
+  the parser.
+- The bounded harness repair delegates only sandbox-contained route-file reads
+  to the host `grep` and models the sourced helpers and generated pass-set
+  files as record-only operations. It cannot execute OpenVPN, nft, UCI or any
+  network command. Empty route fixtures remain an explicit
+  `KNOWN_CURRENT_GAP`, matching production's fail-closed effective-policy
+  behavior rather than being labelled a normalizer defect.
+- `python scripts/test-production-shadow.py` now passes all 12 tests. Before
+  committing the implementation change, rerun the fast matrix, the focused
+  Naive/UI suites, POSIX/BusyBox checks, local gate and diff check. No device,
+  package-install, WAN/DNS, packet-path or VPS test is authorized in this
+  iteration.
