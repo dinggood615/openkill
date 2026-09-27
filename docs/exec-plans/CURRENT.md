@@ -15,9 +15,17 @@
   lacks an edit operation, manual component detection/install controls and
   action-stage diagnostics.
 - Local work will prove each bridge stage with fixtures and browser tests.
-  Device writes, service actions, router package installation and VPS probes
-  remain forbidden by the repository guide; any device verification is
-  explicitly deferred. All test links and credentials are fictional.
+  A user-authorized, read-only device diagnostic phase is permitted for
+  `192.168.1.103`: inspect the independently installed component, node files,
+  service state, listener ownership and redacted logs only. It must not write
+  configuration, install packages, start or stop services, alter WAN, DNS,
+  firewall, routes, CENTRAL_ACTIVE or packet paths. All test links and
+  credentials are fictional.
+- Device diagnostic result: on 2026-09-27 the read-only SSH transport reached
+  `192.168.1.103`, but authentication was rejected before a remote command
+  ran. No router state, configuration, service, package or network setting was
+  read or changed. Resume requires a currently valid credential or approved
+  SSH key; then run only the listed read-only component/service/listener probe.
 - Rollback: revert the bounded source commits. The component installer retains
   the previous executable, and node changes use mode-600 atomic files under
   `/etc/naiveproxy/nodes`; no OpenKill UCI or user YAML is touched.
