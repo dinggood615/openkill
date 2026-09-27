@@ -1,5 +1,54 @@
 # Current status
 
+## 2026-1170 UI theme bridge and official NaiveProxy installer (2026-09-27)
+
+- Scope for this iteration is limited to OpenKill-scoped visual adaptation and
+  the one-click installer’s independent NaiveProxy component discovery,
+  verification and rollback. CBI field names, UCI values, controller routes,
+  DOM handlers, validation, save/apply semantics, DNS, proxy policy and
+  network writers remain unchanged.
+- The UI baseline uses the existing `oc.css` → `flat.css` load order. The new
+  theme layer must consume available LuCI theme variables first, keep scoped
+  light/dark fallbacks, preserve content-sized cards and avoid affecting LuCI
+  system pages or other plugins. Browser evidence must record the actual theme,
+  CSS viewport, DPR, zoom, computed colors and overflow; static CSS checks are
+  not rendered evidence.
+- The installer contract is: OpenKill package → independent-component
+  preflight → official stable release metadata (API or a checked-in official
+  catalog fallback) → HTTPS/size/SHA256/archive/ELF/loader/version checks →
+  staged atomic replacement → separate component result. A missing or
+  untrusted match is a named failure and never a guessed asset. Existing
+  `/etc/naiveproxy/naive`, node JSON and runtime state remain intact on failure.
+  Manual IPK installation does not silently claim that the external binary was
+  installed; the page and installer distinguish management files from the
+  official executable.
+- The official release metadata reviewed for the fallback catalog is
+  `klzgrad/naiveproxy` `v154.0.8037.49-2`; each catalog row is tied to its
+  public release asset, size, SHA256 digest and OpenWrt target. The catalog is
+  only a verified fallback when the bounded API lookup is unavailable; a fresh
+  API result still wins.
+- Device writes remain outside this iteration: the current plan permits only
+  the previously recorded read-only device/browser checks and forbids package
+  installation, service actions, packet-path tests, CENTRAL_ACTIVE, central
+  nft, WAN/default-route/DNS changes and VPS authentication. Local fixtures,
+  final CSS/browser preview and exact-commit CI are the required evidence.
+- Rollback: revert the bounded source commit; for a device later authorized,
+  preserve `/etc/naiveproxy` and `/var/run/naiveproxy`, restore the previous
+  OpenKill package, and remove only the new installer/catalog files. No user
+  YAML, subscription or node credentials are touched by this scope.
+- Local evidence so far: the official catalog fallback resolves the checked
+  `x86_64` asset without `jsonfilter`, while exact package architectures skip
+  `all/noarch` and reject a machine/package mismatch. Installer, standalone
+  bridge, integration, UI contract, UI preview, UI interaction, optimization,
+  import behavior and POSIX syntax fixtures pass; `sh scripts/local-gate.sh`
+  and `git diff --check` pass. The browser evidence uses production templates
+  and CSS in Chrome, records 1920/1366/768/390 CSS px with no horizontal
+  overflow, and captures distinct light/dark computed surfaces and text.
+- The Windows host lacks PyYAML for the direct installer test; the same test
+  passes in the repository's WSL environment. The browser fixture is local and
+  uses a mock backend only. No device write or real VPS probe was run because
+  this plan's device phase remains read-only/local-only.
+
 ## Authorized read-only NaiveProxy device diagnosis (2026-09-27)
 
 - The user requested diagnosis on the existing test target `192.168.1.103`.

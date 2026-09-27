@@ -159,6 +159,22 @@ class LuCIContractTests(unittest.TestCase):
         self.assertNotIn('--row-1-height:', status_css)
         self.assertNotIn('grid-template-rows: var(--row-1-height)', status_css)
 
+    def test_luci_theme_adapter_is_scoped_and_has_light_dark_fallbacks(self) -> None:
+        oc = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/oc.css").read_text(encoding="utf-8")
+        flat = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css").read_text(encoding="utf-8")
+        for token in ("--ok-theme-page", "--ok-theme-surface", "--ok-theme-text", "--ok-theme-border"):
+            self.assertIn(token, oc)
+        self.assertIn(":root {", oc)
+        self.assertIn("--ok-luci-link", oc)
+        self.assertIn("    --bg-white: var(--ok-theme-surface);", oc)
+        self.assertIn(".oc,\n#cbi-openkill.openkill-settings", oc)
+        self.assertIn("var(--background-color", oc)
+        self.assertIn('html[data-theme="dark"]', oc)
+        self.assertIn("prefers-color-scheme: dark", oc)
+        self.assertIn("--ok-flat-surface", flat)
+        self.assertIn('body[data-page^="admin-services-openkill"]', flat)
+        self.assertNotRegex(flat, r"(?m)^body\s*\{")
+
     def test_settings_cards_use_one_content_sized_layout_contract(self) -> None:
         css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css").read_text(encoding="utf-8")
         self.assertIn('/* ===== OpenKill Stage 4: Settings Card Layout Start =====', css)

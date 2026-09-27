@@ -4,6 +4,7 @@ import subprocess
 import shutil
 import unittest
 import yaml
+import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 BASH = shutil.which("bash") or "C:/Program Files/Git/bin/bash.exe"
@@ -15,6 +16,8 @@ SHADOW_PATH = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_nft_sha
 SHADOW_SOURCE = SHADOW_PATH.read_text(encoding="utf-8")
 SHADOW_TEMPLATE_DIR = ROOT / "luci-app-openkill/root/usr/share/openkill/shadow"
 MAKEFILE_SOURCE = (ROOT / "luci-app-openkill/Makefile").read_text(encoding="utf-8")
+METADATA_SOURCE = (ROOT / "luci-app-openkill/root/usr/share/openkill/naiveproxy-component-metadata.sh").read_text(encoding="utf-8")
+CATALOG_PATH = ROOT / "luci-app-openkill/root/usr/share/openkill/naiveproxy-release-catalog.tsv"
 SETTINGS_SOURCE = (ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua").read_text(encoding="utf-8")
 SETTINGS_THEME = (ROOT / "luci-app-openkill/luasrc/view/openkill/settings_theme.htm").read_text(encoding="utf-8")
 VERSION_BUMP_CHECK = ROOT / "scripts/check-version-bump.sh"
@@ -109,6 +112,32 @@ grep -q 'deadline reached' "$WORK_DIR/detail"
         self.assertIn('naiveproxy-bridge', SOURCE)
         self.assertIn('validate_install', SOURCE)
         self.assertIn('naiveproxy-standalone.sh', SOURCE)
+
+    def test_naiveproxy_installer_has_official_catalog_fallback_and_partial_failure(self):
+        self.assertTrue(CATALOG_PATH.is_file())
+        rows = []
+        for line in CATALOG_PATH.read_text(encoding="utf-8").splitlines():
+            if not line or line.startswith("#"):
+                continue
+            fields = line.split("\t")
+            self.assertEqual(len(fields), 6, line)
+            release, target, asset, size, digest, url = fields
+            self.assertRegex(release, r"^v[0-9A-Za-z._-]+$")
+            self.assertTrue(target)
+            self.assertRegex(asset, r"^naiveproxy-v[^-]+(?:-[0-9]+)?-openwrt-.+\.tar\.xz$")
+            self.assertGreater(int(size), 0)
+            self.assertRegex(digest, r"^[0-9a-f]{64}$")
+            self.assertTrue(url.startswith("https://github.com/klzgrad/naiveproxy/releases/download/"))
+            rows.append((target, asset))
+        self.assertGreaterEqual(len(rows), 1)
+        self.assertIn("NAIVE_METADATA_CATALOG", METADATA_SOURCE)
+        self.assertIn("metadata_catalog_result", METADATA_SOURCE)
+        self.assertIn("$2 != \"noarch\"", METADATA_SOURCE)
+        self.assertIn("package-architecture-mismatch", METADATA_SOURCE)
+        self.assertIn("aarch64_cortex-a53", METADATA_SOURCE)
+        self.assertIn("preflight failed", SOURCE)
+        self.assertIn("NaiveProxy independent component failed", SOURCE)
+        self.assertIn("exit 2", SOURCE)
 
     def test_manifest_selection_prefers_newest_version_over_fastest_stale_cdn(self):
         if not shutil.which("ruby"):

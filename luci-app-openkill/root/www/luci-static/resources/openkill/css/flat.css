@@ -226,6 +226,52 @@
     }
 }
 
+/* Final LuCI theme hand-off.  oc.css owns the semantic adapter; this file
+ * only maps the layout layer's flat tokens and page surfaces after all legacy
+ * rules have loaded.  The selectors stay inside OpenKill routes. */
+.oc.openkill-status-page,
+#cbi-openkill.openkill-settings {
+    --ok-flat-page: var(--ok-bg-page, var(--background-color, #f8fafc));
+    --ok-flat-surface: var(--ok-bg-surface, var(--card-background-color, #ffffff));
+    --ok-flat-surface-muted: var(--ok-bg-surface-muted, var(--background-color-high, #f1f5f9));
+    --ok-flat-text: var(--ok-text-primary, var(--text-color, #252936));
+    --ok-flat-muted: var(--ok-text-secondary, var(--text-color-medium, #6d7483));
+    --ok-flat-border: var(--ok-border-subtle, var(--border-color-medium, #e1e5ec));
+    --ok-flat-accent: var(--ok-color-primary, var(--primary-color, #6654b6));
+    --ok-flat-accent-soft: color-mix(in srgb, var(--ok-flat-accent) 12%, transparent);
+    --ok-flat-success: var(--ok-color-success, #18a871);
+    --ok-flat-success-soft: color-mix(in srgb, var(--ok-flat-success) 12%, transparent);
+}
+
+body[data-page^="admin-services-openkill"] .oc.openkill-status-page,
+body[data-page^="admin-services-openkill"] #cbi-openkill.openkill-settings {
+    color: var(--ok-flat-text);
+}
+
+body[data-page^="admin-services-openkill"] .oc.openkill-status-page .main-card,
+body[data-page^="admin-services-openkill"] .oc.openkill-status-page .sub-card,
+body[data-page^="admin-services-openkill"] #cbi-openkill.openkill-settings .openkill-settings-card {
+    background-color: var(--ok-flat-surface);
+    border-color: var(--ok-flat-border);
+    color: var(--ok-flat-text);
+}
+
+body[data-page^="admin-services-openkill"] .oc.openkill-status-page .card-description,
+body[data-page^="admin-services-openkill"] .oc.openkill-status-page .card-help,
+body[data-page^="admin-services-openkill"] #cbi-openkill.openkill-settings .cbi-value-description {
+    color: var(--ok-flat-muted);
+}
+
+/* Older Chromium/WebView builds do not implement color-mix.  The semantic
+ * fallback keeps the same readable focus and status surfaces there. */
+@supports not (background: color-mix(in srgb, black 10%, transparent)) {
+    .oc.openkill-status-page,
+    #cbi-openkill.openkill-settings {
+        --ok-flat-accent-soft: rgba(59, 130, 246, 0.12);
+        --ok-flat-success-soft: rgba(5, 150, 105, 0.12);
+    }
+}
+
 /* ===== OpenKill Design System V1: Start =====
  * Layout compatibility layer only.  Component semantics remain in oc.css. */
 :root {

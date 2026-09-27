@@ -6848,7 +6848,7 @@ html[data-darkmode=true] .oc #addCustomOption:hover {
  * controls intact, which makes the UI usable on both older LuCI releases and
  * current Argon builds.
  * ======================================================================== */
-.oc.openkill-status-page,
+.oc,
 #cbi-openkill.openkill-settings {
     --ok-flat-page: #f7f8fb;
     --ok-flat-surface: #ffffff;
@@ -9527,7 +9527,7 @@ html[data-theme="dark"] body[data-page^="admin-services-openkill"] {
     --ok-theme-warning: var(--warning-color, #f2c66d);
     --ok-theme-danger: var(--error-color, #ff8a8a);
 }
-.oc.openkill-status-page,
+.oc,
 #cbi-openkill.openkill-settings {
     --ok-ui-surface: var(--ok-theme-surface, #ffffff);
     --ok-ui-surface-muted: var(--ok-theme-surface-muted, #f5f6fa);
@@ -9560,14 +9560,139 @@ html[data-theme="dark"] #cbi-openkill.openkill-settings {
     --ok-ui-danger: var(--ok-theme-danger, #ff8a8a);
 }
 
-.oc.openkill-status-page a,
+/* Capture LuCI semantic tokens before the page-local legacy tokens are
+ * aliased below.  The names are OpenKill-prefixed, so this does not alter
+ * LuCI's own variables or other pages. */
+:root {
+    --ok-luci-page: var(--background-color);
+    --ok-luci-surface: var(--card-background-color, var(--panel-background-color, var(--background-color)));
+    --ok-luci-surface-muted: var(--input-bg-color, var(--background-color-high, var(--background-color)));
+    --ok-luci-surface-hover: var(--background-color-high, var(--background-color));
+    --ok-luci-text: var(--text-color-high, var(--text-color));
+    --ok-luci-muted: var(--text-color-medium, var(--text-color-secondary));
+    --ok-luci-border: var(--border-color-medium, var(--border-color));
+    --ok-luci-link: var(--primary-color);
+    --ok-luci-success: var(--success-color);
+    --ok-luci-warning: var(--warning-color);
+    --ok-luci-danger: var(--error-color);
+}
+
+/* LuCI theme adapter: older OpenWrt themes do not all expose
+ * data-darkmode/data-theme, but most publish the same semantic custom
+ * properties on the page root.  Map those values into the existing OpenKill
+ * tokens at the last component layer so legacy selectors inherit the current
+ * theme without leaking variables to LuCI or other plugins. */
+.oc.openkill-status-page,
+#cbi-openkill.openkill-settings {
+    --ok-theme-page: var(--ok-luci-page, #f8fafc);
+    --ok-theme-surface: var(--ok-luci-surface, #ffffff);
+    --ok-theme-surface-muted: var(--ok-luci-surface-muted, #f1f5f9);
+    --ok-theme-surface-hover: var(--ok-luci-surface-hover, #eef4ff);
+    --ok-theme-text: var(--ok-luci-text, #1f2937);
+    --ok-theme-muted: var(--ok-luci-muted, #64748b);
+    --ok-theme-border: var(--ok-luci-border, #cbd5e1);
+    --ok-theme-link: var(--ok-luci-link, #2563eb);
+    --ok-theme-focus: var(--ok-luci-link, #2563eb);
+    --ok-theme-success: var(--ok-luci-success, #15803d);
+    --ok-theme-warning: var(--ok-luci-warning, #a16207);
+    --ok-theme-danger: var(--ok-luci-danger, #b91c1c);
+
+    --ok-bg-page: var(--ok-theme-page);
+    --ok-bg-surface: var(--ok-theme-surface);
+    --ok-bg-surface-muted: var(--ok-theme-surface-muted);
+    --ok-bg-surface-hover: var(--ok-theme-surface-hover);
+    --ok-text-primary: var(--ok-theme-text);
+    --ok-text-secondary: var(--ok-theme-muted);
+    --ok-text-muted: var(--ok-theme-muted);
+    --ok-border-subtle: var(--ok-theme-border);
+    --ok-border-default: var(--ok-theme-border);
+    --ok-border-strong: var(--border-color-high, var(--ok-theme-border));
+    --ok-color-primary: var(--ok-theme-link);
+    --ok-color-primary-hover: var(--ok-theme-link);
+    --ok-color-primary-active: var(--ok-theme-link);
+    --ok-color-success: var(--ok-theme-success);
+    --ok-color-warning: var(--ok-theme-warning);
+    --ok-color-danger: var(--ok-theme-danger);
+    --ok-color-info: var(--ok-theme-link);
+    --ok-border-focus: var(--ok-theme-focus);
+    --ok-ui-surface: var(--ok-theme-surface);
+    --ok-ui-surface-muted: var(--ok-theme-surface-muted);
+    --ok-ui-text: var(--ok-theme-text);
+    --ok-ui-muted: var(--ok-theme-muted);
+    --ok-ui-border: var(--ok-theme-border);
+    --ok-ui-link: var(--ok-theme-link);
+    --ok-ui-focus: var(--ok-theme-focus);
+    --ok-ui-success: var(--ok-theme-success);
+    --ok-ui-warning: var(--ok-theme-warning);
+    --ok-ui-danger: var(--ok-theme-danger);
+
+    /* Legacy component tokens are kept as aliases so every existing OpenKill
+     * view follows the same LuCI theme without changing its markup or event
+     * handlers. */
+    --bg-white: var(--ok-theme-surface);
+    --bg-light: var(--ok-theme-page);
+    --bg-gray: var(--ok-theme-surface-muted);
+    --text-primary: var(--ok-theme-text);
+    --text-secondary: var(--ok-theme-muted);
+    --text-title: var(--ok-theme-text);
+    --primary-color: var(--ok-theme-link);
+    --info-color: var(--ok-theme-link);
+    --success-color: var(--ok-theme-success);
+    --error-color: var(--ok-theme-danger);
+    --warning-color: var(--ok-theme-warning);
+    --border-color: var(--ok-theme-border);
+    --border-light: var(--ok-theme-border);
+    --hover-bg: var(--ok-theme-surface-hover);
+    --select-hover: var(--ok-theme-surface-hover);
+    --editor-bg: var(--ok-theme-surface-muted);
+    --divider: var(--ok-theme-border);
+}
+
+/* Theme variables are not guaranteed on very old LuCI skins.  Prefer an
+ * explicit dark marker, then the browser preference only when no explicit
+ * light marker is present. */
+html[data-darkmode="true"] .oc,
+html[data-darkmode="true"] #cbi-openkill.openkill-settings,
+html[data-theme="dark"] .oc,
+html[data-theme="dark"] #cbi-openkill.openkill-settings,
+body.theme-dark .oc,
+body.theme-dark #cbi-openkill.openkill-settings,
+body[data-theme="dark"] .oc,
+body[data-theme="dark"] #cbi-openkill.openkill-settings {
+    --ok-theme-page: var(--ok-luci-page, #111827);
+    --ok-theme-surface: var(--ok-luci-surface, #1f2937);
+    --ok-theme-surface-muted: var(--ok-luci-surface-muted, #273449);
+    --ok-theme-surface-hover: var(--ok-luci-surface-hover, #334155);
+    --ok-theme-text: var(--ok-luci-text, #f3f4f6);
+    --ok-theme-muted: var(--ok-luci-muted, #cbd5e1);
+    --ok-theme-border: var(--ok-luci-border, #4b5563);
+    --ok-theme-link: var(--ok-luci-link, #93c5fd);
+    --ok-theme-focus: var(--ok-luci-link, #93c5fd);
+    --ok-theme-success: var(--ok-luci-success, #34d399);
+    --ok-theme-warning: var(--ok-luci-warning, #fbbf24);
+    --ok-theme-danger: var(--ok-luci-danger, #f87171);
+}
+
+@media (prefers-color-scheme: dark) {
+    html:not([data-darkmode="false"]):not([data-theme="light"]) .oc,
+    html:not([data-darkmode="false"]):not([data-theme="light"]) #cbi-openkill.openkill-settings {
+        --ok-theme-page: var(--ok-luci-page, #111827);
+        --ok-theme-surface: var(--ok-luci-surface, #1f2937);
+        --ok-theme-surface-muted: var(--ok-luci-surface-muted, #273449);
+        --ok-theme-text: var(--ok-luci-text, #cbd5e1);
+        --ok-theme-muted: var(--ok-luci-muted, #cbd5e1);
+        --ok-theme-border: var(--ok-luci-border, #4b5563);
+    }
+}
+
+.oc a,
 #cbi-openkill.openkill-settings a { color: var(--ok-ui-link); }
 
-.oc.openkill-status-page button:focus-visible,
-.oc.openkill-status-page a:focus-visible,
-.oc.openkill-status-page input:focus-visible,
-.oc.openkill-status-page select:focus-visible,
-.oc.openkill-status-page textarea:focus-visible,
+.oc button:focus-visible,
+.oc a:focus-visible,
+.oc input:focus-visible,
+.oc select:focus-visible,
+.oc textarea:focus-visible,
 #cbi-openkill.openkill-settings button:focus-visible,
 #cbi-openkill.openkill-settings a:focus-visible,
 #cbi-openkill.openkill-settings input:focus-visible,

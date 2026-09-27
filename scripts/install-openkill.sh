@@ -419,8 +419,31 @@ validate_install(){
 }
 
 install_naive_standalone_component(){
-  local metadata_script metadata_output ok reason url sha size asset current_sha
+  local metadata_script metadata_output ok reason url sha size asset current_sha install_output install_reason tool available_kb
   step "Resolving and installing the NaiveProxy independent component"
+  # The official OpenWrt archives are xz-compressed and are verified locally
+  # before the standalone library is allowed to replace an existing binary.
+  # Keep these checks separate from OpenKill package validation so a missing
+  # component is reported as a partial installation rather than a false
+  # all-success result.
+  for tool in sha256sum tar xz od find awk sed; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+      detail "NaiveProxy independent component: preflight failed (missing-$tool)"
+      return 1
+    fi
+  done
+  if ! command -v curl >/dev/null 2>&1 && ! command -v wget >/dev/null 2>&1; then
+    detail "NaiveProxy independent component: preflight failed (downloader-missing)"
+    return 1
+  fi
+  available_kb=$(df -Pk /etc 2>/dev/null | awk 'NR==2 {print $4}')
+  case "$available_kb" in
+    ''|*[!0-9]*) detail "NaiveProxy independent component: preflight failed (disk-space-unknown)"; return 1 ;;
+  esac
+  if [ "$available_kb" -lt 16384 ]; then
+    detail "NaiveProxy independent component: preflight failed (disk-space-low)"
+    return 1
+  fi
   metadata_script=/usr/share/openkill/naiveproxy-component-metadata.sh
   if [ ! -x "$metadata_script" ]; then
     detail "NaiveProxy independent component: metadata resolver is missing"
@@ -451,11 +474,13 @@ install_naive_standalone_component(){
     return 0
   fi
   detail "Verified NaiveProxy independent asset: ${asset:-unknown} (${size} bytes)"
-  if sh /usr/share/openkill/naiveproxy-standalone.sh install "$url" "$sha" "$size"; then
+  install_output="$WORK_DIR/naiveproxy-install.log"
+  if sh /usr/share/openkill/naiveproxy-standalone.sh install "$url" "$sha" "$size" >"$install_output" 2>&1; then
     detail "NaiveProxy independent component installed under /etc/naiveproxy/naive"
     return 0
   fi
-  detail "NaiveProxy independent component install failed; OpenKill remains installed and the previous component was retained"
+  install_reason=$(sed -n 's/^reason=//p; s/^component_install_error=//p' "$install_output" 2>/dev/null | tail -n 1 || true)
+  detail "NaiveProxy independent component install failed (${install_reason:-verification-failed}); OpenKill remains installed and the previous component was retained"
   return 1
 }
 
@@ -859,4 +884,8 @@ rm -f /tmp/luci-indexcache /tmp/luci-modulecache/*openkill* 2>/dev/null || true
 rm -f "$PACKAGE_FILE"
 step "Completing installation and retaining recovery backup"
 detail "Detailed installation log: ${INSTALL_LOG:-unavailable}"
-printf 'OpenKill %s installation/update complete.\n' "${ver:-local package}"
+if [ "$NAIVE_COMPONENT_RESULT" = failed ]; then
+  printf 'OpenKill %s installed, but the NaiveProxy independent component failed. Review the named preflight or verification stage above and retry after fixing it.\n' "${ver:-local package}" >&2
+  exit 2
+fi
+printf 'OpenKill %s installation/update complete; NaiveProxy independent component is ready for node setup.\n' "${ver:-local package}"

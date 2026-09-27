@@ -210,7 +210,7 @@ np_component_install() {
         printf 'url=%s\n' "$url"
         printf 'asset=%s\n' "${url##*/}"
         case "${url##*/}" in
-            naiveproxy-v*-openwrt-*) printf 'version=%s\n' "$(printf '%s' "${url##*/}" | sed 's/^naiveproxy-\(v[^-]*\)-openwrt-.*/\1/')" ;;
+            naiveproxy-v*-openwrt-*) printf 'version=%s\n' "$(printf '%s' "${url##*/}" | sed 's/^naiveproxy-\(v.*\)-openwrt-.*/\1/')" ;;
             *) printf 'version=unknown\n' ;;
         esac
         printf 'installed_at=%s\n' "$(date +%s)"
@@ -537,7 +537,18 @@ np_dispatch() {
     np_dirs || exit 1
     case "${1:-status}" in
         component) np_probe_component; exit $? ;;
-        install) np_component_install "$2" "$3" "${4:-}"; rc=$?; [ "$rc" -eq 0 ] && np_manifest >/dev/null 2>&1 || true; exit "$rc" ;;
+        install)
+            np_component_install "$2" "$3" "${4:-}"
+            rc=$?
+            if [ "$rc" -eq 0 ]; then
+                np_manifest >/dev/null 2>&1 || true
+            else
+                # The installer consumes this redacted stage name; never
+                # echo the URL, credentials or generated node JSON here.
+                printf 'reason=%s\n' "${NP_INSTALL_ERROR:-component-install-failed}" >&2
+            fi
+            exit "$rc"
+            ;;
         prepare) np_prepare "$2" >/dev/null; exit $? ;;
         port) np_port "$2"; exit $? ;;
         health)

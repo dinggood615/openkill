@@ -9,6 +9,8 @@ STANDALONE = ROOT / "luci-app-openkill/root/usr/share/openkill/naiveproxy-standa
 BRIDGE_INIT = ROOT / "luci-app-openkill/root/etc/init.d/naiveproxy-bridge"
 OPENKILL_INIT = ROOT / "luci-app-openkill/root/etc/init.d/openkill"
 INSTALLER = ROOT / "scripts/install-openkill.sh"
+METADATA = ROOT / "luci-app-openkill/root/usr/share/openkill/naiveproxy-component-metadata.sh"
+CATALOG = ROOT / "luci-app-openkill/root/usr/share/openkill/naiveproxy-release-catalog.tsv"
 CONTROLLER = ROOT / "luci-app-openkill/luasrc/controller/openkill.lua"
 SETTINGS = ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua"
 SERVERS = ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua"
@@ -53,6 +55,14 @@ def main() -> None:
     require(INSTALLER, "naiveproxy-component-metadata.sh")
     assert "install_naive_component(){" not in installer
     require(INSTALLER, "naiveproxy-bridge")
+    require(INSTALLER, "preflight failed")
+    require(INSTALLER, "NaiveProxy independent component failed")
+    metadata = require(METADATA, "metadata_catalog_result")
+    require(METADATA, "official-github-release-catalog")
+    assert CATALOG.is_file()
+    catalog_rows = [line for line in CATALOG.read_text(encoding="utf-8").splitlines()
+                    if line and not line.startswith("#")]
+    assert catalog_rows and all(len(line.split("\t")) == 6 for line in catalog_rows)
     controller = require(CONTROLLER, "action_naive_standalone_status")
     require(CONTROLLER, "/var/run/naiveproxy/manifest")
     require(CONTROLLER, "/var/run/naiveproxy/snippets.yaml")
@@ -94,6 +104,7 @@ def main() -> None:
     require(STANDALONE, "np_legacy_cleanup")
     require(STANDALONE, "np_import_link")
     require(STANDALONE, "component_reason=")
+    require(STANDALONE, "sed 's/^naiveproxy-\\(v.*\\)-openwrt-.*/\\1/'")
     require(CONTROLLER, "component_reason")
     require(CONTROLLER, "component_detail")
     assert "zerotier = \"advanced\"" not in SETTINGS.read_text(encoding="utf-8")

@@ -129,6 +129,38 @@ def main() -> int:
                 page.route("**/*", route_handler)
                 page.goto(f"http://127.0.0.1:{server.server_port}/index.html", wait_until="networkidle", timeout=30_000)
 
+                theme_evidence = page.evaluate(
+                    """
+                    () => {
+                      const root = document.documentElement;
+                      const pageRoot = document.querySelector('.oc.openkill-status-page');
+                      if (!pageRoot) throw new Error('THEME_PAGE_ROOT_MISSING');
+                      const read = (mode) => {
+                        root.setAttribute('data-darkmode', mode);
+                        root.removeAttribute('data-theme');
+                        const style = getComputedStyle(pageRoot);
+                        return {
+                          mode,
+                          pageBackground: style.backgroundColor,
+                          surface: style.getPropertyValue('--ok-ui-surface').trim(),
+                          text: style.color,
+                          border: style.getPropertyValue('--ok-ui-border').trim()
+                        };
+                      };
+                      const dark = read('true');
+                      const light = read('false');
+                      root.setAttribute('data-darkmode', 'true');
+                      return {dark, light};
+                    }
+                    """
+                )
+                if theme_evidence["dark"] == theme_evidence["light"]:
+                    raise AssertionError(f"UI_THEME_MODES_NOT_DISTINCT:{json.dumps(theme_evidence)}")
+                page.screenshot(path=str(EVIDENCE_DIR / "theme-dark-1366.png"), full_page=True)
+                page.evaluate("document.documentElement.setAttribute('data-darkmode', 'false')")
+                page.screenshot(path=str(EVIDENCE_DIR / "theme-light-1366.png"), full_page=True)
+                page.evaluate("document.documentElement.setAttribute('data-darkmode', 'true')")
+
                 probe = page.evaluate(
                     """
                     async () => {
@@ -549,6 +581,7 @@ def main() -> int:
                     "browser_executable": str(executable),
                     "dimensions": dimensions,
                     "probe": probe,
+                    "theme": theme_evidence,
                     "visibility": visibility,
                     "conditional": conditional,
                     "editor_race": editor_race,
