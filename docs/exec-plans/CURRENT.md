@@ -26,11 +26,15 @@
   release gates remain in place.
 - Local verification: `python scripts/test-autonomous-workflow.py -v`,
   `sh scripts/local-gate.sh` (via WSL), and `git diff --check` passed. The
-  workflow files were not executed on a GitHub runner yet; exact-commit CI,
-  RC timing/cache-hit evidence and Formal Release remain the next gates.
-- Next action: commit and push the bounded workflow optimization, verify the
-  exact Development CI, then bump the source metadata once to 2026-1168 and
-  run the RC/Formal release gates.
+  first exact commit `091ef87809120436c69748e59607616e86317147` reached the
+  Development CI but its runtime matrix exposed a pre-existing uncommitted
+  settings-test assertion that still expected six tabs. The bounded repair is
+  commit `d0e88b229c8baccb8a556cadc8086808536382ef`, which records the already
+  present seven-tab layout contract. Development CI Run 274 for that exact
+  commit passed; the earlier failure was not a workflow/build regression.
+- Next action: commit the prepared source metadata and 2026-1168 release note,
+  verify that exact versioned commit's Development CI, and run the RC/Formal
+  release gates.
 
 ## NaiveProxy service tab and stable component update (2026-09-27)
 
