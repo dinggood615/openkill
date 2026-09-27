@@ -40,8 +40,10 @@ def main():
         os.chmod(root / "naive", 0o755)
         (fake / "jsonfilter").write_text("""#!/bin/sh
 expr=
+file=
 while [ "$#" -gt 0 ]; do
   if [ "$1" = -e ]; then expr=$2; shift 2; continue; fi
+  if [ "$1" = -i ]; then file=$2; shift 2; continue; fi
   shift
 done
 case "$expr" in
@@ -52,6 +54,7 @@ case "$expr" in
   @.username) printf '%s' 'fixture-user' ;;
   @.password) printf '%s' 'fixture-secret' ;;
   @.transport) printf '%s' 'https' ;;
+  @.generation) sed -n 's/.*"generation":\\([0-9][0-9]*\\).*/\\1/p' "$file" ;;
 esac
 """, encoding="utf-8")
         (fake / "ss").write_text("#!/bin/sh\nprintf '%s\\n' 'LISTEN 0 128 127.0.0.1:11080 0.0.0.0:*'\n", encoding="utf-8")
@@ -61,6 +64,7 @@ esac
         env = os.environ.copy()
         env.update({"NAIVEPROXY_ROOT": git_path(root), "NAIVEPROXY_RUN": git_path(run_dir),
                     "NAIVEPROXY_BIN": git_path(root / "naive"),
+                    "NAIVEPROXY_TEST_ALLOW_NON_ELF": "1",
                     "PATH": git_path(fake) + ":" + env.get("PATH", "")})
         bash_env = Path(temp) / "bash_env"
         bash_env.write_text(f"export PATH={git_path(fake)}:$PATH\n", encoding="utf-8")
@@ -103,9 +107,37 @@ esac
         assert imported_data["username"] == "fixture-user"
         assert imported_data["password"] == "fixture-secret"
         assert imported_data["transport"] == "https"
+        assert imported_data["generation"] == 1
         imported_port = (run(["port", imported_id], env).stdout.strip())
         assert imported_port.isdigit() and imported_port != "11080"
         assert "fixture-secret" not in (run_dir / "manifest").read_text(encoding="utf-8")
+        read_node = subprocess.run(
+            [BASH, git_path(SCRIPT), "control"], env=env,
+            text=True, input=f"operation=get\nid={imported_id}\n", capture_output=True,
+        )
+        assert read_node.returncode == 0, (read_node.stdout, read_node.stderr)
+        control_result = (run_dir / "control.result").read_text(encoding="utf-8")
+        assert "stage=node-read" in control_result and "fixture-secret" not in control_result
+        edited = subprocess.run(
+            [BASH, git_path(SCRIPT), "control"], env=env, text=True, input=(
+                f"operation=edit\nid={imported_id}\ngeneration=1\nname=Renamed\n"
+                "server=import.example.test\nport=443\nusername=fixture-user\n"
+                "password_mode=retain\ntransport=https\nenabled=1\n"
+            ), capture_output=True,
+        )
+        assert edited.returncode == 0, (edited.stdout, edited.stderr)
+        edited_data = json.loads(imported_file.read_text(encoding="utf-8"))
+        assert edited_data["name"] == "Renamed"
+        assert edited_data["password"] == "fixture-secret"
+        assert edited_data["generation"] == 2
+        conflict = subprocess.run(
+            [BASH, git_path(SCRIPT), "control"], env=env, text=True, input=(
+                f"operation=edit\nid={imported_id}\ngeneration=1\nname=Renamed\n"
+                "server=import.example.test\nport=443\nusername=fixture-user\n"
+                "password_mode=retain\ntransport=https\nenabled=1\n"
+            ), capture_output=True,
+        )
+        assert conflict.returncode != 0
         invalid = subprocess.run([BASH, git_path(SCRIPT), "control"], env=env, text=True,
                                  input="operation=import\nshare=naive+https://bad\n", capture_output=True)
         assert invalid.returncode != 0
@@ -115,6 +147,12 @@ esac
             ), capture_output=True,
         )
         assert encoded.returncode == 0, (encoded.stdout, encoded.stderr)
+        quic = subprocess.run(
+            [BASH, git_path(SCRIPT), "control"], env=env, text=True, input=(
+                "operation=import\nshare=naive+quic://quic-user:quic-secret@quic.example.test:443#Quic\nenabled=1\n"
+            ), capture_output=True,
+        )
+        assert quic.returncode == 0, (quic.stdout, quic.stderr)
         duplicate = subprocess.run([BASH, git_path(SCRIPT), "control"], env=env, text=True,
                                     input=("operation=import\nshare=naive+https://fixture-user:fixture-secret@import.example.test:443?security=tls&type=tcp&headerType=none#Again\n"),
                                     capture_output=True)

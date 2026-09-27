@@ -1645,6 +1645,19 @@ end
 -- Read-only adapter for the independent NaiveProxy bridge.  This endpoint
 -- never touches OpenKill UCI or the selected Mihomo YAML and only exposes the
 -- standalone service's redacted manifest and credential-free SOCKS5 snippet.
+local function naive_read_manifest()
+	local command = "/usr/share/openkill/naiveproxy-standalone.sh manifest 2>/dev/null"
+	if type(io) == "table" and type(io.popen) == "function" then
+		local ok, pipe = pcall(io.popen, command, "r")
+		if ok and pipe then
+			local read_ok, output = pcall(function() return pipe:read("*a") end)
+			pcall(function() pipe:close() end)
+			if read_ok and output and output ~= "" then return output end
+		end
+	end
+	return fs.readfile("/var/run/naiveproxy/manifest") or ""
+end
+
 function action_naive_standalone_status()
 	local operation = HTTP.formvalue("operation") or "status"
 	local output
@@ -1657,7 +1670,11 @@ function action_naive_standalone_status()
 		-- OpenKill is a read-only adapter. Health probes are scheduled or
 		-- started by naiveproxy-bridge; this request never starts a process,
 		-- rewrites a node, or runs a remote probe.
-		output = fs.readfile("/var/run/naiveproxy/manifest") or ""
+		-- Rebuild only the redacted runtime manifest.  This never downloads a
+		-- component, starts a node or writes OpenKill/UCI/YAML state; it makes a
+		-- manual component installation visible without waiting for a service
+		-- lifecycle event.
+		output = naive_read_manifest()
 	end
 	local result = { ok = true, mode = "standalone", nodes = {}, component_status = "unavailable", updated = 0 }
 	for line in output:gmatch("[^\r\n]+") do
@@ -1669,6 +1686,10 @@ function action_naive_standalone_status()
 				result.component_reason = value
 			elseif key == "component_version" then
 				result.component_version = value
+			elseif key == "component_asset" then
+				result.component_asset = value
+			elseif key == "component_machine" then
+				result.component_machine = value
 			elseif key == "component" then
 				result.component = value
 			elseif key == "updated" then
@@ -1677,7 +1698,7 @@ function action_naive_standalone_status()
 				local sid, field = key:match("^node%.([%w_-]+)%.([%w_]+)$")
 				if sid and field then
 					result.nodes[sid] = result.nodes[sid] or { id = sid }
-					if field == "port" or field == "pid" or field == "latency_ms" or field == "checked_at" or field == "expires_at" then
+					if field == "port" or field == "pid" or field == "latency_ms" or field == "checked_at" or field == "expires_at" or field == "generation" or field == "pending_apply" then
 						-- Preserve an unknown value as unknown; converting a missing
 						-- field to zero makes the UI claim a port, PID or timestamp
 						-- that the standalone service never proved.
@@ -1747,17 +1768,60 @@ local function naive_bridge_request(fields)
 	return rc == true or rc == 0, "fallback", rc
 end
 
+local function naive_percent_decode(value)
+	value = value or ""
+	return (value:gsub("%%(%x%x)", function(hex)
+		return string.char(tonumber(hex, 16))
+	end))
+end
+
+local function naive_control_result_fields(content, result)
+	local node = nil
+	for line in (content or ""):gmatch("[^\r\n]+") do
+		local key, value = line:match("^([%w_.-]+)=(.*)$")
+		if key == "stage" then result.stage = value
+		elseif key == "id" then result.id = value
+		elseif key == "reason" then result.reason = value
+		elseif key == "asset" then result.asset = value
+		elseif key == "candidate_version" then result.candidate_version = value
+		elseif key == "task_id" then result.task_id = value
+		elseif key == "node_name" or key == "node_server" or key == "node_username" or
+			key == "node_port" or key == "node_transport" or key == "node_enabled" or
+			key == "node_generation" or key == "password_set" then
+			node = node or {}
+			local field = key:gsub("^node_", "")
+			if key == "node_name" or key == "node_server" or key == "node_username" then
+				node[field] = naive_percent_decode(value)
+			elseif key == "node_port" or key == "node_generation" then
+				node[field] = tonumber(value) or value
+			elseif key == "password_set" then
+				node.password_set = value == "1"
+			else
+				node[field] = value
+			end
+		end
+	end
+	if node then result.node = node end
+end
+
 local function action_naive_bridge_control_impl()
 	local method = HTTP.getenv("REQUEST_METHOD") or "GET"
 	local operation = HTTP.formvalue("operation") or ""
-	local allowed = { add = true, import = true, remove = true, start = true, stop = true, health = true, update = true, legacy_cleanup = true }
+	local allowed = { add = true, import = true, get = true, edit = true, remove = true, start = true, stop = true, health = true, component = true, install = true, update = true, legacy_cleanup = true }
 	local result = { ok = false, operation = operation, stage = "request" }
 	if method ~= "POST" or not allowed[operation] then
 		result.error = "post-and-supported-operation-required"
 		return result, 400, "Bad Request"
 	end
+	-- LuCI already enforces the page ACL and session cookie for this route.  A
+	-- same-origin XHR marker adds a CSRF boundary for these credential-bearing
+	-- mutations without leaking the request body in an error page.
+	if HTTP.getenv("HTTP_X_REQUESTED_WITH") ~= "XMLHttpRequest" then
+		result.error = "same-origin-xhr-required"
+		return result, 403, "Forbidden"
+	end
 	local fields = {}
-	for _, key in ipairs({ "operation", "id", "name", "server", "port", "username", "password", "transport", "enabled", "share" }) do
+	for _, key in ipairs({ "operation", "id", "name", "server", "port", "username", "password", "password_mode", "generation", "transport", "enabled", "share" }) do
 		local value = HTTP.formvalue(key)
 		if value ~= nil then
 			if #value > 4096 or value:find("[\r\n]") then
@@ -1773,10 +1837,7 @@ local function action_naive_bridge_control_impl()
 	os.remove("/var/run/naiveproxy/control.result")
 	local launched, why, code = naive_bridge_request(fields)
 	local control_result = fs.readfile("/var/run/naiveproxy/control.result") or ""
-	local control_stage = control_result:match("stage=([^\n]+)")
-	local control_id = control_result:match("id=([%w_-]+)")
-	if control_stage then result.stage = control_stage end
-	if control_id then result.id = control_id end
+	naive_control_result_fields(control_result, result)
 	if launched then
 		result.ok = true
 		result.stage = result.stage == "request" and "accepted" or result.stage

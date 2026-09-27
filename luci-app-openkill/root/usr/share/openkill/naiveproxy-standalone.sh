@@ -20,6 +20,7 @@ NP_TIMEOUT="${NAIVEPROXY_HEALTH_TIMEOUT:-8}"
 NP_PORT_BASE="${NAIVEPROXY_PORT_BASE:-11080}"
 NP_PORT_LIMIT=100
 NP_HEALTH_LOCK="$NP_RUN/health.lock"
+NP_COMPONENT_LOCK="$NP_RUN/component.lock"
 NP_CONTROL_RESULT="$NP_RUN/control.result"
 
 np_safe() { printf '%s' "$1" | tr '\r\n|=' '    ' | cut -c1-160; }
@@ -141,6 +142,25 @@ np_probe_component() {
     NP_PROBE_REASON=""
     if [ ! -e "$NP_BIN" ]; then NP_PROBE_REASON=component-missing; return 1; fi
     if [ ! -x "$NP_BIN" ]; then NP_PROBE_REASON=component-not-executable; return 1; fi
+    # A component that exists but belongs to another target must not be
+    # reported as a generic launch failure.  Check the ELF header before the
+    # loader has a chance to reject it.  Minimal images can lack an od-like
+    # reader, in which case the version probe below remains the evidence.
+    if np_hex_file "$NP_BIN" 0 4 >/dev/null 2>&1; then
+        if [ "$(np_hex_file "$NP_BIN" 0 4 2>/dev/null || true)" != 7f454c46 ]; then
+            # Only the offline fixture opts into this branch.  Production
+            # component installation rejects non-ELF payloads before this
+            # probe is reached, so a shell stub can never become a router
+            # component by setting this environment variable.
+            [ "${NAIVEPROXY_TEST_ALLOW_NON_ELF:-0}" = 1 ] || {
+                NP_PROBE_REASON=component-not-elf
+                return 1
+            }
+        elif ! np_elf_arch_ok "$NP_BIN"; then
+            NP_PROBE_REASON=component-architecture-mismatch
+            return 1
+        fi
+    fi
     if ! "$NP_BIN" --version >/dev/null 2>&1; then NP_PROBE_REASON=loader-or-version-probe-failed; return 1; fi
     NP_PROBE_REASON=available
     return 0
@@ -392,21 +412,28 @@ np_health_all() {
 }
 
 np_manifest() {
-    local now id file name enabled port config pid health_status latency checked expires reason state component_version component_reason
+    local now id file name enabled port config pid health_status latency checked expires reason state component_version component_reason component_asset component_machine generation running_generation pending_apply
     np_dirs || return 1; now=$(date +%s)
     component_version=$(sed -n 's/^version=//p' "$NP_ROOT/component.meta" 2>/dev/null | head -n1)
     [ -n "$component_version" ] || component_version=unknown
+    component_asset=$(sed -n 's/^asset=//p' "$NP_ROOT/component.meta" 2>/dev/null | head -n1)
+    [ -n "$component_asset" ] || component_asset=unknown
+    component_machine=$(uname -m 2>/dev/null || printf unknown)
     {
-        printf 'version=1\nmode=standalone\nupdated=%s\ncomponent=%s\ncomponent_version=%s\n' "$now" "$NP_BIN" "$(np_safe "$component_version")"
+        printf 'version=1\nmode=standalone\nupdated=%s\ncomponent=%s\ncomponent_version=%s\ncomponent_asset=%s\ncomponent_machine=%s\n' "$now" "$NP_BIN" "$(np_safe "$component_version")" "$(np_safe "$component_asset")" "$(np_safe "$component_machine")"
         if np_probe_component; then printf 'component_status=available\ncomponent_reason=available\n'; else component_reason=${NP_PROBE_REASON:-unavailable}; printf 'component_status=unavailable\ncomponent_reason=%s\n' "$component_reason"; fi
         for id in $(np_ids); do
             file=$(np_node_file "$id") || continue; name=$(np_node_value "$file" name); [ -n "$name" ] || name="$id"
             enabled=$(np_node_value "$file" enabled); port=$(np_port "$id" 2>/dev/null || true); config="$NP_CONFIG_DIR/$id.json"
+            generation=$(np_node_generation "$file")
             pid=$(np_pid_for_config "$config" 2>/dev/null || true); health_status=$(sed -n 's/^status=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); latency=$(sed -n 's/^latency_ms=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); checked=$(sed -n 's/^checked_at=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); expires=$(sed -n 's/^expires_at=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); reason=$(sed -n 's/^reason=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1)
             case "$expires" in ''|*[!0-9]*) ;; *) [ "$expires" -le "$now" ] && [ "$health_status" = available ] && health_status=expired ;; esac
             state=stopped; [ -n "$pid" ] && np_listener "$port" && state=running
-            printf 'node.%s.name=%s\nnode.%s.enabled=%s\nnode.%s.port=%s\nnode.%s.pid=%s\nnode.%s.state=%s\nnode.%s.local_ready=%s\nnode.%s.health=%s\nnode.%s.latency_ms=%s\nnode.%s.checked_at=%s\nnode.%s.expires_at=%s\nnode.%s.reason=%s\n' \
-                "$id" "$(np_safe "$name")" "$id" "$(np_safe "$enabled")" "$id" "$(np_safe "$port")" "$id" "$(np_safe "$pid")" "$id" "$state" "$id" "$( [ "$state" = running ] && printf 1 || printf 0 )" "$id" "$(np_safe "${health_status:-unknown}")" "$id" "$(np_safe "${latency:-unknown}")" "$id" "$(np_safe "${checked:-unknown}")" "$id" "$(np_safe "${expires:-unknown}")" "$id" "$(np_safe "${reason:-not-tested}")"
+            running_generation=$(sed -n 's/^generation=//p' "$NP_STATE_DIR/instance.$id" 2>/dev/null | head -n1)
+            pending_apply=0
+            [ "$state" = running ] && [ "$running_generation" != "$generation" ] && pending_apply=1
+            printf 'node.%s.name=%s\nnode.%s.enabled=%s\nnode.%s.port=%s\nnode.%s.pid=%s\nnode.%s.state=%s\nnode.%s.local_ready=%s\nnode.%s.health=%s\nnode.%s.latency_ms=%s\nnode.%s.checked_at=%s\nnode.%s.expires_at=%s\nnode.%s.reason=%s\nnode.%s.generation=%s\nnode.%s.pending_apply=%s\n' \
+                "$id" "$(np_safe "$name")" "$id" "$(np_safe "$enabled")" "$id" "$(np_safe "$port")" "$id" "$(np_safe "$pid")" "$id" "$state" "$id" "$( [ "$state" = running ] && printf 1 || printf 0 )" "$id" "$(np_safe "${health_status:-unknown}")" "$id" "$(np_safe "${latency:-unknown}")" "$id" "$(np_safe "${checked:-unknown}")" "$id" "$(np_safe "${expires:-unknown}")" "$id" "$(np_safe "${reason:-not-tested}")" "$id" "$(np_safe "$generation")" "$id" "$pending_apply"
         done
     } > "$NP_RUN/manifest.new.$$" || return 1
     chmod 600 "$NP_RUN/manifest.new.$$"; mv -f "$NP_RUN/manifest.new.$$" "$NP_RUN/manifest"
@@ -432,7 +459,11 @@ np_control_read() {
     NP_CTL_action=""; NP_CTL_id=""; NP_CTL_name=""; NP_CTL_server=""
     NP_CTL_port=""; NP_CTL_username=""; NP_CTL_password=""
     NP_CTL_transport="https"; NP_CTL_enabled="1"; NP_CTL_share=""
-    NP_CTL_RESULT_ID=""
+    NP_CTL_generation=""; NP_CTL_password_mode="replace"
+    NP_CTL_RESULT_ID=""; NP_CTL_RESULT_REASON=""; NP_CTL_RESULT_ASSET=""
+    NP_CTL_RESULT_VERSION=""; NP_CTL_RESULT_TASK_ID=""; NP_CTL_RESULT_NODE_NAME=""; NP_CTL_RESULT_NODE_SERVER=""
+    NP_CTL_RESULT_NODE_PORT=""; NP_CTL_RESULT_NODE_USERNAME=""; NP_CTL_RESULT_NODE_TRANSPORT=""
+    NP_CTL_RESULT_NODE_ENABLED=""; NP_CTL_RESULT_NODE_GENERATION=""; NP_CTL_RESULT_PASSWORD_SET=""
     local line key value cr
     cr=$(printf '\r')
     while IFS= read -r line; do
@@ -444,6 +475,7 @@ np_control_read() {
             port) NP_CTL_port="$value" ;; username) NP_CTL_username="$value" ;;
             password) NP_CTL_password="$value" ;; transport) NP_CTL_transport="$value" ;;
             enabled) NP_CTL_enabled="$value" ;; share) NP_CTL_share="$value" ;;
+            generation) NP_CTL_generation="$value" ;; password_mode) NP_CTL_password_mode="$value" ;;
         esac
     done
     [ -n "$NP_CTL_action" ] || return 1
@@ -451,12 +483,16 @@ np_control_read() {
 
 # The service parses an import itself.  The browser preview is convenience
 # only; accepting client-filled credentials would make the link importer
-# ambiguous.  This intentionally accepts only the documented HTTPS aliases.
+# ambiguous.  The scheme is the sole transport mapping: query hints from
+# other clients are accepted only when their documented HTTPS semantics agree.
 np_import_link() {
-    local raw="$NP_CTL_share" normalized authority fragment query userpass hostport host port user
+    local raw="$NP_CTL_share" normalized authority fragment query userpass hostport host port user scheme
     printf '%s' "$raw" | grep -q '[[:cntrl:]]' && return 44
-    case "$raw" in naive+https://*|naiveproxy://*) ;; *) return 40 ;; esac
-    normalized=${raw#naive+https://}; [ "$normalized" = "$raw" ] && normalized=${raw#naiveproxy://}
+    case "$raw" in naive+https://*) scheme=https; normalized=${raw#naive+https://} ;;
+        naive+quic://*) scheme=quic; normalized=${raw#naive+quic://} ;;
+        naiveproxy://*) scheme=https; normalized=${raw#naiveproxy://} ;;
+        *) return 40 ;;
+    esac
     fragment=${normalized#*#}; [ "$fragment" = "$normalized" ] && fragment=""
     normalized=${normalized%%#*}; query=${normalized#*\?}; [ "$query" = "$normalized" ] && query=""
     authority=${normalized%%\?*}
@@ -472,7 +508,7 @@ np_import_link() {
     np_valid_encoded "$fragment" && np_valid_encoded "$host" || return 42
     np_validate_query "$query" || return 43
     NP_CTL_name=$(np_urldecode "${fragment:-$host}"); NP_CTL_server=$(np_urldecode "$host"); NP_CTL_port=$port
-    NP_CTL_username=$(np_urldecode "$user"); NP_CTL_password=$(np_urldecode "$NP_CTL_password"); NP_CTL_transport=https
+    NP_CTL_username=$(np_urldecode "$user"); NP_CTL_password=$(np_urldecode "$NP_CTL_password"); NP_CTL_transport="$scheme"
 }
 
 np_json_quote() {
@@ -486,19 +522,41 @@ np_make_id() {
     printf 'node-%s' "$value"
 }
 
+np_node_generation() {
+    local file="$1" value
+    value=$(np_json "$file" generation 2>/dev/null || true)
+    case "$value" in ''|*[!0-9]*) printf '1\n' ;; *) printf '%s\n' "$value" ;; esac
+}
+
 np_node_matches() {
     local id file server port username
     for id in $(np_ids); do
         file=$(np_node_file "$id") || continue
         server=$(np_node_value "$file" server); port=$(np_node_value "$file" port)
         username=$(np_node_value "$file" username)
-        [ "$server" = "$NP_CTL_server" ] && [ "$port" = "$NP_CTL_port" ] && [ "$username" = "$NP_CTL_username" ] && printf '%s\n' "$id" && return 0
+        [ "$id" != "$NP_CTL_id" ] && [ "$server" = "$NP_CTL_server" ] && [ "$port" = "$NP_CTL_port" ] && [ "$username" = "$NP_CTL_username" ] && printf '%s\n' "$id" && return 0
     done
     return 1
 }
 
+np_write_node() {
+    local id="$1" generation="$2" password="$3" file tmp
+    file=$(np_node_file "$id") || return 14
+    tmp="$file.new.$$"
+    printf '{"name":"%s","server":"%s","port":%s,"username":"%s","password":"%s","transport":"%s","enabled":"%s","generation":%s}\n' \
+        "$(np_json_quote "$NP_CTL_name")" "$(np_json_quote "$NP_CTL_server")" "$NP_CTL_port" \
+        "$(np_json_quote "$NP_CTL_username")" "$(np_json_quote "$password")" \
+        "$NP_CTL_transport" "$(np_json_quote "$NP_CTL_enabled")" "$generation" > "$tmp" || return 15
+    chmod 600 "$tmp" || return 15
+    mv -f "$tmp" "$file" || return 15
+    np_port "$id" >/dev/null || return 16
+    rm -f "$NP_STATE_DIR/health.$id" || return 15
+    NP_CTL_RESULT_ID="$id"
+    NP_CTL_RESULT_NODE_GENERATION="$generation"
+}
+
 np_control_add() {
-    local id file tmp duplicate
+    local id file duplicate
     [ -n "$NP_CTL_name" ] && [ -n "$NP_CTL_server" ] && [ -n "$NP_CTL_username" ] && [ -n "$NP_CTL_password" ] || return 10
     np_valid_text "$NP_CTL_name" 120 && np_valid_server "$NP_CTL_server" && np_valid_text "$NP_CTL_username" 512 && np_valid_text "$NP_CTL_password" 1024 || return 10
     np_valid_port "$NP_CTL_port" || return 11
@@ -510,17 +568,53 @@ np_control_add() {
     np_valid_id "$id" || return 14
     file=$(np_node_file "$id") || return 14
     [ ! -e "$file" ] || return 13
-    tmp="$file.new.$$"
-    printf '{"name":"%s","server":"%s","port":%s,"username":"%s","password":"%s","transport":"%s","enabled":"%s"}\n' \
-        "$(np_json_quote "$NP_CTL_name")" "$(np_json_quote "$NP_CTL_server")" "$NP_CTL_port" \
-        "$(np_json_quote "$NP_CTL_username")" "$(np_json_quote "$NP_CTL_password")" \
-        "$NP_CTL_transport" "$(np_json_quote "$NP_CTL_enabled")" > "$tmp" || return 15
-    chmod 600 "$tmp" || return 15
-    mv -f "$tmp" "$file" || return 15
-    np_port "$id" >/dev/null || return 16
+    np_write_node "$id" 1 "$NP_CTL_password" || return $?
     np_manifest >/dev/null || return 17
-    NP_CTL_RESULT_ID="$id"
     printf 'id=%s\n' "$id"
+}
+
+np_control_get() {
+    local file generation password
+    np_valid_id "$NP_CTL_id" || return 20
+    file=$(np_node_file "$NP_CTL_id") || return 20
+    [ -r "$file" ] || return 21
+    generation=$(np_node_generation "$file")
+    password=$(np_json "$file" password 2>/dev/null || true)
+    [ -n "$password" ] || return 10
+    NP_CTL_RESULT_ID="$NP_CTL_id"
+    NP_CTL_RESULT_NODE_NAME=$(np_json "$file" name 2>/dev/null || true)
+    NP_CTL_RESULT_NODE_SERVER=$(np_json "$file" server 2>/dev/null || true)
+    NP_CTL_RESULT_NODE_PORT=$(np_json "$file" port 2>/dev/null || true)
+    NP_CTL_RESULT_NODE_USERNAME=$(np_json "$file" username 2>/dev/null || true)
+    NP_CTL_RESULT_NODE_TRANSPORT=$(np_json "$file" transport 2>/dev/null || true)
+    NP_CTL_RESULT_NODE_ENABLED=$(np_json "$file" enabled 2>/dev/null || true)
+    NP_CTL_RESULT_NODE_GENERATION="$generation"
+    NP_CTL_RESULT_PASSWORD_SET=1
+    return 0
+}
+
+np_control_edit() {
+    local file current_generation password duplicate next_generation
+    np_valid_id "$NP_CTL_id" || return 20
+    file=$(np_node_file "$NP_CTL_id") || return 20
+    [ -r "$file" ] || return 21
+    current_generation=$(np_node_generation "$file")
+    [ "$NP_CTL_generation" = "$current_generation" ] || return 24
+    [ -n "$NP_CTL_name" ] && [ -n "$NP_CTL_server" ] && [ -n "$NP_CTL_username" ] || return 10
+    np_valid_text "$NP_CTL_name" 120 && np_valid_server "$NP_CTL_server" && np_valid_text "$NP_CTL_username" 512 || return 10
+    np_valid_port "$NP_CTL_port" || return 11
+    case "$NP_CTL_transport" in tls|https) NP_CTL_transport=https ;; quic) ;; *) return 12 ;; esac
+    case "$NP_CTL_password_mode" in
+        retain) password=$(np_json "$file" password 2>/dev/null || true); [ -n "$password" ] || return 10 ;;
+        replace) password="$NP_CTL_password"; [ -n "$password" ] && np_valid_text "$password" 1024 || return 10 ;;
+        *) return 10 ;;
+    esac
+    duplicate=$(np_node_matches 2>/dev/null || true)
+    [ -z "$duplicate" ] || { printf 'duplicate_id=%s\n' "$duplicate"; return 13; }
+    next_generation=$((current_generation + 1))
+    np_write_node "$NP_CTL_id" "$next_generation" "$password" || return $?
+    np_manifest >/dev/null || return 17
+    printf 'id=%s\n' "$NP_CTL_id"
 }
 
 np_control_remove() {
@@ -528,7 +622,7 @@ np_control_remove() {
     np_valid_id "$NP_CTL_id" || return 20
     file=$(np_node_file "$NP_CTL_id") || return 20
     [ -f "$file" ] || return 21
-    rm -f "$file" "$NP_CONFIG_DIR/$NP_CTL_id.json" "$NP_STATE_DIR/health.$NP_CTL_id" || return 22
+    rm -f "$file" "$NP_CONFIG_DIR/$NP_CTL_id.json" "$NP_STATE_DIR/health.$NP_CTL_id" "$NP_STATE_DIR/instance.$NP_CTL_id" || return 22
     np_manifest >/dev/null || return 23
 }
 
@@ -569,13 +663,95 @@ np_control_result() {
     {
         printf 'stage=%s\n' "$(np_safe "$stage")"
         [ -n "$NP_CTL_RESULT_ID" ] && printf 'id=%s\n' "$(np_safe "$NP_CTL_RESULT_ID")"
+        [ -n "$NP_CTL_RESULT_REASON" ] && printf 'reason=%s\n' "$(np_safe "$NP_CTL_RESULT_REASON")"
+        [ -n "$NP_CTL_RESULT_ASSET" ] && printf 'asset=%s\n' "$(np_safe "$NP_CTL_RESULT_ASSET")"
+        [ -n "$NP_CTL_RESULT_VERSION" ] && printf 'candidate_version=%s\n' "$(np_safe "$NP_CTL_RESULT_VERSION")"
+        [ -n "$NP_CTL_RESULT_TASK_ID" ] && printf 'task_id=%s\n' "$(np_safe "$NP_CTL_RESULT_TASK_ID")"
+        [ -n "$NP_CTL_RESULT_NODE_NAME" ] && printf 'node_name=%s\n' "$(np_urlencode "$NP_CTL_RESULT_NODE_NAME")"
+        [ -n "$NP_CTL_RESULT_NODE_SERVER" ] && printf 'node_server=%s\n' "$(np_urlencode "$NP_CTL_RESULT_NODE_SERVER")"
+        [ -n "$NP_CTL_RESULT_NODE_PORT" ] && printf 'node_port=%s\n' "$(np_safe "$NP_CTL_RESULT_NODE_PORT")"
+        [ -n "$NP_CTL_RESULT_NODE_USERNAME" ] && printf 'node_username=%s\n' "$(np_urlencode "$NP_CTL_RESULT_NODE_USERNAME")"
+        [ -n "$NP_CTL_RESULT_NODE_TRANSPORT" ] && printf 'node_transport=%s\n' "$(np_safe "$NP_CTL_RESULT_NODE_TRANSPORT")"
+        [ -n "$NP_CTL_RESULT_NODE_ENABLED" ] && printf 'node_enabled=%s\n' "$(np_safe "$NP_CTL_RESULT_NODE_ENABLED")"
+        [ -n "$NP_CTL_RESULT_NODE_GENERATION" ] && printf 'node_generation=%s\n' "$(np_safe "$NP_CTL_RESULT_NODE_GENERATION")"
+        [ -n "$NP_CTL_RESULT_PASSWORD_SET" ] && printf 'password_set=1\n'
+		# Optional fields above deliberately return false when absent.  The
+		# result write itself is still successful and must be atomically moved,
+		# otherwise a valid import can return success without its control result.
+		:
     } > "$tmp" || return 0
     chmod 600 "$tmp" 2>/dev/null || true
     mv -f "$tmp" "$NP_CONTROL_RESULT" 2>/dev/null || true
     return "$rc"
 }
 
+np_component_lock_begin() {
+    local owner
+    np_dirs || return 1
+    if mkdir "$NP_COMPONENT_LOCK" 2>/dev/null; then
+        printf '%s\n' "$$" > "$NP_COMPONENT_LOCK/pid" 2>/dev/null || true
+        chmod 700 "$NP_COMPONENT_LOCK" 2>/dev/null || true
+        return 0
+    fi
+    owner=$(sed -n '1p' "$NP_COMPONENT_LOCK/pid" 2>/dev/null || true)
+    case "$owner" in
+        ''|*[!0-9]*) return 1 ;;
+        *) kill -0 "$owner" 2>/dev/null && return 1 ;;
+    esac
+    # A crashed owner cannot complete an atomic replacement.  Reclaim only
+    # that demonstrably stale lock; a live install is never interrupted.
+    rm -f "$NP_COMPONENT_LOCK/pid" 2>/dev/null || true
+    rmdir "$NP_COMPONENT_LOCK" 2>/dev/null || return 1
+    mkdir "$NP_COMPONENT_LOCK" 2>/dev/null || return 1
+    printf '%s\n' "$$" > "$NP_COMPONENT_LOCK/pid" 2>/dev/null || true
+    chmod 700 "$NP_COMPONENT_LOCK" 2>/dev/null || true
+}
+
+np_component_lock_end() {
+    rm -f "$NP_COMPONENT_LOCK/pid" 2>/dev/null || true
+    rmdir "$NP_COMPONENT_LOCK" 2>/dev/null || true
+}
+
+np_control_component_metadata() {
+    local metadata output ok reason
+    metadata=/usr/share/openkill/naiveproxy-component-metadata.sh
+    [ -r "$metadata" ] || { NP_CTL_RESULT_REASON=metadata-resolver-missing; return 33; }
+    output=$(sh "$metadata" detect 2>/dev/null) || { NP_CTL_RESULT_REASON=metadata-lookup-failed; return 34; }
+    NP_CTL_METADATA_OUTPUT="$output"
+    ok=$(printf '%s\n' "$output" | sed -n 's/^ok=//p' | sed -n '1p')
+    reason=$(printf '%s\n' "$output" | sed -n 's/^reason=//p' | sed -n '1p')
+    NP_CTL_RESULT_REASON=${reason:-metadata-unavailable}
+    NP_CTL_RESULT_ASSET=$(printf '%s\n' "$output" | sed -n 's/^asset=//p' | sed -n '1p')
+    NP_CTL_RESULT_VERSION=$(printf '%s\n' "$output" | sed -n 's/^release=//p' | sed -n '1p')
+    [ "$ok" = 1 ] || return 35
+    return 0
+}
+
+np_control_install_component() {
+    local output update_url update_sha update_size rc
+    NP_CTL_RESULT_TASK_ID="component-install-$$"
+    np_component_lock_begin || { NP_CTL_RESULT_REASON=component-task-busy; return 39; }
+    np_control_component_metadata
+    rc=$?
+    if [ "$rc" -ne 0 ]; then np_component_lock_end; return "$rc"; fi
+    output=${NP_CTL_METADATA_OUTPUT:-}
+    update_url=$(printf '%s\n' "$output" | sed -n 's/^url=//p' | sed -n '1p')
+    update_sha=$(printf '%s\n' "$output" | sed -n 's/^sha256=//p' | sed -n '1p')
+    update_size=$(printf '%s\n' "$output" | sed -n 's/^size=//p' | sed -n '1p')
+    [ -n "$update_url" ] && [ -n "$update_sha" ] && [ -n "$update_size" ] || { NP_CTL_RESULT_REASON=metadata-incomplete; np_component_lock_end; return 36; }
+    if np_component_install "$update_url" "$update_sha" "$update_size"; then
+        NP_CTL_RESULT_REASON=component-installed
+        np_manifest >/dev/null 2>&1 || true
+        np_component_lock_end
+        return 0
+    fi
+    NP_CTL_RESULT_REASON=${NP_INSTALL_ERROR:-component-install-failed}
+    np_component_lock_end
+    return 37
+}
+
 np_control() {
+    local rc stage enabled_found start_id start_file
     np_control_read || return 30
     rm -f "$NP_CONTROL_RESULT" 2>/dev/null || true
     case "$NP_CTL_action" in
@@ -589,42 +765,70 @@ np_control() {
             np_control_add; rc=$?
             [ "$rc" -eq 0 ] && stage=accepted || stage=node-save-failed
             np_control_result "$rc" "$stage"; return "$rc" ;;
-        remove) np_control_remove ;;
+        get)
+            np_control_get; rc=$?
+            [ "$rc" -eq 0 ] && stage=node-read || stage=node-read-failed
+            np_control_result "$rc" "$stage"; return "$rc" ;;
+        edit)
+            np_control_edit; rc=$?
+            case "$rc" in 0) stage=node-saved ;; 24) stage=node-edit-conflict ;; *) stage=node-save-failed ;; esac
+            np_control_result "$rc" "$stage"; return "$rc" ;;
+        remove)
+            np_control_remove; rc=$?
+            [ "$rc" -eq 0 ] && stage=node-removed || stage=node-remove-failed
+            np_control_result "$rc" "$stage"; return "$rc" ;;
         start)
             if [ -n "$NP_CTL_id" ]; then
                 /etc/init.d/naiveproxy-bridge start_node "$NP_CTL_id" >/dev/null 2>&1
             else
-                /etc/init.d/naiveproxy-bridge start >/dev/null 2>&1
+                enabled_found=0
+                for start_id in $(np_ids); do
+                    start_file=$(np_node_file "$start_id" 2>/dev/null || true)
+                    np_enabled "$(np_node_value "$start_file" enabled)" && enabled_found=1
+                done
+                if [ "$enabled_found" -eq 1 ]; then
+                    /etc/init.d/naiveproxy-bridge start >/dev/null 2>&1
+                else
+                    rc=38; stage=no-enabled-node
+                    np_control_result "$rc" "$stage"; return "$rc"
+                fi
             fi
-            rc=$?; np_manifest >/dev/null 2>&1 || true; return "$rc" ;;
+            rc=$?; np_manifest >/dev/null 2>&1 || true
+            [ "$rc" -eq 0 ] && stage=service-started || stage=service-start-failed
+            np_control_result "$rc" "$stage"; return "$rc" ;;
         stop)
             if [ -n "$NP_CTL_id" ]; then
                 /etc/init.d/naiveproxy-bridge stop_node "$NP_CTL_id" >/dev/null 2>&1
             else
                 /etc/init.d/naiveproxy-bridge stop >/dev/null 2>&1
             fi
-            rc=$?; np_manifest >/dev/null 2>&1 || true; return "$rc" ;;
+            rc=$?; np_manifest >/dev/null 2>&1 || true
+            [ "$rc" -eq 0 ] && stage=service-stopped || stage=service-stop-failed
+            np_control_result "$rc" "$stage"; return "$rc" ;;
         health)
             if [ -n "$NP_CTL_id" ]; then
                 np_health_begin || return 31
                 np_health_one "$NP_CTL_id"; rc=$?
                 np_health_end
                 [ "$rc" -eq 0 ] && np_manifest >/dev/null 2>&1 || true
-                return "$rc"
+                [ "$rc" -eq 0 ] && stage=node-health-checked || stage=node-health-failed
+                np_control_result "$rc" "$stage"; return "$rc"
             fi
-            np_health_all; return $? ;;
-        update)
-            metadata=/usr/share/openkill/naiveproxy-component-metadata.sh
-            [ -r "$metadata" ] || return 33
-            metadata_output=$(sh "$metadata" detect 2>/dev/null) || return 34
-            printf '%s\n' "$metadata_output" | grep -q '^ok=1$' || return 35
-            update_url=$(printf '%s\n' "$metadata_output" | sed -n 's/^url=//p' | sed -n '1p')
-            update_sha=$(printf '%s\n' "$metadata_output" | sed -n 's/^sha256=//p' | sed -n '1p')
-            update_size=$(printf '%s\n' "$metadata_output" | sed -n 's/^size=//p' | sed -n '1p')
-            [ -n "$update_url" ] && [ -n "$update_sha" ] && [ -n "$update_size" ] || return 36
-            np_component_install "$update_url" "$update_sha" "$update_size"
-            ;;
-        legacy_cleanup) np_legacy_cleanup ;;
+            np_health_all; rc=$?
+            [ "$rc" -eq 0 ] && stage=all-health-checked || stage=health-busy
+            np_control_result "$rc" "$stage"; return "$rc" ;;
+        component)
+            np_control_component_metadata; rc=$?
+            [ "$rc" -eq 0 ] && stage=component-candidate-ready || stage=component-candidate-unavailable
+            np_control_result "$rc" "$stage"; return "$rc" ;;
+        install|update)
+            np_control_install_component; rc=$?
+            case "$rc" in 0) stage=component-installed ;; 39) stage=component-task-busy ;; *) stage=component-install-failed ;; esac
+            np_control_result "$rc" "$stage"; return "$rc" ;;
+        legacy_cleanup)
+            np_legacy_cleanup; rc=$?
+            [ "$rc" -eq 0 ] && stage=legacy-cleanup-complete || stage=legacy-cleanup-failed
+            np_control_result "$rc" "$stage"; return "$rc" ;;
         *) return 32 ;;
     esac
 }

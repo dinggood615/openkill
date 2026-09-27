@@ -61,7 +61,7 @@ NATIVE_TESTS: tuple[Case, ...] = tuple(
             script=f"scripts/{path.name}",
             timeout=180,
             skip_policy=("NFT_CLI_UNAVAILABLE",) if path.stem == "test-nft-syntax" else
-            ("PLAYWRIGHT_UNAVAILABLE", "PLAYWRIGHT_BROWSER_UNAVAILABLE") if path.stem == "test-ui-browser" else (),
+            ("PLAYWRIGHT_UNAVAILABLE", "PLAYWRIGHT_BROWSER_UNAVAILABLE", "PLAYWRIGHT_BROWSER_LAUNCH_UNAVAILABLE") if path.stem in ("test-ui-browser", "test-naiveproxy-ui-browser") else (),
         )
     for path in (
         Path("test-3e2-safe-config.py"),
@@ -94,6 +94,7 @@ NATIVE_TESTS: tuple[Case, ...] = tuple(
         Path("test-ui-contract.py"),
         Path("test-ui-interactions.py"),
         Path("test-ui-browser.py"),
+        Path("test-naiveproxy-ui-browser.py"),
         Path("test-ui-preview.py"),
         Path("test-uci-lifecycle.py"),
     )
@@ -856,6 +857,7 @@ def build_cases(mode: str) -> list[Case]:
         "test-ui-contract",
         "test-ui-interactions",
         "test-ui-browser",
+        "test-naiveproxy-ui-browser",
         "test-ui-preview",
     )
     native_by_name = {case.name: case for case in NATIVE_TESTS}

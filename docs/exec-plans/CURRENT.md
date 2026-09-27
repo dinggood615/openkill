@@ -1,5 +1,36 @@
 # Current status
 
+## 2026-09-27 NaiveProxy component, node persistence and edit repair
+
+- Scope: repair the independent NaiveProxy control contract only: component
+  diagnostics and installation/update actions, share-link import and
+  persistence, protected node editing, per-node start/health state, and the
+  matching LuCI card. OpenKill UCI, selected Mihomo YAML, proxy groups, DNS,
+  firewall, WAN and route behaviour remain outside this change.
+- Evidence baseline: the previous read-only device inspection found version
+  `2026-1169` without `/etc/naiveproxy/naive`, no standalone node JSON and no
+  NaiveProxy instance. The occupied `127.0.0.1:11080` listener belonged to a
+  different process. A prior dialog failure was caused by invalid nested CBI
+  form markup; the current source has the repaired form-like dialog but still
+  lacks an edit operation, manual component detection/install controls and
+  action-stage diagnostics.
+- Local work will prove each bridge stage with fixtures and browser tests.
+  Device writes, service actions, router package installation and VPS probes
+  remain forbidden by the repository guide; any device verification is
+  explicitly deferred. All test links and credentials are fictional.
+- Rollback: revert the bounded source commits. The component installer retains
+  the previous executable, and node changes use mode-600 atomic files under
+  `/etc/naiveproxy/nodes`; no OpenKill UCI or user YAML is touched.
+- Local evidence: the standalone fixture now covers HTTPS and QUIC import,
+  duplicate rejection, protected read, password retention, configuration
+  generation conflict and atomic persistence. The component fixture confirms
+  failed replacements retain the prior binary. The production-template
+  Playwright card test covers link-first import, save, protected edit and
+  narrow layout without horizontal overflow; the generic UI browser test also
+  passes. `test-naiveproxy-import.js`, integration/runtime/UI contracts,
+  POSIX syntax and `sh scripts/local-gate.sh` pass. No device, router or VPS
+  action was performed under the repository boundary.
+
 ## 2026-09-27 OpenKill UI theme toggle and light/dark consistency
 
 - This iteration is limited to OpenKill-scoped presentation: the runtime
