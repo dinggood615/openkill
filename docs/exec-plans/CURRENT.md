@@ -1,5 +1,43 @@
 # Current status
 
+## LuCI theme-aligned UI refresh (2026-09-27)
+
+- Scope: visual and layout work only. The change may adjust page structure,
+  theme-aware CSS variables, responsive layout, focus states and accessibility
+  text, but must preserve every CBI field name, UCI value, request endpoint,
+  event binding, validation rule and save/apply behavior.
+- UI contract: OpenKill pages inherit the active LuCI theme's page shell and
+  typography where available. OpenKill-only fallback tokens are scoped below
+  `.oc` or `#cbi-openkill.openkill-settings`; no selector may style LuCI system
+  pages or other plugins.
+- Verification scope: inspect the real template DOM and final packaged CSS,
+  then validate locally and in an available browser at desktop, tablet and
+  phone viewports. Device access, `CENTRAL_ACTIVE`, central nft state, WAN,
+  default-gateway and packet-path tests remain outside this iteration.
+- Current implementation finding: `oc.css` contains legacy and current token
+  sets with late page-specific overrides, while `flat.css` is loaded after it
+  and changes shared widths and surfaces. Settings cards are created by
+  `settings_theme.htm`, whereas the status dashboard has a separate custom DOM;
+  the refresh must preserve both structures and their runtime hooks.
+- Implemented: added an OpenKill-only LuCI theme bridge in `oc.css`, with
+  page-body capture of theme variables so legacy `.oc` tokens cannot shadow
+  the active LuCI theme.  `flat.css` now has one terminal layout precedence
+  layer for natural-height cards, wrapping controls, scoped surfaces and
+  responsive grids; the earlier duplicate bridge was removed.
+- Local evidence: `test-ui-contract.py` (27 passed), `test-ui-preview.py` (2
+  passed), `test-ui-interactions.py` (1 passed),
+  `test-autonomous-workflow.py -v` (10 passed), `git diff --check` and
+  `sh scripts/local-gate.sh` passed.  The preview was rebuilt from the real
+  templates and served locally with the LuCI asset path; Chrome rendered the
+  themed desktop dashboard without console-visible errors.
+- Browser boundary: the repository browser test reports
+  `PLAYWRIGHT_UNAVAILABLE`; the connected Chrome preview has no viewport
+  override API in this environment, so exact 1920/1366/1200/768/390 CSS-pixel
+  and 125% measurements, light-theme rendering, and device/LuCI integration
+  remain unverified.  No device or packet-path test was run.
+- Next action: review the final diff, commit this UI-only change, and leave
+  formal release/version work for an explicit release request.
+
 ## Release build acceleration and version 2026-1168 (2026-09-27)
 
 - Scope: optimize only the RC/Formal Release build and publication path. The

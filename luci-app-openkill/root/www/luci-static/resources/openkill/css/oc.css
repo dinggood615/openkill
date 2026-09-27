@@ -10548,3 +10548,82 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
     #cbi-openkill.openkill-settings .openkill-naive-form-grid { grid-template-columns: 1fr; }
     #cbi-openkill.openkill-settings .openkill-naive-dialog { padding: 8px; }
 }
+
+/* ===== OpenKill LuCI theme contract =====
+ * Read theme variables on the OpenKill page body before legacy .oc variables
+ * can shadow them.  The bridge is page-scoped and flat.css owns layout after
+ * this component stylesheet. */
+body[data-page^="admin-services-openkill"] {
+    --ok-theme-surface: var(--card-background-color, var(--panel-background-color, var(--background-color, #ffffff)));
+    --ok-theme-surface-muted: var(--input-bg-color, var(--background-color, #f5f6fa));
+    --ok-theme-text: var(--text-color, var(--foreground-color, #252936));
+    --ok-theme-muted: var(--text-color-secondary, #687386);
+    --ok-theme-border: var(--border-color, #d7dce5);
+    --ok-theme-link: var(--primary-color, #2563eb);
+    --ok-theme-focus: var(--primary-color, #2563eb);
+    --ok-theme-success: var(--success-color, #15803d);
+    --ok-theme-warning: var(--warning-color, #a16207);
+    --ok-theme-danger: var(--error-color, #b91c1c);
+}
+html[data-darkmode="true"] body[data-page^="admin-services-openkill"],
+html[data-theme="dark"] body[data-page^="admin-services-openkill"] {
+    --ok-theme-surface: var(--card-background-color, var(--panel-background-color, var(--background-color, #252a33)));
+    --ok-theme-surface-muted: var(--input-bg-color, var(--background-color, #303640));
+    --ok-theme-text: var(--text-color, var(--foreground-color, #e8ebf2));
+    --ok-theme-muted: var(--text-color-secondary, #aab2c0);
+    --ok-theme-border: var(--border-color, #4a5361);
+    --ok-theme-link: var(--primary-color, #79a9ff);
+    --ok-theme-focus: var(--primary-color, #79a9ff);
+    --ok-theme-success: var(--success-color, #65c58a);
+    --ok-theme-warning: var(--warning-color, #f2c66d);
+    --ok-theme-danger: var(--error-color, #ff8a8a);
+}
+.oc.openkill-status-page,
+#cbi-openkill.openkill-settings {
+    --ok-ui-surface: var(--ok-theme-surface, #ffffff);
+    --ok-ui-surface-muted: var(--ok-theme-surface-muted, #f5f6fa);
+    --ok-ui-text: var(--ok-theme-text, #252936);
+    --ok-ui-muted: var(--ok-theme-muted, #687386);
+    --ok-ui-border: var(--ok-theme-border, #d7dce5);
+    --ok-ui-link: var(--ok-theme-link, #2563eb);
+    --ok-ui-focus: var(--ok-theme-focus, #2563eb);
+    --ok-ui-success: var(--ok-theme-success, #15803d);
+    --ok-ui-warning: var(--ok-theme-warning, #a16207);
+    --ok-ui-danger: var(--ok-theme-danger, #b91c1c);
+    --ok-ui-radius: 8px;
+    --ok-ui-space: 12px;
+    color: var(--ok-ui-text);
+}
+
+html[data-darkmode="true"] .oc.openkill-status-page,
+html[data-darkmode="true"] #cbi-openkill.openkill-settings,
+html[data-theme="dark"] .oc.openkill-status-page,
+html[data-theme="dark"] #cbi-openkill.openkill-settings {
+    --ok-ui-surface: var(--ok-theme-surface, #252a33);
+    --ok-ui-surface-muted: var(--ok-theme-surface-muted, #303640);
+    --ok-ui-text: var(--ok-theme-text, #e8ebf2);
+    --ok-ui-muted: var(--ok-theme-muted, #aab2c0);
+    --ok-ui-border: var(--ok-theme-border, #4a5361);
+    --ok-ui-link: var(--ok-theme-link, #79a9ff);
+    --ok-ui-focus: var(--ok-theme-focus, #79a9ff);
+    --ok-ui-success: var(--ok-theme-success, #65c58a);
+    --ok-ui-warning: var(--ok-theme-warning, #f2c66d);
+    --ok-ui-danger: var(--ok-theme-danger, #ff8a8a);
+}
+
+.oc.openkill-status-page a,
+#cbi-openkill.openkill-settings a { color: var(--ok-ui-link); }
+
+.oc.openkill-status-page button:focus-visible,
+.oc.openkill-status-page a:focus-visible,
+.oc.openkill-status-page input:focus-visible,
+.oc.openkill-status-page select:focus-visible,
+.oc.openkill-status-page textarea:focus-visible,
+#cbi-openkill.openkill-settings button:focus-visible,
+#cbi-openkill.openkill-settings a:focus-visible,
+#cbi-openkill.openkill-settings input:focus-visible,
+#cbi-openkill.openkill-settings select:focus-visible,
+#cbi-openkill.openkill-settings textarea:focus-visible {
+    outline: 2px solid var(--ok-ui-focus);
+    outline-offset: 2px;
+}
