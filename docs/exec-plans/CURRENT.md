@@ -3407,3 +3407,20 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
   explicitly retains a checked-in copy when the source is temporarily
   unavailable, and fails if neither source exists. It does not bypass package
   audits or alter runtime/network semantics.
+
+### Formal release 2026-1169 completed
+
+- Exact source commit `8350ddd841b4c39941726feaadf7e4b155f4aea0` passed
+  Development CI [run 36296759854](https://github.com/dinggood615/openkill/actions/runs/36296759854).
+- RC Build [run 36296840515](https://github.com/dinggood615/openkill/actions/runs/36296840515)
+  passed from that commit. Its audited candidate was
+  `luci-app-openkill_2026-1169_all.ipk`, SHA256
+  `de0aadd0b38557a1e8da2a21c3619be26629eb62394be4971f0fbee9b90619b8`.
+- Formal Release [run 36296926087](https://github.com/dinggood615/openkill/actions/runs/36296926087)
+  passed with `release_gate=true` and `publish=true`. It published
+  [v2026-1169-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1169-ipk)
+  from the exact source commit. The formal IPK SHA256 is
+  `ade64ad3483549cadb5ea4813c28db6010f474ea409874c48f1f79f86f6d491c`.
+- The formal package retained the previous `v2026-1168-ipk` release as the
+  rollback target. No router, test-device, VPS, WAN, CENTRAL_ACTIVE, central
+  nft or packet-path validation was performed.
