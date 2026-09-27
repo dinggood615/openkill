@@ -32,9 +32,20 @@
   exposed by the local preview environment and remain explicitly unverified if
   unavailable.  Device access, CENTRAL_ACTIVE, central nft, WAN/default route
   and packet-path tests remain forbidden.
-- Next action: implement only the runtime-status ownership cleanup, validate
-  it, commit and push it independently, then verify its exact Development CI
-  before beginning the plugin-settings phase.
+- Runtime-status phase: removed the four legacy row-height tokens, fixed grid
+  tracks, nth-row minimums and the duplicated late repair block.  The primary
+  component/layout rules now use content-sized grid rows.  Local UI contract,
+  preview and interaction tests, final CSS/package validation, `git diff
+  --check` and the local gate passed.  The real local preview at 1536 x 730
+  CSS px (DPR 1.25, dark theme) retained equal 724 px cards, a 1461 px grid,
+  no horizontal overflow, `grid-template-rows: none`, and the same computed
+  card surface before and after.  Source commit
+  `bd4242aa4d5547d811ada439fbd2f8299a93ba62` is pushed; Development CI #281
+  passed: https://github.com/dinggood615/openkill/actions/runs/36292472825 .
+- Next action: consolidate plugin-settings card layout ownership.  Retain the
+  existing DOM reparenting, field order and CBI rows while merging duplicate
+  card-stack/card layout declarations into the documented layout layer and
+  removing containment that can defer an expanded card's content.
 
 ## LuCI theme-aligned UI refresh (2026-09-27)
 

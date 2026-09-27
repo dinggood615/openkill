@@ -175,26 +175,10 @@
 
 #cbi-openkill.openkill-settings > .cbi-section,
 #cbi-openkill.openkill-settings .openkill-settings-tabs,
-#cbi-openkill.openkill-settings .openkill-settings-toolbar,
-#cbi-openkill.openkill-settings .openkill-settings-card-stack {
+#cbi-openkill.openkill-settings .openkill-settings-toolbar {
     width: 100%;
     max-width: none;
     box-sizing: border-box;
-}
-
-#cbi-openkill.openkill-settings .openkill-settings-card-stack {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--openkill-card-gap);
-    margin: var(--openkill-page-gap) 0 0;
-}
-
-#cbi-openkill.openkill-settings .openkill-settings-card {
-    min-width: 0;
-    margin: 0;
-    contain: layout paint;
-    content-visibility: auto;
-    contain-intrinsic-size: 180px;
 }
 
 /* Do not animate layout on a low-power router. */
@@ -597,16 +581,24 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-se
 #cbi-openkill.openkill-settings .openkill-settings-card-stack {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
+    align-items: stretch;
+    grid-auto-rows: max-content;
     gap: var(--ok-layout-card-gap, 12px);
+    width: 100%;
+    max-width: 100%;
+    margin: var(--openkill-page-gap) 0 0;
     min-width: 0;
 }
 
 #cbi-openkill.openkill-settings .openkill-settings-card {
     min-width: 0;
     max-width: 100%;
+    margin: 0;
     display: flex;
     flex-direction: column;
+    contain: none;
+    content-visibility: visible;
+    contain-intrinsic-size: auto;
 }
 
 #cbi-openkill.openkill-settings .openkill-settings-card-full-width,
@@ -1778,24 +1770,6 @@ body[data-page="admin-services-openkill-config"] #cbi-openkill > .cbi-section-ca
 #cbi-openkill.openkill-settings textarea:focus-visible {
     outline: 2px solid var(--ok-ui-focus);
     outline-offset: 2px;
-}
-
-#cbi-openkill.openkill-settings .openkill-settings-card-stack {
-    align-items: stretch;
-    grid-auto-rows: max-content;
-}
-
-#cbi-openkill.openkill-settings .openkill-settings-card {
-    display: flex;
-    flex-direction: column;
-    contain: none;
-    content-visibility: visible;
-    contain-intrinsic-size: auto;
-}
-
-#cbi-openkill.openkill-settings .openkill-settings-card-body {
-    flex: 1 1 auto;
-    min-width: 0;
 }
 
 body[data-page^="admin-services-openkill"] .cbi-section-table th,

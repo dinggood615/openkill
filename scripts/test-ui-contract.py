@@ -159,6 +159,14 @@ class LuCIContractTests(unittest.TestCase):
         self.assertNotIn('--row-1-height:', status_css)
         self.assertNotIn('grid-template-rows: var(--row-1-height)', status_css)
 
+    def test_settings_cards_use_one_content_sized_layout_contract(self) -> None:
+        css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css").read_text(encoding="utf-8")
+        self.assertIn('/* ===== OpenKill Stage 4: Settings Card Layout Start =====', css)
+        self.assertIn('grid-auto-rows: max-content;', css)
+        self.assertIn('content-visibility: visible;', css)
+        self.assertNotIn('contain: layout paint;', css)
+        self.assertNotIn('content-visibility: auto;', css)
+
     def test_dashboard_promotes_equal_width_entry_row_and_settings_grid(self) -> None:
         source = STATUS.read_text(encoding="utf-8")
         css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css").read_text(encoding="utf-8")
