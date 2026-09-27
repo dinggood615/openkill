@@ -3630,3 +3630,8 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
 - Rollback is `v2026-1170-ipk`, followed by restoring the prior OpenKill IPK
   and preserving the user's existing configuration. The fix does not modify
   user YAML, subscriptions, DNS, routing policy or NaiveProxy credentials.
+
+- This release evidence was recorded in commit `3396c17de87c7429a9d4dbe47fe32254b8d1f3a8`;
+  its exact-source Development CI [run 36302923885](https://github.com/dinggood615/openkill/actions/runs/36302923885)
+  completed successfully. No version metadata was changed by that evidence
+  commit.
