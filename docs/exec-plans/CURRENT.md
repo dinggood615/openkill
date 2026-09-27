@@ -3742,5 +3742,22 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
 - The version-bump check passes against the published `2026-1171` channel.
   WSL installer tests (15 tests, one documented environment skip), UI/browser
   tests, `sh scripts/local-gate.sh` and `git diff --check` pass for the release
-  candidate source. Formal release is still gated on the exact source commit,
-  the RC audit and the manual `release_gate=true`/`publish=true` workflow.
+  candidate source.
+- Exact source Development CI for `7d2e15a66c94940f002c83f2b07e5db7a88d687e`:
+  [36307946320](https://github.com/dinggood615/openkill/actions/runs/36307946320)
+  completed successfully. RC Build run
+  [36308171668](https://github.com/dinggood615/openkill/actions/runs/36308171668)
+  completed successfully; its SDK audit artifact digest is
+  `sha256:82509e832fae3ad71bf0546f122dc100505a7aad957dce704134dded83147a7f`
+  and the candidate IPK SHA256 is
+  `6352ba7fd14f6653741c86fa67faa304beb173a2d01233b6b8c5833135b5bb66`.
+- Formal Release run
+  [36308331238](https://github.com/dinggood615/openkill/actions/runs/36308331238)
+  completed successfully with `release_gate=true` and `publish=true`. The
+  published package is
+  [v2026-1172-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-1172-ipk),
+  asset `luci-app-openkill_2026-1172_all.ipk`, SHA256
+  `62340d7a1ef39b1a252d3df8aeac83b30dcf086769dcb63415ae973ad1515084`.
+  The package branch records `v2026-1172`; `v2026-1171-ipk` remains the
+  rollback target. No device, package-install, WAN/DNS, packet-path or VPS
+  test was performed.
