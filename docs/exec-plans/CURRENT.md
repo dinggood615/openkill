@@ -47,9 +47,10 @@
   The formal package was installed on the authorized test machine and passed
   the same start, listener, health, and two-target HTTPS smoke checks. The
   protected backup remains available for recovery. The only uncompleted UI
-  evidence is live LuCI browser accessibility/screenshot automation, whose
-  bridge timed out; production-template UI tests and backend/device control
-  paths passed.
+  evidence is the live LuCI import submission: the authenticated Chrome tab
+  reaches the device login form, but no LuCI password was supplied in this
+  session, so no login or credential-bearing import submission was attempted.
+  Production-template UI tests and backend/device control paths passed.
 
 ## 2026-09-29 NaiveProxy independent lifecycle, import and UI repair
 
