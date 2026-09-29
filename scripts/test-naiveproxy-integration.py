@@ -45,8 +45,13 @@ def main() -> None:
     # ordinary node/config/health paths remain independent.
     assert "np_legacy_cleanup" in standalone
     bridge = require(BRIDGE_INIT, "USE_PROCD=1")
+    require(BRIDGE_INIT, 'extra_command "start_node"')
+    require(BRIDGE_INIT, 'extra_command "stop_node"')
+    require(BRIDGE_INIT, "service_started()")
     require(BRIDGE_INIT, "procd_set_param respawn 300 5 3")
-    require(BRIDGE_INIT, "group nogroup")
+    require(BRIDGE_INIT, "group root")
+    require(BRIDGE_INIT, 'procd_close_service\n    [ "$rc" -eq 0 ]')
+    require(BRIDGE_INIT, 'service_started || rc=$?')
     require(STANDALONE, "np_control")
     require(STANDALONE, "np_control_add")
     assert "uci" not in bridge
