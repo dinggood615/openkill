@@ -36,9 +36,20 @@
   remain the available UI evidence. The device currently has the repaired
   source files deployed temporarily, not a package built from the new
   release commit.
-- Release work is now at `2026-1177` in source metadata and release notes.
-  Next action is exact-commit CI/push, RC package build/install on the test
-  machine, repeat the same evidence from the package, then Formal Release.
+- Release delivery completed: source commit `f8c6d3c3a910410333c8879730a138c966431f3f`
+  passed exact-commit Development CI run `36561263200`; RC Build run
+  `36562702967` passed and produced the candidate IPK SHA256
+  `93c4709ed9cb60b6b69d30450b2df50f0dc37341d4cafccf24acb0c200978f83`;
+  Formal Release run `36563177410` passed with `release_gate` and `publish`
+  enabled. Tag `v2026-1177-ipk` points to the same source commit, and the
+  published IPK is 7,930,313 bytes with SHA256
+  `36c59e3d2c5bda3fe21229c6ddd785252ac21c036e0611f588cbe490d9c2501a`.
+  The formal package was installed on the authorized test machine and passed
+  the same start, listener, health, and two-target HTTPS smoke checks. The
+  protected backup remains available for recovery. The only uncompleted UI
+  evidence is live LuCI browser accessibility/screenshot automation, whose
+  bridge timed out; production-template UI tests and backend/device control
+  paths passed.
 
 ## 2026-09-29 NaiveProxy independent lifecycle, import and UI repair
 
