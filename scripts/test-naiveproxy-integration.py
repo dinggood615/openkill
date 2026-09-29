@@ -52,6 +52,7 @@ def main() -> None:
     require(BRIDGE_INIT, "procd_set_param respawn 300 5 3")
     require(BRIDGE_INIT, "group root")
     require(BRIDGE_INIT, 'procd_close_service\n    [ "$rc" -eq 0 ]')
+    require(BRIDGE_INIT, "procd_close_service add")
     require(BRIDGE_INIT, 'service_started || rc=$?')
     require(BRIDGE_INIT, 'rm -f "$NP_STATE_DIR/health.$id"')
     require(BRIDGE_INIT, 'rm -f "$NP_STATE_DIR/instance.$id" "$NP_STATE_DIR/health.$id"')

@@ -92,7 +92,10 @@ start_node() {
     NP_START_IDS=""
     procd_open_service "$NP_SERVICE_NAME" "$initscript"
     naiveproxy_start_instance "$id" || rc=$?
-    procd_close_service
+    # A targeted start must add/update only this instance.  The default
+    # procd_close_service action is `set`, which replaces the service's full
+    # instance table and silently drops already-running nodes.
+    procd_close_service add
     [ "$rc" -eq 0 ] || { np_manifest >/dev/null 2>&1 || true; return "$rc"; }
     service_started || rc=$?
     np_manifest >/dev/null 2>&1 || true

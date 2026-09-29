@@ -1,5 +1,21 @@
 # Current status
 
+## 2026-09-29 Candidate multi-instance follow-up
+
+- Candidate 2026-1178 was installed and exposed a second real lifecycle defect:
+  targeted `start_node node-2` used procd's default `set` operation and
+  replaced the existing instance table, stopping node-1. The source now uses
+  `procd_close_service add` for targeted starts while full service start/reload
+  retains the complete `set` transaction.
+- The temporary node-2 was removed after the reproduction. The device's
+  node-1 was restarted and independently verified through its SOCKS5; the
+  current Mihomo loopback listener continued to return successful HTTPS
+  responses. The 2026-1179 candidate must repeat two-instance isolation after
+  installation before release.
+- Local standalone, integration, import, POSIX and local-gate tests pass for
+  the targeted procd change. Version 2026-1178 is not a release candidate for
+  publication because this additional source fix supersedes it.
+
 ## 2026-09-29 NaiveProxy lifecycle follow-up and current Mihomo test entry
 
 - Rechecked baseline at source HEAD `c4a1ad7f228064b53651db5e25375cca42124552`.
