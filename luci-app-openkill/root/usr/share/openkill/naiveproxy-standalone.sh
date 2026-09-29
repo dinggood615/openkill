@@ -79,10 +79,12 @@ np_urlencode() {
 }
 
 np_urldecode() {
-    # Share links use percent encoding for credentials and display names.
+    # Share-link userinfo and fragments use URI encoding.  A literal '+' is
+    # data in these components; application/x-www-form-urlencoded's plus-to-
+    # space rule applies only to query fields and must not change credentials.
     # BusyBox printf implements %b; decode only well-formed %HH bytes and
     # leave literal backslashes untouched by first escaping them.
-    printf '%b' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/+/ /g; s/%/\\\\x/g')"
+    printf '%b' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/%/\\\\x/g')"
 }
 
 np_valid_encoded() {
@@ -128,7 +130,10 @@ np_port() {
     fi
     port="$NP_PORT_BASE"
     while [ "$port" -lt $((NP_PORT_BASE + NP_PORT_LIMIT)) ]; do
-        if ! grep -q " $port$" "$NP_PORT_MAP" 2>/dev/null; then
+        # The map is only a persistence record.  A stale record or another
+        # daemon may already own a port, so reserve only ports that are absent
+        # from both the map and the live listener table.
+        if ! grep -q " $port$" "$NP_PORT_MAP" 2>/dev/null && ! np_listener "$port"; then
             printf '%s %s\n' "$id" "$port" >> "$NP_PORT_MAP" || return 1
             printf '%s\n' "$port"
             return 0
@@ -338,12 +343,48 @@ np_listener() {
     return 1
 }
 
+np_listener_owner() {
+    # Return success only when the listener can be tied to the generated
+    # configuration.  BusyBox ss may omit process information; in that case
+    # retain the listener result and let the caller report ownership as
+    # unknown rather than claiming a different process is NaiveProxy.
+    local id="$1" port="$2" config pid line
+    config=$(np_node_file "$id" 2>/dev/null || true)
+    [ -n "$config" ] || return 2
+    pid=$(np_pid_for_config "$NP_CONFIG_DIR/$id.json" 2>/dev/null || true)
+    if [ -n "$pid" ] && np_listener "$port"; then
+        printf 'verified\n'
+        return 0
+    fi
+    if command -v ss >/dev/null 2>&1; then
+        line=$(ss -lntp 2>/dev/null | grep -E "127[.]0[.]0[.]1:${port}[[:space:]]" | head -n1 || true)
+        case "$line" in *"pid="*) printf 'external-or-unmatched\n'; return 1 ;; esac
+    fi
+    printf 'unknown\n'
+    return 2
+}
+
 np_pid_for_config() {
     local config="$1" proc cmd
     for proc in /proc/[0-9]*; do
         [ -r "$proc/cmdline" ] || continue
         cmd=$(tr '\000' ' ' < "$proc/cmdline" 2>/dev/null || true)
         case "$cmd" in *"$config"*) printf '%s\n' "${proc##*/}"; return 0 ;; esac
+    done
+    return 1
+}
+
+np_wait_for_ready() {
+    local id="$1" attempts=0 port pid owner
+    port=$(np_port "$id" 2>/dev/null) || return 1
+    while [ "$attempts" -lt 8 ]; do
+        pid=$(np_pid_for_config "$NP_CONFIG_DIR/$id.json" 2>/dev/null || true)
+        if [ -n "$pid" ] && np_listener "$port"; then
+            owner=$(np_listener_owner "$id" "$port" 2>/dev/null || true)
+            case "$owner" in external-or-unmatched) return 1 ;; *) return 0 ;; esac
+        fi
+        attempts=$((attempts + 1))
+        sleep 1
     done
     return 1
 }
@@ -371,7 +412,7 @@ np_prepare() {
 }
 
 np_health_one() {
-    local id="$1" file port output code seconds now old_fail status reason latency state
+    local id="$1" file port output code seconds now old_fail status reason latency state owner
     file=$(np_node_file "$id") || return 1
     [ -r "$file" ] || return 1
     port=$(np_port "$id") || return 1
@@ -384,6 +425,8 @@ np_health_one() {
         latency=unknown
     elif ! np_prepare "$id" >/dev/null; then status=config-invalid; reason=node-config-invalid; latency=unknown
     elif ! np_listener "$port"; then status=local-not-ready; reason=loopback-listener-not-ready; latency=unknown
+    elif owner=$(np_listener_owner "$id" "$port" 2>/dev/null) && [ "$owner" = external-or-unmatched ]; then
+        status=local-not-ready; reason=port-owned-by-other-process; latency=unknown
     elif ! command -v curl >/dev/null 2>&1; then status=probe-failed; reason=curl-missing; latency=unknown
     else
         output=$(curl --proxy "socks5h://127.0.0.1:${port}" --noproxy '' --connect-timeout 3 --max-time "$NP_TIMEOUT" --max-redirs 0 --proto '=https' -sS -o /dev/null -w '%{http_code}\t%{time_total}' "$NP_TARGET" 2>/dev/null || true)
@@ -412,7 +455,7 @@ np_health_all() {
 }
 
 np_manifest() {
-    local now id file name enabled port config pid health_status latency checked expires reason state component_version component_reason component_asset component_machine generation running_generation pending_apply
+    local now id file name enabled port config pid health_status latency checked expires reason state component_version component_reason component_asset component_machine generation running_generation pending_apply transport listener_owner
     np_dirs || return 1; now=$(date +%s)
     component_version=$(sed -n 's/^version=//p' "$NP_ROOT/component.meta" 2>/dev/null | head -n1)
     [ -n "$component_version" ] || component_version=unknown
@@ -425,15 +468,24 @@ np_manifest() {
         for id in $(np_ids); do
             file=$(np_node_file "$id") || continue; name=$(np_node_value "$file" name); [ -n "$name" ] || name="$id"
             enabled=$(np_node_value "$file" enabled); port=$(np_port "$id" 2>/dev/null || true); config="$NP_CONFIG_DIR/$id.json"
+            transport=$(np_node_value "$file" transport); [ -n "$transport" ] || transport=https
             generation=$(np_node_generation "$file")
             pid=$(np_pid_for_config "$config" 2>/dev/null || true); health_status=$(sed -n 's/^status=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); latency=$(sed -n 's/^latency_ms=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); checked=$(sed -n 's/^checked_at=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); expires=$(sed -n 's/^expires_at=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); reason=$(sed -n 's/^reason=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1)
             case "$expires" in ''|*[!0-9]*) ;; *) [ "$expires" -le "$now" ] && [ "$health_status" = available ] && health_status=expired ;; esac
-            state=stopped; [ -n "$pid" ] && np_listener "$port" && state=running
+            state=stopped; listener_owner=not-listening
+            if np_listener "$port"; then
+                listener_owner=$(np_listener_owner "$id" "$port" 2>/dev/null || true)
+                [ -n "$listener_owner" ] || listener_owner=unknown
+                case "$listener_owner" in
+                    external-or-unmatched) state=conflict ;;
+                    *) [ -n "$pid" ] && state=running ;;
+                esac
+            fi
             running_generation=$(sed -n 's/^generation=//p' "$NP_STATE_DIR/instance.$id" 2>/dev/null | head -n1)
             pending_apply=0
             [ "$state" = running ] && [ "$running_generation" != "$generation" ] && pending_apply=1
-            printf 'node.%s.name=%s\nnode.%s.enabled=%s\nnode.%s.port=%s\nnode.%s.pid=%s\nnode.%s.state=%s\nnode.%s.local_ready=%s\nnode.%s.health=%s\nnode.%s.latency_ms=%s\nnode.%s.checked_at=%s\nnode.%s.expires_at=%s\nnode.%s.reason=%s\nnode.%s.generation=%s\nnode.%s.pending_apply=%s\n' \
-                "$id" "$(np_safe "$name")" "$id" "$(np_safe "$enabled")" "$id" "$(np_safe "$port")" "$id" "$(np_safe "$pid")" "$id" "$state" "$id" "$( [ "$state" = running ] && printf 1 || printf 0 )" "$id" "$(np_safe "${health_status:-unknown}")" "$id" "$(np_safe "${latency:-unknown}")" "$id" "$(np_safe "${checked:-unknown}")" "$id" "$(np_safe "${expires:-unknown}")" "$id" "$(np_safe "${reason:-not-tested}")" "$id" "$(np_safe "$generation")" "$id" "$pending_apply"
+            printf 'node.%s.name=%s\nnode.%s.enabled=%s\nnode.%s.transport=%s\nnode.%s.port=%s\nnode.%s.pid=%s\nnode.%s.state=%s\nnode.%s.listener_owner=%s\nnode.%s.local_ready=%s\nnode.%s.health=%s\nnode.%s.latency_ms=%s\nnode.%s.checked_at=%s\nnode.%s.expires_at=%s\nnode.%s.reason=%s\nnode.%s.generation=%s\nnode.%s.pending_apply=%s\n' \
+                "$id" "$(np_safe "$name")" "$id" "$(np_safe "$enabled")" "$id" "$(np_safe "$transport")" "$id" "$(np_safe "$port")" "$id" "$(np_safe "$pid")" "$id" "$state" "$id" "$(np_safe "$listener_owner")" "$id" "$( [ "$state" = running ] && printf 1 || printf 0 )" "$id" "$(np_safe "${health_status:-unknown}")" "$id" "$(np_safe "${latency:-unknown}")" "$id" "$(np_safe "${checked:-unknown}")" "$id" "$(np_safe "${expires:-unknown}")" "$id" "$(np_safe "${reason:-not-tested}")" "$id" "$(np_safe "$generation")" "$id" "$pending_apply"
         done
     } > "$NP_RUN/manifest.new.$$" || return 1
     chmod 600 "$NP_RUN/manifest.new.$$"; mv -f "$NP_RUN/manifest.new.$$" "$NP_RUN/manifest"
@@ -502,11 +554,14 @@ np_import_link() {
     np_valid_encoded "$user" && np_valid_encoded "$NP_CTL_password" || return 41
     case "$hostport" in
         \[*\]:*) host=${hostport%%]*}; host=${host#\[}; port=${hostport##*:} ;;
+        \[*\]) host=${hostport#\[}; host=${host%\]}; port=443 ;;
+        *:*:*) return 42 ;;
         *:*) host=${hostport%:*}; port=${hostport##*:} ;;
-        *) return 42 ;;
+        *) host="$hostport"; port=443 ;;
     esac
     np_valid_encoded "$fragment" && np_valid_encoded "$host" || return 42
     np_validate_query "$query" || return 43
+    np_valid_port "$port" || return 42
     NP_CTL_name=$(np_urldecode "${fragment:-$host}"); NP_CTL_server=$(np_urldecode "$host"); NP_CTL_port=$port
     NP_CTL_username=$(np_urldecode "$user"); NP_CTL_password=$(np_urldecode "$NP_CTL_password"); NP_CTL_transport="$scheme"
 }

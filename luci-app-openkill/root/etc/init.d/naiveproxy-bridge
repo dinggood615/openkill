@@ -31,6 +31,12 @@ naiveproxy_start_instance() {
     procd_set_param respawn 300 5 3
     procd_set_param stderr 1
     procd_close_instance
+    # procd accepts the instance asynchronously.  Do not report a successful
+    # start until the generated config has a matching process and listener.
+    if ! np_wait_for_ready "$id"; then
+        rm -f "$NP_STATE_DIR/instance.$id"
+        return 1
+    fi
     state_tmp="$NP_STATE_DIR/instance.$id.new.$$"
     printf 'generation=%s\nstarted_at=%s\n' "$generation" "$(date +%s)" > "$state_tmp" 2>/dev/null && \
         chmod 600 "$state_tmp" 2>/dev/null && mv -f "$state_tmp" "$NP_STATE_DIR/instance.$id" 2>/dev/null || rm -f "$state_tmp"

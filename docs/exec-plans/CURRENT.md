@@ -1,5 +1,38 @@
 # Current status
 
+## 2026-09-29 NaiveProxy independent lifecycle, import and UI repair
+
+- Scope: repair the independent NaiveProxy lifecycle and share-link contract,
+  expose real listener/port evidence, and clarify the LuCI component-to-
+  Mihomo hand-off. OpenKill UCI, DNS, firewall, route and TUN behavior remain
+  outside this iteration.
+- Changes: imported HTTPS/QUIC links now default an omitted port to 443,
+  preserve literal `+` in URI credentials, reject ambiguous unbracketed IPv6,
+  and allocate new ports only when they are absent from both the persistent
+  map and the live listener table. The redacted manifest records transport and
+  listener ownership; external listeners are surfaced as `conflict` and are
+  never treated as a healthy Naive listener.
+- The bridge now waits for a matching generated configuration, process and
+  loopback listener after procd accepts a start request. Health checks report
+  `port-owned-by-other-process` when listener evidence identifies another
+  process. The LuCI card now shows the component-to-Mihomo flow, transport,
+  process/listener state, explicit port conflicts and separate unverified
+  Mihomo integration state.
+- Local evidence so far: `test-naiveproxy-import.js`,
+  `test-naiveproxy-standalone.py`, `test-naiveproxy-integration.py`, POSIX
+  syntax checks and `sh scripts/local-gate.sh` pass. The standalone fixture
+  covers omitted 443 and literal plus credentials. Windows browser execution
+  is environment-dependent; no router write, service action, packet-path or
+  authenticated remote endpoint test was performed.
+- Release work: source and installer version were advanced from `2026-1175`
+  to `2026-1176` with release notes in `docs/release/notes/2026-1176.md`.
+  The versioned local gate passes and the bounded change is committed locally
+  as `2d7d26af15e9f30ec0021e12d6ea01f7604aa230`. Push attempts from Windows
+  Git and WSL both fail before authentication with a GitHub TLS handshake
+  error (`schannel: failed to receive handshake` / `GnuTLS: handshake failed`).
+  Development CI, RC Build and Formal Release therefore remain pending until
+  GitHub transport is reachable; no release tag or artifact digest is claimed.
+
 ## 2026-09-27 NaiveProxy component, node persistence and edit repair
 
 - Scope: repair the independent NaiveProxy control contract only: component

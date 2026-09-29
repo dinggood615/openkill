@@ -100,6 +100,7 @@ def main() -> None:
     require(VIEW, "data-naive-parse-link")
     require(VIEW, "data-naive-node-health")
     require(VIEW, "data-naive-node-remove")
+    require(VIEW, "data-naive-standalone-flow")
     require(VIEW, 'role="group" aria-labelledby="openkill-naive-dialog-title" data-naive-node-form')
     require(VIEW, "function submitNode(start)")
     assert '<form data-naive-node-form>' not in view
@@ -121,6 +122,9 @@ def main() -> None:
     require(STANDALONE, "np_control_install_component")
     require(STANDALONE, "component-architecture-mismatch")
     require(STANDALONE, "np_validate_query")
+    require(STANDALONE, "np_listener_owner")
+    require(STANDALONE, "port-owned-by-other-process")
+    require(STANDALONE, "np_wait_for_ready")
     require(STANDALONE, "control.result")
     require(STANDALONE, "component-unavailable")
     require(BRIDGE_INIT, "start_node()")

@@ -21,6 +21,8 @@ result = parse('naiveproxy://fixture-user:fixture-secret@[2001:db8::1]:443?secur
 if (result.server !== '[2001:db8::1]' && result.server !== '2001:db8::1') throw new Error('IPv6 import was not preserved');
 result = parse('naive+quic://fixture-user:fixture-secret@quic.example.test:443#Quic');
 if (result.transport !== 'quic' || result.name !== 'Quic') throw new Error('QUIC import was not preserved');
+result = parse('naive+https://user+name:pass+word@default.example#Default');
+if (result.port !== '443' || result.username !== 'user+name' || result.password !== 'pass+word') throw new Error('default port or literal plus was not preserved');
 try { parse('naive+https://fixture-user:fixture-secret@example.test:443?unknown=x#Fixture'); throw new Error('unknown parameter accepted'); } catch (error) {
   if (error.message === 'unknown parameter accepted') throw error;
 }

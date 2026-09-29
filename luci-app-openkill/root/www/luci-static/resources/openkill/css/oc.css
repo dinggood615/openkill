@@ -9464,6 +9464,15 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
     color: var(--oc-text-secondary, #aeb8c8);
     overflow-wrap: anywhere;
 }
+#cbi-openkill.openkill-settings .openkill-naive-standalone-flow {
+    margin: 8px 0 12px;
+    padding: 9px 12px;
+    border-left: 3px solid var(--oc-accent, #38bdf8);
+    border-radius: 6px;
+    background: var(--oc-surface-subtle, rgba(15, 23, 42, .35));
+    color: var(--oc-text-secondary, #aeb8c8);
+    overflow-wrap: anywhere;
+}
 #cbi-openkill.openkill-settings .openkill-naive-standalone-help,
 #cbi-openkill.openkill-settings .openkill-naive-standalone-status,
 #cbi-openkill.openkill-settings .openkill-naive-standalone-yaml {

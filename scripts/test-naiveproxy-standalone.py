@@ -38,6 +38,7 @@ def main():
             '"transport":"https"}\n', encoding="utf-8")
         (root / "naive").write_text("#!/bin/sh\nprintf '%s\\n' 'naive 1.0'\n", encoding="utf-8")
         os.chmod(root / "naive", 0o755)
+        (root / "ports").write_text("n1 11080\n", encoding="utf-8")
         (fake / "jsonfilter").write_text("""#!/bin/sh
 expr=
 file=
@@ -153,6 +154,19 @@ esac
             ), capture_output=True,
         )
         assert quic.returncode == 0, (quic.stdout, quic.stderr)
+        default_port = subprocess.run(
+            [BASH, git_path(SCRIPT), "control"], env=env, text=True, input=(
+                "operation=import\nshare=naive+https://user+name:pass+word@default.example#Default\nenabled=1\n"
+            ), capture_output=True,
+        )
+        assert default_port.returncode == 0, (default_port.stdout, default_port.stderr)
+        default_id = next((line.split("=", 1)[1] for line in default_port.stdout.splitlines()
+                           if line.startswith("id=")), "")
+        assert default_id, default_port.stdout
+        default_data = json.loads((root / "nodes" / f"{default_id}.json").read_text(encoding="utf-8"))
+        assert default_data["port"] == 443
+        assert default_data["username"] == "user+name"
+        assert default_data["password"] == "pass+word"
         duplicate = subprocess.run([BASH, git_path(SCRIPT), "control"], env=env, text=True,
                                     input=("operation=import\nshare=naive+https://fixture-user:fixture-secret@import.example.test:443?security=tls&type=tcp&headerType=none#Again\n"),
                                     capture_output=True)
