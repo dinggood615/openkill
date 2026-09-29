@@ -20,6 +20,7 @@ OC_CSS = ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/o
 GENERATOR = ROOT / "luci-app-openkill/root/usr/share/openkill/yml_proxys_set.sh"
 CONFIG = ROOT / "luci-app-openkill/root/etc/config/openkill"
 NORMALIZE = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_config_normalize.sh"
+YML_CHANGE = ROOT / "luci-app-openkill/root/usr/share/openkill/yml_change.sh"
 
 
 def require(path: Path, value: str) -> str:
@@ -52,10 +53,15 @@ def main() -> None:
     require(BRIDGE_INIT, "group root")
     require(BRIDGE_INIT, 'procd_close_service\n    [ "$rc" -eq 0 ]')
     require(BRIDGE_INIT, 'service_started || rc=$?')
+    require(BRIDGE_INIT, 'rm -f "$NP_STATE_DIR/health.$id"')
+    require(BRIDGE_INIT, 'rm -f "$NP_STATE_DIR/instance.$id" "$NP_STATE_DIR/health.$id"')
     require(STANDALONE, "np_control")
     require(STANDALONE, "np_control_add")
     assert "uci" not in bridge
     openkill = require(OPENKILL_INIT, "standalone")
+    yml_change = YML_CHANGE.read_text(encoding="utf-8")
+    assert "`" not in yml_change, "embedded Ruby must not contain shell backtick substitution"
+    require(ROOT / "luci-app-openkill/Makefile", "chown -R root:root /usr/share/openkill")
     assert ". openkill_naive.sh" not in openkill
     assert "openkill_naive_health.sh" not in openkill
     installer = require(INSTALLER, "install_naive_standalone_component")

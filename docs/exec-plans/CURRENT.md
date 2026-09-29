@@ -1,5 +1,47 @@
 # Current status
 
+## 2026-09-29 NaiveProxy lifecycle follow-up and current Mihomo test entry
+
+- Rechecked baseline at source HEAD `c4a1ad7f228064b53651db5e25375cca42124552`.
+  The authorized device remains OpenWrt 25.12-SNAPSHOT x86_64 VMware with
+  formal package 2026-1177 installed. Existing node, component and protected
+  backup were preserved.
+- A device stop/start reproduction found a real remaining defect: the old
+  `health.node-1` file survived `stop_node`, so the manifest could expose an
+  expired result from the previous process generation. The bridge now clears
+  health state on every new start attempt, failed readiness, targeted stop and
+  service stop/reload. This is the 2026-1178 source change.
+- The formal-package install warning `yml_change.sh: ... use: command not
+  found` was traced to backticks in an embedded Ruby comment inside a shell
+  double-quoted Ruby program. The comment is now shell-safe. Package-owned
+  runtime/UI files are normalized to `root:root` by postinst; protected Naive
+  node and state paths remain 700/600.
+- Device-only Mihomo evidence: the selected `/etc/openkill/openkill.optimized.yaml`
+  was backed up under `/root/openkill-naive-backup-20260929185837`, then given
+  a credential-free `YT` loopback proxy group and a dedicated
+  `127.0.0.1:17891` mixed listener. Mihomo API reload returned HTTP 204,
+  the listener belonged to the running clash process, and three rounds to two
+  HTTPS targets returned 204/200. The default proxy group was not changed.
+  A custom overwrite hook preserves this test entry across OpenKill config
+  regeneration; no WAN, DNS, firewall, route, TUN or other-plugin setting was
+  changed.
+- After targeted stop/start, the Naive listener disappeared and returned;
+  the independent SOCKS5 request and the current Mihomo test listener both
+  succeeded. The pre-fix stale health timestamp remains historical evidence;
+  the new package must be installed before claiming the cleanup fix on-device.
+- Local WSL tests pass: standalone fixture, integration contract, import
+  behavior, POSIX syntax and `scripts/local-gate.sh`. A Windows browser login
+  was attempted twice with the credentials supplied in this session and the
+  LuCI page rejected them as invalid; therefore authenticated LuCI import,
+  CSRF/UI acceptance and credential-bearing page screenshots remain an
+  external authentication blocker, not an unverified success.
+- Next action: commit and push 2026-1178, verify exact-commit Development CI,
+  run RC Build and Formal Release, install the candidate/formal package on the
+  authorized device, then recheck postinst ownership, warning-free YAML
+  generation, health invalidation, multi-instance isolation and current
+  Mihomo requests. Do not claim complete UI acceptance unless LuCI accepts a
+  valid credential without changing the device login.
+
 ## 2026-09-29 NaiveProxy test-machine lifecycle and real-node verification
 
 - Baseline was rechecked on the authorized `192.168.1.103` OpenWrt x86_64

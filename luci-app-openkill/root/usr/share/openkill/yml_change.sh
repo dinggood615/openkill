@@ -1025,7 +1025,7 @@ begin
       end
        if dns_privacy_mode == 'strict'
           # A group can be selectable through explicit proxies, a provider
-          # (`use`) or Mihomo's include-all flag.  The old check only looked at
+          # use key or Mihomo's include-all flag.  The old check only looked at
           # group['proxies'], so valid imported profiles were rejected even
           # when they had real proxy entries available through a provider.
           proxy_names = Array(Value['proxies']).map do |proxy|

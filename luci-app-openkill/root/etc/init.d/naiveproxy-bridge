@@ -36,6 +36,9 @@ naiveproxy_start_instance() {
     fi
     file=$(np_node_file "$id") || return 1
     [ -r "$file" ] || return 1
+    # A new application attempt must never expose a result from the previous
+    # process/configuration generation while procd is still starting.
+    rm -f "$NP_STATE_DIR/health.$id"
     enabled=$(np_node_value "$file" enabled)
     np_enabled "$enabled" || return 0
     config=$(np_prepare "$id" 2>/dev/null || true)
@@ -72,6 +75,7 @@ service_started() {
             naiveproxy_record_ready "$id" || failed=1
         else
             rm -f "$NP_STATE_DIR/instance.$id"
+            rm -f "$NP_STATE_DIR/health.$id"
             failed=1
         fi
     done
@@ -98,7 +102,9 @@ start_node() {
 stop_service() {
     local id
     procd_kill "$NP_SERVICE_NAME" >/dev/null 2>&1 || true
-    for id in $(np_ids 2>/dev/null); do rm -f "$NP_STATE_DIR/instance.$id"; done
+    for id in $(np_ids 2>/dev/null); do
+        rm -f "$NP_STATE_DIR/instance.$id" "$NP_STATE_DIR/health.$id"
+    done
     np_manifest >/dev/null 2>&1 || true
 }
 
@@ -107,7 +113,7 @@ stop_node() {
     [ -n "$id" ] || return 1
     procd_lock
     procd_kill "$NP_SERVICE_NAME" "naive_$id" >/dev/null 2>&1 || true
-    rm -f "$NP_STATE_DIR/instance.$id"
+    rm -f "$NP_STATE_DIR/instance.$id" "$NP_STATE_DIR/health.$id"
     np_manifest >/dev/null 2>&1 || true
 }
 
