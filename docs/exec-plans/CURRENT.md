@@ -1,5 +1,45 @@
 # Current status
 
+## 2026-09-29 NaiveProxy test-machine lifecycle and real-node verification
+
+- Baseline was rechecked on the authorized `192.168.1.103` OpenWrt x86_64
+  VMware test machine: installed OpenKill was `2026-1175`, and the saved
+  node's server hash and non-secret fields matched the supplied test link.
+  A protected backup was created at
+  `/root/openkill-naive-backup-20260929185837` with mode-700 directory and
+  mode-600 archive.
+- Root cause evidence: the old bridge started Naive as `root:nogroup`; it
+  accepted a SOCKS5 listener but could not establish upstream HTTPS. The same
+  official binary and generated configuration as `root:root` returned HTTP
+  204 and 200 through two independent HTTPS targets. The old readiness wait
+  also ran before `procd_close_service`, so the process could appear later
+  without an instance state file. Health previously regenerated the active
+  runtime config; that is now avoided when the generated config is valid.
+- Fixes are in commits `3dc247234cda9b9b83e185de307b7141c1504fba` and
+  `dbc996ee6f3301f9af66affd960a52366b376f59`: preserve valid runtime config,
+  register `start_node`/`stop_node`/`health`, use the real procd service and
+  instance names, wait in `service_started` after transaction commit, record
+  per-instance generation state, skip disabled nodes, and run with group
+  `root`.
+- Device evidence after source deployment: normal start returned success,
+  instance state recorded generation 4 with `pending_apply=0`, listener
+  ownership was verified, health was `available` with `probe-ok`, and both
+  gstatic generate_204 and Cloudflare trace returned success through the
+  loopback SOCKS5. A targeted stop followed by `start_node` returned success
+  and the same HTTPS request succeeded again. A temporary Mihomo config passed
+  `-t` and routed both targets through the loopback SOCKS5, then its test
+  process was stopped and temporary files removed. No WAN, DNS, firewall,
+  route, TUN, other-plugin or VPS changes were made.
+- Local import, standalone, integration, POSIX syntax and local policy gates
+  pass. The LuCI browser bridge opened the device title but timed out while
+  returning accessibility/screenshot state; production-template UI tests
+  remain the available UI evidence. The device currently has the repaired
+  source files deployed temporarily, not a package built from the new
+  release commit.
+- Release work is now at `2026-1177` in source metadata and release notes.
+  Next action is exact-commit CI/push, RC package build/install on the test
+  machine, repeat the same evidence from the package, then Formal Release.
+
 ## 2026-09-29 NaiveProxy independent lifecycle, import and UI repair
 
 - Scope: repair the independent NaiveProxy lifecycle and share-link contract,
