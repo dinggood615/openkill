@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-openkill
-PKG_VERSION:=2026-1179
+PKG_VERSION:=2026-1180
 PKG_MAINTAINER:=dinggood615 <https://github.com/dinggood615/openkill>
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
@@ -72,6 +72,7 @@ endef
 
 define Package/$(PKG_NAME)/conffiles
 /etc/config/openkill
+/etc/openkill/custom/openkill_custom_overwrite.sh
 endef
 
 define Package/$(PKG_NAME)/preinst
