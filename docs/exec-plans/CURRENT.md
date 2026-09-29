@@ -1,5 +1,54 @@
 # Current status
 
+## 2026-09-29 2026-1180 formal release and authorized device acceptance
+
+- Baseline was rechecked at source `95a3d0d362e7be78e35219de2ebb79048b47781b`.
+  The follow-up commit `1ed36e0ecf50dc33cca64d752dc977dbd8153b69` adds
+  `/etc/openkill/custom/openkill_custom_overwrite.sh` to the opkg conffiles,
+  bumps the synchronized version to `2026-1180`, and adds a contract test.
+  This fixes a release-only regression where an upgrade replaced a user's
+  Mihomo custom overwrite hook and removed the manual loopback listener.
+- Exact-commit Development CI run `36579416565` passed. RC Build run
+  `36579730489` passed; its IPK was 7,712,717 bytes with SHA256
+  `841e38cd025303afb7dae1b52cedf229a571486b9ccb0ff6e42f31247f6bc7a4`.
+  The RC audit verified package metadata, both conffiles, maintainer-script
+  deletion safety, stale development references and sensitive/test content.
+- Formal Release run `36580520637` passed with `release_gate=true` and
+  `publish=true`. Tag `v2026-1180-ipk` points to the 1ed36e0 source commit;
+  release: https://github.com/dinggood615/openkill/releases/tag/v2026-1180-ipk
+  The formal IPK is 7,930,222 bytes with SHA256
+  `e541adf20aef8281df926a5d3374e096011dd83c605705319bed7ce98a4231f3`.
+  The package channel reports `v2026-1180`.
+- The formal package was installed on the authorized `192.168.1.103`
+  OpenWrt/Kwrt 25.12-SNAPSHOT x86_64 VMware test machine. Installed package
+  status is `2026-1180`; component `v154.0.8037.49-2` executes successfully.
+  The protected backup root is `/root/openkill-naive-backup-20260929185837`
+  (mode 700; `pre-1179`, `pre-1180` and `pre-formal-1180` snapshots are mode
+  700 with protected files). Node directory/file and generated runtime config
+  permissions are 700/600. The custom overwrite conffile remained present
+  after the formal package installation, and the dedicated Mihomo listener
+  remained on loopback.
+- Device acceptance passed for the real supplied node without printing its
+  credentials: node generation 5 is running, the PID-to-listener ownership is
+  verified, health is `available`/`probe-ok`, and the independent SOCKS5
+  endpoint returned HTTP 204 from gstatic and 200 from Cloudflare in three
+  rounds each. Stop/start cleared stale health and restored the listener.
+  A retain-password edit/apply advanced generation 4 to 5 and revalidated the
+  same request. A temporary second node proved both 11080/11081 instances
+  could run concurrently; stopping node-2 left node-1 running and reachable.
+- The current running Mihomo instance retained the credential-free
+  `127.0.0.1:17891` test listener and its dedicated group after the formal
+  package install. Three rounds to the same two HTTPS targets returned 204/200
+  through that listener. Existing default policy was not changed; no WAN,
+  DNS, firewall, route, TUN, other-plugin or remote-VPS setting was changed.
+- Automated standalone, integration, import, POSIX and local-gate tests pass;
+  Development CI, RC and Formal Release all pass on the exact source commits.
+  The supplied LuCI login was attempted twice and rejected by the device as an
+  invalid username/password. Therefore authenticated LuCI import/CSRF/browser
+  acceptance remains an explicit external authentication blocker; the backend,
+  device lifecycle, SOCKS5 and current Mihomo path are not represented as a
+  successful LuCI page submission.
+
 ## 2026-09-29 Candidate multi-instance follow-up
 
 - Candidate 2026-1178 was installed and exposed a second real lifecycle defect:
@@ -10,8 +59,8 @@
 - The temporary node-2 was removed after the reproduction. The device's
   node-1 was restarted and independently verified through its SOCKS5; the
   current Mihomo loopback listener continued to return successful HTTPS
-  responses. The 2026-1179 candidate must repeat two-instance isolation after
-  installation before release.
+  responses. This candidate was superseded by the 2026-1180 release after the
+  conffile-preservation regression was found and fixed.
 - Local standalone, integration, import, POSIX and local-gate tests pass for
   the targeted procd change. Version 2026-1178 is not a release candidate for
   publication because this additional source fix supersedes it.
@@ -51,12 +100,9 @@
   LuCI page rejected them as invalid; therefore authenticated LuCI import,
   CSRF/UI acceptance and credential-bearing page screenshots remain an
   external authentication blocker, not an unverified success.
-- Next action: commit and push 2026-1178, verify exact-commit Development CI,
-  run RC Build and Formal Release, install the candidate/formal package on the
-  authorized device, then recheck postinst ownership, warning-free YAML
-  generation, health invalidation, multi-instance isolation and current
-  Mihomo requests. Do not claim complete UI acceptance unless LuCI accepts a
-  valid credential without changing the device login.
+- The remaining UI item is still conditional on a valid LuCI session: do not
+  claim complete browser acceptance unless the device accepts valid credentials
+  without changing the login configuration.
 
 ## 2026-09-29 NaiveProxy test-machine lifecycle and real-node verification
 
