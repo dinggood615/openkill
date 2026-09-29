@@ -55,6 +55,8 @@ case "$expr" in
   @.username) printf '%s' 'fixture-user' ;;
   @.password) printf '%s' 'fixture-secret' ;;
   @.transport) printf '%s' 'https' ;;
+  @.listen) printf '%s' 'socks://127.0.0.1:11080' ;;
+  @.proxy) printf '%s' 'https://fixture-user:fixture-secret@example.invalid:443' ;;
   @.generation) sed -n 's/.*"generation":\\([0-9][0-9]*\\).*/\\1/p' "$file" ;;
 esac
 """, encoding="utf-8")
@@ -74,6 +76,8 @@ esac
                                capture_output=True, check=True).stdout.strip()
         assert probe.startswith(git_path(fake)), probe
         run(["prepare", "n1"], env)
+        config_path = run_dir / "config" / "n1.json"
+        config_before = config_path.stat().st_mtime_ns
         health_result = subprocess.run([BASH, git_path(SCRIPT), "health", "all"], env=env, text=True, capture_output=True)
         manifest = subprocess.run([BASH, git_path(SCRIPT), "manifest"], env=env, text=True,
                                   capture_output=True, check=True).stdout
@@ -81,6 +85,7 @@ esac
             raise AssertionError(f"health rc={health_result.returncode} stdout={health_result.stdout!r} stderr={health_result.stderr!r}")
         assert "node.n1.health=available" in manifest, manifest
         assert "node.n1.latency_ms=123" in manifest, manifest
+        assert config_path.stat().st_mtime_ns == config_before, "health rewrote the active runtime config"
         yaml = run(["yaml"], env).stdout
         assert 'server: "127.0.0.1"' in yaml and "port: 11080" in yaml
         assert "fixture-secret" not in yaml and "example.invalid" not in yaml

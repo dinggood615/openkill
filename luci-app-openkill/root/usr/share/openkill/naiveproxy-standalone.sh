@@ -411,6 +411,17 @@ np_prepare() {
     printf '%s\n' "$config"
 }
 
+np_config_ready() {
+    local id="$1" config listen proxy
+    config="$NP_CONFIG_DIR/$id.json"
+    [ -r "$config" ] || return 1
+    listen=$(np_json "$config" listen 2>/dev/null || true)
+    proxy=$(np_json "$config" proxy 2>/dev/null || true)
+    case "$listen" in socks://127.0.0.1:*) ;; *) return 1 ;; esac
+    case "$proxy" in https://*|quic://*) ;; *) return 1 ;; esac
+    return 0
+}
+
 np_health_one() {
     local id="$1" file port output code seconds now old_fail status reason latency state owner
     file=$(np_node_file "$id") || return 1
@@ -423,7 +434,7 @@ np_health_one() {
         reason=${NP_PROBE_REASON:-component-unavailable}
         case "$reason" in component-missing) status=component-missing ;; *) status=component-unavailable ;; esac
         latency=unknown
-    elif ! np_prepare "$id" >/dev/null; then status=config-invalid; reason=node-config-invalid; latency=unknown
+    elif ! np_config_ready "$id" && ! np_prepare "$id" >/dev/null; then status=config-invalid; reason=node-config-invalid; latency=unknown
     elif ! np_listener "$port"; then status=local-not-ready; reason=loopback-listener-not-ready; latency=unknown
     elif owner=$(np_listener_owner "$id" "$port" 2>/dev/null) && [ "$owner" = external-or-unmatched ]; then
         status=local-not-ready; reason=port-owned-by-other-process; latency=unknown
