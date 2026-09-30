@@ -24,22 +24,44 @@
   address family/bind address instead of only 127.0.0.1.  The reboot-only
   component refresh changes only the two component evidence lines in an
   existing manifest.
-- Device evidence before this code package was rebuilt remains valid for the
-  independent path: the protected Naive component was executable, its target
-  PID/socket ownership was verified, three rounds through the SOCKS5 reached
-  both HTTPS targets, and two instances ran concurrently without interrupting
-  the first.  A temporary Mihomo config containing only a loopback SOCKS5
+- Candidate and formal package device evidence is complete: after the
+  2026-1196 candidate install, the real LuCI HTTP flow imported the authorized
+  link (`stage=accepted`), started and health-checked the node, stopped it
+  (the PID and listener disappeared), started it again, retained the protected
+  password during an edit, applied generation 2, and restored `pending_apply=0`.
+  Three rounds through the SOCKS5 reached both HTTPS targets (204 and 200 with
+  exit 0), and two instances ran concurrently; stopping the temporary instance
+  left the original verified.  The same sequence was repeated after a
+  `--force-reinstall` of the formal IPK.
+- A temporary Mihomo config containing only a credential-free loopback SOCKS5
   proxy, a dedicated selector and a loopback mixed listener was loaded through
-  the authenticated API; after overriding the listener's inherited auth with
-  an empty user list, three requests returned 204 and one independent target
-  returned 200.  The original runtime config was restored and the temporary
-  file removed.  No WAN, DNS, firewall, route, TUN or default proxy policy was
-  changed.
+  the authenticated API both before and after formal installation.  Three
+  rounds after each load returned 204 and 200 with exit 0.  The original
+  runtime config was restored and temporary files removed.  No WAN, DNS,
+  firewall, route, TUN or default proxy policy was changed.
 - Local regression gates pass after the follow-up changes: standalone fixture,
   import behavior, integration contract, UI contract, POSIX syntax and the
-  repository local gate.  Version authorities are advanced together to
-  `2026-1196`; Development CI, RC build, formal release, formal package
-  installation and post-package browser/device acceptance are pending.
+  repository local gate.  Version authorities are synchronized at `2026-1196`.
+  Exact-commit Development CI `36702993130` passed
+  (https://github.com/dinggood615/openkill/actions/runs/36702993130); RC Build
+  `36703169459` passed
+  (https://github.com/dinggood615/openkill/actions/runs/36703169459).  The RC
+  IPK is 7,716,341 bytes with SHA256
+  `641109c7b77c4dc5f2357bb2243549ddc123dd0bd9c93819bbe9675974060828`.
+- Formal Release `36704944101` passed with `release_gate=true` and `publish=true`
+  (https://github.com/dinggood615/openkill/actions/runs/36704944101).  Tag
+  `v2026-1196-ipk` points to `01d411914c810d2a8c38b38d26a4581b7d57c5d4` and
+  the release is https://github.com/dinggood615/openkill/releases/tag/v2026-1196-ipk .
+  The formal IPK is 7,909,931 bytes with SHA256
+  `469e6b4337e961dab466daaf97b76c4928e6d24e7da87960cc95f0cb22c28b9e`:
+  https://github.com/dinggood615/openkill/releases/download/v2026-1196-ipk/luci-app-openkill_2026-1196_all.ipk .
+  RC and formal hashes are intentionally different and were recorded
+  separately.  The formal IPK was force-reinstalled on the test device and
+  its post-install LuCI/SOCKS5/Mihomo smoke checks passed.
+- The Chrome tab was not exposed by the computer-use inventory during this
+  run.  LuCI behavior was therefore verified through the authenticated HTTP
+  requests and device evidence above, while visual Chrome/keyboard/narrow
+  viewport confirmation remains **unverified** and is not claimed as passed.
 
 ## 2026-09-30 2026-1195 formal release and final device verification
 
