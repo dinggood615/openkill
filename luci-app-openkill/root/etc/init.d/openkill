@@ -4389,7 +4389,18 @@ get_config()
    # delegated/internal prefixes are collected separately by lan_cidr6; a
    # device-wide address scan would incorrectly bypass the whole WAN /64.
    wan_ip6s=$(openkill_wan6_host_addresses 2>/dev/null)
-   log_level=$(uci_get_config "log_level")
+   # A preserved pre-2026-1198 conffile may not contain log_level.  Never
+   # pass an empty or unsupported value to yml_change.sh: Mihomo treats an
+   # empty YAML log-level as invalid and aborts the whole service start.
+   log_level=$(uci_get_config "log_level" || echo 0)
+   case "$log_level" in
+      ""|0) log_level=0 ;;
+      info|warning|error|debug|silent) ;;
+      *)
+         LOG_WARN "Invalid log level in UCI; using disabled core logging for this start."
+         log_level=0
+         ;;
+   esac
    intranet_allowed=$(uci_get_config "intranet_allowed")
    enable_udp_proxy=$(uci_get_config "enable_udp_proxy" || echo 1)
    disable_udp_quic=$(uci_get_config "disable_udp_quic")

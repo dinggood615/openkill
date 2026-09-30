@@ -281,6 +281,19 @@ class UciLifecycleContractTests(unittest.TestCase):
         self.assertIn("uci -q commit openkill", self.normalize)
         self.assertNotIn("uci -q commit dhcp", self.normalize)
 
+    def test_log_level_migration_repairs_preserved_conffile(self):
+        self.assertIn("set_default log_level 0", self.normalize)
+        self.assertIn("0|info|warning|error|debug|silent", self.normalize)
+        self.assertIn(
+            'log_level=$(uci_get_config "log_level" || echo 0)',
+            self.init,
+        )
+        self.assertIn('""|0) log_level=0', self.init)
+        self.assertIn(
+            'LOG_WARN "Invalid log level in UCI; using disabled core logging for this start."',
+            self.init,
+        )
+
     def test_firewall_include_is_lifecycle_owned_and_network_uci_is_untouched(self):
         prepare = function_block(self.init, "prepare_openkill_include", "remove_openkill_include")
         remove = function_block(self.init, "remove_openkill_include", "apply_node_endpoint_sets")

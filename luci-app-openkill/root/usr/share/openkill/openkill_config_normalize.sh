@@ -20,6 +20,15 @@ set_default proxy_mode rule
 set_default find_process_mode off
 set_default geodata_loader memconservative
 set_default enable_tcp_concurrent 1
+# Older conffiles can predate the log_level option.  An empty value is passed
+# to yml_change.sh as an explicit YAML scalar and Mihomo rejects it as an
+# invalid log level, so repair both missing and stale values before rendering.
+set_default log_level 0
+log_level="$(uci -q get openkill.config.log_level 2>/dev/null || true)"
+case "$log_level" in
+    0|info|warning|error|debug|silent) ;;
+    *) uci -q set openkill.config.log_level=0; changed=1 ;;
+esac
 dns_privacy_mode="$(uci -q get openkill.config.dns_privacy_mode 2>/dev/null || true)"
 case "$dns_privacy_mode" in split|strict) ;; *) uci -q set openkill.config.dns_privacy_mode=split; changed=1 ;; esac
 
