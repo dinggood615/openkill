@@ -42,7 +42,7 @@
   包频道 `latest-ipk.json` 已同步同一版本、提交、URL 和哈希。
 - 正式 IPK 已在授权设备通过 `opkg --force-reinstall` 完成真实替换；
   conffile 差异被保留为设备侧的 `openkill-opkg`，没有覆盖用户配置。正式
-  包安装后再次完成停止/启动：服务 `running`、核心进程存在、就绪日志通过、
+  包安装事务最终返回 0，随后再次完成停止/启动：服务 `running`、核心进程存在、就绪日志通过、
   控制器 HTTP 200。当前配置哈希为
   `ce418ab554c42256baa169ca788e5b2f04e1f8c3b4ef7a4a7c891912d94ef174`，
   `log_level=0`，Naive 数据目录仍为 700，节点文件数量和独立组件状态未被
