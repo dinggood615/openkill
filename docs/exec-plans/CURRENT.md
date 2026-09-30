@@ -1,5 +1,18 @@
 # Current status
 
+## 2026-09-30 2026-1197 listener ownership follow-up
+
+- Follow-up review found that wildcard/IPv6 port collisions were safely
+  rejected but the `ss` evidence path could label a foreign wildcard socket as
+  merely unknown.  The ownership probe now matches any address family and
+  returns `port-owned-by-other-process` when a foreign PID owns the port; a
+  regression fixture covers this branch.  No credentials, node data or
+  network-policy behavior changed.
+- The synchronized source authorities are advanced to `2026-1197`.  The
+  2026-1196 formal tag and package remain intact for rollback.  Local behavior,
+  integration, import, POSIX and gate tests must pass again before the new
+  Development/RC/Formal chain is started.
+
 ## 2026-09-30 2026-1196 Naive request-validation and read-only health follow-up
 
 - Revalidated the prior 2026-1195 claims against the current worktree and

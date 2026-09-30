@@ -501,7 +501,10 @@ np_listener_owner() {
         return 0
     fi
     if command -v ss >/dev/null 2>&1; then
-        line=$(ss -lntp 2>/dev/null | grep -E "127[.]0[.]0[.]1:${port}[[:space:]]" | head -n1 || true)
+        # The ownership probe must cover loopback, wildcard and IPv6 binds.
+        # A foreign wildcard socket is still a conflict even though it is not
+        # printed as 127.0.0.1 by ss.
+        line=$(ss -lntp 2>/dev/null | grep -E ":${port}[[:space:]]" | head -n1 || true)
         case "$line" in *"pid="*) printf 'external-or-unmatched\n'; return 1 ;; esac
     fi
     printf 'unknown\n'

@@ -105,6 +105,29 @@ esac
         assert config_path.is_file()
         if os.name != "nt":
             assert config_path.stat().st_mode & 0o777 == 0o600
+        # A wildcard listener owned by another process must be reported as a
+        # conflict, not as an unverified Naive listener.  Restore the fixture
+        # listener before continuing with the read-only-config assertions.
+        fake_ss = fake / "ss"
+        fake_ss.write_text("#!/bin/sh\nprintf '%s\\n' 'LISTEN 0 128 0.0.0.0:11080 0.0.0.0:* users:((\\\"foreign\\\",pid=999,fd=3))'\n", encoding="utf-8")
+        os.chmod(fake_ss, 0o755)
+        foreign_health = subprocess.run(
+            [BASH, git_path(SCRIPT), "health", "n1"], env=env, text=True,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        assert foreign_health.returncode == 0
+        foreign_manifest = (run_dir / "manifest").read_text(encoding="utf-8")
+        assert "node.n1.health=local-not-ready" in foreign_manifest
+        assert "node.n1.reason=port-owned-by-other-process" in foreign_manifest
+        fake_ss.write_text("#!/bin/sh\nprintf '%s\\n' 'LISTEN 0 128 127.0.0.1:11080 0.0.0.0:*'\n", encoding="utf-8")
+        os.chmod(fake_ss, 0o755)
+        restored_health = subprocess.run(
+            [BASH, git_path(SCRIPT), "health", "n1"], env=env, text=True,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        assert restored_health.returncode == 0
+        manifest = (run_dir / "manifest").read_text(encoding="utf-8")
+        assert "node.n1.reason=listener-ownership-unverified" in manifest
         # A health/status request must not recreate a missing runtime config
         # or allocate a new port.  Applying a changed node is an explicit
         # start/apply operation, not a side effect of detection.
