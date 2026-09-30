@@ -9,7 +9,8 @@
   `0490801` (TLS-verified formal SDK downloads and synchronized version
   `2026-1192`).
 - Exact-commit Development CI run `36667980688` passed.  RC Build run
-  `36668086837` passed; the candidate IPK is 7,718,650 bytes with SHA256
+  `36668086837` passed; the candidate artifact contained an IPK of 7,713,953
+  bytes with SHA256
   `c2a7aeee5f6807a31b5175765cb4b4d8dd46c85ec3e991d641b4b77ce4df47cb`.
   The RC audit passed package metadata, conffile preservation, maintainer
   deletion safety, stale-reference and sensitive-content checks.
