@@ -31,8 +31,15 @@ naiveproxy_start_instance() {
     [ -n "$id" ] || return 1
     np_dirs || return 1
     if ! np_probe_component; then
-        NP_FORCE_COMPONENT_PROBE=1 np_manifest >/dev/null 2>&1 || true
-        return 1
+        # LuCI/uwsgi can expose a transient loader-probe context even when
+        # the signed installed component is intact.  The installer already
+        # verified this exact file; use its protected digest as a second
+        # bounded piece of evidence, then let procd readiness prove execution
+        # and listener ownership.  A changed or unverified file still fails.
+        np_cached_component_valid || {
+            NP_FORCE_COMPONENT_PROBE=1 np_manifest >/dev/null 2>&1 || true
+            return 1
+        }
     fi
     file=$(np_node_file "$id") || return 1
     [ -r "$file" ] || return 1

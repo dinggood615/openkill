@@ -171,6 +171,17 @@ np_probe_component() {
     return 0
 }
 
+np_cached_component_valid() {
+    local expected actual
+    [ -x "$NP_BIN" ] || return 1
+    expected=$(sed -n 's/^sha256=//p' "$NP_ROOT/component.meta" 2>/dev/null | head -n1)
+    case "$expected" in ''|*[!0-9A-Fa-f]*) return 1 ;; esac
+    [ "${#expected}" -eq 64 ] || return 1
+    command -v sha256sum >/dev/null 2>&1 || return 1
+    actual=$(sha256sum "$NP_BIN" 2>/dev/null | awk '{print tolower($1)}')
+    [ "$actual" = "$(printf '%s' "$expected" | tr 'A-F' 'a-f')" ]
+}
+
 # Install the independently-owned component without touching OpenKill UCI or
 # any node file.  The caller supplies the already-bound official URL, digest
 # and (when available) release-asset size.  Every failure happens before the
@@ -474,7 +485,10 @@ np_manifest() {
     [ -n "$component_asset" ] || component_asset=unknown
     component_machine=$(uname -m 2>/dev/null || printf unknown)
     manifest_component_status=${NP_COMPONENT_STATUS_OVERRIDE:-}
-    manifest_component_reason=
+    manifest_component_reason=${NP_COMPONENT_STATUS_REASON:-}
+    [ -n "$manifest_component_status" ] && [ -n "$manifest_component_reason" ] || {
+        [ "$manifest_component_status" = available ] && manifest_component_reason=available
+    }
     if [ -z "$manifest_component_status" ] && [ "${NP_FORCE_COMPONENT_PROBE:-0}" != 1 ] && [ -r "$NP_RUN/manifest" ]; then
         manifest_component_status=$(sed -n 's/^component_status=//p' "$NP_RUN/manifest" 2>/dev/null | head -n1)
         manifest_component_reason=$(sed -n 's/^component_reason=//p' "$NP_RUN/manifest" 2>/dev/null | head -n1)

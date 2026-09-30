@@ -37,6 +37,8 @@ def main() -> None:
     require(STANDALONE, "component_status=available")
     require(STANDALONE, "NP_COMPONENT_STATUS_OVERRIDE")
     require(STANDALONE, "NP_FORCE_COMPONENT_PROBE")
+    require(STANDALONE, "np_cached_component_valid")
+    require(BRIDGE_INIT, "signed installed component is intact")
     require(STANDALONE, "expires_at")
     require(STANDALONE, "remote-auth-failed")
     require(STANDALONE, "NP_HEALTH_LOCK")
