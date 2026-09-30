@@ -1,5 +1,52 @@
 # Current status
 
+## 2026-10-01 2026-1200 运行状态 UI 状态证据与布局修复
+
+- 本轮范围限定为运行状态页面 UI；没有修改 NaiveProxy 生命周期、节点配置、
+  DNS、防火墙、路由、WAN、TUN 或默认代理策略。截图中的状态误导根因是旧
+  前端把“已配置/已生成”、字符串布尔值及缺失字段混同为启用，且状态详情被
+  CSS 隐藏；IP 地址/访问检查则仍套在 CBI 外层 fieldset/table 视觉容器中，
+  产生额外黑色背景、边距和宽度收缩。
+- 修复提交 `82522c756b8217e028ba333c011e5c1b807fd14b`：
+  `luci-app-openkill/luasrc/view/openkill/status.htm` 增加统一证据状态模型
+  （开启、关闭、待验证、异常、未知），严格区分缺失、布尔/数字/字符串和
+  运行/验证证据；`luasrc/controller/openkill.lua` 仅增加脱敏的
+  `naive_manifest_present` 只读字段；`oc.css` 显示次级证据；
+  `myip.htm`/`flat.css` 仅对 OpenKill 页面移除外层 CBI 视觉壳并恢复统一宽度，
+  保留内部卡片、操作和响应式结构。未以页面颜色推断 Naive 远端联网。
+- 本地门禁：UI contract 31 项、preview 2 项、interaction 1 项、Naive UI
+  browser contract、OpenKill test gates 25 项、Naive integration、UCI
+  lifecycle、UI browser/production JS/dimensions/local requests 及
+  `scripts/local-gate.sh` 均通过；Windows 环境不能替代 Linux/BusyBox 运行时
+  集成测试，精确提交的 CI 为最终门禁。
+- 受保护 UI/配置备份位于设备
+  `/root/openkill-ui-backup-20261001003906`（目录 700、归档 600），归档
+  SHA256 为 `9271e1320c107ad096edc43eb1221618b97bdc5d24817a8692a039a514392163`。
+  备份不在 Git、构建缓存或发布附件中。
+- RC Build `36746091821` 通过，候选 IPK 已强制安装并验证；随后正式 Release
+  `36746897917` 通过。正式标签 `v2026-1200-ipk` 指向上述源提交，正式 IPK
+  `luci-app-openkill_2026-1200_all.ipk` 大小 7,913,873 bytes，SHA256
+  `875be4dbbf417d19b0d31f50aaf6e0d4a70cb0ca74c2f8d3e9cc14a184b12d00`，
+  下载地址为
+  https://github.com/dinggood615/openkill/releases/download/v2026-1200-ipk/luci-app-openkill_2026-1200_all.ipk 。
+  包频道 `master/version` 与 `master/latest-ipk.json` 已同步版本、提交、URL
+  和哈希。
+- 正式包在授权测试机通过 `opkg --force-reinstall` 实际替换（事务返回 0，
+  包状态为 2026-1200，服务为 running）；认证状态接口及 client/settings
+  页面均返回 HTTP 200。既有 Mihomo SOCKS5 入口在正式包安装后对两个 HTTPS
+  目标返回 HTTP 204/200，退出码均为 0，作为 UI 发布回归证据；本轮没有把它
+  解释为 NaiveProxy 网络问题已修复。
+- Development CI `36745905015`：
+  https://github.com/dinggood615/openkill/actions/runs/36745905015 ；RC：
+  https://github.com/dinggood615/openkill/actions/runs/36746091821 ；Formal：
+  https://github.com/dinggood615/openkill/actions/runs/36746897917 ；Release：
+  https://github.com/dinggood615/openkill/releases/tag/v2026-1200-ipk 。
+- 设备 HTTP/API、包内容和服务状态已复核；当前 Chrome computer-use 桥接持续
+  返回 request-header policy 错误，无法取得真实浏览器截图或控制台证据。因此
+  深浅主题、窄屏和键盘的自动化/源码契约已通过，但本轮真实 Chrome 视觉验收
+  标记为未验证，不能用 HTTP 200 冒充。此前独立 Naive 远端链路也不属于本轮
+  UI 范围，保持历史限制记录。
+
 ## 2026-09-30 2026-1199 重装后核心启动修复与正式包验收
 
 - 本次重新复现了“重新安装后无法启动”的实际根因：旧版
