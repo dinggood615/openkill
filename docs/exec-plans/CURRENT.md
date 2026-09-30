@@ -8,10 +8,47 @@
   returns `port-owned-by-other-process` when a foreign PID owns the port; a
   regression fixture covers this branch.  No credentials, node data or
   network-policy behavior changed.
-- The synchronized source authorities are advanced to `2026-1197`.  The
-  2026-1196 formal tag and package remain intact for rollback.  Local behavior,
-  integration, import, POSIX and gate tests must pass again before the new
-  Development/RC/Formal chain is started.
+- Local import, integration, standalone, POSIX and repository gate checks pass.
+  Exact-commit Development CI `36706800729` passed
+  (https://github.com/dinggood615/openkill/actions/runs/36706800729).  RC Build
+  `36707010551` passed
+  (https://github.com/dinggood615/openkill/actions/runs/36707010551); its IPK
+  is 7,716,363 bytes with SHA256
+  `1ef9d9978b56fe12e2c872167059869f0fd88cd4e8f0c7cbd901ff2c997cc072`.
+  The RC audit found no personal node or credential data, and the formal
+  package was independently scanned for the same content.
+- Formal Release `36707912428` passed with `release_gate=true` and
+  `publish=true`
+  (https://github.com/dinggood615/openkill/actions/runs/36707912428).  Tag
+  `v2026-1197-ipk` points to source commit
+  `f030c1cc99c31b3e190d2a0fa5884ff3e997c09e`; the release is
+  https://github.com/dinggood615/openkill/releases/tag/v2026-1197-ipk .  The
+  formal IPK is 7,910,298 bytes with SHA256
+  `e9b801bc9a2d82b09ea0c026427ea327c4c754f4f237ed309572b6852c7c82d4`:
+  https://github.com/dinggood615/openkill/releases/download/v2026-1197-ipk/luci-app-openkill_2026-1197_all.ipk .
+  RC and formal hashes are intentionally recorded separately.
+- The formal IPK was uploaded and installed on the authorized x86_64 test
+  device with `opkg --force-reinstall`; package version is `2026-1197`, and
+  the installed standalone script hash matches the source hash
+  `1dd63450f0dccabe1107ba3ca47cf1204148b1129b2ebc702460d4dd149c2d3a`.
+  Authenticated LuCI HTTP controls returned successful `start`, `stop`,
+  `start`, and `health` stages.  Final evidence is `state=running`,
+  `listener_owner=verified`, `local_ready=1`, `health=available`,
+  `reason=probe-ok`, generation 2, and no pending apply.  After the final
+  stop/start cycle, three forced SOCKS5 rounds to two HTTPS targets returned
+  HTTP 204 and 200 on every round; no proxy-bypass variables were present.
+- The current Mihomo process loaded a protected temporary configuration through
+  its authenticated API with a credential-free loopback SOCKS5 node, a
+  dedicated selector, and a loopback mixed listener.  Three rounds through
+  that listener returned HTTP 204 and 200, then the original runtime
+  configuration was restored with HTTP 204 and the temporary file removed.
+  Existing WAN, DNS, firewall, route, TUN and default proxy policy were not
+  changed.  The device retained its existing independent test node as user
+  data; no personal node data is in tracked source or either package.
+- The Chrome automation inventory still exposes no usable tab, so visual
+  browser/keyboard/narrow-viewport confirmation remains **unverified**.  The
+  LuCI controller and CSRF-bound HTTP path were exercised against the real
+  device; this record does not claim a screenshot-only browser pass.
 
 ## 2026-09-30 2026-1196 Naive request-validation and read-only health follow-up
 
