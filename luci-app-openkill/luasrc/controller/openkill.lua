@@ -1646,26 +1646,22 @@ end
 -- never touches OpenKill UCI or the selected Mihomo YAML and only exposes the
 -- standalone service's redacted manifest and credential-free SOCKS5 snippet.
 local function naive_read_manifest()
+	-- Status is deliberately read-only.  Running the standalone probe from a
+	-- LuCI request can inherit a different loader/stdio context and overwrite
+	-- a valid redacted manifest with a transient probe failure.  Lifecycle and
+	-- explicit component operations already rebuild this file as root, so a
+	-- normal refresh must never change evidence or runtime state.
+	local manifest = fs.readfile("/var/run/naiveproxy/manifest")
+	if manifest and manifest ~= "" then return manifest end
+	-- A first install may not have produced a manifest yet.  Keep a fixed,
+	-- credential-free fallback for that bootstrap case only; never replace a
+	-- non-empty manifest with its result.
 	local command = "/usr/share/openkill/naiveproxy-standalone.sh manifest 2>/dev/null"
-	if type(io) == "table" and type(io.popen) == "function" then
-		local ok, pipe = pcall(io.popen, command, "r")
-		if ok and pipe then
-			local read_ok, output = pcall(function() return pipe:read("*a") end)
-			pcall(function() pipe:close() end)
-			if read_ok and output and output ~= "" then return output end
-		end
-	end
-	-- Some current LuCI builds expose io.popen but deny it when a controller
-	-- executes.  Falling straight back to an old manifest then leaves the UI
-	-- reporting a previous loader failure even after a valid binary has been
-	-- installed.  luci.sys.exec is the established controller runner and the
-	-- command here is fixed: it only rebuilds the bridge's redacted runtime
-	-- manifest, never accepts user input or touches OpenKill configuration.
 	if SYS and type(SYS.exec) == "function" then
 		local ok, output = pcall(SYS.exec, command)
 		if ok and output and output ~= "" then return output end
 	end
-	return fs.readfile("/var/run/naiveproxy/manifest") or ""
+	return ""
 end
 
 function action_naive_standalone_status()
@@ -1679,11 +1675,9 @@ function action_naive_standalone_status()
 	else
 		-- OpenKill is a read-only adapter. Health probes are scheduled or
 		-- started by naiveproxy-bridge; this request never starts a process,
-		-- rewrites a node, or runs a remote probe.
-		-- Rebuild only the redacted runtime manifest.  This never downloads a
-		-- component, starts a node or writes OpenKill/UCI/YAML state; it makes a
-		-- manual component installation visible without waiting for a service
-		-- lifecycle event.
+		-- rewrites a node, or runs a remote probe.  It also never regenerates
+		-- the manifest during ordinary status polling, so a transient LuCI
+		-- execution context cannot replace valid runtime evidence.
 		output = naive_read_manifest()
 	end
 	local result = { ok = true, mode = "standalone", nodes = {}, component_status = "unavailable", updated = 0 }

@@ -79,12 +79,14 @@ def main() -> None:
                     if line and not line.startswith("#")]
     assert catalog_rows and all(len(line.split("\t")) == 6 for line in catalog_rows)
     controller = require(CONTROLLER, "action_naive_standalone_status")
-    # Current LuCI builds can expose io.popen but reject its controller use;
-    # status must rebuild the redacted manifest through the established runner
-    # instead of presenting a stale loader failure.
+    # Status polling must remain read-only.  A non-empty runtime manifest is
+    # authoritative; only the bootstrap fallback may invoke the fixed runner.
     require(CONTROLLER, "pcall(SYS.exec, command)")
     require(CONTROLLER, "/var/run/naiveproxy/manifest")
     require(CONTROLLER, "/var/run/naiveproxy/snippets.yaml")
+    manifest_read = controller.index('local manifest = fs.readfile')
+    fallback_runner = controller.index('local command = "/usr/share/openkill/naiveproxy-standalone.sh manifest')
+    assert manifest_read < fallback_runner, "status must read an existing manifest before fallback execution"
     require(CONTROLLER, "action_naive_bridge_control")
     assert "legacy_migration" not in controller
     require(CONTROLLER, 'HTTP.formvalue("operation")')
