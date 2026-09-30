@@ -49,6 +49,11 @@
   browser/keyboard/narrow-viewport confirmation remains **unverified**.  The
   LuCI controller and CSRF-bound HTTP path were exercised against the real
   device; this record does not claim a screenshot-only browser pass.
+- This acceptance record is committed as `8e3092c95d81b0703a575a8b238ee72b9d2f1e76`
+  and its exact Development CI `36709376595` passed
+  (https://github.com/dinggood615/openkill/actions/runs/36709376595).  The
+  formal release intentionally remains sourced from the tested code commit
+  `f030c1cc99c31b3e190d2a0fa5884ff3e997c09e`.
 
 ## 2026-09-30 2026-1196 Naive request-validation and read-only health follow-up
 
