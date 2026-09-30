@@ -1,5 +1,71 @@
 # Current status
 
+## 2026-09-30 2026-1194 formal release and post-reboot device acceptance
+
+- The baseline was rechecked after the authorized test-machine reboot.  The
+  source worktree was clean at `0f87c59700708ee0025019a984a388168063fbec`
+  (`0f87c59`), with synchronized version `2026-1194`.  This release includes
+  the request/result isolation and incremental procd lifecycle fixes, package
+  ownership normalization, and the Fake-IP-safe Naive endpoint resolver rule.
+  The resolver rule is generated only while preparing a runtime config; no
+  device DNS, firewall, route or TUN setting is changed.
+- Exact-commit Development CI run `36673066905` passed:
+  https://github.com/dinggood615/openkill/actions/runs/36673066905 .  The exact
+  commit RC Build run `36673312539` passed; its IPK is 7,714,289 bytes with
+  SHA256
+  `8308a69815a9e213aad0cf234f68793992265b885c006c55a4df9b5f6ea32351`.
+  The RC package audit confirmed root ownership for the init/config/custom
+  files and retained protected node-file permissions.
+- Formal Release run `36674180379` passed with `release_gate=true` and
+  `publish=true`:
+  https://github.com/dinggood615/openkill/actions/runs/36674180379 .  Tag
+  `v2026-1194-ipk` points to the expected source commit and the formal release
+  is https://github.com/dinggood615/openkill/releases/tag/v2026-1194-ipk .  The
+  published IPK is
+  https://github.com/dinggood615/openkill/releases/download/v2026-1194-ipk/luci-app-openkill_2026-1194_all.ipk
+  , 7,904,100 bytes, SHA256
+  `234b2ae8f647e04b3e8fc79a099e2895eb30e1f460f1d56f182515229e4aba84`.
+  RC and formal hashes are intentionally recorded separately.
+- The authorized device was reidentified as Kwrt/OpenWrt 25.12-SNAPSHOT,
+  x86_64 VMware.  Before the formal replacement, a protected backup already
+  existed at `/root/openkill-naive-backup-20260930135000/pre-1194-rc` (mode
+  700 directory, mode 600 archives/config).  The formal IPK was copied over
+  a protected channel, its device SHA256 matched the published hash, and
+  `opkg install --force-reinstall` completed.  Device package status is
+  `2026-1194`; the installed standalone script SHA256 matches the source and
+  formal package.  The temporary `/tmp` package/backup files were removed
+  after verification.
+- Component evidence: official Naive executable `154.0.8037.49`, metadata
+  release `v154.0.8037.49-2`, executable probe successful.  The real saved
+  node `YT-singbox_naive` was re-read as generation 3, HTTPS transport, local
+  port 11080.  The process PID, generated config and `127.0.0.1:11080`
+  listener are tied to the same instance; manifest reports
+  `listener_owner=verified`, `local_ready=1`, and health `available`/`probe-ok`.
+  Runtime config contains the resolver mapping rule, while node/runtime
+  directories and files remain 700/600.  Credentials were checked for
+  persistence consistency without returning their values.
+- Forced SOCKS5 tests cleared proxy bypass variables and completed three rounds
+  to each of two HTTPS targets, returning HTTP 204 and HTTP 200 with exit code
+  0 in every round.  A formal-package stop/start returned the listener and
+  cleared stale health.  A retain-password edit/apply advanced generation 2
+  to 3; after applying the new config, the same three-round/two-target SOCKS5
+  test passed again.  A temporary second instance on 11081 ran concurrently,
+  passed both HTTPS targets, and was stopped and removed; node-1 remained
+  running and unaffected.
+- Current running Mihomo was tested through its API and actual HTTP proxy.  The
+  credential-free loopback node `YT` was selected in the dedicated
+  `日本自动组`; gstatic returned 204 and Cloudflare trace returned 200.  The
+  original top-level group `手动组` was restored with API status 204.  Source
+  YAML, runtime group membership and the running process were checked; no
+  whole-device traffic policy was changed.
+- Local standalone/import/integration/POSIX/UI-contract tests and the WSL
+  local-gate all pass.  The current CUA inventory exposes only the Codex
+  in-app browser and not the user's Chrome tab, so post-reboot live LuCI
+  browser import/CSRF/screenshot verification could not be re-observed in this
+  session.  The backend request-file path, service lifecycle and UI contract
+  tests are verified; this browser-session item remains **unverified**, not a
+  claimed success.  No whole-device reboot was performed by the agent.
+
 ## 2026-09-30 2026-1192 release; device acceptance blocked during candidate upgrade
 
 - Baseline was rechecked at source `04908019b970f7f68ad02a64ce77cde312442dce`.
