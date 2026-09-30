@@ -466,16 +466,26 @@ np_health_all() {
 }
 
 np_manifest() {
-    local now id file name enabled port config pid health_status latency checked expires reason state component_version component_reason component_asset component_machine generation running_generation pending_apply transport listener_owner
+    local now id file name enabled port config pid health_status latency checked expires reason state component_version component_reason component_asset component_machine generation running_generation pending_apply transport listener_owner manifest_component_status manifest_component_reason
     np_dirs || return 1; now=$(date +%s)
     component_version=$(sed -n 's/^version=//p' "$NP_ROOT/component.meta" 2>/dev/null | head -n1)
     [ -n "$component_version" ] || component_version=unknown
     component_asset=$(sed -n 's/^asset=//p' "$NP_ROOT/component.meta" 2>/dev/null | head -n1)
     [ -n "$component_asset" ] || component_asset=unknown
     component_machine=$(uname -m 2>/dev/null || printf unknown)
+    manifest_component_status=${NP_COMPONENT_STATUS_OVERRIDE:-}
+    manifest_component_reason=
+    if [ -z "$manifest_component_status" ] && [ "${NP_FORCE_COMPONENT_PROBE:-0}" != 1 ] && [ -r "$NP_RUN/manifest" ]; then
+        manifest_component_status=$(sed -n 's/^component_status=//p' "$NP_RUN/manifest" 2>/dev/null | head -n1)
+        manifest_component_reason=$(sed -n 's/^component_reason=//p' "$NP_RUN/manifest" 2>/dev/null | head -n1)
+    fi
+    if [ -z "$manifest_component_status" ]; then
+        if np_probe_component; then manifest_component_status=available; manifest_component_reason=available
+        else manifest_component_status=unavailable; manifest_component_reason=${NP_PROBE_REASON:-unavailable}; fi
+    fi
     {
         printf 'version=1\nmode=standalone\nupdated=%s\ncomponent=%s\ncomponent_version=%s\ncomponent_asset=%s\ncomponent_machine=%s\n' "$now" "$NP_BIN" "$(np_safe "$component_version")" "$(np_safe "$component_asset")" "$(np_safe "$component_machine")"
-        if np_probe_component; then printf 'component_status=available\ncomponent_reason=available\n'; else component_reason=${NP_PROBE_REASON:-unavailable}; printf 'component_status=unavailable\ncomponent_reason=%s\n' "$component_reason"; fi
+        printf 'component_status=%s\ncomponent_reason=%s\n' "$(np_safe "$manifest_component_status")" "$(np_safe "$manifest_component_reason")"
         for id in $(np_ids); do
             file=$(np_node_file "$id") || continue; name=$(np_node_value "$file" name); [ -n "$name" ] || name="$id"
             enabled=$(np_node_value "$file" enabled); port=$(np_port "$id" 2>/dev/null || true); config="$NP_CONFIG_DIR/$id.json"
@@ -808,7 +818,7 @@ np_control_install_component() {
     [ -n "$update_url" ] && [ -n "$update_sha" ] && [ -n "$update_size" ] || { NP_CTL_RESULT_REASON=metadata-incomplete; np_component_lock_end; return 36; }
     if np_component_install "$update_url" "$update_sha" "$update_size"; then
         NP_CTL_RESULT_REASON=component-installed
-        np_manifest >/dev/null 2>&1 || true
+        NP_COMPONENT_STATUS_OVERRIDE=available np_manifest >/dev/null 2>&1 || true
         np_component_lock_end
         return 0
     fi

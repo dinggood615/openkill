@@ -31,7 +31,7 @@ naiveproxy_start_instance() {
     [ -n "$id" ] || return 1
     np_dirs || return 1
     if ! np_probe_component; then
-        np_manifest >/dev/null 2>&1 || true
+        NP_FORCE_COMPONENT_PROBE=1 np_manifest >/dev/null 2>&1 || true
         return 1
     fi
     file=$(np_node_file "$id") || return 1
@@ -79,7 +79,11 @@ service_started() {
             failed=1
         fi
     done
-    np_manifest >/dev/null 2>&1 || true
+    if [ "$failed" -eq 0 ] && [ -n "$NP_START_IDS" ]; then
+        NP_COMPONENT_STATUS_OVERRIDE=available np_manifest >/dev/null 2>&1 || true
+    else
+        np_manifest >/dev/null 2>&1 || true
+    fi
     return "$failed"
 }
 

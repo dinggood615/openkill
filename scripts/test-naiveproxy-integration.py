@@ -35,6 +35,8 @@ def main() -> None:
     require(STANDALONE, "udp: false")
     require(STANDALONE, "chmod 600")
     require(STANDALONE, "component_status=available")
+    require(STANDALONE, "NP_COMPONENT_STATUS_OVERRIDE")
+    require(STANDALONE, "NP_FORCE_COMPONENT_PROBE")
     require(STANDALONE, "expires_at")
     require(STANDALONE, "remote-auth-failed")
     require(STANDALONE, "NP_HEALTH_LOCK")
