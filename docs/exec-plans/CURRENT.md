@@ -1,5 +1,63 @@
 # Current status
 
+## 2026-09-30 2026-1198 插件设置七页保存与应用正式验收
+
+- 重新核对当前页面定义后，实际七个页签为：运行与服务
+  (`basic`)、网络与分流 (`network`)、NaiveProxy 与服务
+  (`naive_service`)、兼容与辅助 (`compatibility`)、规则与订阅
+  (`rules`)、性能与稳定 (`stability`)、系统维护 (`advanced`)。
+  覆写设置仍使用独立的 CBI 保存/应用路径，作为对照。
+- 截图所示故障的实际根因不是七个控制器各自保存失败，而是 NaiveProxy
+  导入弹窗嵌在 LuCI 的外层 CBI `<form>` 中，隐藏的空字段带有原生
+  HTML5 `required`。浏览器在提交前直接阻止了外层 Save/Apply，LuCI
+  控制器因此没有收到请求。修复位于
+  `luci-app-openkill/luasrc/view/openkill/naive_compatibility.htm`：
+  隐藏弹窗字段不再注册父表单的 `required`，弹窗真正提交时仍由
+  `submitNode()` 做条件校验；会话、ACL、CSRF、CBI 校验和保存/应用
+  语义均未放宽。
+- 真实 LuCI 页面在正式包上逐页操作并刷新重读：七页的 Save 均返回
+  HTTP 200，字段页的修改均可重读（`persisted=1`）；NaiveProxy 页的
+  提交也返回 HTTP 200；七页 Apply 均返回 HTTP 302 并回到 OpenKill
+  页面。系统维护页使用真实 CodeMirror 可见编辑器验证，未把隐藏同步
+  `<textarea>` 当作可见输入。最终表单 `checkValidity=true`，无
+  `pageerror`；唯一控制台 403 来自未登录入口的预期拒绝，不是设置页
+  JavaScript 错误。测试后的临时值和自定义防火墙测试文件已删除。
+- 页面真实请求由 `device_luci_pages.py` 记录（脚本位于工作区外，未进入
+  仓库、包或发布附件）。设备身份为 Kwrt/OpenWrt 25.12-SNAPSHOT
+  x86_64 VMware。Save/Apply 请求和桥接服务重载路径可用；当前设备未
+  安装 OpenKill 核心，`/etc/init.d/openkill` 最终为 inactive，故核心
+  进程重启后的运行态不能宣称通过。Naive 组件同样未在该设备安装可执行
+  二进制或节点，Naive/Mihomo 实际联网属于 **未验证**，不是本次设置页
+  修复失败。
+- 写入前的受保护备份仍保留在设备
+  `/root/openkill-settings-backup-20260930194800`（目录 700，归档 600），
+  `configs.tar.gz` SHA256 为
+  `c416e971fbac3f221c23fab5bc331d9d1f9b6b9fc37c8c25014a5e150de290dc`。
+  `openkill` UCI 配置、既有默认策略及目录权限均已复核；设备节点目录
+  700，敏感文件权限由安装后脚本保持为 600。源码、RC、正式 IPK 和发布
+  元数据均未包含本次个人节点链接、账号或密码；GeoSite 中的同名公共域名
+  字节在 2026-1197 基线中已存在，并非本次节点数据。
+- 本地 `test-naiveproxy-ui-browser.py`、29 项 UI 合同测试和
+  `scripts/local-gate.sh` 均通过。源提交
+  `7347ad2ab324b5d647f6a390157b56db8403264d` 的 Development CI
+  `36717000634` 通过
+  (https://github.com/dinggood615/openkill/actions/runs/36717000634)。
+  RC Build `36717204379` 通过
+  (https://github.com/dinggood615/openkill/actions/runs/36717204379)，
+  IPK 为 7,716,486 bytes，SHA256
+  `936a6c1a51067816892af899c52288324b7cc14f724277cd765f6e1d4f1e73ee`。
+- Formal Release `36722275576` 以 `release_gate=true`、`publish=true`
+  通过
+  (https://github.com/dinggood615/openkill/actions/runs/36722275576)。标签
+  `v2026-1198-ipk` 指向上述源提交，正式 Release 为
+  https://github.com/dinggood615/openkill/releases/tag/v2026-1198-ipk 。
+  正式 IPK 为 7,910,459 bytes，SHA256
+  `e6fafcd194c206b3038aeba7f28a523bf8b54dd84855215aedd0b4bbdd20d286`：
+  https://github.com/dinggood615/openkill/releases/download/v2026-1198-ipk/luci-app-openkill_2026-1198_all.ipk 。
+  包频道 `latest-ipk.json` 已同步 2026-1198、提交、URL 和同一正式哈希。
+  正式包已在授权测试机用 `opkg --force-reinstall` 完成替换，安装状态为
+  `luci-app-openkill 2026-1198`；同版本“已是最新”未被用作安装证据。
+
 ## 2026-09-30 2026-1197 listener ownership follow-up
 
 - Follow-up review found that wildcard/IPv6 port collisions were safely
