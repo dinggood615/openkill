@@ -172,14 +172,28 @@ np_probe_component() {
 }
 
 np_cached_component_valid() {
-    local expected actual
+    local expected actual asset version
     [ -x "$NP_BIN" ] || return 1
-    expected=$(sed -n 's/^sha256=//p' "$NP_ROOT/component.meta" 2>/dev/null | head -n1)
-    case "$expected" in ''|*[!0-9A-Fa-f]*) return 1 ;; esac
-    [ "${#expected}" -eq 64 ] || return 1
-    command -v sha256sum >/dev/null 2>&1 || return 1
-    actual=$(sha256sum "$NP_BIN" 2>/dev/null | awk '{print tolower($1)}')
-    [ "$actual" = "$(printf '%s' "$expected" | tr 'A-F' 'a-f')" ]
+    expected=$(sed -n 's/^binary_sha256=//p' "$NP_ROOT/component.meta" 2>/dev/null | head -n1)
+    case "$expected" in
+        '' )
+            # Older metadata recorded the official archive digest in sha256;
+            # it must never be compared with the extracted executable.  Keep
+            # the already verified official asset/version binding and run a
+            # clean, bounded version probe before procd readiness takes over.
+            asset=$(sed -n 's/^asset=//p' "$NP_ROOT/component.meta" 2>/dev/null | head -n1)
+            version=$(sed -n 's/^version=//p' "$NP_ROOT/component.meta" 2>/dev/null | head -n1)
+            [ -n "$asset" ] && [ -n "$version" ] && [ "$version" != unknown ] || return 1
+            env -i HOME=/ PATH=/usr/sbin:/usr/bin:/sbin:/bin "$NP_BIN" --version >/dev/null 2>&1
+            ;;
+        *[!0-9A-Fa-f]* ) return 1 ;;
+        * )
+            [ "${#expected}" -eq 64 ] || return 1
+            command -v sha256sum >/dev/null 2>&1 || return 1
+            actual=$(sha256sum "$NP_BIN" 2>/dev/null | awk '{print tolower($1)}')
+            [ "$actual" = "$(printf '%s' "$expected" | tr 'A-F' 'a-f')" ]
+            ;;
+    esac
 }
 
 # Install the independently-owned component without touching OpenKill UCI or
@@ -253,7 +267,7 @@ np_elf_arch_ok() {
 }
 
 np_component_install() {
-    local url="$1" expected="$2" expected_size="${3:-}" tmp archive extract candidate size actual magic previous
+    local url="$1" expected="$2" expected_size="${3:-}" tmp archive extract candidate size actual binary_sha256 magic previous
     NP_INSTALL_ERROR=""
     case "$url" in
         https://github.com/klzgrad/naiveproxy/releases/download/*) ;;
@@ -305,8 +319,11 @@ np_component_install() {
     [ "$magic" = 7f454c46 ] || { rm -f "$NP_BIN.new"; np_install_error not-elf; return 8; }
     np_elf_arch_ok "$NP_BIN.new" || { rm -f "$NP_BIN.new"; np_install_error wrong-architecture; return 8; }
     "$NP_BIN.new" --version >/dev/null 2>&1 || { rm -f "$NP_BIN.new"; np_install_error loader-or-version-probe-failed; return 8; }
+    binary_sha256=$(sha256sum "$NP_BIN.new" 2>/dev/null | awk '{print tolower($1)}')
+    case "$binary_sha256" in ''|*[!0-9a-f]*) rm -f "$NP_BIN.new"; np_install_error binary-digest-failed; return 8 ;; esac
     {
         printf 'sha256=%s\n' "$actual"
+        printf 'binary_sha256=%s\n' "$binary_sha256"
         printf 'size=%s\n' "$size"
         printf 'url=%s\n' "$url"
         printf 'asset=%s\n' "${url##*/}"
