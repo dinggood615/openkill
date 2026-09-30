@@ -1736,30 +1736,16 @@ local function naive_bridge_response(result, status, message)
 	HTTP.write_json(result)
 end
 
--- Keep the controller boundary JSON-only.  Some LuCI/OpenWrt builds disable
--- io.popen in the embedded Lua runtime; allowing that exception to escape
--- produces an HTML error page, which the browser then reports as
--- "Unexpected token '<'".  The fallback uses a mode-600, one-shot request
--- file with a fixed path and never places credentials in command arguments.
+-- Keep the controller boundary JSON-only.  A mode-600, one-shot request file
+-- avoids inheriting the uWSGI pipe as NaiveProxy's stdin; on this device that
+-- pipe caused the official binary to trap during a LuCI-triggered start.  A
+-- per-request result file also prevents concurrent pages from consuming one
+-- another's status.  Neither path places credentials in command arguments.
 local function naive_bridge_request(fields)
-	-- Keep the child exit status at zero after the standalone bridge has
-	-- committed its private result file.  This avoids a vendor ucode/uwsgi
-	-- pipe:close() abort for ordinary validation failures; the result's `rc`
-	-- field remains the authoritative operation status.
-	local command = "/usr/share/openkill/naiveproxy-standalone.sh control; exit 0"
-	if type(io) == "table" and type(io.popen) == "function" then
-		local popen_ok, pipe = pcall(io.popen, command, "w")
-		if popen_ok and pipe then
-			for _, item in ipairs(fields) do pipe:write(item.key .. "=" .. item.value .. "\n") end
-			local ok, why, code = pipe:close()
-			return (ok == true or code == 0), why or "", code
-		end
-	end
-	-- Fallback for LuCI builds without io.popen.  The request path is fixed,
-	-- per-process and never contains user input; the bridge still reports rc
-	-- in its mode-600 result file.
 	local pid = (nixio and type(nixio.getpid) == "function") and nixio.getpid() or os.time()
 	local request = "/var/run/naiveproxy/control.request." .. tostring(pid)
+	local result_path = "/var/run/naiveproxy/control.result." .. tostring(pid)
+	local command = "NAIVEPROXY_CONTROL_RESULT=" .. result_path .. " /usr/share/openkill/naiveproxy-standalone.sh control; exit 0"
 	-- The standalone script normally creates its run directory itself.  The
 	-- request-file path is used before that script can start, so create only
 	-- this fixed runtime directory when the platform exposes nixio mkdir.
@@ -1778,7 +1764,7 @@ local function naive_bridge_request(fields)
 	-- os.remove is available on the supported Lua runtimes and avoids relying
 	-- on an optional nixio.fs unlink spelling here.
 	os.remove(request)
-	return rc == true or rc == 0, "fallback", rc
+	return rc == true or rc == 0, result_path, rc
 end
 
 local function naive_percent_decode(value)
@@ -1848,9 +1834,10 @@ local function action_naive_bridge_control_impl()
 	end
 	-- Do not consume a result left by an earlier request when the bridge could
 	-- not be launched this time.
-	os.remove("/var/run/naiveproxy/control.result")
-	local launched, why, code = naive_bridge_request(fields)
-	local control_result = fs.readfile("/var/run/naiveproxy/control.result") or ""
+	local launched, bridge_detail, code = naive_bridge_request(fields)
+	local result_path = launched and bridge_detail or nil
+	local control_result = (result_path and fs.readfile(result_path)) or ""
+	if result_path then os.remove(result_path) end
 	naive_control_result_fields(control_result, result)
 	if launched then
 		if tonumber(result.rc or 0) ~= 0 then
@@ -1864,7 +1851,8 @@ local function action_naive_bridge_control_impl()
 		return result, nil, nil
 	end
 	result.stage = result.stage == "request" and "bridge-rejected" or result.stage
-	result.error = (why == "popen-unavailable" or why == "request-file-unavailable") and "independent-service-unavailable" or "operation-failed"
+	result.error = (bridge_detail == "popen-unavailable" or bridge_detail == "request-file-unavailable" or bridge_detail == "request-file-open-failed") and "independent-service-unavailable" or "operation-failed"
+	result.bridge_detail = bridge_detail
 	result.detail = result.error == "operation-failed" and "control-exit-failed" or nil
 	return result, 422, "Unprocessable Entity"
 end

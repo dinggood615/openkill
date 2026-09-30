@@ -42,6 +42,8 @@ def main() -> None:
     require(STANDALONE, "Older metadata recorded the official archive digest")
     require(STANDALONE, "start_node \"$start_id\"")
     require(STANDALONE, "procd's")
+    require(STANDALONE, "NAIVEPROXY_CONTROL_RESULT:-")
+    require(CONTROLLER, "control.result.")
     require(BRIDGE_INIT, "signed installed component is intact")
     require(STANDALONE, "expires_at")
     require(STANDALONE, "remote-auth-failed")
@@ -97,7 +99,8 @@ def main() -> None:
     assert manifest_read < fallback_runner, "status must read an existing manifest before fallback execution"
     require(CONTROLLER, "action_naive_bridge_control")
     require(CONTROLLER, "result.http_status = status")
-    require(CONTROLLER, "pcall(io.popen, command, \"w\")")
+    require(CONTROLLER, "control.request.")
+    assert "io.popen" not in controller
     require(CONTROLLER, "control; exit 0")
     require(CONTROLLER, "standalone-bridge-returned-nonzero")
     require(STANDALONE, "printf 'rc=%s\\n'")

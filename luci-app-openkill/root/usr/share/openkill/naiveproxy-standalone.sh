@@ -21,7 +21,7 @@ NP_PORT_BASE="${NAIVEPROXY_PORT_BASE:-11080}"
 NP_PORT_LIMIT=100
 NP_HEALTH_LOCK="$NP_RUN/health.lock"
 NP_COMPONENT_LOCK="$NP_RUN/component.lock"
-NP_CONTROL_RESULT="$NP_RUN/control.result"
+NP_CONTROL_RESULT="${NAIVEPROXY_CONTROL_RESULT:-$NP_RUN/control.result}"
 
 np_safe() { printf '%s' "$1" | tr '\r\n|=' '    ' | cut -c1-160; }
 np_valid_id() { case "$1" in ''|*[!A-Za-z0-9_-]*) return 1 ;; esac; }
