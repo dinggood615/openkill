@@ -1652,7 +1652,17 @@ local function naive_read_manifest()
 	-- explicit component operations already rebuild this file as root, so a
 	-- normal refresh must never change evidence or runtime state.
 	local manifest = fs.readfile("/var/run/naiveproxy/manifest")
-	if manifest and manifest ~= "" then return manifest end
+	if manifest and manifest ~= "" then
+		-- Recheck only protected component evidence after a reboot.  The
+		-- standalone command replaces the two component lines atomically and
+		-- never generates a node config, allocates a port or runs health.
+		local refresh = "/usr/share/openkill/naiveproxy-standalone.sh component-status 2>/dev/null"
+		if SYS and type(SYS.exec) == "function" then
+			local ok, updated = pcall(SYS.exec, refresh)
+			if ok and updated and updated ~= "" then return updated end
+		end
+		return manifest
+	end
 	-- A first install may not have produced a manifest yet.  Keep a fixed,
 	-- credential-free fallback for that bootstrap case only; never replace a
 	-- non-empty manifest with its result.
@@ -1742,9 +1752,11 @@ end
 -- per-request result file also prevents concurrent pages from consuming one
 -- another's status.  Neither path places credentials in command arguments.
 local function naive_bridge_request(fields)
+	naive_bridge_sequence = (tonumber(naive_bridge_sequence) or 0) + 1
 	local pid = (nixio and type(nixio.getpid) == "function") and nixio.getpid() or os.time()
-	local request = "/var/run/naiveproxy/control.request." .. tostring(pid)
-	local result_path = "/var/run/naiveproxy/control.result." .. tostring(pid)
+	local suffix = tostring(pid) .. "." .. tostring(naive_bridge_sequence)
+	local request = "/var/run/naiveproxy/control.request." .. suffix
+	local result_path = "/var/run/naiveproxy/control.result." .. suffix
 	-- Execute through LuCI's fork/exec wrapper.  It closes stdin to /dev/null
 	-- and waits for the child, avoiding uWSGI pipes reaching procd or the
 	-- official binary.  The request/result paths are fixed runtime paths (the
@@ -1841,7 +1853,15 @@ local function action_naive_bridge_control_impl()
 	for _, key in ipairs({ "operation", "id", "name", "server", "port", "username", "password", "password_mode", "generation", "transport", "enabled", "share" }) do
 		local value = HTTP.formvalue(key)
 		if value ~= nil then
-			if #value > 4096 or value:find("[\r\n]") then
+			-- The browser parser intentionally trims a pasted share link before
+			-- previewing it.  Apply the same boundary normalization here so a
+			-- harmless trailing newline/space from a clipboard paste cannot turn
+			-- a valid preview into request-validation.  Whitespace inside the
+			-- URI remains subject to the control-character check and parser.
+			if key == "share" and type(value) == "string" then
+				value = value:match("^%s*(.-)%s*$") or value
+			end
+			if type(value) ~= "string" or #value > 4096 or value:find("[\r\n]") then
 				result.stage = "request-validation"
 				result.error = "invalid-field"
 				return result, 400, "Bad Request"

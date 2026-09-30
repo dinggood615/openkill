@@ -102,12 +102,28 @@ esac
         assert "node.n1.health=local-not-ready" in manifest, manifest
         assert "node.n1.reason=listener-ownership-unverified" in manifest, manifest
         assert config_path.stat().st_mtime_ns == config_before, "health rewrote the active runtime config"
+        assert config_path.is_file()
+        if os.name != "nt":
+            assert config_path.stat().st_mode & 0o777 == 0o600
+        # A health/status request must not recreate a missing runtime config
+        # or allocate a new port.  Applying a changed node is an explicit
+        # start/apply operation, not a side effect of detection.
+        config_path.unlink()
+        ports_before = (root / "ports").read_text(encoding="utf-8")
+        missing_config_health = subprocess.run(
+            [BASH, git_path(SCRIPT), "health", "n1"], env=env, text=True,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        assert missing_config_health.returncode == 0
+        missing_manifest = (run_dir / "manifest").read_text(encoding="utf-8")
+        assert "node.n1.health=config-invalid" in missing_manifest
+        assert "node.n1.reason=config-invalid" not in missing_manifest
+        assert "node.n1.reason=node-config-not-applied" in missing_manifest
+        assert not config_path.exists(), "health recreated the runtime config"
+        assert (root / "ports").read_text(encoding="utf-8") == ports_before
         yaml = run(["yaml"], env).stdout
         assert 'server: "127.0.0.1"' in yaml and "port: 11080" in yaml
         assert "fixture-secret" not in yaml and "example.invalid" not in yaml
-        assert (run_dir / "config" / "n1.json").is_file()
-        if os.name != "nt":
-            assert (run_dir / "config" / "n1.json").stat().st_mode & 0o777 == 0o600
         assert not (root / "openkill.config").exists()
 
         imported = subprocess.run(
@@ -133,6 +149,17 @@ esac
         imported_port = (run(["port", imported_id], env).stdout.strip())
         assert imported_port.isdigit() and imported_port != "11080"
         assert "fixture-secret" not in (run_dir / "manifest").read_text(encoding="utf-8")
+        # A reboot or interrupted install can leave a stale component line in
+        # an otherwise valid manifest.  The read-only refresh must correct
+        # that evidence without touching the node table or allocating ports.
+        (root / "naive").unlink()
+        refreshed = run(["component-status"], env).stdout
+        assert "component_status=unavailable" in refreshed
+        assert "component_reason=component-missing" in refreshed
+        assert "node.n1.name=fixture node" in refreshed
+        assert "n1 11080" in (root / "ports").read_text(encoding="utf-8")
+        (root / "naive").write_text("#!/bin/sh\nprintf '%s\\n' 'naive 1.0'\n", encoding="utf-8")
+        os.chmod(root / "naive", 0o755)
         read_node = subprocess.run(
             [BASH, git_path(SCRIPT), "control"], env=env,
             text=True, input=f"operation=get\nid={imported_id}\n", capture_output=True,

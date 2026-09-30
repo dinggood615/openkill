@@ -21,6 +21,7 @@ NP_PORT_BASE="${NAIVEPROXY_PORT_BASE:-11080}"
 NP_PORT_LIMIT=100
 NP_HEALTH_LOCK="$NP_RUN/health.lock"
 NP_COMPONENT_LOCK="$NP_RUN/component.lock"
+NP_PORT_LOCK="$NP_RUN/ports.lock"
 NP_CONTROL_RESULT="${NAIVEPROXY_CONTROL_RESULT:-$NP_RUN/control.result}"
 
 np_safe() { printf '%s' "$1" | tr '\r\n|=' '    ' | cut -c1-160; }
@@ -118,15 +119,20 @@ np_validate_query() {
 }
 
 np_port() {
-    local id="$1" line port
+    local id="$1" line port tmp
     np_valid_id "$id" || return 1
     np_dirs || return 1
-    touch "$NP_PORT_MAP" || return 1
+    np_port_lock_begin || return 1
+    touch "$NP_PORT_MAP" || { np_port_lock_end; return 1; }
     chmod 600 "$NP_PORT_MAP" 2>/dev/null || true
     line=$(grep -m1 "^${id} " "$NP_PORT_MAP" 2>/dev/null || true)
     if [ -n "$line" ]; then
         port=${line#* }
-        np_valid_port "$port" && printf '%s\n' "$port" && return 0
+        if np_valid_port "$port"; then
+            np_port_lock_end
+            printf '%s\n' "$port"
+            return 0
+        fi
     fi
     port="$NP_PORT_BASE"
     while [ "$port" -lt $((NP_PORT_BASE + NP_PORT_LIMIT)) ]; do
@@ -134,13 +140,67 @@ np_port() {
         # daemon may already own a port, so reserve only ports that are absent
         # from both the map and the live listener table.
         if ! grep -q " $port$" "$NP_PORT_MAP" 2>/dev/null && ! np_listener "$port"; then
-            printf '%s %s\n' "$id" "$port" >> "$NP_PORT_MAP" || return 1
+            tmp="$NP_PORT_MAP.new.$$"
+            awk -v id="$id" '$1 != id {print}' "$NP_PORT_MAP" > "$tmp" || {
+                rm -f "$tmp"; np_port_lock_end; return 1;
+            }
+            printf '%s %s\n' "$id" "$port" >> "$tmp" || {
+                rm -f "$tmp"; np_port_lock_end; return 1;
+            }
+            chmod 600 "$tmp" 2>/dev/null || true
+            mv -f "$tmp" "$NP_PORT_MAP" || {
+                rm -f "$tmp"; np_port_lock_end; return 1;
+            }
+            np_port_lock_end
             printf '%s\n' "$port"
             return 0
         fi
         port=$((port + 1))
     done
+    np_port_lock_end
     return 1
+}
+
+np_port_lock_begin() {
+    local owner attempts=0
+    np_dirs || return 1
+    while [ "$attempts" -lt 5 ]; do
+        if mkdir "$NP_PORT_LOCK" 2>/dev/null; then
+            printf '%s\n' "$$" > "$NP_PORT_LOCK/pid" 2>/dev/null || true
+            chmod 700 "$NP_PORT_LOCK" 2>/dev/null || true
+            return 0
+        fi
+        owner=$(sed -n '1p' "$NP_PORT_LOCK/pid" 2>/dev/null || true)
+        case "$owner" in
+            ''|*[!0-9]*) rm -f "$NP_PORT_LOCK/pid" 2>/dev/null || true; rmdir "$NP_PORT_LOCK" 2>/dev/null || true ;;
+            *)
+                if ! kill -0 "$owner" 2>/dev/null; then
+                    rm -f "$NP_PORT_LOCK/pid" 2>/dev/null || true
+                    rmdir "$NP_PORT_LOCK" 2>/dev/null || true
+                fi
+                ;;
+        esac
+        attempts=$((attempts + 1))
+        [ "$attempts" -lt 5 ] && sleep 1
+    done
+    return 1
+}
+
+np_port_lock_end() {
+    rm -f "$NP_PORT_LOCK/pid" 2>/dev/null || true
+    rmdir "$NP_PORT_LOCK" 2>/dev/null || true
+}
+
+np_mapped_port() {
+    local id="$1" line port
+    np_valid_id "$id" || return 1
+    np_dirs || return 1
+    [ -r "$NP_PORT_MAP" ] || return 1
+    line=$(grep -m1 "^${id} " "$NP_PORT_MAP" 2>/dev/null || true)
+    [ -n "$line" ] || return 1
+    port=${line#* }
+    np_valid_port "$port" || return 1
+    printf '%s\n' "$port"
 }
 
 np_probe_component() {
@@ -202,6 +262,54 @@ np_cached_component_valid() {
             [ "$actual" = "$(printf '%s' "$expected" | tr 'A-F' 'a-f')" ]
             ;;
     esac
+}
+
+# Refresh only the component evidence in an existing manifest.  This is used
+# by read-only status polling after a reboot: the node table, port map,
+# generated configs and health results are deliberately left untouched.  A
+# previous manifest may say "component-missing" even though the protected
+# executable and its verified metadata survived the reboot.
+np_component_status_refresh() {
+    local status reason tmp manifest
+    np_dirs || return 1
+    manifest="$NP_RUN/manifest"
+    if [ ! -r "$manifest" ]; then
+        if np_cached_component_valid; then
+            status=available; reason=available
+        elif [ ! -e "$NP_BIN" ]; then
+            status=unavailable; reason=component-missing
+        elif [ ! -x "$NP_BIN" ]; then
+            status=unavailable; reason=component-not-executable
+        else
+            status=unavailable; reason=component-unverified
+        fi
+        NP_COMPONENT_STATUS_OVERRIDE="$status" NP_COMPONENT_STATUS_REASON="$reason" np_manifest || return 1
+        cat "$manifest"
+        return 0
+    fi
+    if np_cached_component_valid; then
+        status=available; reason=available
+    elif [ ! -e "$NP_BIN" ]; then
+        status=unavailable; reason=component-missing
+    elif [ ! -x "$NP_BIN" ]; then
+        status=unavailable; reason=component-not-executable
+    else
+        status=unavailable; reason=component-unverified
+    fi
+    tmp="$manifest.component.new.$$"
+    awk -v status="$status" -v reason="$reason" '
+        BEGIN { status_seen=0; reason_seen=0 }
+        /^component_status=/ { print "component_status=" status; status_seen=1; next }
+        /^component_reason=/ { print "component_reason=" reason; reason_seen=1; next }
+        { print }
+        END {
+            if (!status_seen) print "component_status=" status
+            if (!reason_seen) print "component_reason=" reason
+        }
+    ' "$manifest" > "$tmp" || { rm -f "$tmp"; return 1; }
+    chmod 600 "$tmp" 2>/dev/null || true
+    mv -f "$tmp" "$manifest" || { rm -f "$tmp"; return 1; }
+    cat "$manifest"
 }
 
 # Install the independently-owned component without touching OpenKill UCI or
@@ -371,10 +479,10 @@ np_listener() {
     local port="$1"
     np_valid_port "$port" || return 1
     if command -v ss >/dev/null 2>&1; then
-        ss -lnt 2>/dev/null | grep -qE "127[.]0[.]0[.]1:${port}[[:space:]]" && return 0
+        ss -lnt 2>/dev/null | grep -qE ":${port}[[:space:]]" && return 0
     fi
     if command -v netstat >/dev/null 2>&1; then
-        netstat -lnt 2>/dev/null | grep -qE "127[.]0[.]0[.]1:${port}[[:space:]]" && return 0
+        netstat -lnt 2>/dev/null | grep -qE ":${port}[[:space:]]" && return 0
     fi
     return 1
 }
@@ -515,7 +623,9 @@ np_health_one() {
     local id="$1" file port output code seconds now old_fail status reason latency state owner
     file=$(np_node_file "$id") || return 1
     [ -r "$file" ] || return 1
-    port=$(np_port "$id") || return 1
+    # Health is observational.  It must never create a port mapping or a
+    # runtime config as a side effect of a status/test request.
+    port=$(np_mapped_port "$id" 2>/dev/null || true)
     now=$(date +%s); old_fail=$(sed -n 's/^fail_count=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1)
     case "$old_fail" in ''|*[!0-9]*) old_fail=0 ;; esac
     if ! np_enabled "$(np_node_value "$file" enabled)"; then status=disabled; reason=node-disabled; latency=unknown
@@ -523,7 +633,9 @@ np_health_one() {
         reason=${NP_PROBE_REASON:-component-unavailable}
         case "$reason" in component-missing) status=component-missing ;; *) status=component-unavailable ;; esac
         latency=unknown
-    elif ! np_config_ready "$id" && ! np_prepare "$id" >/dev/null; then status=config-invalid; reason=node-config-invalid; latency=unknown
+    elif ! np_valid_port "$port"; then
+        status=config-invalid; reason=port-unassigned; latency=unknown
+    elif ! np_config_ready "$id"; then status=config-invalid; reason=node-config-not-applied; latency=unknown
     elif ! np_listener "$port"; then status=local-not-ready; reason=loopback-listener-not-ready; latency=unknown
     else
         owner=$(np_listener_owner "$id" "$port" 2>/dev/null || true)
@@ -586,7 +698,7 @@ np_manifest() {
         printf 'component_status=%s\ncomponent_reason=%s\n' "$(np_safe "$manifest_component_status")" "$(np_safe "$manifest_component_reason")"
         for id in $(np_ids); do
             file=$(np_node_file "$id") || continue; name=$(np_node_value "$file" name); [ -n "$name" ] || name="$id"
-            enabled=$(np_node_value "$file" enabled); port=$(np_port "$id" 2>/dev/null || true); config="$NP_CONFIG_DIR/$id.json"
+            enabled=$(np_node_value "$file" enabled); port=$(np_mapped_port "$id" 2>/dev/null || true); config="$NP_CONFIG_DIR/$id.json"
             transport=$(np_node_value "$file" transport); [ -n "$transport" ] || transport=https
             generation=$(np_node_generation "$file")
             pid=$(np_pid_for_config "$config" 2>/dev/null || true); health_status=$(sed -n 's/^status=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); latency=$(sed -n 's/^latency_ms=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); checked=$(sed -n 's/^checked_at=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); expires=$(sed -n 's/^expires_at=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); reason=$(sed -n 's/^reason=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1)
@@ -617,7 +729,7 @@ np_yaml() {
     local id file name port enabled first=1
     for id in $(np_ids); do
         file=$(np_node_file "$id") || continue; enabled=$(np_node_value "$file" enabled); np_enabled "$enabled" || continue
-        name=$(np_node_value "$file" name); [ -n "$name" ] || name="$id"; port=$(np_port "$id" 2>/dev/null || true); np_valid_port "$port" || continue
+        name=$(np_node_value "$file" name); [ -n "$name" ] || name="$id"; port=$(np_mapped_port "$id" 2>/dev/null || true); np_valid_port "$port" || continue
         [ "$first" -eq 1 ] || printf '\n'; first=0
         printf -- '- name: "%s"\n  type: socks5\n  server: "127.0.0.1"\n  port: %s\n  udp: false\n' "$(np_yaml_quote "$name")" "$port"
     done
@@ -1038,6 +1150,7 @@ np_dispatch() {
     np_dirs || exit 1
     case "${1:-status}" in
         component) np_probe_component; exit $? ;;
+        component-status) np_component_status_refresh; exit $? ;;
         install)
             np_component_install "$2" "$3" "${4:-}"
             rc=$?

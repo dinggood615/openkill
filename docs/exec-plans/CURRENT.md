@@ -1,5 +1,46 @@
 # Current status
 
+## 2026-09-30 2026-1196 Naive request-validation and read-only health follow-up
+
+- Revalidated the prior 2026-1195 claims against the current worktree and
+  authorized x86_64 test device.  The device still has the previously retained
+  independent test node; it is not present in tracked source, default config,
+  package content, or the new release note.  A protected pre-change backup is
+  retained on the device at `/root/openkill-naive-backup-20260930174922` with
+  mode 700; its contents are not copied into the repository or release.
+- The screenshot's `request-validation` path is now addressed at its actual
+  boundary: pasted links are trimmed before the browser submits them, and the
+  controller applies the same trim to the `share` field before rejecting
+  control characters.  Internal control characters and overlong fields remain
+  rejected.  This change preserves credentials and does not bypass CSRF or
+  LuCI ACL checks.  The current authenticated device HTTP probe previously
+  reproduced successful import/duplicate handling, but the Chrome tab was not
+  visible to the computer-use inventory during this run; visual browser
+  confirmation remains unverified.
+- Standalone health is now observational when a node has no applied runtime
+  config: it reports `node-config-not-applied` and leaves both the config file
+  and port map unchanged.  Port allocation is guarded by a bounded lock and
+  atomically replaces a node's mapping; listener collision checks cover any
+  address family/bind address instead of only 127.0.0.1.  The reboot-only
+  component refresh changes only the two component evidence lines in an
+  existing manifest.
+- Device evidence before this code package was rebuilt remains valid for the
+  independent path: the protected Naive component was executable, its target
+  PID/socket ownership was verified, three rounds through the SOCKS5 reached
+  both HTTPS targets, and two instances ran concurrently without interrupting
+  the first.  A temporary Mihomo config containing only a loopback SOCKS5
+  proxy, a dedicated selector and a loopback mixed listener was loaded through
+  the authenticated API; after overriding the listener's inherited auth with
+  an empty user list, three requests returned 204 and one independent target
+  returned 200.  The original runtime config was restored and the temporary
+  file removed.  No WAN, DNS, firewall, route, TUN or default proxy policy was
+  changed.
+- Local regression gates pass after the follow-up changes: standalone fixture,
+  import behavior, integration contract, UI contract, POSIX syntax and the
+  repository local gate.  Version authorities are advanced together to
+  `2026-1196`; Development CI, RC build, formal release, formal package
+  installation and post-package browser/device acceptance are pending.
+
 ## 2026-09-30 2026-1195 formal release and final device verification
 
 - Rechecked the repository and preserved the existing device backups.  Source
