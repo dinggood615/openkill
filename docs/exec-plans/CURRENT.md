@@ -1,5 +1,58 @@
 # Current status
 
+## 2026-09-30 2026-1192 release; device acceptance blocked during candidate upgrade
+
+- Baseline was rechecked at source `04908019b970f7f68ad02a64ce77cde312442dce`.
+  The worktree was clean before release work.  The repair chain is now:
+  `71b0bf3` (legacy archive-vs-binary component digest), `375c256` (incremental
+  per-node procd start), `466aaaf` (LuCI request/result isolation), and
+  `0490801` (TLS-verified formal SDK downloads and synchronized version
+  `2026-1192`).
+- Exact-commit Development CI run `36667980688` passed.  RC Build run
+  `36668086837` passed; the candidate IPK is 7,718,650 bytes with SHA256
+  `c2a7aeee5f6807a31b5175765cb4b4d8dd46c85ec3e991d641b4b77ce4df47cb`.
+  The RC audit passed package metadata, conffile preservation, maintainer
+  deletion safety, stale-reference and sensitive-content checks.
+- Formal Release run `36668229527` passed with `release_gate=true` and
+  `publish=true`.  Tag `v2026-1192-ipk` points to the expected source commit:
+  https://github.com/dinggood615/openkill/releases/tag/v2026-1192-ipk .  The
+  formal IPK is 7,933,671 bytes with SHA256
+  `7b43d6f83be805b77ea3e9710325929adefe60fa5852094f3d521888dc771ba1`.
+  The package channel `package/master/version` reports `v2026-1192`, and
+  `package/master/latest-ipk.json` matches the formal tag, source commit and
+  digest.  RC and formal hashes are intentionally recorded separately.
+- The authorized device identity was previously confirmed as Kwrt/OpenWrt
+  25.12-SNAPSHOT x86_64 VMware.  Protected backups exist at
+  `/root/openkill-naive-backup-20260929185837` and the task-created
+  `pre-1189`, `pre-1190` and `pre-1191` roots under timestamped directories;
+  Naive directories were mode 700 and sensitive files mode 600.  Candidate
+  2026-1190 was installed and the real node/component data remained present.
+- The authenticated Chrome LuCI session was reused.  The real node had been
+  imported and persisted before this release iteration.  With candidate
+  2026-1190, LuCI stop worked, but LuCI start still produced
+  `service-start-failed`; device logs showed the official Naive process
+  trapping immediately when launched through the uWSGI `io.popen` pipe.  The
+  same node started and held a verified loopback listener when invoked through
+  the request-file/SSH path.  This reproduced the remaining LuCI transport
+  defect and motivated 2026-1191.
+- Candidate 2026-1191 was then copied and its `opkg install` entered the
+  package post-install OpenKill restart, but the device stopped answering SSH
+  and LuCI during that restart.  The installation command was interrupted
+  after a bounded wait; package completion, final installed version, formal
+  2026-1192 installation and post-upgrade smoke are therefore **not
+  verified**.  No whole-device reboot was performed (not authorized).
+- Before the device became unreachable, the upstream Naive endpoint had also
+  shown TCP/SOCKS timeouts while direct WAN access remained available.  This
+  is retained as an external remote-node blocker, not reclassified as an
+  authentication success or a DIRECT fallback.  Current device process,
+  SOCKS5, three-round HTTPS and running Mihomo-group results cannot be freshly
+  collected until the authorized device responds again.
+- Correction to the older 2026-1180 section below: its statement that a
+  same-version formal package was installed is not sufficient evidence when
+  `opkg` reported “already up to date”.  Treat that historical installation as
+  **not independently replacement-verified**; the package channel and formal
+  release metadata above are the current verified publication evidence.
+
 ## 2026-09-29 2026-1180 formal release and authorized device acceptance
 
 - Baseline was rechecked at source `95a3d0d362e7be78e35219de2ebb79048b47781b`.
@@ -19,9 +72,13 @@
   The formal IPK is 7,930,222 bytes with SHA256
   `e541adf20aef8281df926a5d3374e096011dd83c605705319bed7ce98a4231f3`.
   The package channel reports `v2026-1180`.
-- The formal package was installed on the authorized `192.168.1.103`
-  OpenWrt/Kwrt 25.12-SNAPSHOT x86_64 VMware test machine. Installed package
-  status is `2026-1180`; component `v154.0.8037.49-2` executes successfully.
+- A previous run recorded package status `2026-1180` on the authorized
+  `192.168.1.103` OpenWrt/Kwrt 25.12-SNAPSHOT x86_64 VMware test machine, but
+  the installation command for the same version reported “already up to date”.
+  That result does not prove that the formal bytes replaced the installed
+  package; formal-package replacement is consequently **not independently
+  verified**.  The component version and device evidence below remain useful
+  runtime history only.
   The protected backup root is `/root/openkill-naive-backup-20260929185837`
   (mode 700; `pre-1179`, `pre-1180` and `pre-formal-1180` snapshots are mode
   700 with protected files). Node directory/file and generated runtime config
