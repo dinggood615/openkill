@@ -249,6 +249,42 @@ class LuCIContractTests(unittest.TestCase):
         self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", css)
         self.assertIn("grid-template-rows: repeat(4, minmax(min-content, 1fr));", css)
 
+    def test_dashboard_feature_cards_use_explicit_evidence_states(self) -> None:
+        source = STATUS.read_text(encoding="utf-8")
+        controller = (ROOT / "luci-app-openkill/luasrc/controller/openkill.lua").read_text(encoding="utf-8")
+        css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css").read_text(encoding="utf-8")
+        for hook in (
+            "var securityStates =",
+            "function asBool(value)",
+            "function setSecurityValue(element, state, detail, fullText, customText)",
+            "element.dataset.state = state",
+            "status.dns_privacy_effective",
+            "naive_manifest_present",
+            "setSecurityValue(DOMCache.adblock_status, 'disabled'",
+            "setSecurityValue(DOMCache.openvpn_status, 'enabled'",
+            "setSecurityValue(DOMCache.rustdesk_status, 'error'",
+            "setSecurityValue(DOMCache.naiveproxy_status, 'pending'",
+        ):
+            with self.subTest(hook=hook):
+                self.assertIn(hook, source if hook != "naive_manifest_present" else controller)
+        for state in ("is-enabled", "is-disabled", "is-pending", "is-error", "is-unknown"):
+            with self.subTest(state=state):
+                self.assertIn(".security-status-value." + state, css)
+
+    def test_myip_shell_is_visual_only_and_aligned(self) -> None:
+        source = MYIP.read_text(encoding="utf-8")
+        css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css").read_text(encoding="utf-8")
+        self.assertIn('class="cbi-section" data-openkill-myip-shell="1"', source)
+        self.assertIn('class="oc openkill-myip-page"', source)
+        for hook in (
+            'fieldset.cbi-section[data-openkill-myip-shell="1"]',
+            ".openkill-myip-page .myip-main-card",
+            "background: transparent;",
+            "max-width: var(--ok-layout-content-max, 1480px);",
+        ):
+            with self.subTest(hook=hook):
+                self.assertIn(hook, css)
+
     def test_status_settings_are_scoped_and_generation_guarded(self) -> None:
         source = STATUS.read_text(encoding="utf-8")
         for hook in (

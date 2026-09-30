@@ -164,36 +164,36 @@
                             <div class="sub-card security-status-card" data-security-card="dns">
                                 <div class="card-title">DNS 隐私保护<a href="javascript:void(0);" onclick="window.open('<%=luci.dispatcher.build_url('admin','services','openkill','settings')%>#dns', '_blank');" class="help-link" title="查看 DNS 隐私设置"><svg width="12" height="12"><use href="#oc-icon-help"/></svg></a></div>
                                 <div class="card-content security-status-content">
-                                    <span id="dns-privacy-status" class="security-status-value">未验证</span>
-                                    <span id="dns-privacy-detail" class="security-status-detail">等待运行状态</span>
+                                    <span id="dns-privacy-status" class="security-status-value is-unknown" data-state="unknown">未知</span>
+                                    <span id="dns-privacy-detail" class="security-status-detail">正在读取运行证据</span>
                                 </div>
                             </div>
                             <div class="sub-card security-status-card" data-security-card="adblock">
                                 <div class="card-title">广告拦截<a href="javascript:void(0);" onclick="window.open('<%=luci.dispatcher.build_url('admin','services','openkill','settings')%>#rules', '_blank');" class="help-link" title="查看广告规则与例外"><svg width="12" height="12"><use href="#oc-icon-help"/></svg></a></div>
                                 <div class="card-content security-status-content">
-                                    <span id="adblock-status" class="security-status-value">未验证</span>
-                                    <span id="adblock-detail" class="security-status-detail">DNS 与核心规则独立显示</span>
+                                    <span id="adblock-status" class="security-status-value is-unknown" data-state="unknown">未知</span>
+                                    <span id="adblock-detail" class="security-status-detail">正在读取规则状态</span>
                                 </div>
                             </div>
                             <div class="sub-card security-status-card" data-security-card="openvpn">
                                 <div class="card-title">OpenVPN 兼容<a href="javascript:void(0);" onclick="window.open('<%=luci.dispatcher.build_url('admin','services','openkill','settings')%>#compatibility', '_blank');" class="help-link" title="查看 OpenVPN 精确绕过设置"><svg width="12" height="12"><use href="#oc-icon-help"/></svg></a></div>
                                 <div class="card-content security-status-content">
-                                    <span id="openvpn-status" class="security-status-value">未配置</span>
-                                    <span id="openvpn-detail" class="security-status-detail">隧道与业务尚未验证</span>
+                                    <span id="openvpn-status" class="security-status-value is-unknown" data-state="unknown">未知</span>
+                                    <span id="openvpn-detail" class="security-status-detail">正在读取兼容状态</span>
                                 </div>
                             </div>
                             <div class="sub-card security-status-card" data-security-card="rustdesk">
                                 <div class="card-title">RustDesk<a href="javascript:void(0);" onclick="window.open('<%=luci.dispatcher.build_url('admin','services','openkill','settings')%>#compatibility', '_blank');" class="help-link" title="查看 RustDesk 兼容设置"><svg width="12" height="12"><use href="#oc-icon-help"/></svg></a></div>
                                 <div class="card-content security-status-content">
-                                    <span id="rustdesk-status" class="security-status-value">未验证</span>
-                                    <span id="rustdesk-detail" class="security-status-detail">连接未验证 · 规则独立于广告与出口策略</span>
+                                    <span id="rustdesk-status" class="security-status-value is-unknown" data-state="unknown">未知</span>
+                                    <span id="rustdesk-detail" class="security-status-detail">正在读取兼容状态</span>
                                 </div>
                             </div>
                             <div class="sub-card security-status-card" data-security-card="naiveproxy">
                                 <div class="card-title">NaiveProxy<a href="javascript:void(0);" onclick="window.open('<%=luci.dispatcher.build_url('admin','services','openkill','naive')%>', '_blank');" class="help-link" title="查看 NaiveProxy 独立服务设置"><svg width="12" height="12"><use href="#oc-icon-help"/></svg></a></div>
                                 <div class="card-content security-status-content">
-                                    <span id="naiveproxy-status" class="security-status-value">未验证</span>
-                                    <span id="naiveproxy-detail" class="security-status-detail">可选回环 SOCKS5 桥接 · 连接未验证</span>
+                                    <span id="naiveproxy-status" class="security-status-value is-unknown" data-state="unknown">未知</span>
+                                    <span id="naiveproxy-detail" class="security-status-detail">正在读取独立组件状态</span>
                                 </div>
                             </div>
                         </div>
@@ -611,7 +611,7 @@
         }
     }
 
-    function updateSecurityCards(status) {
+    function updateSecurityCardsLegacy(status) {
         function setSecurityDetail(element, summary, fullText) {
             if (!element) return;
             element.textContent = summary;
@@ -760,6 +760,179 @@
             (naiveConfigured ? ('回环入口 ' + naiveGenerated + '/' + naiveConfigured) :
             '节点未配置')));
         setSecurityDetail(naiveDetail, naiveSummary, naiveFullDetail);
+    }
+
+    /* Render feature cards from evidence, not from a truthy configuration
+     * value. The independent features have different proof requirements, so
+     * an enabled switch without a generated/applied/verified result remains
+     * clearly marked as pending. */
+    function updateSecurityCards(status) {
+        var securityStates = {
+            enabled: '开启',
+            disabled: '关闭',
+            pending: '待验证',
+            error: '异常',
+            unknown: '未知'
+        };
+
+        function asBool(value) {
+            return value === true || value === 1 || value === '1' || value === 'true' || value === 'yes' || value === 'on';
+        }
+
+        function hasField(name) {
+            return hasStatus && Object.prototype.hasOwnProperty.call(status, name);
+        }
+
+        function setSecurityDetail(element, summary, fullText) {
+            if (!element) return;
+            element.textContent = summary;
+            var card = element.closest ? element.closest('.security-status-card') : null;
+            var value = card && card.querySelector ? card.querySelector('.security-status-value') : null;
+            if (fullText && fullText !== summary) {
+                element.title = fullText;
+                element.setAttribute('aria-label', fullText);
+                if (value) value.title = fullText;
+            } else {
+                element.removeAttribute('title');
+                element.removeAttribute('aria-label');
+                if (value) value.removeAttribute('title');
+            }
+        }
+
+        function setSecurityValue(element, state, detail, fullText, customText) {
+            if (!element) return;
+            var card = element.closest ? element.closest('.security-status-card') : null;
+            var text = customText || securityStates[state] || securityStates.unknown;
+            element.textContent = text;
+            element.className = 'security-status-value is-' + state;
+            element.dataset.state = state;
+            if (card) card.dataset.state = state;
+            setSecurityDetail(card && card.querySelector ? card.querySelector('.security-status-detail') : null, detail, fullText || detail);
+        }
+
+        var hasStatus = !!(status && typeof status === 'object');
+        var running = hasStatus && asBool(status.clash);
+
+        /* A configured DNS mode is not proof that the resolver path is
+         * effective. The backend may opt in to an explicit evidence field;
+         * otherwise keep the card in the pending state. */
+        var dnsMode = hasStatus && (status.dns_privacy_mode === 'split' || status.dns_privacy_mode === 'strict') ? status.dns_privacy_mode : '';
+        var dnsDetail = dnsMode ? ('已配置 · ' + (dnsMode === 'strict' ? '严格隐私' : '分流隐私')) : '隐私档位未配置';
+        if (!hasField('dns_privacy_mode')) {
+            setSecurityValue(DOMCache.dns_privacy_status, 'unknown', '状态接口不可用', '无法读取 DNS 隐私配置');
+        } else if (!dnsMode) {
+            setSecurityValue(DOMCache.dns_privacy_status, 'disabled', '未配置隐私档位', 'DNS 隐私档位未配置');
+        } else if (asBool(status.dns_privacy_effective)) {
+            setSecurityValue(DOMCache.dns_privacy_status, 'enabled', dnsDetail + ' · 已生效', dnsDetail + ' · 运行证据已确认');
+        } else {
+            setSecurityValue(DOMCache.dns_privacy_status, 'pending', running ? dnsDetail + ' · 待验证' : dnsDetail + ' · 核心未运行',
+                running ? dnsDetail + ' · DNS 出站仍待验证' : '核心未运行，DNS 出站未验证');
+        }
+
+        var adMode = hasStatus && (status.adblock_mode === 'standard' || status.adblock_mode === 'enhanced') ? status.adblock_mode : 'off';
+        var adState = hasStatus && status.adblock_state ? status.adblock_state : 'unknown';
+        var adDnsEffective = hasStatus && asBool(status.adblock_dns_effective);
+        var adCoreEffective = hasStatus && asBool(status.adblock_provider_effective);
+        var adGenerated = (hasStatus && asBool(status.adblock_generated)) || adDnsEffective || adCoreEffective;
+        var adDnsLoaded = hasStatus && (status.adblock_dns_loaded === '1' || status.adblock_dns_loaded === true);
+        var adCoreLoaded = hasStatus && (status.adblock_core_loaded === '1' || status.adblock_core_loaded === true);
+        var adVerified = hasStatus && asBool(status.adblock_verified);
+        var adReason = hasStatus && status.adblock_reason ? status.adblock_reason : 'unknown';
+        var adDnsSummary = adDnsLoaded ? 'DNS 后端已加载' : (adDnsEffective ? 'DNS 规则已生成' : 'DNS 后端未确认');
+        var adCoreSummary = adCoreLoaded ? '核心规则已加载' : (adCoreEffective ? '核心规则已生成' : '核心规则未确认');
+        var adFullDetail = adMode === 'off' ? '广告拦截已关闭，DNS 隐私仍独立运行' :
+            (adState === 'failed' ? ('规则生成失败 · ' + adReason) :
+            (adDnsSummary + ' · ' + adCoreSummary + (adVerified ? ' · 实际拦截已验证' : ' · 实际拦截未验证')));
+        if (!hasField('adblock_mode')) {
+            setSecurityValue(DOMCache.adblock_status, 'unknown', '状态接口不可用', '无法读取广告规则状态');
+        } else if (adMode === 'off') {
+            setSecurityValue(DOMCache.adblock_status, 'disabled', '广告规则未启用', adFullDetail);
+        } else if (adState === 'failed') {
+            setSecurityValue(DOMCache.adblock_status, 'error', '规则生成失败', adFullDetail);
+        } else if (adVerified) {
+            setSecurityValue(DOMCache.adblock_status, 'enabled', '规则已加载 · 拦截已验证', adFullDetail);
+        } else {
+            /* Keep the old diagnostic phrase in the detail while the primary
+             * value stays an unambiguous lifecycle state. */
+            setSecurityValue(DOMCache.adblock_status, 'pending', adGenerated ? '规则已生成 · 加载待验证' : '已配置 · 待验证', adFullDetail);
+        }
+
+        var vpnConfigured = hasStatus && asBool(status.openvpn_compatibility);
+        var vpnApplied = hasStatus && asBool(status.openvpn_applied);
+        var vpnGenerated = hasStatus && asBool(status.openvpn_generated);
+        var tunnelState = hasStatus && status.openvpn_tunnel_state ? status.openvpn_tunnel_state : 'unknown';
+        var vpnTransportBypass = hasStatus && asBool(status.openvpn_transport_bypass);
+        var vpnReason = hasStatus && status.openvpn_reason ? status.openvpn_reason : 'not-started';
+        var vpnFullDetail = !vpnConfigured ? '兼容开关关闭' :
+            ('传输绕过 ' + (vpnTransportBypass ? '已开启' : '已关闭') + ' · 角色 ' +
+            (status.openvpn_role || 'router-client') + ' · 隧道 ' +
+            (tunnelState === 'established' ? '已建立' : '未验证') +
+            ' · ' + (status.openvpn_transport_protocol || 'udp') + '/' +
+            (status.openvpn_protocol_family || 'all') + ' · IPv4/IPv6 ' +
+            (status.openvpn_endpoint4 || '0') + '/' + (status.openvpn_endpoint6 || '0') +
+            (vpnReason !== 'applied' ? ' · ' + vpnReason : ''));
+        if (!hasField('openvpn_compatibility')) {
+            setSecurityValue(DOMCache.openvpn_status, 'unknown', '状态接口不可用', '无法读取 OpenVPN 兼容状态');
+        } else if (!vpnConfigured) {
+            setSecurityValue(DOMCache.openvpn_status, 'disabled', '兼容开关已关闭', vpnFullDetail);
+        } else if (vpnReason === 'failed' || vpnReason === 'invalid-protocol' || vpnReason === 'server-role-no-transport') {
+            setSecurityValue(DOMCache.openvpn_status, 'error', '应用异常', vpnFullDetail);
+        } else if (vpnApplied && tunnelState === 'established') {
+            setSecurityValue(DOMCache.openvpn_status, 'enabled', '开启', vpnFullDetail);
+        } else {
+            setSecurityValue(DOMCache.openvpn_status, 'pending', vpnGenerated ? '规则已生成 · 待验证' : '已配置 · 待验证', vpnFullDetail);
+        }
+
+        var rustConfigured = hasStatus && asBool(status.rustdesk_compatibility);
+        var rustGenerated = hasStatus && asBool(status.rustdesk_generated);
+        var rustApplied = hasStatus && asBool(status.rustdesk_applied);
+        var rustVerified = hasStatus && asBool(status.rustdesk_verified);
+        var rustReason = hasStatus && status.rustdesk_reason ? status.rustdesk_reason : 'not-started';
+        var rustFullDetail = !rustConfigured ? '兼容开关关闭，未创建宽范围绕过' :
+            (rustReason === 'failed' ? '兼容规则生成或应用失败 · 请查看诊断' :
+            (rustApplied ? '目标域名范围已应用 · ' + (rustVerified ? '连接已验证' : '连接未验证') :
+            (rustGenerated ? '配置已生成 · 等待核心与防火墙就绪' : '未生成目标规则 · 连接未验证')));
+        if (!hasField('rustdesk_compatibility')) {
+            setSecurityValue(DOMCache.rustdesk_status, 'unknown', '状态接口不可用', '无法读取 RustDesk 兼容状态');
+        } else if (!rustConfigured) {
+            setSecurityValue(DOMCache.rustdesk_status, 'disabled', '兼容开关已关闭', rustFullDetail);
+        } else if (rustReason === 'failed') {
+            setSecurityValue(DOMCache.rustdesk_status, 'error', '应用异常', rustFullDetail);
+        } else if (rustApplied && rustVerified) {
+            setSecurityValue(DOMCache.rustdesk_status, 'enabled', '开启', rustFullDetail);
+        } else {
+            setSecurityValue(DOMCache.rustdesk_status, 'pending', rustApplied ? '规则已应用 · 待验证' :
+                (rustGenerated ? '规则已生成 · 待应用' : '已配置 · 待验证'), rustFullDetail);
+        }
+
+        var naiveManifestPresent = hasStatus && asBool(status.naive_manifest_present);
+        var naiveInstalled = hasStatus && asBool(status.naive_component_installed);
+        var naiveComponentReason = hasStatus && status.naive_component_reason ? status.naive_component_reason : 'unknown';
+        var naiveComponentVersion = hasStatus && status.naive_component_version ? status.naive_component_version : 'unknown';
+        var naiveConfigured = Number(hasStatus && status.naive_configured || 0);
+        var naiveGenerated = Number(hasStatus && status.naive_generated || 0);
+        var naiveLocalReady = hasStatus && asBool(status.naive_local_ready);
+        var naiveRemote = hasStatus && asBool(status.naive_remote_verified);
+        var naiveState = hasStatus && status.naive_state ? status.naive_state : 'unknown';
+        var naiveReason = hasStatus && status.naive_reason ? status.naive_reason : 'unknown';
+        var naiveFullDetail = !naiveManifestPresent ? '独立组件状态尚未产生，尚未检测' :
+            (!naiveInstalled ? '独立 NaiveProxy 组件未安装' :
+            (naiveComponentReason === 'version-probe-failed' || naiveComponentReason === 'loader-or-version-probe-failed' ? '组件存在但版本探测失败 · 版本未知' :
+            (!naiveConfigured ? ('组件可用 · ' + naiveComponentVersion + ' · 未配置节点') :
+            ('回环 SOCKS5 入口 ' + naiveGenerated + '/' + naiveConfigured + ' · ' + naiveReason))));
+        if (!hasField('naive_manifest_present') || !naiveManifestPresent) {
+            setSecurityValue(DOMCache.naiveproxy_status, 'unknown', '尚未检测', naiveFullDetail);
+        } else if (!naiveInstalled) {
+            setSecurityValue(DOMCache.naiveproxy_status, 'unknown', '组件未安装', naiveFullDetail);
+        } else if (!naiveConfigured) {
+            setSecurityValue(DOMCache.naiveproxy_status, 'disabled', '未配置节点', naiveFullDetail);
+        } else if (naiveState === 'failed' || naiveGenerated < naiveConfigured) {
+            setSecurityValue(DOMCache.naiveproxy_status, 'error', naiveState === 'failed' ? '启动异常' : '节点配置不完整', naiveFullDetail);
+        } else if (naiveRemote) {
+            setSecurityValue(DOMCache.naiveproxy_status, 'enabled', '开启', naiveFullDetail + ' · 远端连接已验证');
+        } else {
+            setSecurityValue(DOMCache.naiveproxy_status, 'pending', naiveLocalReady ? '本机就绪 · 待验证' : '已配置 · 待验证', naiveFullDetail);
+        }
     }
 
     function setRuntimeControlsAvailable(available) {

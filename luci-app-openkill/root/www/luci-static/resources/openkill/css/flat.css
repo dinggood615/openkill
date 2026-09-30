@@ -143,12 +143,26 @@
     color: var(--ok-flat-success, #1e9b68);
 }
 
+/* Feature cards expose a finite evidence-backed state vocabulary. */
+.openkill-status-page .security-status-value.is-enabled {
+    color: var(--ok-flat-success, #1e9b68);
+}
+
 .openkill-status-page .security-status-value.is-pending {
     color: var(--ok-flat-warning, #a66a00);
 }
 
 .openkill-status-page .security-status-value.is-muted {
     color: var(--ok-flat-muted, #69758a);
+}
+
+.openkill-status-page .security-status-value.is-disabled,
+.openkill-status-page .security-status-value.is-unknown {
+    color: var(--ok-flat-muted, #69758a);
+}
+
+.openkill-status-page .security-status-value.is-error {
+    color: var(--ok-color-danger, #b91c1c);
 }
 
 .openkill-status-page .core-status-row .sub-card,
@@ -531,6 +545,48 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-se
 
 body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-section > table > tbody > tr > td {
     border-top: 0;
+}
+
+/* The client view used to inherit a native CBI fieldset/table surface around
+ * the actual IP/access panel.  Keep the semantic wrapper and event hooks but
+ * make that chrome transparent so the panel follows the same content axis as
+ * the dashboard above. */
+body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-section[data-openkill-myip-shell="1"],
+body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-section[data-openkill-myip-shell="1"] > table,
+body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-section[data-openkill-myip-shell="1"] > table > tbody,
+body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-section[data-openkill-myip-shell="1"] > table > tbody > tr,
+body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-section[data-openkill-myip-shell="1"] > table > tbody > tr > td,
+body[data-page="admin-services-openkill-client"] .openkill-myip-page,
+body[data-page="admin-services-openkill-client"] .openkill-myip-page .myip-main-card {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+}
+
+body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-section[data-openkill-myip-shell="1"] {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+}
+
+body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-section[data-openkill-myip-shell="1"] > table,
+body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset.cbi-section[data-openkill-myip-shell="1"] > table > tbody > tr > td,
+body[data-page="admin-services-openkill-client"] .openkill-myip-page {
+    width: 100%;
+    max-width: var(--ok-layout-content-max, 1480px);
+    min-width: 0;
+    margin-inline: auto;
+    padding-inline: 0;
+    box-sizing: border-box;
+}
+
+body[data-page="admin-services-openkill-client"] .openkill-myip-page .myip-main-card,
+body[data-page="admin-services-openkill-client"] .openkill-myip-page .myip-content-grid {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 /* ===== OpenKill Design System V1: End ===== */

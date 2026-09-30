@@ -1517,6 +1517,7 @@ function action_status()
 	-- NaiveProxy is an independent service.  Read only its redacted manifest;
 	-- do not inspect legacy UCI credentials or infer health from OpenKill state.
 	local naive_manifest = fs.readfile("/var/run/naiveproxy/manifest") or ""
+	local naive_manifest_present = naive_manifest ~= ""
 	local naive_component_path = naive_manifest:match("component=([^\n]+)") or "/etc/naiveproxy/naive"
 	local naive_component_status = naive_manifest:match("component_status=([^\n]+)") or "unavailable"
 	local naive_component_reason = naive_manifest:match("component_reason=([^\n]+)") or "unknown"
@@ -1587,6 +1588,7 @@ function action_status()
 		naive_component_installed = naive_component_installed,
 		naive_component_reason = naive_component_reason,
 		naive_component_status = naive_component_status,
+		naive_manifest_present = naive_manifest_present,
 		naive_component_detail = naive_component_detail,
 		naive_configured = naive_configured,
 		naive_generated = naive_generated,

@@ -127,6 +127,7 @@ def main() -> int:
                     page.wait_for_timeout(50)
                     page.locator('[data-naive-node-edit="node-fixture"]').click()
                     assert page.locator('[name="name"]').input_value() == "Imported"
+                    page.wait_for_function("() => document.querySelector('[name=\\\"password_mode\\\"]') && document.querySelector('[name=\\\"password_mode\\\"]').checked")
                     assert page.locator('[name="password_mode"]').is_checked()
                     assert page.locator('[name="password"]').input_value() == ""
                     page.locator('[name="name"]').fill("Renamed")

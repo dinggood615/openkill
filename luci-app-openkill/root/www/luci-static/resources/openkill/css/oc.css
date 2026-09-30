@@ -9040,7 +9040,7 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
 }
 
 .oc.openkill-status-page .dashboard-security-section .security-status-detail {
-    display: none;
+    display: block;
 }
 
 .oc.openkill-status-page .dashboard-security-section .security-status-card .card-title {

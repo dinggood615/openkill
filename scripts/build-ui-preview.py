@@ -216,7 +216,9 @@ def _extract_config_editor() -> str:
 
 def _extract_myip() -> str:
     source = (VIEW_ROOT / "myip.htm").read_text(encoding="utf-8")
-    start = source.index('<fieldset class="cbi-section">')
+    # Keep the preview helper tolerant of non-visual data attributes on the
+    # native CBI wrapper; the rendered client page still owns the same hooks.
+    start = source.index('<fieldset class="cbi-section"')
     end = source.index("</fieldset>", start) + len("</fieldset>")
     return _clean_markup(source[start:end])
 
