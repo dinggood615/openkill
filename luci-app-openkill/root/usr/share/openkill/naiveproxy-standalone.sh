@@ -886,22 +886,32 @@ np_control() {
             [ "$rc" -eq 0 ] && stage=node-removed || stage=node-remove-failed
             np_control_result "$rc" "$stage"; return "$rc" ;;
         start)
+            rc=0
             if [ -n "$NP_CTL_id" ]; then
                 /etc/init.d/naiveproxy-bridge start_node "$NP_CTL_id" >/dev/null 2>&1
+                rc=$?
             else
                 enabled_found=0
                 for start_id in $(np_ids); do
                     start_file=$(np_node_file "$start_id" 2>/dev/null || true)
-                    np_enabled "$(np_node_value "$start_file" enabled)" && enabled_found=1
+                    if np_enabled "$(np_node_value "$start_file" enabled)"; then
+                        enabled_found=1
+                        # Use the targeted incremental path for every node.
+                        # The rc.common `start` transaction uses procd's
+                        # default `set` close action, which can discard the
+                        # existing instance table and is not safe for a
+                        # LuCI-triggered multi-node start.
+                        /etc/init.d/naiveproxy-bridge start_node "$start_id" >/dev/null 2>&1 || rc=1
+                    fi
                 done
                 if [ "$enabled_found" -eq 1 ]; then
-                    /etc/init.d/naiveproxy-bridge start >/dev/null 2>&1
+                    :
                 else
                     rc=38; stage=no-enabled-node
                     np_control_result "$rc" "$stage"; return "$rc"
                 fi
             fi
-            rc=$?; np_manifest >/dev/null 2>&1 || true
+            np_manifest >/dev/null 2>&1 || true
             [ "$rc" -eq 0 ] && stage=service-started || stage=service-start-failed
             np_control_result "$rc" "$stage"; return "$rc" ;;
         stop)
