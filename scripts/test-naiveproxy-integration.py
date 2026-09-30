@@ -118,6 +118,7 @@ def main() -> None:
     require(VIEW, "data-naive-standalone-flow")
     require(VIEW, 'role="group" aria-labelledby="openkill-naive-dialog-title" data-naive-node-form')
     require(VIEW, "function submitNode(start)")
+    require(VIEW, 'document.querySelector(\'input[name="token"]\')')
     assert '<form data-naive-node-form>' not in view
     assert "form.addEventListener('submit'" not in view
     assert "data-naive-node-action" not in view
