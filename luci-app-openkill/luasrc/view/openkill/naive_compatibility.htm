@@ -50,11 +50,16 @@
         <button type="button" class="cbi-button cbi-button-apply" data-naive-parse-link>解析链接</button>
       </div>
       <div class="openkill-naive-form-fields" data-naive-form-fields><div class="openkill-naive-form-grid">
-        <label>节点名称<input name="name" required maxlength="120" autocomplete="off"></label>
-        <label>服务器<input name="server" required maxlength="253" autocomplete="off"></label>
-        <label>端口<input name="port" required inputmode="numeric" pattern="[0-9]{1,5}" autocomplete="off"></label>
-        <label>用户名<input name="username" required maxlength="512" autocomplete="off"></label>
-        <label>密码<input name="password" required type="password" maxlength="1024" autocomplete="new-password"></label>
+        <!-- These controls live inside LuCI's outer CBI form.  Native HTML
+             required validation here would block the parent Save/Apply
+             submit while this dialog is hidden, before LuCI can receive the
+             request.  submitNode() performs the conditional validation when
+             the dialog is actually used. -->
+        <label>节点名称<input name="name" maxlength="120" autocomplete="off"></label>
+        <label>服务器<input name="server" maxlength="253" autocomplete="off"></label>
+        <label>端口<input name="port" inputmode="numeric" pattern="[0-9]{1,5}" autocomplete="off"></label>
+        <label>用户名<input name="username" maxlength="512" autocomplete="off"></label>
+        <label>密码<input name="password" type="password" maxlength="1024" autocomplete="new-password"></label>
         <label class="openkill-naive-form-check" data-naive-password-retain hidden><input name="password_mode" type="checkbox"> 保留当前密码</label>
         <label>传输<select name="transport"><option value="https">HTTPS</option><option value="quic">QUIC</option></select></label>
         <label class="openkill-naive-form-check"><input name="enabled" type="checkbox" checked> 启用节点</label>

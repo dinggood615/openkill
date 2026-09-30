@@ -28,7 +28,7 @@ def rendered_view() -> str:
     source = re.sub(r"<%.*?%>", "", source, flags=re.DOTALL)
     source = source.replace('data-naive-standalone-url=""', 'data-naive-standalone-url="/naive-status"')
     source = source.replace('data-naive-control-url=""', 'data-naive-control-url="/naive-control"')
-    return """<!doctype html><html><head><meta charset=\"utf-8\"><script>window.L={env:{token:'fixture-token'}};</script><style>""" + OC_CSS.read_text(encoding="utf-8") + "\n" + FLAT_CSS.read_text(encoding="utf-8") + "</style></head><body><main id=\"cbi-openkill\" class=\"openkill-settings openkill-page\">" + source + "</main></body></html>"
+    return """<!doctype html><html><head><meta charset=\"utf-8\"><script>window.L={env:{token:'fixture-token'}};</script><style>""" + OC_CSS.read_text(encoding="utf-8") + "\n" + FLAT_CSS.read_text(encoding="utf-8") + "</style></head><body><main id=\"cbi-openkill\" class=\"openkill-settings openkill-page\"><form id=\"settings-cbi-form\">" + source + "<button id=\"settings-commit\" type=\"submit\">Commit Settings</button></form></main></body></html>"
 
 
 def main() -> int:
@@ -118,6 +118,7 @@ def main() -> int:
                 try:
                     page = browser.new_page(viewport={"width": 1366, "height": 900})
                     page.goto(f"http://127.0.0.1:{server.server_port}/index.html", wait_until="networkidle")
+                    assert page.evaluate("document.getElementById('settings-cbi-form').checkValidity()"), "hidden Naive dialog blocked outer CBI form validation"
                     page.locator('[data-naive-action="import"]').click()
                     page.locator('[name="share"]').fill("naive+https://fixture-user:fixture-secret@fixture.example.test:443?security=tls&type=tcp&headerType=none#Imported")
                     page.locator('[data-naive-parse-link]').click()
