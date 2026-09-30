@@ -1,5 +1,67 @@
 # Current status
 
+## 2026-09-30 2026-1199 重装后核心启动修复与正式包验收
+
+- 本次重新复现了“重新安装后无法启动”的实际根因：旧版
+  `/etc/config/openkill` 作为 conffile 被保留时可能没有 `log_level` 字段，
+  启动脚本读取到空值并生成空的 `log-level`，Mihomo 随即返回
+  `invalid log-level`，配置校验失败后服务主动停止。核心文件、加载器和
+  权限均正常；临时补回 `log_level=0` 后旧版立即能够启动，证明故障在
+  配置迁移而不是核心缺失。
+- 修复位于
+  `luci-app-openkill/root/usr/share/openkill/openkill_config_normalize.sh`、
+  `luci-app-openkill/root/etc/init.d/openkill` 和
+  `scripts/test-uci-lifecycle.py`。安装/升级/重装归一化会为缺失或不支持的
+  日志等级写入安全默认值 `0`；启动入口仍做防御性回退，避免旧 conffile
+  再次把空值送入运行配置。节点、订阅、规则、YAML、自定义文件及 Naive
+  独立目录不在清理范围内。
+- 修复源提交为
+  `2a5a210bcaa8fad6fabb65530188f839b6019239`。Development CI
+  `36728501878` 通过
+  (https://github.com/dinggood615/openkill/actions/runs/36728501878)。
+  RC Build `36731034406` 通过
+  (https://github.com/dinggood615/openkill/actions/runs/36731034406)，RC
+  IPK 为 7,716,402 bytes，SHA256
+  `3a2786003e07efbbc8e4276ec2ef21f557d10edc49108e164cab604916c0f7d8`。
+  RC 审计未发现个人节点、凭据或测试机数据。
+- 受保护设备备份建立在
+  `/root/openkill-reinstall-backup-20260930220300`（目录 700、归档 600），
+  `configs.tar.gz` SHA256 为
+  `f2af3bf0421889337b58e664f49fbe0d5228264fd4b8ade8220b72134cf719ff`。
+  重装前删除旧配置中的 `log_level`，候选包强制重装后安装脚本自动恢复为
+  `0`；设备包状态为 `2026-1199`，服务为 `running`，实际核心进程存在，
+  就绪日志包含 readiness passed，控制器返回 HTTP 200。候选包随后完成
+  停止（inactive、核心退出）和再次启动（running、核心恢复、控制器 200）。
+- 正式 Release 工作流 `36735178748` 通过
+  (https://github.com/dinggood615/openkill/actions/runs/36735178748)。标签
+  `v2026-1199-ipk` 指向上述源提交，正式 Release 为
+  https://github.com/dinggood615/openkill/releases/tag/v2026-1199-ipk 。
+  正式 IPK 为 7,911,241 bytes，SHA256
+  `9b0cb25900a75acd2b4a62cfde50fec205a037e3bea1dc6956deec615e1fc56f`：
+  https://github.com/dinggood615/openkill/releases/download/v2026-1199-ipk/luci-app-openkill_2026-1199_all.ipk 。
+  包频道 `latest-ipk.json` 已同步同一版本、提交、URL 和哈希。
+- 正式 IPK 已在授权设备通过 `opkg --force-reinstall` 完成真实替换；
+  conffile 差异被保留为设备侧的 `openkill-opkg`，没有覆盖用户配置。正式
+  包安装后再次完成停止/启动：服务 `running`、核心进程存在、就绪日志通过、
+  控制器 HTTP 200。当前配置哈希为
+  `ce418ab554c42256baa169ca788e5b2f04e1f8c3b4ef7a4a7c891912d94ef174`，
+  `log_level=0`，Naive 数据目录仍为 700，节点文件数量和独立组件状态未被
+  清理。
+- 当前运行的 Mihomo SOCKS5 入口在正式包安装后仍可用；清除代理绕过环境后，
+  通过该入口对两个 HTTPS 目标连续三轮均返回 HTTP 204/200、退出码 0。
+  这证明本次重装没有破坏现有核心联网和用户策略。设备上的独立 Naive
+  组件、节点和保护权限仍存在，但本轮对其远端探测连续返回 TLS/连接失败，
+  同时直接 DNS 查询无结果；这是当前远端节点或设备外部 DNS 路径的证据，
+  不能把它宣称为本次代码已验证的 Naive 远端联网成功，也没有通过关闭校验或
+  改成 DIRECT 掩盖失败。较早的内核 trap 记录发生在本次正式包重装之前。
+- 本地 `scripts/local-gate.sh`、UCI 生命周期回归（19 项）、Naive 集成契约、
+  UI 契约（29 项）、浏览器契约和 OpenKill 门禁通过；修改后的 shell 通过
+  WSL `sh -n`。Windows 环境直接运行 Linux/BusyBox 运行时测试、安装器脚本
+  和核心二进制测试仍受 CRLF、路径转换和 Linux ELF 限制，不能替代 CI；精确
+  提交的 Development/RC/Formal 门禁均已通过。当前 Chrome computer-use 会话
+  两次超时，故本轮未新增视觉页面截图证据；此前 LuCI HTTP/CSRF 页面验收记录
+  仍保留，未将浏览器不可见误报为本轮视觉通过。
+
 ## 2026-09-30 2026-1198 插件设置七页保存与应用正式验收
 
 - 重新核对当前页面定义后，实际七个页签为：运行与服务
