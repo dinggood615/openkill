@@ -470,6 +470,10 @@ jobs:
           set -euo pipefail
           package_file=$(find tmp/${{ matrix.target.sdk_dir }}/bin -type f -name 'luci-app-openkill_*.ipk' | head -n 1)
           [ -n "$package_file" ] || { echo 'OpenKill IPK was not produced'; exit 1; }
+          # SDK package builds can inherit the unprivileged runner UID.  Normalize
+          # both data and control archives before the artifact is uploaded so
+          # init scripts and conffiles install as root:root on OpenWrt.
+          python3 "$GITHUB_WORKSPACE/scripts/normalize-ipk-ownership.py" "$package_file"
           # OpenWrt SDKs produce two valid IPK layouts: traditional ar archives
           # and a gzip-tar wrapper containing data.tar.gz. Support both so the
           # assertion follows the package format instead of the SDK generation.

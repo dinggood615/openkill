@@ -73,6 +73,8 @@ def main() -> None:
     yml_change = YML_CHANGE.read_text(encoding="utf-8")
     assert "`" not in yml_change, "embedded Ruby must not contain shell backtick substitution"
     require(ROOT / "luci-app-openkill/Makefile", "chown -R root:root /usr/share/openkill")
+    require(ROOT / "luci-app-openkill/Makefile", "/etc/init.d/naiveproxy-bridge")
+    require(ROOT / ".github/workflows/compile_new_ipk.yml", "normalize-ipk-ownership.py")
     require(ROOT / "luci-app-openkill/Makefile", "/etc/openkill/custom/openkill_custom_overwrite.sh")
     assert ". openkill_naive.sh" not in openkill
     assert "openkill_naive_health.sh" not in openkill

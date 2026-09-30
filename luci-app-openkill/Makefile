@@ -1,7 +1,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=luci-app-openkill
-PKG_VERSION:=2026-1192
+PKG_VERSION:=2026-1193
 PKG_MAINTAINER:=dinggood615 <https://github.com/dinggood615/openkill>
 
 PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)
@@ -98,7 +98,8 @@ define Package/$(PKG_NAME)/postinst
 		# ipkg archives built by an unprivileged SDK user can retain that numeric
 		# owner. Normalize package-owned runtime files on the target; protected
 		# Naive node/state files are created separately with stricter modes.
-		chown -R root:root /usr/share/openkill /usr/lib/lua/luci /www/luci-static/resources/openkill >/dev/null 2>&1 || true
+		chown -R root:root /usr/share/openkill /usr/lib/lua/luci /www/luci-static/resources/openkill /etc/openkill >/dev/null 2>&1 || true
+		chown root:root /etc/init.d/openkill /etc/init.d/naiveproxy-bridge /etc/config/openkill /etc/config/openkill-opkg /etc/openkill/custom/openkill_custom_overwrite.sh >/dev/null 2>&1 || true
 		# Retired OpenKill-owned Naive fields are never a source for the
 		# independent service. Keep a protected local backup if cleanup finds any.
 		if [ -x /usr/share/openkill/naiveproxy-standalone.sh ]; then
