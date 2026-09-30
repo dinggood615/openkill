@@ -25,7 +25,10 @@
   https://github.com/dinggood615/openkill/releases/download/v2026-1194-ipk/luci-app-openkill_2026-1194_all.ipk
   , 7,904,100 bytes, SHA256
   `234b2ae8f647e04b3e8fc79a099e2895eb30e1f460f1d56f182515229e4aba84`.
-  RC and formal hashes are intentionally recorded separately.
+  RC and formal hashes are intentionally recorded separately.  The package
+  channel is also live and consistent: `package/master/version` is `v2026-1194`
+  and `package/master/latest-ipk.json` points to the same formal commit, URL and
+  SHA256.
 - The authorized device was reidentified as Kwrt/OpenWrt 25.12-SNAPSHOT,
   x86_64 VMware.  Before the formal replacement, a protected backup already
   existed at `/root/openkill-naive-backup-20260930135000/pre-1194-rc` (mode
