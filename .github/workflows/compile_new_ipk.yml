@@ -210,7 +210,7 @@ jobs:
             mkdir -p tmp/sdk-cache
             SDK_CACHE="./tmp/sdk-cache/${{ matrix.target.sdk_tar }}"
             if [ ! -s "$SDK_CACHE" ]; then
-              if ! curl -SLfk --connect-timeout 30 --retry 2 "${{ matrix.target.sdk_url }}" -o "$SDK_CACHE"; then
+              if ! curl -SLf --connect-timeout 30 --retry 2 "${{ matrix.target.sdk_url }}" -o "$SDK_CACHE"; then
                 curl -SLf --connect-timeout 30 --retry 2 "https://downloads.openwrt.org/releases/22.03.0/targets/x86/64/openwrt-sdk-22.03.0-x86-64_gcc-11.2.0_musl.Linux-x86_64.tar.xz" -o "$SDK_CACHE"
               fi
             else
@@ -229,11 +229,11 @@ jobs:
             BASE_URL="https://downloads.openwrt.org/snapshots/targets/x86/64/"
             SDK_NAME=$(curl -sf $BASE_URL | grep -oE 'openwrt-sdk-x86-64[^"]+\.tar\.zst' | head -n 1)
             [ -n "$SDK_NAME" ] || { echo 'OpenWrt snapshot SDK was not listed'; exit 1; }
-            if ! curl -SLfk --connect-timeout 30 --retry 2 "$BASE_URL/$SDK_NAME" -o "./tmp/${{ matrix.target.sdk_tar }}"; then
+            if ! curl -SLf --connect-timeout 30 --retry 2 "$BASE_URL/$SDK_NAME" -o "./tmp/${{ matrix.target.sdk_tar }}"; then
               BASE_URL2="https://mirrors.pku.edu.cn/files/openwrt/snapshots/targets/x86/64/"
               SDK_NAME=$(curl -sf $BASE_URL2 | grep -oE 'openwrt-sdk-x86-64[^"]+\.tar\.zst' | head -n 1)
               [ -n "$SDK_NAME" ] || { echo 'Fallback OpenWrt snapshot SDK was not listed'; exit 1; }
-              curl -SLfk --connect-timeout 30 --retry 2 "$BASE_URL2/$SDK_NAME" -o "./tmp/${{ matrix.target.sdk_tar }}"
+              curl -SLf --connect-timeout 30 --retry 2 "$BASE_URL2/$SDK_NAME" -o "./tmp/${{ matrix.target.sdk_tar }}"
             fi
             cd tmp
             zstd -d ${{ matrix.target.sdk_tar }} -o SNAPSDK.tar
