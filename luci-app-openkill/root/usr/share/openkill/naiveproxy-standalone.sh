@@ -417,8 +417,31 @@ np_wait_for_ready() {
     return 1
 }
 
+np_public_resolver_ip() {
+    # Mihomo Fake-IP DNS can return 198.18.0.0/15 for an upstream hostname.
+    # Resolve the Naive endpoint through a bounded direct DNS query only while
+    # preparing its runtime config; this does not change the device resolver.
+    local server="$1" resolver answer
+    case "$server" in
+        ''|*[!A-Za-z0-9.-]*) return 1 ;;
+    esac
+    command -v nslookup >/dev/null 2>&1 || return 1
+    for resolver in 1.1.1.1 8.8.8.8 223.5.5.5; do
+        if command -v timeout >/dev/null 2>&1; then
+            answer=$(timeout 3 nslookup "$server" "$resolver" 2>/dev/null | awk '/^Name:/{seen=1; next} seen && /^Address:/{print $2; exit}')
+        else
+            answer=$(nslookup "$server" "$resolver" 2>/dev/null | awk '/^Name:/{seen=1; next} seen && /^Address:/{print $2; exit}')
+        fi
+        case "$answer" in
+            ''|198.18.*|198.19.*) continue ;;
+            *.*|*:*) printf '%s\n' "$answer"; return 0 ;;
+        esac
+    done
+    return 1
+}
+
 np_prepare() {
-    local id="$1" file port server remote_port user pass transport host eu ep config tmp
+    local id="$1" file port server remote_port user pass transport host eu ep config tmp resolver_ip resolver_rule
     file=$(np_node_file "$id") || return 1
     [ -r "$file" ] || return 1
     port=$(np_port "$id") || return 1
@@ -432,8 +455,16 @@ np_prepare() {
     host="$server"
     case "$host" in *:*|'['*) case "$host" in \[*\]) ;; *) host="[$host]" ;; esac ;; esac
     config="$NP_CONFIG_DIR/$id.json"; tmp="$config.new.$$"
-    printf '{\n  "listen": "socks://127.0.0.1:%s",\n  "proxy": "%s://%s:%s@%s:%s"\n}\n' \
-        "$port" "$transport" "$eu" "$ep" "$host" "$remote_port" > "$tmp" || return 1
+    resolver_ip=$(np_public_resolver_ip "$server" 2>/dev/null || true)
+    resolver_rule=""
+    [ -n "$resolver_ip" ] && resolver_rule=$(np_json_quote "MAP $server $resolver_ip")
+    if [ -n "$resolver_rule" ]; then
+        printf '{\n  "listen": "socks://127.0.0.1:%s",\n  "proxy": "%s://%s:%s@%s:%s",\n  "host-resolver-rules": "%s"\n}\n' \
+            "$port" "$transport" "$eu" "$ep" "$host" "$remote_port" "$resolver_rule" > "$tmp" || return 1
+    else
+        printf '{\n  "listen": "socks://127.0.0.1:%s",\n  "proxy": "%s://%s:%s@%s:%s"\n}\n' \
+            "$port" "$transport" "$eu" "$ep" "$host" "$remote_port" > "$tmp" || return 1
+    fi
     chmod 600 "$tmp" || return 1
     mv -f "$tmp" "$config" || return 1
     printf '%s\n' "$config"
