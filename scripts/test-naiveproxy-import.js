@@ -4,6 +4,10 @@ const fs = require('fs');
 const vm = require('vm');
 
 const template = fs.readFileSync('luci-app-openkill/luasrc/view/openkill/naive_compatibility.htm', 'utf8');
+const scriptStart = template.indexOf('<script>');
+const scriptEnd = template.lastIndexOf('</script>');
+if (scriptStart < 0 || scriptEnd < 0) throw new Error('standalone UI script boundary not found');
+new vm.Script(template.slice(scriptStart + '<script>'.length, scriptEnd), { filename: 'naive_compatibility.htm' });
 const start = template.indexOf('function shareFields(');
 const end = template.indexOf('function fill(', start);
 if (start < 0 || end < 0) throw new Error('standalone parser boundary not found');
