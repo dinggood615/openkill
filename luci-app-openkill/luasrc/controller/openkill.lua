@@ -1743,16 +1743,11 @@ end
 -- file with a fixed path and never places credentials in command arguments.
 local function naive_bridge_request(fields)
 	local command = "/usr/share/openkill/naiveproxy-standalone.sh control"
-	if type(io) == "table" and type(io.popen) == "function" then
-		local popen_ok, pipe = pcall(io.popen, command, "w")
-		if popen_ok and pipe then
-			for _, item in ipairs(fields) do pipe:write(item.key .. "=" .. item.value .. "\n") end
-			local ok, why, code = pipe:close()
-			return (ok == true or code == 0), why or "", code
-		end
-		-- Some vendor LuCI builds expose io.popen but reject it at runtime.
-		-- Fall through to the protected request-file path in that case.
-	end
+	-- Do not use io.popen here.  On the tested vendor ucode/uwsgi build, a
+	-- non-zero child exit (for example a duplicate import) can make
+	-- pipe:close() abort the CGI before JSON is written.  The fixed request
+	-- file below is mode 0600, uses a per-process name, and has no user-derived
+	-- path or shell fragment, so it preserves the same credential boundary.
 	local pid = (nixio and type(nixio.getpid) == "function") and nixio.getpid() or os.time()
 	local request = "/var/run/naiveproxy/control.request." .. tostring(pid)
 	-- The standalone script normally creates its run directory itself.  The
