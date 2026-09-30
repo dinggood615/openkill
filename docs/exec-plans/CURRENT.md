@@ -1,5 +1,83 @@
 # Current status
 
+## 2026-09-30 2026-1195 formal release and final device verification
+
+- Rechecked the repository and preserved the existing device backups.  Source
+  commit `8349ee5e6d7a80561e4c958f3d55b6d5486ce8a4` carries synchronized version
+  `2026-1195`.  The real LuCI controller failure was reproduced and fixed: the
+  current runtime requires string file modes (`0700`/`0600`), and the previous
+  shell-pipe control path was replaced with a protected per-request file plus
+  `/usr/bin/env` fork/exec.  Results now retain stage and exit evidence rather
+  than reporting a generic controller rejection.
+- The Naive bridge now uses incremental procd registration, waits only after
+  the transaction is committed, clears inherited proxy variables, verifies PID
+  to listener socket inode ownership, and keeps health checks read-only.  The
+  UI separates import from edit password retention and distinguishes saved,
+  starting, local-ready, remote-verified and Mihomo-unverified states.
+- Exact-commit Development CI `36685134897` passed
+  (https://github.com/dinggood615/openkill/actions/runs/36685134897).  RC Build
+  `36685296384` passed
+  (https://github.com/dinggood615/openkill/actions/runs/36685296384); its IPK is
+  7,715,285 bytes with SHA256
+  `5e8724c19e4c0d9271cc98bfcbc77b100a76717880583ee02985ff3d4f519786`.
+  The RC audit found no personal node or credential data in source/package
+  content.
+- Formal Release `36685818942` passed with `release_gate=true` and
+  `publish=true`:
+  https://github.com/dinggood615/openkill/actions/runs/36685818942 .  Tag
+  `v2026-1195-ipk` points to the expected source commit and the release is
+  https://github.com/dinggood615/openkill/releases/tag/v2026-1195-ipk .  The
+  formal IPK is 7,907,553 bytes, SHA256
+  `150cce47a676dc56d9f9d427912be1e70004efa5f4ce8fa0363982b94503cd71`:
+  https://github.com/dinggood615/openkill/releases/download/v2026-1195-ipk/luci-app-openkill_2026-1195_all.ipk .
+  RC and formal hashes are intentionally recorded separately; the package
+  channel reports `v2026-1195` and the published metadata carries the same
+  formal URL and digest.
+- On the authorized Kwrt/OpenWrt 25.12-SNAPSHOT x86_64 VMware device, the
+  formal package was verified by SHA256 and installed with a completed,
+  waited-for `opkg --force-reinstall` transaction.  Device status is
+  `2026-1195`; package-owned files are `root:root` with expected modes.  The
+  first interrupted SSH install was allowed to finish/roll back before the
+  second install; no same-version “already latest” result was used as proof.
+  A transient truncated `/etc/config/openkill` was restored from the protected
+  pre-1195 backup before restarting the existing Mihomo service.  The retained
+  backup is `/root/openkill-naive-backup-20260930154500/pre-1195-rc` (mode 700).
+- The independent component is `v154.0.8037.49-2`; the authorized test node
+  is generation 2, HTTPS, local port 11080.  Final manifest evidence is
+  `component_status=available`, `state=running`, `listener_owner=verified`,
+  `local_ready=1`, `health=available`, `reason=probe-ok`, and
+  `pending_apply=0`.  Protected directories remain 700 and node/runtime
+  files 600.  No new Naive SIGTRAP was observed after the formal installation;
+  older kernel entries predate this final run.
+- Real LuCI interaction on the same source was completed through import,
+  save, save-and-start, stop, start, node test, retain-password edit and
+  apply.  After the formal package install, the available Chrome session also
+  completed stop -> start -> node test (`连接成功`).  The browser extension
+  later disappeared from the automation inventory, so a final screenshot-only
+  refresh after the service recovery is **unverified**; device-side status and
+  health evidence remain available.
+- Forced SOCKS5 requests cleared all proxy bypass variables and completed
+  three rounds to two HTTPS targets with exit code 0 and HTTP 204/200 on every
+  round.  Two independent instances on ports 11080/11081 ran concurrently;
+  both passed the two targets, then node-2 was stopped and removed while
+  node-1 stayed running and passed another request.
+- The current running Mihomo process was restarted from the restored existing
+  configuration without changing user YAML policy.  Its API selected the
+  credential-free loopback node in the dedicated test group (HTTP 204), actual
+  proxy requests returned HTTP 204 and 200, and the prior group selection was
+  restored with HTTP 204.  Mihomo UI detection intentionally remains
+  “未验证” when arbitrary user YAML/group ownership cannot be parsed reliably;
+  the running-instance request itself is verified.
+- Source/package audits found no personal node, hostname, username or
+  credential in tracked source, RC content, formal content or default files.
+  The node visible on the device is retained independent service data from the
+  authorized test machine; it is not shipped by the project package.  Only
+  task-created old duplicate backups were cleaned after the device reached
+  100% overlay usage; the latest recovery backups were retained.
+- Local gates passed: Naive import behavior, integration contract, UI browser
+  contract, standalone fixture, POSIX syntax, WSL local gate and repository
+  preflight.  No whole-device reboot was performed by the agent.
+
 ## 2026-09-30 2026-1194 formal release and post-reboot device acceptance
 
 - The baseline was rechecked after the authorized test-machine reboot.  The
@@ -56,7 +134,7 @@
   passed both HTTPS targets, and was stopped and removed; node-1 remained
   running and unaffected.
 - Current running Mihomo was tested through its API and actual HTTP proxy.  The
-  credential-free loopback node `YT` was selected in the dedicated
+  credential-free loopback node for the authorized test was selected in the dedicated
   `日本自动组`; gstatic returned 204 and Cloudflare trace returned 200.  The
   original top-level group `手动组` was restored with API status 204.  Source
   YAML, runtime group membership and the running process were checked; no
@@ -210,7 +288,7 @@
   node and state paths remain 700/600.
 - Device-only Mihomo evidence: the selected `/etc/openkill/openkill.optimized.yaml`
   was backed up under `/root/openkill-naive-backup-20260929185837`, then given
-  a credential-free `YT` loopback proxy group and a dedicated
+  a credential-free authorized-test loopback proxy group and a dedicated
   `127.0.0.1:17891` mixed listener. Mihomo API reload returned HTTP 204,
   the listener belonged to the running clash process, and three rounds to two
   HTTPS targets returned 204/200. The default proxy group was not changed.
