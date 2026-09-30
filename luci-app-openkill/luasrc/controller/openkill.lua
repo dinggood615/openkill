@@ -1727,7 +1727,11 @@ end
 -- placed in a command argument, UCI value, log message or OpenKill state.
 -- The bridge validates and persists the request under /etc/naiveproxy.
 local function naive_bridge_response(result, status, message)
-	if status then HTTP.status(status, message or "NaiveProxy bridge request failed") end
+	-- Some vendor ucode/uwsgi combinations close the CGI stream when a
+	-- controller emits a non-standard HTTP error (notably 422).  Keep the
+	-- transport a valid JSON response and carry the diagnostic status inside
+	-- the body; the UI already branches on d.ok/stage/error.
+	if status then result.http_status = status end
 	HTTP.prepare_content("application/json; charset=utf-8")
 	HTTP.write_json(result)
 end

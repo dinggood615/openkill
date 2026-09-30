@@ -88,6 +88,7 @@ def main() -> None:
     fallback_runner = controller.index('local command = "/usr/share/openkill/naiveproxy-standalone.sh manifest')
     assert manifest_read < fallback_runner, "status must read an existing manifest before fallback execution"
     require(CONTROLLER, "action_naive_bridge_control")
+    require(CONTROLLER, "result.http_status = status")
     assert "legacy_migration" not in controller
     require(CONTROLLER, 'HTTP.formvalue("operation")')
     require(CONTROLLER, "update = true")
