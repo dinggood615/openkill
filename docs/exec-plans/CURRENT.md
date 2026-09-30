@@ -39,8 +39,8 @@
   formal package.  The temporary `/tmp` package/backup files were removed
   after verification.
 - Component evidence: official Naive executable `154.0.8037.49`, metadata
-  release `v154.0.8037.49-2`, executable probe successful.  The real saved
-  node `YT-singbox_naive` was re-read as generation 3, HTTPS transport, local
+  release `v154.0.8037.49-2`, executable probe successful.  The authorized
+  test node was re-read as generation 3, HTTPS transport, local
   port 11080.  The process PID, generated config and `127.0.0.1:11080`
   listener are tied to the same instance; manifest reports
   `listener_owner=verified`, `local_ready=1`, and health `available`/`probe-ok`.

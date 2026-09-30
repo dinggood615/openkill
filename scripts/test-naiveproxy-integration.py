@@ -106,7 +106,8 @@ def main() -> None:
     require(CONTROLLER, "result.http_status = status")
     require(CONTROLLER, "control.request.")
     assert "io.popen" not in controller
-    require(CONTROLLER, "control; exit 0")
+    require(CONTROLLER, "SYS.process.exec")
+    assert "local rc = os.execute" not in controller
     require(CONTROLLER, "standalone-bridge-returned-nonzero")
     require(STANDALONE, "printf 'rc=%s\\n'")
     assert "legacy_migration" not in controller
@@ -139,6 +140,9 @@ def main() -> None:
     require(VIEW, "data-naive-standalone-flow")
     require(VIEW, 'role="group" aria-labelledby="openkill-naive-dialog-title" data-naive-node-form')
     require(VIEW, "function submitNode(start)")
+    require(VIEW, "passwordRetain.style.display")
+    require(VIEW, "if(editing)f.password_mode")
+    require(OC_CSS, ".openkill-naive-form-check[hidden]")
     require(VIEW, 'document.querySelector(\'input[name="token"]\')')
     assert '<form data-naive-node-form>' not in view
     assert "form.addEventListener('submit'" not in view
@@ -160,6 +164,8 @@ def main() -> None:
     require(STANDALONE, "component-architecture-mismatch")
     require(STANDALONE, "np_validate_query")
     require(STANDALONE, "np_listener_owner")
+    require(STANDALONE, "np_socket_owned_by_pid")
+    require(STANDALONE, "listener-ownership-unverified")
     require(STANDALONE, "port-owned-by-other-process")
     require(STANDALONE, "np_wait_for_ready")
     require(STANDALONE, "control.result")

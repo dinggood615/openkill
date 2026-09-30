@@ -26,17 +26,43 @@ naiveproxy_record_ready() {
     }
 }
 
+naiveproxy_instance_ready() {
+    local id="$1" file port pid owner generation running_generation
+    file=$(np_node_file "$id") || return 1
+    port=$(np_port "$id" 2>/dev/null) || return 1
+    pid=$(np_pid_for_config "$NP_CONFIG_DIR/$id.json" 2>/dev/null || true)
+    [ -n "$pid" ] && np_listener "$port" || return 1
+    owner=$(np_listener_owner "$id" "$port" 2>/dev/null || true)
+    [ "$owner" = verified ] || return 1
+    generation=$(np_node_generation "$file")
+    running_generation=$(sed -n 's/^generation=//p' "$NP_STATE_DIR/instance.$id" 2>/dev/null | head -n1)
+    [ -n "$running_generation" ] && [ "$running_generation" = "$generation" ]
+}
+
+naiveproxy_wait_stopped() {
+    local id="$1" attempts=0 pid
+    while [ "$attempts" -lt 8 ]; do
+        pid=$(np_pid_for_config "$NP_CONFIG_DIR/$id.json" 2>/dev/null || true)
+        [ -z "$pid" ] && return 0
+        attempts=$((attempts + 1))
+        sleep 1
+    done
+    return 1
+}
+
 naiveproxy_start_instance() {
     local id="$1" file enabled config instance
     [ -n "$id" ] || return 1
     np_dirs || return 1
-    if ! np_probe_component; then
-        # LuCI/uwsgi can expose a transient loader-probe context even when
-        # the signed installed component is intact.  The installer already
-        # verified this exact file; use its protected digest as a second
-        # bounded piece of evidence, then let procd readiness prove execution
-        # and listener ownership.  A changed or unverified file still fails.
-        np_cached_component_valid || {
+    # The signed installed component is intact when protected metadata and
+    # ELF evidence are valid.  Prefer that
+    # digest for a LuCI-triggered start: launching `naive --version` from a
+    # uWSGI worker is an unreliable loader probe on some OpenWrt builds and
+    # can trap even though the same binary is valid under procd.  If metadata
+    # is absent or changed, fall back to the bounded executable probe and fail
+    # with an explicit component reason.
+    if ! np_cached_component_valid; then
+        np_probe_component || {
             NP_FORCE_COMPONENT_PROBE=1 np_manifest >/dev/null 2>&1 || true
             return 1
         }
@@ -52,6 +78,20 @@ naiveproxy_start_instance() {
     [ -r "$config" ] || return 1
     instance="naive_${id}"
     procd_open_instance "$instance"
+    # Keep the official binary independent of LuCI/uWSGI proxy and loader
+    # variables.  Inherited proxy variables can make its own upstream setup
+    # recurse through a local service and the binary exits with SIGTRAP before
+    # the SOCKS listener is ready.
+    procd_set_param env HOME=/
+    procd_append_param env PATH=/usr/sbin:/usr/bin:/sbin:/bin
+    procd_append_param env http_proxy=
+    procd_append_param env https_proxy=
+    procd_append_param env all_proxy=
+    procd_append_param env no_proxy=
+    procd_append_param env HTTP_PROXY=
+    procd_append_param env HTTPS_PROXY=
+    procd_append_param env ALL_PROXY=
+    procd_append_param env NO_PROXY=
     procd_set_param command "$NP_BIN" "$config"
     procd_set_param user root
     # The official NaiveProxy binary needs the root group for its TLS/network
@@ -99,6 +139,14 @@ start_service() { naiveproxy_start_instances; }
 start_node() {
     local id="$1" rc=0
     [ -n "$id" ] || return 1
+    # Starting an already-ready generation is idempotent.  Re-registering the
+    # same procd instance causes the official binary to be launched twice and
+    # can produce a transient trap instead of a useful success result.
+    if naiveproxy_instance_ready "$id"; then
+        naiveproxy_record_ready "$id" || return 1
+        np_manifest >/dev/null 2>&1 || true
+        return 0
+    fi
     procd_lock
     NP_START_IDS=""
     procd_open_service "$NP_SERVICE_NAME" "$initscript"
@@ -114,12 +162,14 @@ start_node() {
 }
 
 stop_service() {
-    local id
+    local id failed=0
     procd_kill "$NP_SERVICE_NAME" >/dev/null 2>&1 || true
     for id in $(np_ids 2>/dev/null); do
+        naiveproxy_wait_stopped "$id" || failed=1
         rm -f "$NP_STATE_DIR/instance.$id" "$NP_STATE_DIR/health.$id"
     done
     np_manifest >/dev/null 2>&1 || true
+    return "$failed"
 }
 
 stop_node() {
@@ -127,6 +177,10 @@ stop_node() {
     [ -n "$id" ] || return 1
     procd_lock
     procd_kill "$NP_SERVICE_NAME" "naive_$id" >/dev/null 2>&1 || true
+    naiveproxy_wait_stopped "$id" || {
+        np_manifest >/dev/null 2>&1 || true
+        return 1
+    }
     rm -f "$NP_STATE_DIR/instance.$id" "$NP_STATE_DIR/health.$id"
     np_manifest >/dev/null 2>&1 || true
 }

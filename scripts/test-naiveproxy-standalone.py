@@ -61,6 +61,10 @@ case "$expr" in
 esac
 """, encoding="utf-8")
         (fake / "ss").write_text("#!/bin/sh\nprintf '%s\\n' 'LISTEN 0 128 127.0.0.1:11080 0.0.0.0:*'\n", encoding="utf-8")
+        # Keep the fixture offline.  Git for Windows may expose the host
+        # nslookup executable through PATH; invoking it would make prepare
+        # depend on the host network and can leave a captured pipe open.
+        (fake / "nslookup").write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
         (fake / "curl").write_text("#!/bin/sh\nprintf '204\\t0.123\\n'\n", encoding="utf-8")
         for path in fake.iterdir():
             os.chmod(path, 0o755)
@@ -78,13 +82,25 @@ esac
         run(["prepare", "n1"], env)
         config_path = run_dir / "config" / "n1.json"
         config_before = config_path.stat().st_mtime_ns
-        health_result = subprocess.run([BASH, git_path(SCRIPT), "health", "all"], env=env, text=True, capture_output=True)
-        manifest = subprocess.run([BASH, git_path(SCRIPT), "manifest"], env=env, text=True,
-                                  capture_output=True, check=True).stdout
+        # Git for Windows can keep a pipeline child attached to captured pipes
+        # after the shell has exited (notably the fake ss/grep health probe).
+        # Redirect these read-only status commands and inspect the manifest
+        # file they atomically write, avoiding a false test hang on Windows.
+        health_result = subprocess.run([BASH, git_path(SCRIPT), "health", "all"], env=env, text=True,
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        manifest_result = subprocess.run([BASH, git_path(SCRIPT), "manifest"], env=env, text=True,
+                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if manifest_result.returncode:
+            raise AssertionError(f"manifest rc={manifest_result.returncode}")
+        manifest = (run_dir / "manifest").read_text(encoding="utf-8")
         if health_result.returncode:
-            raise AssertionError(f"health rc={health_result.returncode} stdout={health_result.stdout!r} stderr={health_result.stderr!r}")
-        assert "node.n1.health=available" in manifest, manifest
-        assert "node.n1.latency_ms=123" in manifest, manifest
+            raise AssertionError(f"health rc={health_result.returncode}")
+        # The offline fixture has no real /proc socket inode to associate with
+        # its fake listener.  It must therefore remain unverified instead of
+        # claiming a remote probe succeeded; the authorized device test
+        # covers the verified inode + SOCKS5 path.
+        assert "node.n1.health=local-not-ready" in manifest, manifest
+        assert "node.n1.reason=listener-ownership-unverified" in manifest, manifest
         assert config_path.stat().st_mtime_ns == config_before, "health rewrote the active runtime config"
         yaml = run(["yaml"], env).stdout
         assert 'server: "127.0.0.1"' in yaml and "port: 11080" in yaml

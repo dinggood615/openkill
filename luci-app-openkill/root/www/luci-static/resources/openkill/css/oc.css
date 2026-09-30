@@ -9510,6 +9510,10 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
 #cbi-openkill.openkill-settings .openkill-naive-import-start label { display: grid; gap: 6px; color: var(--oc-text-primary, #f1f4f8); font-weight: 600; }
 #cbi-openkill.openkill-settings .openkill-naive-import-start p { margin: 0; color: var(--oc-text-muted, #a8b1c2); font-size: .9em; }
 #cbi-openkill.openkill-settings .openkill-naive-form-check { display: flex; align-items: center; gap: 8px; }
+#cbi-openkill.openkill-settings .openkill-naive-form-check[hidden],
+#cbi-openkill.openkill-settings .openkill-naive-form-fields[hidden],
+#cbi-openkill.openkill-settings .openkill-naive-import-start[hidden],
+#cbi-openkill.openkill-settings .openkill-naive-dialog-actions button[hidden] { display: none !important; }
 #cbi-openkill.openkill-settings .openkill-naive-form-check input { width: auto; }
 #cbi-openkill.openkill-settings .openkill-naive-import-field { margin-top: 12px; }
 #cbi-openkill.openkill-settings .openkill-naive-preview { margin-top: 12px; padding: 10px; border-radius: 6px; background: var(--oc-surface-subtle, rgba(15,23,42,.35)); color: var(--oc-text-secondary, #aeb8c8); overflow-wrap: anywhere; }

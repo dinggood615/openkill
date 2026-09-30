@@ -1745,12 +1745,16 @@ local function naive_bridge_request(fields)
 	local pid = (nixio and type(nixio.getpid) == "function") and nixio.getpid() or os.time()
 	local request = "/var/run/naiveproxy/control.request." .. tostring(pid)
 	local result_path = "/var/run/naiveproxy/control.result." .. tostring(pid)
-	local command = "NAIVEPROXY_CONTROL_RESULT=" .. result_path .. " /usr/share/openkill/naiveproxy-standalone.sh control; exit 0"
+	-- Execute through LuCI's fork/exec wrapper.  It closes stdin to /dev/null
+	-- and waits for the child, avoiding uWSGI pipes reaching procd or the
+	-- official binary.  The request/result paths are fixed runtime paths (the
+	-- pid is numeric), so credentials never enter argv.
+	local command = { "/usr/bin/env", "-i", "PATH=/usr/sbin:/usr/bin:/sbin:/bin", "HOME=/", "NAIVEPROXY_CONTROL_RESULT=" .. result_path, "NAIVEPROXY_CONTROL_REQUEST=" .. request, "/usr/share/openkill/naiveproxy-standalone.sh", "control" }
 	-- The standalone script normally creates its run directory itself.  The
 	-- request-file path is used before that script can start, so create only
 	-- this fixed runtime directory when the platform exposes nixio mkdir.
 	if type(nixio) == "table" and type(nixio.fs) == "table" and type(nixio.fs.mkdir) == "function" then
-		pcall(nixio.fs.mkdir, "/var/run/naiveproxy", 448) -- 0700
+		pcall(nixio.fs.mkdir, "/var/run/naiveproxy", "0700")
 	end
 	local open_ok, file, open_error = pcall(function()
 		return io and io.open and io.open(request, "w")
@@ -1759,12 +1763,25 @@ local function naive_bridge_request(fields)
 	if not file then return false, open_error or "request-file-unavailable", nil end
 	for _, item in ipairs(fields) do file:write(item.key .. "=" .. item.value .. "\n") end
 	file:close()
-	if type(nixio) == "table" and type(nixio.fs) == "table" and type(nixio.fs.chmod) == "function" then nixio.fs.chmod(request, 384) end -- 0600
-	local rc = os.execute(command .. " < " .. request)
-	-- os.remove is available on the supported Lua runtimes and avoids relying
-	-- on an optional nixio.fs unlink spelling here.
-	os.remove(request)
-	return rc == true or rc == 0, result_path, rc
+	if type(nixio) == "table" and type(nixio.fs) == "table" and type(nixio.fs.chmod) == "function" then
+		nixio.fs.chmod(request, "0600")
+	else
+		SYS.call("chmod 600 " .. request .. " >/dev/null 2>&1")
+	end
+	local exec_ok, execution = pcall(SYS.process.exec, command, nil, nil, false)
+	if not exec_ok then
+		return false, result_path, 127
+	end
+	local rc = execution and tonumber(execution.code) or 127
+	-- Remove the one-shot request even when the bridge rejects it.  The
+	-- fallback keeps this compatible with LuCI builds whose nixio fs wrapper
+	-- does not expose unlink.
+	if type(nixio) == "table" and type(nixio.fs) == "table" and type(nixio.fs.unlink) == "function" then
+		pcall(nixio.fs.unlink, request)
+	else
+		SYS.call("rm -f " .. request .. " >/dev/null 2>&1")
+	end
+	return tonumber(rc) == 0, result_path, rc
 end
 
 local function naive_percent_decode(value)
@@ -1835,32 +1852,36 @@ local function action_naive_bridge_control_impl()
 	-- Do not consume a result left by an earlier request when the bridge could
 	-- not be launched this time.
 	local launched, bridge_detail, code = naive_bridge_request(fields)
-	local result_path = launched and bridge_detail or nil
+	-- A completed bridge operation may intentionally return non-zero (duplicate,
+	-- invalid node, stopped instance, etc.).  Its redacted result file still
+	-- contains the actionable stage and must be parsed before classifying the
+	-- transport as unavailable.
+	local result_path = bridge_detail
 	local control_result = (result_path and fs.readfile(result_path)) or ""
-	if result_path then os.remove(result_path) end
+	if result_path then SYS.call("rm -f " .. result_path .. " >/dev/null 2>&1") end
 	naive_control_result_fields(control_result, result)
-	if launched then
-		if tonumber(result.rc or 0) ~= 0 then
-			result.error = "operation-failed"
-			result.detail = "standalone-bridge-returned-nonzero"
-			result.http_status = 422
-			return result, nil, nil
-		end
+	if launched and tonumber(result.rc or 0) == 0 then
 		result.ok = true
 		result.stage = result.stage == "request" and "accepted" or result.stage
 		return result, nil, nil
 	end
+	if control_result ~= "" then
+		result.error = "operation-failed"
+		result.detail = "standalone-bridge-returned-nonzero" .. (result.reason and (":" .. result.reason) or "")
+		result.http_status = 422
+		return result, nil, nil
+	end
 	result.stage = result.stage == "request" and "bridge-rejected" or result.stage
-	result.error = (bridge_detail == "popen-unavailable" or bridge_detail == "request-file-unavailable" or bridge_detail == "request-file-open-failed") and "independent-service-unavailable" or "operation-failed"
+	result.error = "independent-service-unavailable"
 	result.bridge_detail = bridge_detail
-	result.detail = result.error == "operation-failed" and "control-exit-failed" or nil
+	result.detail = "control-exit-failed"
 	return result, 422, "Unprocessable Entity"
 end
 
 function action_naive_bridge_control()
 	local protected_ok, result, status, message = pcall(action_naive_bridge_control_impl)
 	if not protected_ok then
-		result = { ok = false, operation = HTTP.formvalue("operation") or "", stage = "controller-error", error = "independent-service-unavailable" }
+		result = { ok = false, operation = HTTP.formvalue("operation") or "", stage = "controller-error", error = "independent-service-unavailable", detail = "controller-exception" }
 		status, message = 503, "Service Unavailable"
 	end
 	naive_bridge_response(result, status, message)

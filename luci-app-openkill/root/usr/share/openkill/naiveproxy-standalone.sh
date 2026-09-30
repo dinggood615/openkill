@@ -184,7 +184,15 @@ np_cached_component_valid() {
             asset=$(sed -n 's/^asset=//p' "$NP_ROOT/component.meta" 2>/dev/null | head -n1)
             version=$(sed -n 's/^version=//p' "$NP_ROOT/component.meta" 2>/dev/null | head -n1)
             [ -n "$asset" ] && [ -n "$version" ] && [ "$version" != unknown ] || return 1
-            env -i HOME=/ PATH=/usr/sbin:/usr/bin:/sbin:/bin "$NP_BIN" --version >/dev/null 2>&1
+            # Legacy metadata predates binary_sha256.  The package installer
+            # already validated the official archive/version; do not rerun
+            # the official binary from a LuCI worker just to prove a cached
+            # component, because that context can trigger a false loader trap.
+            # Architecture/ELF and executable checks remain local evidence;
+            # procd readiness is the final runtime proof.
+            np_hex_file "$NP_BIN" 0 4 >/dev/null 2>&1 || return 1
+            [ "$(np_hex_file "$NP_BIN" 0 4 2>/dev/null || true)" = 7f454c46 ] || return 1
+            np_elf_arch_ok "$NP_BIN" || return 1
             ;;
         *[!0-9A-Fa-f]* ) return 1 ;;
         * )
@@ -380,7 +388,7 @@ np_listener_owner() {
     config=$(np_node_file "$id" 2>/dev/null || true)
     [ -n "$config" ] || return 2
     pid=$(np_pid_for_config "$NP_CONFIG_DIR/$id.json" 2>/dev/null || true)
-    if [ -n "$pid" ] && np_listener "$port"; then
+    if [ -n "$pid" ] && np_listener "$port" && np_socket_owned_by_pid "$pid" "$port"; then
         printf 'verified\n'
         return 0
     fi
@@ -394,10 +402,29 @@ np_listener_owner() {
 
 np_pid_for_config() {
     local config="$1" proc cmd
+    case "$(uname -s 2>/dev/null || true)" in Linux*) ;; *) return 1 ;; esac
     for proc in /proc/[0-9]*; do
         [ -r "$proc/cmdline" ] || continue
         cmd=$(tr '\000' ' ' < "$proc/cmdline" 2>/dev/null || true)
         case "$cmd" in *"$config"*) printf '%s\n' "${proc##*/}"; return 0 ;; esac
+    done
+    return 1
+}
+
+np_socket_owned_by_pid() {
+    local pid="$1" port="$2" hex proto inode fd target
+    case "$(uname -s 2>/dev/null || true)" in Linux*) ;; *) return 1 ;; esac
+    np_valid_port "$port" || return 1
+    hex=$(printf '%04X' "$port" 2>/dev/null) || return 1
+    for proto in /proc/net/tcp /proc/net/tcp6; do
+        [ -r "$proto" ] || continue
+        inode=$(awk -v p=":$hex" '$4 == "0A" && $2 ~ p "$" {print $10; exit}' "$proto" 2>/dev/null || true)
+        [ -n "$inode" ] || continue
+        for fd in /proc/$pid/fd/*; do
+            [ -e "$fd" ] || continue
+            target=$(readlink "$fd" 2>/dev/null || true)
+            [ "$target" = "socket:[$inode]" ] && return 0
+        done
     done
     return 1
 }
@@ -409,7 +436,10 @@ np_wait_for_ready() {
         pid=$(np_pid_for_config "$NP_CONFIG_DIR/$id.json" 2>/dev/null || true)
         if [ -n "$pid" ] && np_listener "$port"; then
             owner=$(np_listener_owner "$id" "$port" 2>/dev/null || true)
-            case "$owner" in external-or-unmatched) return 1 ;; *) return 0 ;; esac
+            case "$owner" in
+                verified) return 0 ;;
+                external-or-unmatched) return 1 ;;
+            esac
         fi
         attempts=$((attempts + 1))
         sleep 1
@@ -489,23 +519,29 @@ np_health_one() {
     now=$(date +%s); old_fail=$(sed -n 's/^fail_count=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1)
     case "$old_fail" in ''|*[!0-9]*) old_fail=0 ;; esac
     if ! np_enabled "$(np_node_value "$file" enabled)"; then status=disabled; reason=node-disabled; latency=unknown
-    elif ! np_probe_component; then
+    elif ! np_cached_component_valid && ! np_probe_component; then
         reason=${NP_PROBE_REASON:-component-unavailable}
         case "$reason" in component-missing) status=component-missing ;; *) status=component-unavailable ;; esac
         latency=unknown
     elif ! np_config_ready "$id" && ! np_prepare "$id" >/dev/null; then status=config-invalid; reason=node-config-invalid; latency=unknown
     elif ! np_listener "$port"; then status=local-not-ready; reason=loopback-listener-not-ready; latency=unknown
-    elif owner=$(np_listener_owner "$id" "$port" 2>/dev/null) && [ "$owner" = external-or-unmatched ]; then
-        status=local-not-ready; reason=port-owned-by-other-process; latency=unknown
-    elif ! command -v curl >/dev/null 2>&1; then status=probe-failed; reason=curl-missing; latency=unknown
     else
-        output=$(curl --proxy "socks5h://127.0.0.1:${port}" --noproxy '' --connect-timeout 3 --max-time "$NP_TIMEOUT" --max-redirs 0 --proto '=https' -sS -o /dev/null -w '%{http_code}\t%{time_total}' "$NP_TARGET" 2>/dev/null || true)
-        code=$(printf '%s' "$output" | cut -f1); seconds=$(printf '%s' "$output" | cut -f2)
-        case "$code" in
-            2??) latency=$(awk -v s="$seconds" 'BEGIN { if (s !~ /^[0-9.]+$/) exit 1; printf "%d", s * 1000 + 0.5 }' 2>/dev/null || true); status=available; reason=probe-ok ;;
-            401|407) latency=unknown; status=probe-failed; reason=remote-auth-failed ;;
-            *) latency=unknown; status=probe-failed; reason=https-probe-failed ;;
-        esac
+        owner=$(np_listener_owner "$id" "$port" 2>/dev/null || true)
+        if [ "$owner" = external-or-unmatched ]; then
+            status=local-not-ready; reason=port-owned-by-other-process; latency=unknown
+        elif [ "$owner" != verified ]; then
+            status=local-not-ready; reason=listener-ownership-unverified; latency=unknown
+        elif ! command -v curl >/dev/null 2>&1; then
+            status=probe-failed; reason=curl-missing; latency=unknown
+        else
+            output=$(curl --proxy "socks5h://127.0.0.1:${port}" --noproxy '' --connect-timeout 3 --max-time "$NP_TIMEOUT" --max-redirs 0 --proto '=https' -sS -o /dev/null -w '%{http_code}\t%{time_total}' "$NP_TARGET" 2>/dev/null || true)
+            code=$(printf '%s' "$output" | cut -f1); seconds=$(printf '%s' "$output" | cut -f2)
+            case "$code" in
+                2??) latency=$(awk -v s="$seconds" 'BEGIN { if (s !~ /^[0-9.]+$/) exit 1; printf "%d", s * 1000 + 0.5 }' 2>/dev/null || true); status=available; reason=probe-ok ;;
+                401|407) latency=unknown; status=probe-failed; reason=remote-auth-failed ;;
+                *) latency=unknown; status=probe-failed; reason=https-probe-failed ;;
+            esac
+        fi
     fi
     case "$status" in available) old_fail=0 ;; disabled) ;; *) old_fail=$((old_fail + 1)) ;; esac
     [ -n "$latency" ] || latency=unknown
@@ -601,7 +637,8 @@ np_control_read() {
     NP_CTL_RESULT_NODE_ENABLED=""; NP_CTL_RESULT_NODE_GENERATION=""; NP_CTL_RESULT_PASSWORD_SET=""
     local line key value cr
     cr=$(printf '\r')
-    while IFS= read -r line; do
+    np_control_read_stream() {
+        while IFS= read -r line; do
         case "$line" in *"$cr") line=${line%?} ;; esac
         key=${line%%=*}; value=${line#*=}
         case "$key" in
@@ -612,7 +649,16 @@ np_control_read() {
             enabled) NP_CTL_enabled="$value" ;; share) NP_CTL_share="$value" ;;
             generation) NP_CTL_generation="$value" ;; password_mode) NP_CTL_password_mode="$value" ;;
         esac
-    done
+        done
+    }
+    # LuCI invokes the bridge with stdin attached to /dev/null so the
+    # official Naive process never inherits a request pipe.  The standalone
+    # command-line form continues to accept stdin for compatibility.
+    if [ -n "${NAIVEPROXY_CONTROL_REQUEST:-}" ] && [ -r "$NAIVEPROXY_CONTROL_REQUEST" ]; then
+        np_control_read_stream < "$NAIVEPROXY_CONTROL_REQUEST"
+    else
+        np_control_read_stream
+    fi
     [ -n "$NP_CTL_action" ] || return 1
 }
 
@@ -919,7 +965,9 @@ np_control() {
         start)
             rc=0
             if [ -n "$NP_CTL_id" ]; then
-                /etc/init.d/naiveproxy-bridge start_node "$NP_CTL_id" >/dev/null 2>&1
+                # Do not let the one-shot control request become the
+                # official binary's inherited stdin through rc.common/procd.
+                /etc/init.d/naiveproxy-bridge start_node "$NP_CTL_id" </dev/null >/dev/null 2>&1
                 rc=$?
             else
                 enabled_found=0
@@ -932,7 +980,9 @@ np_control() {
                         # default `set` close action, which can discard the
                         # existing instance table and is not safe for a
                         # LuCI-triggered multi-node start.
-                        /etc/init.d/naiveproxy-bridge start_node "$start_id" >/dev/null 2>&1 || rc=1
+                        # Do not let the one-shot control request become the
+                        # official binary's inherited stdin through procd.
+                        /etc/init.d/naiveproxy-bridge start_node "$start_id" </dev/null >/dev/null 2>&1 || rc=1
                     fi
                 done
                 if [ "$enabled_found" -eq 1 ]; then
@@ -944,15 +994,17 @@ np_control() {
             fi
             np_manifest >/dev/null 2>&1 || true
             [ "$rc" -eq 0 ] && stage=service-started || stage=service-start-failed
+            [ "$rc" -eq 0 ] || NP_CTL_RESULT_REASON="start-node-returned-$rc"
             np_control_result "$rc" "$stage"; return "$rc" ;;
         stop)
             if [ -n "$NP_CTL_id" ]; then
-                /etc/init.d/naiveproxy-bridge stop_node "$NP_CTL_id" >/dev/null 2>&1
+                /etc/init.d/naiveproxy-bridge stop_node "$NP_CTL_id" </dev/null >/dev/null 2>&1
             else
-                /etc/init.d/naiveproxy-bridge stop >/dev/null 2>&1
+                /etc/init.d/naiveproxy-bridge stop </dev/null >/dev/null 2>&1
             fi
             rc=$?; np_manifest >/dev/null 2>&1 || true
             [ "$rc" -eq 0 ] && stage=service-stopped || stage=service-stop-failed
+            [ "$rc" -eq 0 ] || NP_CTL_RESULT_REASON="stop-node-returned-$rc"
             np_control_result "$rc" "$stage"; return "$rc" ;;
         health)
             if [ -n "$NP_CTL_id" ]; then
