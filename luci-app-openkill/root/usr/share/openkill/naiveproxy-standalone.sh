@@ -728,6 +728,7 @@ np_control_result() {
     tmp="$NP_CONTROL_RESULT.new.$$"
     {
         printf 'stage=%s\n' "$(np_safe "$stage")"
+        printf 'rc=%s\n' "$rc"
         [ -n "$NP_CTL_RESULT_ID" ] && printf 'id=%s\n' "$(np_safe "$NP_CTL_RESULT_ID")"
         [ -n "$NP_CTL_RESULT_REASON" ] && printf 'reason=%s\n' "$(np_safe "$NP_CTL_RESULT_REASON")"
         [ -n "$NP_CTL_RESULT_ASSET" ] && printf 'asset=%s\n' "$(np_safe "$NP_CTL_RESULT_ASSET")"

@@ -89,8 +89,10 @@ def main() -> None:
     assert manifest_read < fallback_runner, "status must read an existing manifest before fallback execution"
     require(CONTROLLER, "action_naive_bridge_control")
     require(CONTROLLER, "result.http_status = status")
-    assert "io.popen(command, \"w\")" not in controller
-    require(CONTROLLER, "/var/run/naiveproxy/control.request.")
+    require(CONTROLLER, "pcall(io.popen, command, \"w\")")
+    require(CONTROLLER, "control; exit 0")
+    require(CONTROLLER, "standalone-bridge-returned-nonzero")
+    require(STANDALONE, "printf 'rc=%s\\n'")
     assert "legacy_migration" not in controller
     require(CONTROLLER, 'HTTP.formvalue("operation")')
     require(CONTROLLER, "update = true")

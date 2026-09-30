@@ -1742,12 +1742,22 @@ end
 -- "Unexpected token '<'".  The fallback uses a mode-600, one-shot request
 -- file with a fixed path and never places credentials in command arguments.
 local function naive_bridge_request(fields)
-	local command = "/usr/share/openkill/naiveproxy-standalone.sh control"
-	-- Do not use io.popen here.  On the tested vendor ucode/uwsgi build, a
-	-- non-zero child exit (for example a duplicate import) can make
-	-- pipe:close() abort the CGI before JSON is written.  The fixed request
-	-- file below is mode 0600, uses a per-process name, and has no user-derived
-	-- path or shell fragment, so it preserves the same credential boundary.
+	-- Keep the child exit status at zero after the standalone bridge has
+	-- committed its private result file.  This avoids a vendor ucode/uwsgi
+	-- pipe:close() abort for ordinary validation failures; the result's `rc`
+	-- field remains the authoritative operation status.
+	local command = "/usr/share/openkill/naiveproxy-standalone.sh control; exit 0"
+	if type(io) == "table" and type(io.popen) == "function" then
+		local popen_ok, pipe = pcall(io.popen, command, "w")
+		if popen_ok and pipe then
+			for _, item in ipairs(fields) do pipe:write(item.key .. "=" .. item.value .. "\n") end
+			local ok, why, code = pipe:close()
+			return (ok == true or code == 0), why or "", code
+		end
+	end
+	-- Fallback for LuCI builds without io.popen.  The request path is fixed,
+	-- per-process and never contains user input; the bridge still reports rc
+	-- in its mode-600 result file.
 	local pid = (nixio and type(nixio.getpid) == "function") and nixio.getpid() or os.time()
 	local request = "/var/run/naiveproxy/control.request." .. tostring(pid)
 	-- The standalone script normally creates its run directory itself.  The
@@ -1783,6 +1793,7 @@ local function naive_control_result_fields(content, result)
 	for line in (content or ""):gmatch("[^\r\n]+") do
 		local key, value = line:match("^([%w_.-]+)=(.*)$")
 		if key == "stage" then result.stage = value
+		elseif key == "rc" then result.rc = tonumber(value) or value
 		elseif key == "id" then result.id = value
 		elseif key == "reason" then result.reason = value
 		elseif key == "asset" then result.asset = value
@@ -1842,6 +1853,12 @@ local function action_naive_bridge_control_impl()
 	local control_result = fs.readfile("/var/run/naiveproxy/control.result") or ""
 	naive_control_result_fields(control_result, result)
 	if launched then
+		if tonumber(result.rc or 0) ~= 0 then
+			result.error = "operation-failed"
+			result.detail = "standalone-bridge-returned-nonzero"
+			result.http_status = 422
+			return result, nil, nil
+		end
 		result.ok = true
 		result.stage = result.stage == "request" and "accepted" or result.stage
 		return result, nil, nil
