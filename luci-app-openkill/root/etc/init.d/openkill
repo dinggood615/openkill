@@ -1259,6 +1259,13 @@ check_core_status()
          LOG_ERROR "DNS listener is not ready on the configured port."
          start_fail
       fi
+      if [ "$(uci -q get openkill.config.dns_privacy_mode 2>/dev/null)" = strict ]; then
+         OPENKILL_DNS_PRIVACY_GROUP="$(uci -q get openkill.config.dns_privacy_group 2>/dev/null || printf '%s' OpenKill-DNS)" \
+            /usr/share/openkill/openkill_dns_runtime_check.sh "$CONFIG_FILE" /tmp/openkill-dns-privacy.state || {
+               LOG_ERROR "Strict DNS privacy runtime verification failed; refusing to report service ready."
+               start_fail
+            }
+      fi
    fi
    if [ "$tun_owner" = openkill ]; then
       if [ -n "$FW4" ]; then
@@ -4560,6 +4567,9 @@ start_service()
       exit 0
    fi
 
+   # A new generation must invalidate any DNS result tied to an older config.
+   rm -f /tmp/openkill-dns-privacy.state
+
    OPENKILL_START_TOKEN="$(date +%s)-$$"
    # A previous crash can leave a ready marker behind.  A new generation must
    # clear it before the fw4 include decides whether startup is still active.
@@ -4856,7 +4866,7 @@ stop_service()
       # The OpenVPN state is runtime evidence, not persistent configuration.
       # Remove it with the firewall objects so a stopped or failed service
       # cannot keep showing a stale "rule applied" status in LuCI.
-      rm -rf /tmp/openkill-openvpn.state /tmp/openkill-openvpn /tmp/openkill-rustdesk.state
+      rm -rf /tmp/openkill-openvpn.state /tmp/openkill-openvpn /tmp/openkill-rustdesk.state /tmp/openkill-dns-privacy.state
       LOG_TIP "OpenKill Already Stop!"
 
       if [ "$enable" != "1" ]; then

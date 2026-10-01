@@ -311,7 +311,16 @@ o:value("split", "分流隐私（推荐）")
 o:value("strict", "严格隐私（失败不明文回退）")
 o.default = "split"
 o.rmempty = false
-o.description = "分流档位分别管理直连与代理 DNS 出口；严格档会移除普通查询路径中的明文公网解析器，使用加密解析并按规则出口发送。节点引导解析保留独立的直接 IPv4 例外；本地域名、终端自建 DoH/DoT 和未授权旁路仍需设备策略配合。"
+o.description = "严格档将普通加密 DNS 绑定独立代理组；节点与解析器引导使用证书校验的直接加密解析，不静默补入明文 DNS。停止服务后的系统解析、客户端自建 DoH 和旁路不属于此模式的保护范围。仅含订阅 provider 的配置须先提供具体代理节点。"
+
+o = s:taboption("dns", Value, "dns_privacy_group", "专用 DNS 代理组名称")
+o.default = "OpenKill-DNS"
+o.rmempty = false
+o.description = "严格档自动建立独立组，不改变默认代理组；名称不可与已有组冲突。"
+function o.validate(self, value)
+  if value and #value <= 64 and value:match("^[A-Za-z0-9_-]+$") then return value end
+  return nil, "仅允许 1 至 64 个英文字母、数字、下划线或连字符"
+end
 
 o = s:taboption("compatibility", Flag, "bypass_gateway_compatible", translate("Bypass Gateway Compatible"))
 o.description = translate("If The Network Cannot be Connected in Bypass Gateway Mode, Please Try to Enable.")..font_red..bold_on..translate("Suggestion: If The Device Does Not Have WLAN, Please Disable The Lan Interface's Bridge Option")..bold_off..font_off

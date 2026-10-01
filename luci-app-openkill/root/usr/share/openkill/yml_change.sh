@@ -17,6 +17,8 @@ enable_custom_dns=$(uci_get_config "enable_custom_dns" || echo 0)
 append_wan_dns=$(uci_get_config "append_wan_dns" || echo 0)
 dns_privacy_mode=$(uci_get_config "dns_privacy_mode" || echo split)
 case "$dns_privacy_mode" in split|strict) ;; *) dns_privacy_mode=split ;; esac
+dns_privacy_group=$(uci_get_config "dns_privacy_group" || echo OpenKill-DNS)
+case "$dns_privacy_group" in ''|*[!A-Za-z0-9_-]*) dns_privacy_group=OpenKill-DNS ;; esac
 adblock_mode=$(uci_get_config "adblock_mode" || echo off)
 case "$adblock_mode" in off|standard|enhanced) ;; *) adblock_mode=off ;; esac
 adblock_rule_url=$(uci_get_config "adblock_rule_url" || echo https://anti-ad.net/domains.txt)
@@ -1124,6 +1126,9 @@ begin
       end
    end
 
+      require '/usr/share/openkill/dns_privacy'
+      OpenKillDnsPrivacy.apply(Value, dns_privacy_mode, '$dns_privacy_group')
+
       # Ad filtering is a separate routing decision. User blocks win over user
       # allows; allow entries are applied while generating the shared provider
       # and dnsmasq views, so an allow never becomes an implicit DIRECT route.
@@ -1195,16 +1200,20 @@ ensure
          encrypted_dns = lambda { |server| server.to_s.match?(/\A(?:https|tls|quic|h3):\/\//i) }
          ordinary_servers = Array(dns_value['nameserver']) + Array(dns_value['fallback'])
          ordinary_encrypted = !ordinary_servers.empty? && ordinary_servers.all? { |server| encrypted_dns.call(server) }
-         strict_routed = '$dns_privacy_mode' != 'strict' || Array(dns_value['nameserver']).all? { |server| server.to_s.match?(/#RULES(?:&|\z)/i) }
+         strict_routed = '$dns_privacy_mode' != 'strict' || ordinary_servers.all? { |server| server.to_s.end_with?('#$dns_privacy_group') }
          redirect_ready = %w[1 2].include?('$enable_redirect_dns')
-         effective = ordinary_encrypted && strict_routed && redirect_ready
+         # Generated configuration is not runtime/packet-path verification.
+         configured = ordinary_encrypted && strict_routed && redirect_ready
+         effective = false
          # Both resolver lists are used only to bootstrap proxy/node names.
          # Keep that explicit exception visible in the read-only evidence even
          # when the source profile supplies default-nameserver instead of
          # proxy-server-nameserver.
          bootstrap_servers = Array(dns_value['proxy-server-nameserver']) + Array(dns_value['default-nameserver'])
          bootstrap_exception = bootstrap_servers.any? { |server| !encrypted_dns.call(server) }
-         reason = if effective
+         reason = if configured
+                    'generated-not-runtime-verified'
+                  elsif effective
                     bootstrap_exception ? 'ordinary-encrypted-bootstrap-exception' : 'ordinary-encrypted'
                   elsif !redirect_ready
                     'dns-redirect-disabled'
@@ -1217,7 +1226,7 @@ ensure
                   end
          begin
             dns_state_tmp = %Q{/tmp/openkill-dns-privacy.state.#{Process.pid}}
-            File.write(dns_state_tmp, %Q{mode=$dns_privacy_mode\neffective=#{effective ? 1 : 0}\nordinary_encrypted=#{ordinary_encrypted ? 1 : 0}\nbootstrap_exception=#{bootstrap_exception ? 1 : 0}\nreason=#{reason}\nchecked_at=#{Time.now.to_i}\n})
+            File.write(dns_state_tmp, %Q{mode=$dns_privacy_mode\nconfigured=#{configured ? 1 : 0}\neffective=#{effective ? 1 : 0}\nordinary_encrypted=#{ordinary_encrypted ? 1 : 0}\nbootstrap_exception=#{bootstrap_exception ? 1 : 0}\nreason=#{reason}\nchecked_at=#{Time.now.to_i}\n})
             File.rename(dns_state_tmp, '/tmp/openkill-dns-privacy.state')
          rescue Exception => e
             # Evidence is optional for startup; a read-only status file must

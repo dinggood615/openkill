@@ -1,5 +1,30 @@
 # Current status
 
+## 2026-10-01 专用 DNS 代理组与加密引导改造（进行中）
+
+- 用户明确授权在 192.168.1.103 进行本轮 DNS 相关备份、应用及验收；不授权新增
+  防火墙、路由、WAN 或 TUN 策略。受影响契约为 DNS YAML 生成、语义校验、只读状态
+  及升级保留。保留现有用户配置与未跟踪 `.rc-1200-audit/`。
+- 基线 HEAD 为 `45fcd20`。先补行为测试，再实现不含 DIRECT 的专用组、无循环的
+  加密引导和真实加载证据，执行精确提交 CI、RC 设备验收，再进入正式发布。
+- 纠正历史结论：effective=1、Fake-IP 和 AAAA 抑制仅证明部分配置/入口行为，不能
+  证明上游代理链或 DNS 无泄漏；2026-1201 的 IPv6 描述是风险修复，不是已经抓包
+  确认的唯一泄漏根因。本轮尚未完成包级泄漏验收。
+- 已实现第一版 `dns_privacy.rb` 转换及 6 项行为测试（10 assertions），本地质量
+  门禁通过，既有 runtime 33 项通过。严格组只含具体非直连代理，排除 dialer 依赖
+  和本地 SOCKS 桥以防外部组件 DNS 循环；provider-only 暂明确拒绝。生成证据不再
+  自称 effective，仍需补充真实加载版本与验证结果接口。
+- 已确认测试机 Kwrt 25.12-SNAPSHOT x86/64，Mihomo v1.19.31，备份
+  `/root/openkill-dns-proxy-backup-20261001/configs.tar.gz`，SHA256
+  `aa028efa6ba3cf5a98f918fdde71efb5837e91fb60a8cea3a46410d8c91e570d`。
+  当前核心接受专用组/IP-literal DoH 配置；直接 DoH 请求在证书校验开启时 HTTP200，
+  候选 API reload HTTP204，真实 DNS status0/answer1，HTTPS204/200。
+- 安装 tcpdump-mini 用于有界诊断；受保护 WAN 采集窗口记录 TCP24、53端口0。
+  这是单个有限窗口，不证明所有查询和 IPv6 无泄漏；最初缓存窗口零包不计入成功
+  证据。候选临时加载后恢复原运行 YAML；未修改网络规则，未发布。
+- 待完成：清理旧生成器的重复规则逻辑、完整参数/引导语义校验、加载状态证据、
+  故障场景与 IPv6 测试、真实 LuCI 保存应用、精确提交 CI、RC 安装与正式发布。
+
 ## 2026-10-01 2026-1202 NaiveProxy 状态卡片解析修复与最终包验收
 
 - 2026-1201 正式包页面复核发现真实清单包含 1 个 enabled/running 实例，但卡片仍为
