@@ -325,6 +325,14 @@ class DualStackRoutingTests(unittest.TestCase):
         self.assertIn("bootstrap_servers = Array(dns_value['proxy-server-nameserver']) + Array(dns_value['default-nameserver'])", change)
         self.assertIn("File.rename(dns_state_tmp, '/tmp/openkill-dns-privacy.state')", change)
 
+    def test_naive_manifest_parser_does_not_use_unsupported_lua_alternation(self):
+        controller = (ROOT / 'luci-app-openkill/luasrc/controller/openkill.lua').read_text(encoding='utf-8')
+        self.assertIn('local function naive_manifest_value(line, field)', controller)
+        self.assertIn('local function naive_truthy(value)', controller)
+        self.assertIn('naive_truthy(naive_manifest_value(line, "enabled"))', controller)
+        self.assertNotIn('enabled=(1|true|yes|on)', controller)
+        self.assertNotIn('health=(component%-missing|config%-invalid|local%-not%-ready|probe%-failed)', controller)
+
     def test_ipv6_local_prefixes_come_from_internal_netifd_interfaces(self):
         source = (SHARE / 'openkill_get_network.lua').read_text(encoding='utf-8')
         init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')

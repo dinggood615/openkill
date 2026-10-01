@@ -1534,11 +1534,19 @@ function action_status()
 	local naive_component_version = naive_manifest:match("component_version=([^\n]+)") or "unknown"
 	local naive_configured, naive_generated, naive_local_ready, naive_remote_verified = 0, 0, 0, 0
 	local naive_failed = false
+	local function naive_manifest_value(line, field)
+		return line:match("^node%.[A-Za-z0-9_-]+%." .. field .. "=(.*)$")
+	end
+	local function naive_truthy(value)
+		value = tostring(value or ""):lower()
+		return value == "1" or value == "true" or value == "yes" or value == "on"
+	end
 	for line in naive_manifest:gmatch("[^\r\n]+") do
-		if line:match("^node%.[%w_-]+%.enabled=(1|true|yes|on)$") then naive_configured = naive_configured + 1 end
-		if line:match("^node%.[%w_-]+%.state=running$") then naive_generated = naive_generated + 1; naive_local_ready = naive_local_ready + 1 end
-		if line:match("^node%.[%w_-]+%.health=available$") then naive_remote_verified = naive_remote_verified + 1 end
-		if line:match("^node%.[%w_-]+%.health=(component%-missing|config%-invalid|local%-not%-ready|probe%-failed)$") then naive_failed = true end
+		if naive_truthy(naive_manifest_value(line, "enabled")) then naive_configured = naive_configured + 1 end
+		if naive_manifest_value(line, "state") == "running" then naive_generated = naive_generated + 1; naive_local_ready = naive_local_ready + 1 end
+		if naive_manifest_value(line, "health") == "available" then naive_remote_verified = naive_remote_verified + 1 end
+		local health = naive_manifest_value(line, "health")
+		if health == "component-missing" or health == "config-invalid" or health == "local-not-ready" or health == "probe-failed" then naive_failed = true end
 	end
 
 	local result = {
