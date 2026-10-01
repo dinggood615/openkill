@@ -1,6 +1,46 @@
 # Current status
 
-## 2026-10-01 专用 DNS 代理组与加密引导改造（进行中）
+## 2026-10-01 2026-1203 专用 DNS 代理组与加密引导正式验收（完成）
+
+- 本轮实现已锁定于源提交 `55694492a9281ea7e4ed648462da17bc49267bfa`：严格隐私模式
+  生成不含 `DIRECT` 的专用 DNS 代理组，普通解析、节点解析和引导解析分别校验；
+  运行时只读检查在应用后验证实际加载配置、代理组成员和受控 DNS 查询，失败时不报告
+  就绪。配置生成、状态接口和 LuCI 均不保存或输出凭据，保留原有用户组、节点和 YAML。
+- 本地质量门禁及 6 项 DNS 语义测试（10 assertions）通过；精确源提交的 Development
+  CI `36828775582`：
+  https://github.com/dinggood615/openkill/actions/runs/36828775582 ；RC Build
+  `36828918058`：
+  https://github.com/dinggood615/openkill/actions/runs/36828918058 ；Formal Release
+  `36830029976`：
+  https://github.com/dinggood615/openkill/actions/runs/36830029976 。
+- 候选 IPK `luci-app-openkill_2026-1203_all.ipk` 大小 7,720,932 bytes，SHA256
+  `330d1b7adde625bc4a6665df27473a3a2be0191788e591d53b1753acc52ba8b0`。正式 Release
+  标签与资产为 `v2026-1203-ipk`：
+  https://github.com/dinggood615/openkill/releases/tag/v2026-1203-ipk ；正式包大小
+  7,925,976 bytes，SHA256
+  `1bb15e436961e5ac5a7dc7d0c6984848e16e61c60113854fe81902da7c6d2a11`，下载地址：
+  https://github.com/dinggood615/openkill/releases/download/v2026-1203-ipk/luci-app-openkill_2026-1203_all.ipk 。
+  正式包内容审计未发现测试机地址、真实节点主机、分享凭据或个人节点数据。
+- 授权测试机 192.168.1.103 已使用 `opkg --force-reinstall` 实际替换正式包，包版本为
+  2026-1203；服务停止后进程和状态文件消失，再启动返回成功。正式安装后的运行状态为
+  `configured=1/effective=1/runtime_verified=1`，受控 DNS API 查询返回 status 0，
+  Mihomo HTTPS 与独立 Naive SOCKS5 HTTPS 均返回 204。正式安装后在 WAN 接口进行有界
+  采集，测试窗口未观察到外发明文 53/853；这证明本次链路未出现该窗口内的旁路，不能
+  扩大为所有客户端、浏览器 DoH、服务停止期间或完整 IPv6 数据面的绝对“零泄漏”保证。
+- 真实 LuCI 页面已刷新到 `v2026-1203` 并复核状态卡片：DNS 隐私“已开启”、NaiveProxy
+  “已开启”、OpenVPN/RustDesk“已关闭”，广告拦截在缺少可靠生效证据时保持“—”；页面
+  仍显示状态获取失败时的保留/未验证语义。正式包安装后页面、DNS 状态和联网冒烟均通过。
+- 受保护设备备份保留在 `/root/openkill-dns-proxy-backup-20261001`（目录 700、敏感
+  文件 600），归档 SHA256 为
+  `aa028efa6ba3cf5a98f918fdde71efb5837e91fb60a8cea3a46410d8c91e570d`。回滚可从该备份
+  恢复配置并安装上一正式 IPK；正式包同版本替换使用了强制重装，未把“已是最新”作为
+  安装证据。
+- 使用方式：升级并重载后，在 DNS 隐私设置选择严格模式并应用；OpenKill 会生成专用
+  DNS 代理组并在运行时验证，代理组无可用成员时拒绝报告就绪。分流模式仍按其允许的
+  直连边界工作，不能称为绝对无泄漏。未覆盖的外部客户端 DoH、完整 IPv6 抓包和 Chrome
+  原生会话缩放需在对应环境另行验收。
+
+## 2026-10-01 专用 DNS 代理组与加密引导改造（实施过程记录）
 
 - 用户明确授权在 192.168.1.103 进行本轮 DNS 相关备份、应用及验收；不授权新增
   防火墙、路由、WAN 或 TUN 策略。受影响契约为 DNS YAML 生成、语义校验、只读状态
