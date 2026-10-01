@@ -179,7 +179,6 @@ class UciLifecycleContractTests(unittest.TestCase):
             "uci -q set openkill.config.dnsmasq_noresolv=",
             "uci -q set openkill.config.dnsmasq_resolvfile=",
             "uci -q set openkill.config.dnsmasq_cachesize=",
-            "uci -q set openkill.config.dnsmasq_filter_aaaa=",
             "uci -q set openkill.config.redirect_dns=1",
             "uci -q set openkill.config.cachesize_dns=1",
             "uci -q set openkill.config.filter_aaaa_dns=1",
@@ -195,6 +194,8 @@ class UciLifecycleContractTests(unittest.TestCase):
             "/etc/init.d/dnsmasq restart",
         ):
             self.assertIn(marker, block, marker)
+        self.assertIn("save_dnsmasq_filter_aaaa", block)
+        self.assertIn("uci -q set openkill.config.dnsmasq_filter_aaaa=", self.init)
 
         for marker in (
             "uci -q set openkill.config.redirect_dns=0",

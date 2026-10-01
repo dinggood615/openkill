@@ -1497,6 +1497,14 @@ function action_status()
 	local function state_value(name, fallback)
 		return region_state:match(name .. "=([^\n]+)") or fallback
 	end
+	-- DNS privacy evidence is written by the YAML generator only after the
+	-- validated runtime profile has been atomically replaced.  Keep this
+	-- endpoint observational: a status request must never regenerate YAML,
+	-- allocate a port or touch dnsmasq/firewall state.
+	local dns_privacy_state = fs.readfile("/tmp/openkill-dns-privacy.state") or ""
+	local function dns_privacy_value(name, fallback)
+		return dns_privacy_state:match(name .. "=([^\n]+)") or fallback
+	end
 	local openvpn_state = fs.readfile("/tmp/openkill-openvpn.state") or ""
 	local function openvpn_value(name, fallback)
 		return openvpn_state:match(name .. "=([^\n]+)") or fallback
@@ -1563,6 +1571,10 @@ function action_status()
 		ipv6_enable = fs.uci_get_config("config", "ipv6_enable") == "1",
 		ipv6_dns = fs.uci_get_config("config", "ipv6_dns") == "1",
 		dns_privacy_mode = fs.uci_get_config("config", "dns_privacy_mode") or "split",
+		dns_privacy_effective = dns_privacy_value("effective", "0") == "1" and status_data.clash,
+		dns_privacy_reason = dns_privacy_value("reason", "not-started"),
+		dns_privacy_bootstrap_exception = dns_privacy_value("bootstrap_exception", "0") == "1",
+		dns_privacy_checked_at = dns_privacy_value("checked_at", "unknown"),
 		adblock_mode = fs.uci_get_config("config", "adblock_mode") or "off",
 		adblock_rule_format = fs.uci_get_config("config", "adblock_rule_format") or "yaml",
 		adblock_dns_effective = adblock_effective == "1",

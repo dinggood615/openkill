@@ -311,6 +311,16 @@ render_ipset_pass_file() {
    rm -f "$source"
 }
 
+save_dnsmasq_filter_aaaa() {
+   if uci -q get "$DNSMASQ_UCI.filter_aaaa" >/dev/null 2>&1; then
+      uci -q set openkill.config.dnsmasq_filter_aaaa="$(uci -q get "$DNSMASQ_UCI.filter_aaaa")"
+      uci -q set openkill.config.dnsmasq_filter_aaaa_present=1
+   else
+      uci -q delete openkill.config.dnsmasq_filter_aaaa
+      uci -q set openkill.config.dnsmasq_filter_aaaa_present=0
+   fi
+}
+
 change_dnsmasq() {
    if ! /etc/init.d/dnsmasq enabled; then
       return
@@ -357,11 +367,22 @@ change_dnsmasq() {
       # Allow AAAA answers independently of the IPv6 interception mode.  The
       # previous condition only handled legacy ip6tables + dnsmasq redirect
       # mode, so firewall redirect mode silently filtered AAAA records.
-      uci -q set openkill.config.dnsmasq_filter_aaaa="$(uci -q get "$DNSMASQ_UCI.filter_aaaa")"
+      save_dnsmasq_filter_aaaa
       uci -q set "$DNSMASQ_UCI.filter_aaaa=0"
       uci -q set openkill.config.filter_aaaa_dns=1
    else
-      uci -q set openkill.config.filter_aaaa_dns=0
+      # Strict privacy must not hand an IPv6-capable client a direct AAAA
+      # answer while IPv6 proxy/DNS handling is disabled.  Save the user's
+      # original dnsmasq choice once, then restore it on service stop.
+      # Split mode keeps the historical opt-in behavior.
+      dns_privacy_mode="$(uci_get_config "dns_privacy_mode" || echo split)"
+      if [ "$dns_privacy_mode" = "strict" ] && [ "$(uci_get_config "ipv6_enable" || echo 0)" != "1" ]; then
+         if [ "$(uci_get_config "filter_aaaa_dns" || echo 0)" != "1" ]; then save_dnsmasq_filter_aaaa; fi
+         uci -q set "$DNSMASQ_UCI.filter_aaaa=1"
+         uci -q set openkill.config.filter_aaaa_dns=1
+      else
+         uci -q set openkill.config.filter_aaaa_dns=0
+      fi
    fi
 
    uci -q commit openkill
@@ -383,6 +404,7 @@ revert_dnsmasq()
    dnsmasq_cachesize=$(uci_get_config "dnsmasq_cachesize")
    filter_aaaa_dns=$(uci_get_config "filter_aaaa_dns")
    dnsmasq_filter_aaaa=$(uci_get_config "dnsmasq_filter_aaaa")
+   dnsmasq_filter_aaaa_present=$(uci_get_config "dnsmasq_filter_aaaa_present")
    default_resolvfile=$(uci_get_config "default_resolvfile")
 
    rm -rf ${DNSMASQ_CONF_DIR}/dnsmasq_openkill_custom_domain.conf
@@ -424,9 +446,14 @@ revert_dnsmasq()
    }
 
    [ "$filter_aaaa_dns" -eq 1 ] && {
-      uci -q set "$DNSMASQ_UCI.filter_aaaa=$dnsmasq_filter_aaaa"
+      if [ "$dnsmasq_filter_aaaa_present" = "0" ]; then
+         uci -q delete "$DNSMASQ_UCI.filter_aaaa"
+      else
+         uci -q set "$DNSMASQ_UCI.filter_aaaa=$dnsmasq_filter_aaaa"
+      fi
       uci -q set openkill.config.filter_aaaa_dns=0
       uci -q delete openkill.config.dnsmasq_filter_aaaa
+      uci -q delete openkill.config.dnsmasq_filter_aaaa_present
    }
 
    [ "$redirect_dns" -eq 1 ] && {
@@ -1440,9 +1467,13 @@ fw4_dns_hijack_ready()
       printf '%s\n' "$rules" | grep -Eq 'redirect[[:space:]]+to[[:space:]]+(:)?[0-9]+' || return 1
    fi
 
-   # IPv6 DNS hijacking is only installed for the IPv6 proxy modes that use
-   # the firewall path.  Do not reject a valid IPv4-only configuration.
-   if [ "$ipv6_enable" -eq 1 ] && { [ "$ipv6_mode" -eq 1 ] || [ "$ipv6_mode" -eq 3 ]; }; then
+   # IPv6 DNS hijacking is required for IPv6 proxy modes and for strict DNS
+   # privacy even when IPv6 traffic proxying is disabled.  The latter closes
+   # the TCP/IPv6 DNS escape hatch while the dnsmasq filter suppresses direct
+   # AAAA answers on an IPv4-only strict profile.
+   dns_privacy_mode_current="$(uci_get_config "dns_privacy_mode" || echo split)"
+   if { [ "$ipv6_enable" -eq 1 ] && { [ "$ipv6_mode" -eq 1 ] || [ "$ipv6_mode" -eq 3 ]; }; } ||
+      { [ "$dns_privacy_mode_current" = "strict" ] && [ "$enable_redirect_dns" -ne 0 ] && [ "$ipv6_enable" -ne 1 ]; }; then
       if [ "$enable_redirect_dns" -eq 2 ]; then
          printf '%s\n' "$rules" | grep -Eq 'meta nfproto[[:space:]]+\{?ipv6\}?|ip6 nexthdr' || {
             rules="$(nft list chain inet fw4 openkill_dns_redirect 2>/dev/null || true)"
@@ -1489,6 +1520,54 @@ wait_for_fw4_settle()
    return 0
 }
 
+# In strict privacy mode keep IPv6 DNS requests on the same local resolver
+# path even when the user has not enabled IPv6 proxy traffic.  This is a
+# narrow DNS-only rule: it does not create routes, marks, TUN devices or WAN
+# exceptions.  The normal IPv6 block above remains responsible for the
+# feature's full IPv6 proxy mode.
+openkill_strict_ipv6_dns_hijack()
+{
+   [ -n "$FW4" ] || return 0
+   [ "$(uci_get_config "dns_privacy_mode" || echo split)" = "strict" ] || return 0
+   [ "$enable_redirect_dns" -ne 0 ] || return 0
+   [ "$ipv6_enable" -eq 1 ] && return 0
+   if [ "$enable_redirect_dns" -eq 2 ]; then
+      fw4_has_dns_hijack_rule openkill_dns_redirect ipv6 && return 0
+   else
+      fw4_has_dns_hijack_rule dstnat ipv6 && return 0
+   fi
+
+   local redirect_port dns_filter dns_chain
+   redirect_port="${DNSPORT:-}"
+   [ "$enable_redirect_dns" -eq 2 ] && redirect_port="${dns_port:-}"
+   [ -n "$redirect_port" ] || return 1
+   dns_chain=dstnat
+   [ "$enable_redirect_dns" -eq 2 ] && dns_chain=openkill_dns_redirect
+
+   dns_filter=""
+   if [ "$lan_ac_mode" != "1" ]; then
+      if [ "$lan_ac_mode" = "0" ]; then
+         [ -n "$(uci_get_config "lan_ac_black_ips")" ] && dns_filter="ip6 saddr != @lan_ac_black_ipv6s"
+         if [ -n "$(uci_get_config "lan_ac_black_macs")" ]; then
+            dns_filter="$dns_filter ether saddr != @lan_ac_black_macs"
+         fi
+      fi
+      nft "insert rule inet fw4 $dns_chain position 0 meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 $dns_filter counter redirect to $redirect_port comment \"OpenKill DNS Hijack\""
+      [ $? -eq 0 ] || return 1
+   else
+      nft "insert rule inet fw4 $dns_chain position 0 meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ip6 saddr @lan_ac_white_ipv6s counter redirect to $redirect_port comment \"OpenKill DNS Hijack\""
+      [ $? -eq 0 ] || return 1
+      nft "insert rule inet fw4 $dns_chain position 0 meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ether saddr @lan_ac_white_macs counter redirect to $redirect_port comment \"OpenKill DNS Hijack\""
+      [ $? -eq 0 ] || return 1
+   fi
+   if [ "$router_self_proxy" = "1" ]; then
+      nft 'add chain inet fw4 nat_output { type nat hook output priority -1; }'
+      nft "insert rule inet fw4 nat_output position 0 skgid != 65534 meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ip6 daddr {::1} counter redirect to $redirect_port comment \"OpenKill DNS Hijack\""
+      [ $? -eq 0 ] || return 1
+   fi
+   return 0
+}
+
 # dnsmasq/procd can queue a second fw4 reload after its service command has
 # returned.  That reload replaces the fw4 table and can erase direct OpenKill
 # rules in the narrow interval between set_firewall() and readiness. Rebuild
@@ -1499,6 +1578,10 @@ ensure_fw4_dns_hijack()
    [ -n "$FW4" ] || return 0
    [ "$enable_redirect_dns" -eq 0 ] && return 0
 
+   # Strict mode also protects an IPv6-capable LAN when IPv6 proxying itself
+   # is disabled.  Install only the scoped DNS redirect; no route, TUN or WAN
+   # policy is changed by this helper.
+   openkill_strict_ipv6_dns_hijack || return 1
    local attempt=1
    while ! fw4_dns_hijack_ready; do
       [ "$attempt" -ge 3 ] && return 1
@@ -1506,6 +1589,7 @@ ensure_fw4_dns_hijack()
       sleep 2
       wait_for_fw4_settle
       set_firewall || return 1
+      openkill_strict_ipv6_dns_hijack || return 1
       attempt=$((attempt + 1))
    done
    return 0

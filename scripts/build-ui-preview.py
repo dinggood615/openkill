@@ -216,10 +216,11 @@ def _extract_config_editor() -> str:
 
 def _extract_myip() -> str:
     source = (VIEW_ROOT / "myip.htm").read_text(encoding="utf-8")
-    # Keep the preview helper tolerant of non-visual data attributes on the
-    # native CBI wrapper; the rendered client page still owns the same hooks.
-    start = source.index('<fieldset class="cbi-section"')
-    end = source.index("</fieldset>", start) + len("</fieldset>")
+    # The production template intentionally has no CBI fieldset/table visual
+    # shell. Extract the single semantic wrapper used by the client page.
+    start = source.index('<div class="oc openkill-myip-page"')
+    end_marker = "\n</div>\n\n<script"
+    end = source.index(end_marker, start) + len("\n</div>")
     return _clean_markup(source[start:end])
 
 

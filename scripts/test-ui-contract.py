@@ -270,14 +270,20 @@ class LuCIContractTests(unittest.TestCase):
         for state in ("is-enabled", "is-disabled", "is-pending", "is-error", "is-unknown"):
             with self.subTest(state=state):
                 self.assertIn(".security-status-value." + state, css)
+        self.assertIn("var labels = { enabled: '已开启', disabled: '已关闭' };", source)
+        self.assertIn("security-status-notice", source)
+        self.assertIn("updateSecurityCards(null, true);", source)
+        self.assertIn(".security-status-detail {", css)
+        self.assertIn("display: none !important;", css)
 
     def test_myip_shell_is_visual_only_and_aligned(self) -> None:
         source = MYIP.read_text(encoding="utf-8")
         css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css").read_text(encoding="utf-8")
-        self.assertIn('class="cbi-section" data-openkill-myip-shell="1"', source)
-        self.assertIn('class="oc openkill-myip-page"', source)
+        self.assertIn('class="oc openkill-myip-page" data-openkill-myip-shell="1"', source)
+        self.assertNotIn('<fieldset class="cbi-section" data-openkill-myip-shell="1">', source)
+        self.assertNotIn('<table width="100%">', source)
         for hook in (
-            'fieldset.cbi-section[data-openkill-myip-shell="1"]',
+            '.openkill-myip-page[data-openkill-myip-shell="1"]',
             ".openkill-myip-page .myip-main-card",
             "background: transparent;",
             "max-width: var(--ok-layout-content-max, 1480px);",

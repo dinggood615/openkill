@@ -20,11 +20,7 @@
 <script src="/luci-static/resources/openkill/js/oc-icons.js?v=<%=plugin_version%>"></script>
 </head>
 
-<fieldset class="cbi-section" data-openkill-myip-shell="1">
-    <table width="100%">
-        <tr>
-            <td>
-                <div class="oc openkill-myip-page" role="region" aria-label="IP 地址与访问检查">
+<div class="oc openkill-myip-page" data-openkill-myip-shell="1" role="region" aria-label="IP 地址与访问检查">
                     <div class="myip-main-card">
                         <div class="myip-content-grid">
                             <div class="myip-ip-section">
@@ -133,11 +129,7 @@
                             </div>
                         </div>
                     </div>
-                </div>
-            </td>
-        </tr>
-    </table>
-</fieldset>
+</div>
 
 <script>
     function ocRandomInterval(min, max) {

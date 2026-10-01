@@ -2176,3 +2176,93 @@ body[data-page^="admin-services-openkill"][data-openkill-theme="dark"] #cbi-open
         grid-template-columns: minmax(0, 1fr);
     }
 }
+
+/* ===== OpenKill runtime/client closeout =====
+ * The CBI client view is one form containing two independent templates.  A
+ * native fieldset/table around the IP checker used to keep its theme surface
+ * and table width, which produced the full-width dark band and a narrower
+ * panel than the dashboard above.  Keep the semantic shell, but make the
+ * two visible wrappers share one content axis and remove only this page's
+ * CBI chrome. */
+body[data-page="admin-services-openkill-client"] #cbi-openkill {
+    --ok-client-content-max: min(1920px, 100%);
+}
+
+body[data-page="admin-services-openkill-client"] #cbi-openkill .oc.openkill-status-page,
+body[data-page="admin-services-openkill-client"] #cbi-openkill .oc.openkill-myip-page[data-openkill-myip-shell="1"] {
+    box-sizing: border-box;
+    width: 100% !important;
+    max-width: var(--ok-layout-content-max, 1480px) !important;
+    min-width: 0;
+    margin-inline: auto !important;
+    padding-inline: var(--ok-layout-page-padding, 12px) !important;
+}
+
+/* myip.htm no longer adds a CBI fieldset/table shell.  Keep this defensive
+ * rule for cached/older markup, but never paint that shell or let it define a
+ * second width axis. */
+body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset[data-openkill-myip-shell="1"],
+body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset[data-openkill-myip-shell="1"] > table,
+body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset[data-openkill-myip-shell="1"] > table > tbody,
+body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset[data-openkill-myip-shell="1"] > table > tbody > tr,
+body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset[data-openkill-myip-shell="1"] > table > tbody > tr > td {
+    box-sizing: border-box;
+    display: block;
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+body[data-page="admin-services-openkill-client"] #cbi-openkill > fieldset[data-openkill-myip-shell="1"] > table {
+    border-collapse: collapse;
+}
+
+body[data-page="admin-services-openkill-client"] #cbi-openkill .openkill-myip-page,
+body[data-page="admin-services-openkill-client"] #cbi-openkill .openkill-myip-page .myip-main-card,
+body[data-page="admin-services-openkill-client"] #cbi-openkill .openkill-myip-page .myip-content-grid {
+    box-sizing: border-box;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0;
+}
+
+body[data-page="admin-services-openkill-client"] #cbi-openkill .oc.openkill-myip-page[data-openkill-myip-shell="1"] {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+/* The cards themselves retain their diagnostic data in the DOM for screen
+ * readers and feature pages, but the runtime dashboard only shows the two
+ * requested binary labels. */
+.oc.openkill-status-page .security-status-detail {
+    display: none !important;
+}
+
+.oc.openkill-status-page .security-status-notice {
+    box-sizing: border-box;
+    width: 100%;
+    margin: 0 0 var(--ok-layout-card-gap, 12px);
+    padding: 6px 10px;
+    border: 1px solid var(--ok-flat-border, #e1e5ec);
+    border-radius: 6px;
+    color: var(--ok-flat-muted, #69758a);
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+.oc.openkill-status-page .security-status-value.is-unknown {
+    color: var(--ok-flat-muted, #69758a);
+}
+
+@media (max-width: 640px) {
+    body[data-page="admin-services-openkill-client"] #cbi-openkill .oc.openkill-status-page,
+    body[data-page="admin-services-openkill-client"] #cbi-openkill .oc.openkill-myip-page[data-openkill-myip-shell="1"] {
+        padding-inline: 8px !important;
+    }
+}

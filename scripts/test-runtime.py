@@ -313,6 +313,18 @@ class DualStackRoutingTests(unittest.TestCase):
         self.assertIn('Do not reject the valid combination dns.ipv6=true + ipv6=false', semantic)
         self.assertIn('if [ "$ipv6_dns" -eq 1 ]; then', init)
 
+    def test_strict_ipv4_only_privacy_closes_ipv6_dns_escape_hatch(self):
+        init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        change = (SHARE / 'yml_change.sh').read_text(encoding='utf-8')
+        self.assertIn('openkill_strict_ipv6_dns_hijack()', init)
+        self.assertIn('dns_privacy_mode_current', init)
+        self.assertIn('meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53', init)
+        self.assertIn('dnsmasq_filter_aaaa', init)
+        self.assertIn('uci -q set "$DNSMASQ_UCI.filter_aaaa=1"', init)
+        self.assertIn("ordinary-encrypted-bootstrap-exception", change)
+        self.assertIn("bootstrap_servers = Array(dns_value['proxy-server-nameserver']) + Array(dns_value['default-nameserver'])", change)
+        self.assertIn("File.rename(dns_state_tmp, '/tmp/openkill-dns-privacy.state')", change)
+
     def test_ipv6_local_prefixes_come_from_internal_netifd_interfaces(self):
         source = (SHARE / 'openkill_get_network.lua').read_text(encoding='utf-8')
         init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')

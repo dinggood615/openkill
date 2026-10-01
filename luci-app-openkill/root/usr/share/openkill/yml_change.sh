@@ -1187,6 +1187,43 @@ ensure
    if write_config && defined?(Value) && Value.is_a?(Hash)
       begin
          YAML.dump(Value, config_file)
+         # Publish a credential-free, atomic DNS evidence record alongside the
+         # generated profile.  The LuCI status endpoint reads this file only;
+         # it never infers privacy from a configured UCI switch or regenerates
+         # the running YAML during a status poll.
+         dns_value = Value['dns'].is_a?(Hash) ? Value['dns'] : {}
+         encrypted_dns = lambda { |server| server.to_s.match?(/\A(?:https|tls|quic|h3):\/\//i) }
+         ordinary_servers = Array(dns_value['nameserver']) + Array(dns_value['fallback'])
+         ordinary_encrypted = !ordinary_servers.empty? && ordinary_servers.all? { |server| encrypted_dns.call(server) }
+         strict_routed = '$dns_privacy_mode' != 'strict' || Array(dns_value['nameserver']).all? { |server| server.to_s.match?(/#RULES(?:&|\z)/i) }
+         redirect_ready = %w[1 2].include?('$enable_redirect_dns')
+         effective = ordinary_encrypted && strict_routed && redirect_ready
+         # Both resolver lists are used only to bootstrap proxy/node names.
+         # Keep that explicit exception visible in the read-only evidence even
+         # when the source profile supplies default-nameserver instead of
+         # proxy-server-nameserver.
+         bootstrap_servers = Array(dns_value['proxy-server-nameserver']) + Array(dns_value['default-nameserver'])
+         bootstrap_exception = bootstrap_servers.any? { |server| !encrypted_dns.call(server) }
+         reason = if effective
+                    bootstrap_exception ? 'ordinary-encrypted-bootstrap-exception' : 'ordinary-encrypted'
+                  elsif !redirect_ready
+                    'dns-redirect-disabled'
+                  elsif !ordinary_encrypted
+                    'ordinary-resolver-not-encrypted'
+                  elsif !strict_routed
+                    'strict-resolver-not-routed'
+                  else
+                    'not-effective'
+                  end
+         begin
+            dns_state_tmp = %Q{/tmp/openkill-dns-privacy.state.#{Process.pid}}
+            File.write(dns_state_tmp, %Q{mode=$dns_privacy_mode\neffective=#{effective ? 1 : 0}\nordinary_encrypted=#{ordinary_encrypted ? 1 : 0}\nbootstrap_exception=#{bootstrap_exception ? 1 : 0}\nreason=#{reason}\nchecked_at=#{Time.now.to_i}\n})
+            File.rename(dns_state_tmp, '/tmp/openkill-dns-privacy.state')
+         rescue Exception => e
+            # Evidence is optional for startup; a read-only status file must
+            # never make an otherwise valid runtime profile fail to apply.
+            YAML.LOG_WARN('DNS privacy evidence unavailable:【%s】' % [e.message])
+         end
          if rustdesk_compatibility == '1' && defined?(rustdesk_rules) && rustdesk_rules.is_a?(Array) && rustdesk_rules.any?
             File.write('/tmp/openkill-rustdesk.state', %Q{generated=1\napplied=0\nverified=0\nreason=generated\nupdated=#{Time.now.to_i}\n})
          else
