@@ -35,7 +35,9 @@
   本轮修改范围。
 - 正式包安装后真实 LuCI 验收：字段唯一出现，`dns_privacy_group` 的 DOM 索引为 6、
   `enable_custom_domain_dns_server` 为 7，前者的下一个兄弟节点即后者；刷新后现有字段值
-  保持一致。运行状态页 `.openkill-status-page` 与 `.openkill-myip-page` 在当前视口均为
+  保持一致。使用该现有值实际点击“保存配置”后仍留在设置页且刷新重读一致；点击“应用配置”
+  正常跳转到运行状态页，但页面继续显示既有核心“启动失败”，这正是本轮范围外的历史状态。
+  运行状态页 `.openkill-status-page` 与 `.openkill-myip-page` 在当前视口均为
   `x=228,width=558`，页面资源版本为 `2026-1206`，无横向滚动（scrollWidth 816）。
   本地 32 项 UI 合同、2 项预览、浏览器/交互/Naive UI 测试、`git diff --check` 与
   `scripts/local-gate.sh` 全部通过；浏览器当前会话未能可靠改变实际视口，因此不同缩放档位
