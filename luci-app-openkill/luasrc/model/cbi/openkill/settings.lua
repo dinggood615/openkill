@@ -313,15 +313,6 @@ o.default = "split"
 o.rmempty = false
 o.description = "严格档将普通加密 DNS 绑定独立代理组；节点与解析器引导使用证书校验的直接加密解析，不静默补入明文 DNS。停止服务后的系统解析、客户端自建 DoH 和旁路不属于此模式的保护范围。仅含订阅 provider 的配置须先提供具体代理节点。"
 
-o = s:taboption("dns", Value, "dns_privacy_group", "专用 DNS 代理组名称")
-o.default = "OpenKill-DNS"
-o.rmempty = false
-o.description = "严格档自动建立独立组，不改变默认代理组；名称不可与已有组冲突。"
-function o.validate(self, value)
-  if value and #value <= 64 and value:match("^[A-Za-z0-9_-]+$") then return value end
-  return nil, "仅允许 1 至 64 个英文字母、数字、下划线或连字符"
-end
-
 o = s:taboption("compatibility", Flag, "bypass_gateway_compatible", translate("Bypass Gateway Compatible"))
 o.description = translate("If The Network Cannot be Connected in Bypass Gateway Mode, Please Try to Enable.")..font_red..bold_on..translate("Suggestion: If The Device Does Not Have WLAN, Please Disable The Lan Interface's Bridge Option")..bold_off..font_off
 o.default = 0
@@ -411,6 +402,15 @@ o = s:taboption("dns", Flag, "enable_custom_domain_dns_server", translate("Enabl
 o.default = 0
 o:depends("enable_redirect_dns", "1")
 o:depends("enable_redirect_dns", "0")
+
+o = s:taboption("dns", Value, "dns_privacy_group", "专用 DNS 代理组名称")
+o.default = "OpenKill-DNS"
+o.rmempty = false
+o.description = "严格档自动建立独立组，不改变默认代理组；名称不可与已有组冲突。"
+function o.validate(self, value)
+  if value and #value <= 64 and value:match("^[A-Za-z0-9_-]+$") then return value end
+  return nil, "仅允许 1 至 64 个英文字母、数字、下划线或连字符"
+end
 
 o = s:taboption("dns", Value, "custom_domain_dns_server", translate("Specify DNS Server"))
 o.description = translate("Specify DNS Server For List, Only One IP Server Address Support")
