@@ -398,11 +398,6 @@ o.write = function()
 	HTTP.redirect(DISP.build_url("admin", "services", "openkill", "settings"))
 end
 
-o = s:taboption("dns", Flag, "enable_custom_domain_dns_server", translate("Enable Specify DNS Server"))
-o.default = 0
-o:depends("enable_redirect_dns", "1")
-o:depends("enable_redirect_dns", "0")
-
 o = s:taboption("dns", Value, "dns_privacy_group", "专用 DNS 代理组名称")
 o.default = "OpenKill-DNS"
 o.rmempty = false
@@ -411,6 +406,11 @@ function o.validate(self, value)
   if value and #value <= 64 and value:match("^[A-Za-z0-9_-]+$") then return value end
   return nil, "仅允许 1 至 64 个英文字母、数字、下划线或连字符"
 end
+
+o = s:taboption("dns", Flag, "enable_custom_domain_dns_server", translate("Enable Specify DNS Server"))
+o.default = 0
+o:depends("enable_redirect_dns", "1")
+o:depends("enable_redirect_dns", "0")
 
 o = s:taboption("dns", Value, "custom_domain_dns_server", translate("Specify DNS Server"))
 o.description = translate("Specify DNS Server For List, Only One IP Server Address Support")

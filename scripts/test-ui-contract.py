@@ -295,8 +295,8 @@ class LuCIContractTests(unittest.TestCase):
         theme = SETTINGS_THEME.read_text(encoding="utf-8")
         settings = (ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua").read_text(encoding="utf-8")
         self.assertLess(
-            settings.index('"enable_custom_domain_dns_server"'),
             settings.index('"dns_privacy_group"'),
+            settings.index('"enable_custom_domain_dns_server"'),
         )
         dns_layout = theme.split("{id: 'dns-local'", 1)[1].split("{id: 'ipv6-tun'", 1)[0]
         self.assertIn("'dns_privacy_group'", dns_layout)
