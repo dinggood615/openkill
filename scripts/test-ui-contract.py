@@ -286,10 +286,23 @@ class LuCIContractTests(unittest.TestCase):
             '.openkill-myip-page[data-openkill-myip-shell="1"]',
             ".openkill-myip-page .myip-main-card",
             "background: transparent;",
-            "max-width: var(--ok-layout-content-max, 1480px);",
+            "max-width: var(--ok-client-content-max, min(1920px, 100%)) !important;",
         ):
             with self.subTest(hook=hook):
                 self.assertIn(hook, css)
+
+    def test_dns_proxy_group_is_in_dns_card_before_secondary_server(self) -> None:
+        theme = SETTINGS_THEME.read_text(encoding="utf-8")
+        self.assertIn(
+            "'dns_privacy_mode', 'dns_privacy_group', 'enable_custom_domain_dns_server'",
+            theme,
+        )
+        dns_layout = theme.split("{id: 'dns-local'", 1)[1].split("{id: 'ipv6-tun'", 1)[0]
+        self.assertIn("'dns_privacy_group'", dns_layout)
+        self.assertLess(
+            dns_layout.index("'dns_privacy_group'"),
+            dns_layout.index("'enable_custom_domain_dns_server'"),
+        )
 
     def test_status_settings_are_scoped_and_generation_guarded(self) -> None:
         source = STATUS.read_text(encoding="utf-8")

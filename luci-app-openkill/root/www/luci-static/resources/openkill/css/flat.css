@@ -2192,7 +2192,11 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill .oc.openkill-stat
 body[data-page="admin-services-openkill-client"] #cbi-openkill .oc.openkill-myip-page[data-openkill-myip-shell="1"] {
     box-sizing: border-box;
     width: 100% !important;
-    max-width: var(--ok-layout-content-max, 1480px) !important;
+    /* Both templates must use the same content axis.  The status dashboard
+     * already advertises the client-wide 1920px cap; the IP checker used to
+     * fall back to the generic 1480px settings cap and therefore rendered
+     * visibly narrower at wide viewports. */
+    max-width: var(--ok-client-content-max, min(1920px, 100%)) !important;
     min-width: 0;
     margin-inline: auto !important;
     padding-inline: var(--ok-layout-page-padding, 12px) !important;
