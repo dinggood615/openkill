@@ -1,5 +1,52 @@
 # Current status
 
+## 2026-10-01 2026-1206 UI 字段顺序与运行状态页宽度（正式验收完成）
+
+- 本轮严格限定为 LuCI UI：未修改 DNS 机制、NaiveProxy、核心启动、WAN、路由、TUN、
+  防火墙或其他网络策略。两个问题的根因均已重新以真实 DOM 验证：
+  `settings_theme.htm` 的卡片筛选保留 CBI 定义顺序，字段定义顺序错误会使“专用 DNS
+  代理组名称”离开目标位置；运行状态页底部 wrapper 使用了不同的宽度约束。
+- 修复文件：`luci-app-openkill/luasrc/model/cbi/openkill/settings.lua` 将
+  `dns_privacy_group` 定义移动到 `enable_custom_domain_dns_server` 之前，使两者在同一
+  卡片中相邻；`luci-app-openkill/luasrc/view/openkill/settings_theme.htm` 与
+  `luci-app-openkill/htdocs/luci-static/resources/openkill/css/flat.css` 延续统一的
+  `--ok-client-content-max` 宽度契约；`scripts/test-ui-contract.py` 增加字段顺序回归断言。
+  版本同步为 `2026-1206`，发布说明为 `docs/release/notes/2026-1206.md`。
+- 源提交 `5bb6035de0a20140a47c77945d0b394f4ca9e5ea` 已推送。精确提交的 Development CI
+  `36837056398`：
+  https://github.com/dinggood615/openkill/actions/runs/36837056398 。RC Build
+  `36837272712`：
+  https://github.com/dinggood615/openkill/actions/runs/36837272712 ，候选 IPK
+  `luci-app-openkill_2026-1206_all.ipk` 大小 7,721,136 bytes，SHA256
+  `08b03486aa7b6fdf9c0e02a535fc035ef337391b037636223b0a6a3fde38ec15`，包内容审计、
+  conffile 保留、维护脚本删除审计及运行时敏感数据审计均通过。
+- Formal Release `36838471667`：
+  https://github.com/dinggood615/openkill/actions/runs/36838471667 ；正式标签与
+  Release 为 `v2026-1206-ipk`：
+  https://github.com/dinggood615/openkill/releases/tag/v2026-1206-ipk 。正式包大小
+  7,925,972 bytes，SHA256
+  `279b7fa5e9912f9fe29a38efe0afcf19616a2ef9d681e58b2a80874ad8fa8e98`，下载地址：
+  https://github.com/dinggood615/openkill/releases/download/v2026-1206-ipk/luci-app-openkill_2026-1206_all.ipk 。
+  RC 与正式包因构建时间元数据不同，哈希分别记录，未声称相同。
+- 授权测试机 192.168.1.103 已先安装候选包，再通过 LuCI 上传正式包并使用包管理器支持的
+  `opkg --force-reinstall /tmp/upload.ipk` 实际替换同版本正式包；设备 `opkg status`
+  显示 `2026-1206`，安装时间更新，且设备三个关键 UI 文件 SHA256 与正式包解包内容一致。
+  用户 conffile `/etc/config/openkill` 被保留，维护脚本产生的服务不存在提示已记录，未扩大
+  本轮修改范围。
+- 正式包安装后真实 LuCI 验收：字段唯一出现，`dns_privacy_group` 的 DOM 索引为 6、
+  `enable_custom_domain_dns_server` 为 7，前者的下一个兄弟节点即后者；刷新后现有字段值
+  保持一致。运行状态页 `.openkill-status-page` 与 `.openkill-myip-page` 在当前视口均为
+  `x=228,width=558`，页面资源版本为 `2026-1206`，无横向滚动（scrollWidth 816）。
+  本地 32 项 UI 合同、2 项预览、浏览器/交互/Naive UI 测试、`git diff --check` 与
+  `scripts/local-gate.sh` 全部通过；浏览器当前会话未能可靠改变实际视口，因此不同缩放档位
+  未冒充已覆盖，已由 CSS/本地响应式契约测试覆盖。
+- 设备设置页与运行状态页均可正常渲染；页面仍显示既有核心“启动失败”，该状态在本轮明确
+  排除且未修复，不能将本次 UI 发布描述为核心或网络故障修复。DNS、NaiveProxy、用户 YAML、
+  节点和服务策略未因 UI 变更被修改。
+- 受保护备份保留在 `/root/openkill-ui-backup-20261001`（目录 700、备份文件 600），
+  覆盖原配置、相关 Lua/模板/CSS 和包状态；回滚可安装上一正式标签或恢复该备份。正式包
+  安装前后的现有配置保持策略未改动。
+
 ## 2026-10-01 2026-1203 专用 DNS 代理组与加密引导正式验收（完成）
 
 - 本轮实现已锁定于源提交 `55694492a9281ea7e4ed648462da17bc49267bfa`：严格隐私模式
