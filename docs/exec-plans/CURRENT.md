@@ -1,5 +1,40 @@
 # Current status
 
+## 2026-10-01 2026-1202 NaiveProxy 状态卡片解析修复与最终包验收
+
+- 2026-1201 正式包页面复核发现真实清单包含 1 个 enabled/running 实例，但卡片仍为
+  “已关闭”。根因是 Lua 清单解析把 `|` 当作正则交替；Lua pattern 不支持该语法，
+  `enabled=(1|true|yes|on)` 永远匹配不到。`openkill.lua` 现改为字段提取和显式布尔归一化，
+  失败健康值也按独立等值判断，未读取或输出节点凭据。
+- 新增运行时回归测试，禁止再次引入该模式；本地运行时测试 33 项（2 项按环境跳过）和
+  `scripts/local-gate.sh` 均通过。候选安装后的真实 LuCI 页面显示 DNS“已开启”、NaiveProxy
+  “已开启”、未启用项“已关闭”，未确认广告拦截保留 `—` 并在卡片外提示；五张卡片详情均
+  隐藏，页面控制台无 error/warning。状态与实例证据对接正确。
+- 源提交 `2756e8344a04687b515b0299ede41b2a374434b6`；Development CI
+  `36813061558`：
+  https://github.com/dinggood615/openkill/actions/runs/36813061558 ；RC Build
+  `36813233460`：
+  https://github.com/dinggood615/openkill/actions/runs/36813233460 ；Formal Release
+  `36813550762`：
+  https://github.com/dinggood615/openkill/actions/runs/36813550762 。正式标签与 Release
+  为 `v2026-1202-ipk`：
+  https://github.com/dinggood615/openkill/releases/tag/v2026-1202-ipk 。RC IPK
+  SHA256 为 `28aebcdc7a5a59b14e386f2632e9190e9c5ff92820921cac7edd53e1bea405c6`；正式
+  `luci-app-openkill_2026-1202_all.ipk` 大小 7,728,389 bytes，SHA256
+  `1a11702f580958f8fa1d8eeeeb4788842515cd89339865bfd23c385316473338`，下载地址：
+  https://github.com/dinggood615/openkill/releases/download/v2026-1202-ipk/luci-app-openkill_2026-1202_all.ipk 。
+- 2026-1202 RC 与正式 IPK 均通过 `opkg --force-reinstall` 在授权设备实际替换；最终
+  包状态为 2026-1202、服务 running。正式包安装后严格 DNS 状态仍为 effective=1、
+  `filter_aaaa=1`、IPv6 DNS 重定向存在，受控 IPv4 A 查询返回 198.18/受控地址；独立
+  Naive SOCKS5 HTTPS 返回 204，当前 Mihomo SOCKS5 HTTPS 返回 200；停止后核心 PID
+  消失，再启动返回 0 并恢复，重启后 HTTPS 返回 204。既有 Naive 数据、用户配置和
+  YAML 未被清理。正式包审计未发现个人节点、凭据或测试机数据。
+- 设备受保护备份仍为 `/root/openkill-dns-ui-backup-20261001082205`（目录 700、归档
+  600），归档 SHA256 为
+  `b1ae76ce827ef843912eec11f7c01fff96ae5a7c30d499de8a3a1e8e156a3849`。完整 IPv6
+  数据面抓包、外部客户端 DoH 旁路及 Chrome 原生会话视觉验收仍未覆盖；IAB 真实 LuCI
+  DOM/计算样式/脚本验收已通过，不能把这些限制描述为已验证。
+
 ## 2026-10-01 2026-1201 运行状态布局、二元卡片与严格 DNS 修复
 
 - 本轮复核确认截图中的黑色横条和宽度差来自 IP 地址页面仍嵌套的 CBI
