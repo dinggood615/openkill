@@ -1,5 +1,57 @@
 # Current status
 
+## 2026-10-01 2026-1201 运行状态布局、二元卡片与严格 DNS 修复
+
+- 本轮复核确认截图中的黑色横条和宽度差来自 IP 地址页面仍嵌套的 CBI
+  `fieldset/table/td` 视觉壳，而不是内部 IP 卡片；`myip.htm` 已改为与运行状态页
+  同一语义内容列，`flat.css` 只在 OpenKill 页面范围内清除旧壳的背景、边框、阴影和
+  宽度限制。真实 LuCI 页面计算盒模型显示运行状态与 IP 区域均为
+  `x=228,width=1022.4`，背景透明、无边框/阴影，`fieldset` 数量为 0；正式包页面
+  重载后结果相同。
+- 五张功能卡片由 `status.htm` 的证据模型驱动：可靠证据只显示“已开启”或“已关闭”，
+  证据不足保留 `—`/上次可靠二元结果，并把失败提示放在卡片外；卡片详情始终隐藏。
+  DNS、广告拦截、OpenVPN、RustDesk 和独立 NaiveProxy 分别检查自己的配置及应用/运行
+  证据，不由核心状态互相推断。真实页面正式包复核显示 DNS“已开启”、未确认的广告拦截
+  显示 `—`、其余未启用项显示“已关闭”；请求失败时不会伪造关闭状态。
+- 真实页面刷新后的浏览器日志为空；订阅接口返回空响应时此前的
+  `null.providers` JavaScript 异常已在 `status.htm` 做空值归一化。IAB 真实 LuCI 页面
+  完成了 DOM、计算样式、状态卡片和脚本复核；本机 Chrome 桥接当时不可用，因此不把
+  Chrome 原生截图/控制台作为已验证证据。
+- DNS 泄漏根因是严格模式在 IPv6 代理关闭时只保护了 IPv4，且没有保存/恢复 dnsmasq
+  `filter_aaaa` 原值；IPv6 TCP/UDP 53 和 AAAA 响应可形成绕过。`openkill` 现在在该
+  精确组合下只增加 fw4 IPv6 DNS 重定向并临时过滤 AAAA，停止时按存在性元数据恢复；
+  `yml_change.sh` 生成加密的普通 `nameserver/fallback`，并以无凭据状态文件记录
+  有效性及明确的节点引导解析例外。没有改 WAN、路由、TUN 或全网代理策略。
+- 授权测试机 `192.168.1.103` 为 Kwrt/OpenWrt 25.12-SNAPSHOT x86/64。正式包安装前
+  受保护备份位于 `/root/openkill-dns-ui-backup-20261001082205`（目录 700、归档 600），
+  `configs.tar.gz` SHA256 为
+  `b1ae76ce827ef843912eec11f7c01fff96ae5a7c30d499de8a3a1e8e156a3849`。备份未进入 Git、
+  构建缓存或发布附件。
+- 候选包 `luci-app-openkill_2026-1201_all.ipk` SHA256 为
+  `7325a1ae730e86ad306ab9a84be426a9e01255e73520854450768d724c307559`；候选审计通过，
+  未发现个人节点、凭据或测试机数据。候选已通过 `opkg --force-reinstall` 实际安装，
+  包版本 2026-1201，服务 running；严格模式生成 `effective=1` 状态、普通解析为加密
+  DoH、IPv4/IPv6 DNS 规则和 `filter_aaaa=1`。来自 LAN 的 IPv4 与 IPv6 DNS A 查询均
+  返回受控地址，AAAA 查询无回答；没有 tcpdump 工具，完整 IPv6 数据面包级抓包及外部
+  客户端 DoH 旁路仍标记为未覆盖。
+- 候选安装后页面停止/启动各返回 0，核心停止时 PID 消失、再次启动恢复；Mihomo
+  SOCKS5 通过两个 HTTPS 目标返回 HTTP 204/200，独立 Naive SOCKS5 通过 HTTPS 返回
+  HTTP 204。正式包重复安装后包版本为 2026-1201、服务 running，停止/启动及 Mihomo
+  HTTPS 冒烟再次通过；没有新增持续崩溃或无限重启证据。
+- 源提交 `aab649a7481d9edf3962f03bfa5beaeea2c4deee`。Development CI
+  `36810348305`：
+  https://github.com/dinggood615/openkill/actions/runs/36810348305 ；RC Build
+  `36810571519`：
+  https://github.com/dinggood615/openkill/actions/runs/36810571519 ；Formal Release
+  `36811899879`：
+  https://github.com/dinggood615/openkill/actions/runs/36811899879 。正式标签
+  `v2026-1201-ipk` 与 Release：
+  https://github.com/dinggood615/openkill/releases/tag/v2026-1201-ipk 。正式 IPK
+  `luci-app-openkill_2026-1201_all.ipk` 大小 7,924,016 bytes，SHA256
+  `8b4c9b99ee1ac69a56d9210c549d0054adfb47d0e32e308b79412879fad6227f`，下载地址：
+  https://github.com/dinggood615/openkill/releases/download/v2026-1201-ipk/luci-app-openkill_2026-1201_all.ipk 。
+  正式包已在授权测试机通过 `opkg --force-reinstall` 实际替换并完成页面、DNS 和联网冒烟。
+
 ## 2026-10-01 2026-1200 运行状态 UI 状态证据与布局修复
 
 - 本轮范围限定为运行状态页面 UI；没有修改 NaiveProxy 生命周期、节点配置、
