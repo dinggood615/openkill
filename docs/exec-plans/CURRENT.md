@@ -9,7 +9,7 @@
 - 修复文件：`luci-app-openkill/luasrc/model/cbi/openkill/settings.lua` 将
   `dns_privacy_group` 定义移动到 `enable_custom_domain_dns_server` 之前，使两者在同一
   卡片中相邻；`luci-app-openkill/luasrc/view/openkill/settings_theme.htm` 与
-  `luci-app-openkill/htdocs/luci-static/resources/openkill/css/flat.css` 延续统一的
+  `luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css` 延续统一的
   `--ok-client-content-max` 宽度契约；`scripts/test-ui-contract.py` 增加字段顺序回归断言。
   版本同步为 `2026-1206`，发布说明为 `docs/release/notes/2026-1206.md`。
 - 源提交 `5bb6035de0a20140a47c77945d0b394f4ca9e5ea` 已推送。精确提交的 Development CI
