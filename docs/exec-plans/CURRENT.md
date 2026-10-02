@@ -1,5 +1,19 @@
 # Current status
 
+## 2026-10-02 安装器说明与精确版本安装（进行中）
+
+- README 的一键安装说明改为每条命令独立代码块，保留安装、更新和卸载入口，补充
+  `--install --version YYYY-NNNN` 的精确版本示例并说明版本替换规则。
+- `scripts/install-openkill.sh` 新增 `--version` 参数：通过对应的正式 Release 标签读取
+  目标 IPK/APK，要求发布资产 digest、文件名和下载地址完全匹配后再下载，并对归档执行
+  SHA256 校验；OpenWrt `opkg` 的明确版本选择使用受控的强制重装/降级参数，默认最新版本
+  安装路径保持不变。
+- 本轮不改变 OpenKill 包版本或设备配置；安装器由短入口从 `master` 获取，故需完成本地门禁、
+  精确提交 Development CI 后再交付。正式包发布仅在版本门禁明确要求时进行。
+- WSL 本地门禁已通过：`scripts/local-gate.sh`（preflight、源码校验、CI 分离、DNS 语义）以及
+  安装器的 17 项主机测试均通过；Windows 直接调用 Linux shell 的失败仅为宿主路径/换行限制，
+  未计入结果。下一步为提交本次安装器与 README 变更并验证精确提交的 Development CI。
+
 ## 2026-10-02 2026-2000 大版本适配（正式发布完成，保留数据面限制）
 
 - 基线正式版本为 `2026-1209-ipk`；实现提交为

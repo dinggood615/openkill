@@ -63,6 +63,29 @@ grep -q -- '-f mirror install local.ipk' "$WORK_DIR/calls"
         self.assertNotIn('s#https://dl.openwrt.ai/', SOURCE)
         self.assertIn('https://downloads.openwrt.org/', SOURCE)
 
+    def test_exact_version_install_is_release_pinned_and_digest_verified(self):
+        self.assertIn('REQUESTED_VERSION=""', SOURCE)
+        self.assertIn('--version       Install an exact published version (YYYY-NNNN)', SOURCE)
+        self.assertIn('Invalid version: $REQUESTED_VERSION (expected YYYY-NNNN)', SOURCE)
+        self.assertIn('releases/tags/$requested_tag', SOURCE)
+        self.assertIn('asset["digest"]', SOURCE)
+        self.assertIn('Selected package download or SHA256 verification failed', SOURCE)
+        self.assertIn('pm_run --force-reinstall --force-downgrade install "$PACKAGE_FILE"', SOURCE)
+        requested_start = SOURCE.index('resolve_requested_package(){')
+        requested_end = SOURCE.index('resolve_package(){', requested_start)
+        requested_block = SOURCE[requested_start:requested_end]
+        self.assertIn('expected_url', requested_block)
+        self.assertIn('browser_download_url', requested_block)
+        self.assertIn('sha256sum "$PACKAGE_FILE"', requested_block)
+
+    def test_invalid_selected_version_is_rejected_before_package_manager_access(self):
+        result = subprocess.run(
+            [BASH, str(ROOT / "scripts" / "install-openkill.sh"), "--install", "--version", "not-a-version"],
+            text=True, capture_output=True, check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("expected YYYY-NNNN", result.stderr)
+
     def test_local_package_does_not_require_ruby_json_manifest_module(self):
         self.assertIn('LOCAL_PACKAGE_MODE=1', SOURCE)
         self.assertIn('local package mode does not need remote manifest parsing', SOURCE)

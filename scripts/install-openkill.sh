@@ -7,6 +7,7 @@ PACKAGE_REF="master"
 PROJECT_VERSION="2026-2000"
 ACTION=install
 PACKAGE_FILE=""
+REQUESTED_VERSION=""
 LOCAL_PACKAGE_MODE=0
 BACKUP_DIR="/tmp/openkill-install-backup-$$"
 ORIGINAL_ARGS="$#"
@@ -25,6 +26,7 @@ OpenKill installer
   --install       Install or repair OpenKill
   --update        Update OpenKill and its official stable Mihomo/Meta core
   --uninstall     Remove OpenKill and its data
+  --version       Install an exact published version (YYYY-NNNN)
   --package-file  Install a local IPK/APK file
 EOF
 }
@@ -34,11 +36,23 @@ while [ "$#" -gt 0 ]; do
     --install) ACTION=install; shift;;
     --update) ACTION=update; shift;;
     --uninstall) ACTION=uninstall; shift;;
+    --version)
+      REQUESTED_VERSION="${2:-}"
+      [ -n "$REQUESTED_VERSION" ] || die "--version requires a YYYY-NNNN value"
+      shift 2
+      ;;
     --package-file) PACKAGE_FILE="${2:-}"; shift 2;;
     -h|--help) usage; exit 0;;
     *) die "Unknown option: $1";;
   esac
 done
+if [ -n "$REQUESTED_VERSION" ]; then
+  case "$REQUESTED_VERSION" in
+    [0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]) ;;
+    *) die "Invalid version: $REQUESTED_VERSION (expected YYYY-NNNN)" ;;
+  esac
+  [ "$ACTION" != uninstall ] || die "--version cannot be used with --uninstall"
+fi
 if [ "$ORIGINAL_ARGS" -eq 0 ]; then
   if [ -r /dev/tty ]; then
     printf '%s\n' 'OpenKill 一键操作' '  1) 安装或修复' '  2) 更新软件包和内核' '  3) 卸载并清理数据'
@@ -688,7 +702,78 @@ version_greater(){
   ' "$1" "$2"
 }
 
+resolve_requested_package(){
+  requested_tag="v${REQUESTED_VERSION}-${EXT}"
+  requested_json="$WORK_DIR/release-${REQUESTED_VERSION}-${EXT}.json"
+  requested_metadata="$WORK_DIR/metadata"
+  requested_api_ok=0
+  # Resolve the tag through the Releases API instead of the moving package
+  # channel.  The selected asset's publisher digest is required before any
+  # package transaction is started.
+  for api in \
+    "https://api.github.com/repos/$REPO/releases/tags/$requested_tag" \
+    "https://ghfast.top/https://api.github.com/repos/$REPO/releases/tags/$requested_tag" \
+    "https://github.dpik.top/https://api.github.com/repos/$REPO/releases/tags/$requested_tag" \
+    "https://gh-proxy.com/https://api.github.com/repos/$REPO/releases/tags/$requested_tag"; do
+    detail "Checking published version: $REQUESTED_VERSION"
+    if download "$api" "$requested_json" 15 >/dev/null 2>&1 &&
+       ruby -rjson -e '
+         begin
+           release=JSON.parse(File.read(ARGV[0]))
+           tag=ARGV[1]
+           ext=ARGV[2]
+           version=ARGV[3]
+           repo=ARGV[4]
+           abort unless release["tag_name"] == tag
+           abort if release["draft"] == true || release["prerelease"] == true
+           package_version = ext == "apk" ? version.sub("-", ".") : version
+           expected = ext == "apk" ? "luci-app-openkill-#{package_version}.apk" : "luci-app-openkill_#{package_version}_all.ipk"
+           expected_url = "https://github.com/#{repo}/releases/download/#{tag}/#{expected}"
+           asset=(release["assets"]||[]).find{|entry| entry["name"].to_s == expected}
+           abort unless asset
+           digest=asset["digest"].to_s.sub(/^sha256:/, "").downcase
+           abort unless digest.match?(/\A[0-9a-f]{64}\z/)
+           abort unless asset["browser_download_url"].to_s == expected_url
+           puts [version, expected, digest, expected_url]
+         rescue StandardError
+           exit 1
+         end
+       ' "$requested_json" "$requested_tag" "$EXT" "$REQUESTED_VERSION" "$REPO" > "$requested_metadata"; then
+      requested_api_ok=1
+      break
+    fi
+  done
+  [ "$requested_api_ok" -eq 1 ] || die "Published $EXT version $REQUESTED_VERSION was not found or has no verified package digest"
+  ver=$(sed -n '1p' "$requested_metadata")
+  name=$(sed -n '2p' "$requested_metadata")
+  checksum=$(sed -n '3p' "$requested_metadata")
+  release_url=$(sed -n '4p' "$requested_metadata")
+  PACKAGE_FILE="$WORK_DIR/$name"
+  detail "Verified selected $EXT version: $ver"
+  # GitHub remains the source of truth.  HTTPS mirrors are only bounded
+  # fallbacks for networks that cannot reach the release host directly; every
+  # copy is checked against the same publisher digest.
+  package_urls="$release_url https://ghfast.top/$release_url https://gh-proxy.com/$release_url"
+  seen_urls=""
+  step "Downloading and verifying OpenKill $ver"
+  for url in $package_urls; do
+    case " $seen_urls " in *" $url "*) continue;; esac
+    seen_urls="$seen_urls $url"
+    detail "Trying package download: $url"
+    if download "$url" "$PACKAGE_FILE" 300 1 &&
+       [ "$(sha256sum "$PACKAGE_FILE" | awk '{print $1}')" = "$checksum" ]; then
+      log "Verified selected published $EXT version: $ver"
+      return 0
+    fi
+  done
+  die "Selected package download or SHA256 verification failed"
+}
+
 resolve_package(){
+  if [ -n "$REQUESTED_VERSION" ]; then
+    resolve_requested_package
+    return 0
+  fi
   step "Resolving the latest published OpenKill $EXT package"
   manifest="$WORK_DIR/latest.json"
   # Probe the manifest itself so the first successful source is also the
@@ -846,7 +931,17 @@ install_dependencies
 # some opkg builds parse firmware sources twice and emit duplicate-src warnings.
 backup_config
 step "Installing OpenKill ${ver:-local package}"
-if [ "$PM" = opkg ]; then pm_run install "$PACKAGE_FILE"; else pm_run add --allow-untrusted "$PACKAGE_FILE"; fi
+if [ "$PM" = opkg ]; then
+  if [ -n "$REQUESTED_VERSION" ]; then
+    # An explicit version is an intentional selection, so equal-version
+    # repairs and a controlled downgrade must not be silently skipped.
+    pm_run --force-reinstall --force-downgrade install "$PACKAGE_FILE"
+  else
+    pm_run install "$PACKAGE_FILE"
+  fi
+else
+  pm_run add --allow-untrusted "$PACKAGE_FILE"
+fi
 step "Validating installed service and runtime"
 validate_install
 install_core

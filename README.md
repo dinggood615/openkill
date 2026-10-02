@@ -6,19 +6,26 @@ OpenKill 是面向 OpenWrt 的轻量化 Mihomo（Meta）客户端 LuCI 插件，
 
 ## 一键安装
 
-安装、更新、卸载统一使用同一入口。默认进入菜单，也可以直接附加参数：
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh
-```
+每条命令都是独立的一行，可直接复制。默认安装最新正式版；指定版本时会从对应
+Release 下载并校验 SHA256。把示例中的 `2026-2000` 替换为需要的正式版本号。
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh -s -- --install
+```
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh -s -- --install --version 2026-2000
+```
+
+```sh
 curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh -s -- --update
+```
+
+```sh
 curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh -s -- --uninstall
 ```
 
-安装器会自动识别 `opkg`/`apk`、设备架构和防火墙环境；短入口、依赖源和软件包源均会按可用性选择有效镜像，安装完整运行依赖，校验软件包 SHA256，并下载当前架构对应的官方稳定版 Mihomo/Meta 内核。OpenKill 本体安装后还会独立检查 OpenWrt 包架构、CPU、libc、loader、依赖和空间，匹配 NaiveProxy 官方稳定制品，完成 HTTPS、大小、SHA256、归档、ELF 与版本验证后再安装到独立服务目录；组件失败会单独报告，不伪装成整套安装成功。安装完成后会自动刷新 GeoIP、GeoSite、ASN、IPv4/IPv6 大陆路由数据库，并在下载失败时保留软件包内的可用副本。更新会保留配置和上一份可用内核；卸载会移除 OpenKill 数据但不删除共享依赖。
+安装器会自动识别 `opkg`/`apk`、设备架构、依赖和可用镜像，并校验软件包 SHA256。更新会保留用户配置和上一份可用内核；卸载只移除 OpenKill 数据，不删除共享依赖。独立 NaiveProxy 组件、Geo 数据和官方 Mihomo/Meta 内核会分别校验，失败时单独报告。
 
 ## 功能
 
