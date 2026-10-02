@@ -4503,12 +4503,39 @@ get_config()
    esac
    lan_ac_mode=$(uci_get_config "lan_ac_mode")
    enable_rule_proxy=$(uci_get_config "enable_rule_proxy")
-   stack_type=$(uci_get_config "stack_type" || echo "mixed")
-   [ -z "$stack_type" ] || [ "$stack_type" = "0" ] && stack_type="mixed"
-   case "$stack_type" in system|gvisor|mixed) ;; *) stack_type="mixed" ;; esac
-   stack_type_v6=$(uci_get_config "stack_type_v6" || echo "mixed")
-   [ -z "$stack_type_v6" ] || [ "$stack_type_v6" = "0" ] && stack_type_v6="mixed"
-   case "$stack_type_v6" in system|gvisor|mixed) ;; *) stack_type_v6="mixed" ;; esac
+   stack_type=$(uci_get_config "stack_type" || echo "mips")
+   stack_type_v6=$(uci_get_config "stack_type_v6" || echo "mips")
+   tun_congestion_controller=$(uci_get_config "tun_congestion_controller" || echo "bbr3")
+   # A preserved pre-v1.19.32 conffile has no profile marker.  Treat the old
+   # package defaults (system/mixed and an absent controller) as a one-time
+   # migration to the v1.19.32 profile.  Once recorded, explicit user changes
+   # remain authoritative and are never overwritten on later starts.
+   mihomo_profile_version=$(uci_get_config "mihomo_profile_version" || true)
+   if [ "$mihomo_profile_version" != "2026-1207" ]; then
+      old_stack=$(uci_get_config "stack_type" || true)
+      old_stack_v6=$(uci_get_config "stack_type_v6" || true)
+      old_controller=$(uci_get_config "tun_congestion_controller" || true)
+      if [ -z "$old_stack" ] || [ "$old_stack" = "0" ] || [ "$old_stack" = "system" ]; then
+         uci -q set openkill.config.stack_type='mips'
+         stack_type='mips'
+      fi
+      if [ -z "$old_stack_v6" ] || [ "$old_stack_v6" = "0" ] || [ "$old_stack_v6" = "mixed" ]; then
+         uci -q set openkill.config.stack_type_v6='mips'
+         stack_type_v6='mips'
+      fi
+      if [ -z "$old_controller" ] || [ "$old_controller" = "0" ]; then
+         uci -q set openkill.config.tun_congestion_controller='bbr3'
+         tun_congestion_controller='bbr3'
+      fi
+      uci -q set openkill.config.mihomo_profile_version='2026-1207'
+      uci -q commit openkill
+      LOG_TIP "Migrated OpenKill to the Mihomo v1.19.32 mips profile."
+   fi
+   [ -z "$stack_type" ] || [ "$stack_type" = "0" ] && stack_type="mips"
+   case "$stack_type" in system|gvisor|mixed|mips) ;; *) stack_type="mips" ;; esac
+   [ -z "$stack_type_v6" ] || [ "$stack_type_v6" = "0" ] && stack_type_v6="mips"
+   case "$stack_type_v6" in system|gvisor|mixed|mips) ;; *) stack_type_v6="mips" ;; esac
+   case "$tun_congestion_controller" in cubic|reno|bbr|bbr3) ;; *) tun_congestion_controller="bbr3" ;; esac
    china_ip_route=$(uci_get_config "china_ip_route"); [[ "$china_ip_route" != "0" && "$china_ip_route" != "1" && "$china_ip_route" != "2" ]] && china_ip_route=0
    china_ip6_route=$(uci_get_config "china_ip6_route"); [[ "$china_ip6_route" != "0" && "$china_ip6_route" != "1" && "$china_ip6_route" != "2" ]] && china_ip6_route=0
    small_flash_memory=$(uci_get_config "small_flash_memory")
@@ -4661,6 +4688,29 @@ start_service()
       LOG_OUT "Step 2: Check The Components..."
       do_run_file "$RAW_CONFIG_FILE"
 
+      # v1.19.31 introduced the mips TUN stack; v1.19.32 introduced the TUN
+      # congestion-controller field.  Keep a pre-v1.19.31 core bootable while
+      # the updater is unavailable, and only emit bbr3 when the running core
+      # is known to understand it.  This is a compatibility fallback, not a
+      # user-facing feature gate; the shipped profile remains mips+bbr3.
+      mihomo_runtime_version=$("$CLASH" -v 2>/dev/null | sed -n 's/.*\(v[0-9][0-9.]*\).*/\1/p' | head -n 1)
+      case "$mihomo_runtime_version" in
+         v1.19.3[1-9]|v1.19.[4-9][0-9]|v1.[2-9]*|v[2-9]*)
+            ;;
+         v1.19.30)
+            stack_type=mixed
+            stack_type_v6=mixed
+            tun_congestion_controller=bbr
+            LOG_WARN "Mihomo $mihomo_runtime_version lacks the v1.19.32 TUN congestion field; using the compatible mixed/bbr profile."
+            ;;
+         *)
+            stack_type=mixed
+            stack_type_v6=mixed
+            tun_congestion_controller=cubic
+            LOG_WARN "Mihomo core version is unknown or older than v1.19.31; using a compatible mixed/cubic profile."
+            ;;
+      esac
+
       if [ "${OPENKILL_RECOVERY:-0}" = 1 ]; then
          cp /etc/openkill/.last-good/config.yaml "$CONFIG_FILE" || start_fail
          QUICK_START=true
@@ -4668,6 +4718,7 @@ start_service()
 
       if ! $QUICK_START; then
          LOG_OUT "Step 3: Modify The Config File..."
+         export OPENKILL_TUN_CONGESTION_CONTROLLER="$tun_congestion_controller"
          config_check
          # NaiveProxy is an independent service. OpenKill never prepares,
          # starts, stops or rewrites its node configuration during YAML

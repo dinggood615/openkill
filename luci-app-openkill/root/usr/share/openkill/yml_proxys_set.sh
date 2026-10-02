@@ -23,13 +23,8 @@ UPDATE_CONFIG_NAME=$(echo "$UPDATE_CONFIG_FILE" |awk -F '/' '{print $5}' 2>/dev/
 UCI_DEL_LIST="uci -q del_list openkill.config.new_servers_group"
 UCI_ADD_LIST="uci -q add_list openkill.config.new_servers_group"
 UCI_SET="uci -q set openkill.config."
-FEATURE_H2C=$(uci_get_config "feature_h2c" || echo 0)
-FEATURE_SHADOWQUIC=$(uci_get_config "feature_shadowquic" || echo 0)
-FEATURE_MASQUE=$(uci_get_config "feature_masque" || echo 0)
-FEATURE_AMNEZIA_WG=$(uci_get_config "feature_amnezia_wg" || echo 0)
-FEATURE_ANYTLS_METADATA=$(uci_get_config "feature_anytls_metadata" || echo 0)
-FEATURE_BBR3=$(uci_get_config "feature_bbr3" || echo 0)
-FEATURE_ZEROTIER=$(uci_get_config "feature_zerotier" || echo 0)
+# Protocol support is selected by the node context.  The legacy feature_*
+# options remain in UCI for upgrades but are intentionally not read here.
 servers_name="/tmp/servers_name.list"
 proxy_provider_name="/tmp/provider_name.list"
 set_lock
@@ -526,7 +521,7 @@ if [ "$type" = "vmess" ]; then
    fi
 
    if [ "$obfs_vmess" = "network: h2" ]; then
-      if [ "$FEATURE_H2C" = "1" ] && [ "$h2c_enable" = "1" ]; then
+      if [ "$h2c_enable" = "1" ]; then
          tls="false"
       elif [ -z "$tls" ] || [ "$tls" = "false" ]; then
          # H2C is opt-in.  Keep ordinary VMess H2 on TLS when either guard is
@@ -731,7 +726,7 @@ cat >> "$SERVER_FILE" <<-EOF
     min-idle-session: $min_idle_session
 EOF
     fi
-    if [ "$FEATURE_ANYTLS_METADATA" = "1" ] && [ "$anytls_advanced" = "1" ] && [ -n "$anytls_client_metadata" ]; then
+    if [ "$anytls_advanced" = "1" ] && [ -n "$anytls_client_metadata" ]; then
 cat >> "$SERVER_FILE" <<-EOF
     client-metadata: "$anytls_client_metadata"
 EOF
@@ -971,7 +966,7 @@ EOF
        [ -n "$amnezia_j1" ] || [ -n "$amnezia_j2" ] || [ -n "$amnezia_j3" ] || [ -n "$amnezia_itime" ]; then
         amnezia_has_options=1
     fi
-    if [ "$FEATURE_AMNEZIA_WG" = "1" ] && [ "$amnezia_wg_enable" = "1" ] && [ "$amnezia_has_options" = "1" ]; then
+    if [ "$amnezia_wg_enable" = "1" ] && [ "$amnezia_has_options" = "1" ]; then
 cat >> "$SERVER_FILE" <<-EOF
     amnezia-wg-option:
 EOF
@@ -1245,7 +1240,6 @@ fi
 
 #shadowquic
 if [ "$type" = "shadowquic" ]; then
-   [ "$FEATURE_SHADOWQUIC" = "1" ] || return
    config_get "password" "$section" "password" ""
    config_get "shadowquic_username" "$section" "shadowquic_username" ""
    config_get "shadowquic_advanced" "$section" "shadowquic_advanced" ""
@@ -1298,11 +1292,11 @@ cat >> "$SERVER_FILE" <<-EOF
     client-fingerprint: "$client_fingerprint"
 EOF
     fi
-    # Advanced ShadowQUIC fields require both the global capability switch
-    # and the per-node advanced switch.  Required credentials and common TLS
-    # fields above remain available for every enabled ShadowQUIC node.
-    if [ "$FEATURE_SHADOWQUIC" = "1" ] && [ "$shadowquic_advanced" = "1" ]; then
-      if [ "$FEATURE_H2C" = "1" ] && [ -n "$shadowquic_quic_versions" ]; then
+    # Advanced ShadowQUIC fields are controlled by the node context only.
+    # Required credentials and common TLS fields remain available for every
+    # enabled ShadowQUIC node.
+    if [ "$shadowquic_advanced" = "1" ]; then
+      if [ -n "$shadowquic_quic_versions" ]; then
 cat >> "$SERVER_FILE" <<-EOF
     quic-versions:
 EOF
@@ -1923,10 +1917,10 @@ EOF
     masque_emit_ip_stack=0
     if [ -n "$masque_ip_stack_mode" ]; then
         masque_emit_ip_stack=1
-    elif [ -n "$masque_ip_stack_congestion_controller" ] && { [ "$masque_ip_stack_congestion_controller" != "bbr3" ] || [ "$FEATURE_BBR3" = "1" ]; }; then
+    elif [ -n "$masque_ip_stack_congestion_controller" ]; then
         masque_emit_ip_stack=1
     fi
-    if [ "$FEATURE_MASQUE" = "1" ] && [ "$masque_advanced" = "1" ]; then
+    if [ "$masque_advanced" = "1" ]; then
         if [ "$masque_emit_ip_stack" = "1" ]; then
 cat >> "$SERVER_FILE" <<-EOF
     ip-stack:
@@ -1937,7 +1931,7 @@ cat >> "$SERVER_FILE" <<-EOF
 EOF
             fi
             if [ -n "$masque_ip_stack_congestion_controller" ]; then
-                if [ "$masque_ip_stack_congestion_controller" != "bbr3" ] || [ "$FEATURE_BBR3" = "1" ]; then
+                if [ "$masque_ip_stack_congestion_controller" != "bbr3" ] || [ "$masque_ip_stack_mode" = "mips" ] || [ "$masque_ip_stack_mode" = "auto" ]; then
 cat >> "$SERVER_FILE" <<-EOF
       congestion-controller: $masque_ip_stack_congestion_controller
 EOF
@@ -1980,7 +1974,6 @@ fi
 
 #ZeroTier (Mihomo built-in overlay node)
 if [ "$type" = "zerotier" ]; then
-   [ "$FEATURE_ZEROTIER" = "1" ] || return
    config_get "zerotier_network" "$section" "zerotier_network" ""
    config_get "zerotier_advanced" "$section" "zerotier_advanced" ""
    config_get "zerotier_state_dir" "$section" "zerotier_state_dir" ""
@@ -2036,7 +2029,7 @@ EOF
    zerotier_emit_ip_stack=0
    if [ -n "$zerotier_ip_stack_mode" ]; then
       zerotier_emit_ip_stack=1
-   elif [ -n "$zerotier_ip_stack_congestion_controller" ] && { [ "$zerotier_ip_stack_congestion_controller" != "bbr3" ] || [ "$FEATURE_BBR3" = "1" ]; }; then
+   elif [ -n "$zerotier_ip_stack_congestion_controller" ]; then
       zerotier_emit_ip_stack=1
    fi
    if [ "$zerotier_emit_ip_stack" = "1" ]; then
@@ -2048,7 +2041,7 @@ cat >> "$SERVER_FILE" <<-EOF
       mode: $zerotier_ip_stack_mode
 EOF
       fi
-      if [ -n "$zerotier_ip_stack_congestion_controller" ] && { [ "$zerotier_ip_stack_congestion_controller" != "bbr3" ] || [ "$FEATURE_BBR3" = "1" ]; }; then
+      if [ -n "$zerotier_ip_stack_congestion_controller" ] && { [ "$zerotier_ip_stack_congestion_controller" != "bbr3" ] || [ "$zerotier_ip_stack_mode" = "mips" ] || [ "$zerotier_ip_stack_mode" = "auto" ]; }; then
 cat >> "$SERVER_FILE" <<-EOF
       congestion-controller: $zerotier_ip_stack_congestion_controller
 EOF

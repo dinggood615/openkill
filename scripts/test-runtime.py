@@ -206,13 +206,15 @@ class DualStackRoutingTests(unittest.TestCase):
 
         # The init call supplies stack_type at position 12 and stack_type_v6
         # at position 30.  The latter must use braced POSIX expansion.
-        self.assertIn('stack_type_v6=${30:-"mixed"}', change)
+        self.assertIn('stack_type_v6=${30:-"mips"}', change)
         self.assertIn("tun_stack = '$stack_type_v6' if en_mode_tun == '0'", change)
         self.assertNotRegex(change, r'(?<!\{)\$30')
         call = init.split('/usr/share/openkill/yml_change.sh', 1)[1].split(
             '# Validate the rewritten controller context', 1)[0]
         self.assertIn('"$en_mode_tun" "$stack_type" "$dns_port"', call)
         self.assertIn('"$ipv6_mode" "$stack_type_v6" "$enable_unified_delay"', call)
+        self.assertIn("tun_congestion_controller", change)
+        self.assertIn("congestion-controller", change)
 
         def selected(v4, v6, en_mode_tun, ipv6_mode):
             # This is the externally visible selector contract represented by
@@ -231,6 +233,26 @@ class DualStackRoutingTests(unittest.TestCase):
         for v4, v6, tun, ipv6_mode, expected in cases:
             with self.subTest(v4=v4, v6=v6, tun=tun, ipv6_mode=ipv6_mode):
                 self.assertEqual(selected(v4, v6, tun, ipv6_mode), expected)
+
+    def test_v11932_profile_is_default_and_protocol_fields_are_not_global_gated(self):
+        settings = (ROOT / 'luci-app-openkill/luasrc/model/cbi/openkill/settings.lua').read_text(encoding='utf-8')
+        uci = (ROOT / 'luci-app-openkill/root/etc/config/openkill').read_text(encoding='utf-8')
+        semantic = (SHARE / 'openkill_semantic_check.sh').read_text(encoding='utf-8')
+        proxies = (SHARE / 'yml_proxys_set.sh').read_text(encoding='utf-8')
+        self.assertIn('o:value("mips", translate("Mihomo mips (recommended)"))', settings)
+        self.assertIn('option stack_type \'mips\'', uci)
+        self.assertIn("option tun_congestion_controller 'bbr3'", uci)
+        self.assertIn('%w[system gvisor mixed mips]', semantic)
+        self.assertIn("tun.congestion-controller is invalid", semantic)
+        init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        self.assertIn('OPENKILL_TUN_CONGESTION_CONTROLLER', init)
+        self.assertIn('lacks the v1.19.32 TUN congestion field', init)
+        for legacy_gate in (
+            'FEATURE_H2C', 'FEATURE_SHADOWQUIC', 'FEATURE_MASQUE',
+            'FEATURE_AMNEZIA_WG', 'FEATURE_ANYTLS_METADATA',
+            'FEATURE_BBR3', 'FEATURE_ZEROTIER',
+        ):
+            self.assertNotIn(legacy_gate, proxies)
 
     def test_benchmark_is_read_only_and_busybox_ash_compatible(self):
         source = (SHARE / 'openkill-benchmark.sh').read_text(encoding='utf-8')

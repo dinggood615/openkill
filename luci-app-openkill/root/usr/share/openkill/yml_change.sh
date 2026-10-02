@@ -105,13 +105,18 @@ case "$tun_endpoint_independent_nat" in 0|1) ;; *) tun_endpoint_independent_nat=
 
 en_mode_tun=${11:-0}
 if [ -z "${12}" ]; then
-   stack_type=${30:-"system"}
+   stack_type=${30:-"mips"}
 else
    stack_type=${12}
 fi
 # The IPv6-only TUN path has its own stack selector.  Keep the parameter
 # expansion braced so BusyBox ash treats position 30 as one argument.
-stack_type_v6=${30:-"mixed"}
+stack_type_v6=${30:-"mips"}
+tun_congestion_controller=${OPENKILL_TUN_CONGESTION_CONTROLLER:-$(uci_get_config "tun_congestion_controller" || echo bbr3)}
+case "$tun_congestion_controller" in
+   cubic|reno|bbr|bbr3) ;;
+   *) tun_congestion_controller=bbr3 ;;
+esac
 
 if [ "$1" = "fake-ip" ] && [ "$enable_redirect_dns" != "2" ]; then
    TMP_FILTER_FILE="/tmp/yaml_openkill_fake_filter_include"
@@ -744,6 +749,7 @@ begin
                'auto-redirect' => (tun_auto_redirect == '1'),
                'strict-route' => tun_strict_route, 'disable-icmp-forwarding' => false
             }
+            Value['tun']['congestion-controller'] = '$tun_congestion_controller' if ['mips', 'mixed'].include?(tun_stack)
             Value['tun'].delete('iproute2-table-index')
          else
             Value.delete('tun')

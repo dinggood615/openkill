@@ -148,17 +148,13 @@ EOF
             cat > "$probe_file" <<'EOF'
 mixed-port: 65535
 mode: rule
-proxies:
-  - name: capability
-    type: masque
-    server: 127.0.0.1
-    port: 443
-    private-key: MHcCAQEEILI1eOtnbEIh89Fj4yNDuFR6UjayCKI3NdLl3DhetimWoAoGCCqGSM49AwEHoUQDQgAEgyXrE8v+hHsHy3ewSb3WcRjYgCrM9T9hiE0Uv6k2DZ1+4kefrDT9v1Q/8wdRigTf6t6gGNUV8W+IUMdrfUt+9g==
-    public-key: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEIaU7MToJm9NKp8YfGxR6r+/h4mcG7SxI8tsW8OR1A5tv/zCzVbCRRh2t87/kxnP6lAy0lkr7qYwu+ox+k3dr6w==
-    ip: 172.16.0.2/32
-    ip-stack:
-      mode: mips
-      congestion-controller: bbr3
+tun:
+  enable: true
+  stack: mips
+  congestion-controller: bbr3
+  auto-route: false
+  auto-redirect: false
+  dns-hijack: [any:53]
 EOF
             ;;
         *)
@@ -180,7 +176,7 @@ EOF
         # Parsing may ignore unknown optional fields. A successful parse is
         # not sufficient evidence of runtime protocol support.
         case "$name" in
-            masque|shadowquic|zerotier) printf '%s\n' "1" ;;
+            masque|shadowquic|zerotier|bbr3) printf '%s\n' "1" ;;
             *) printf '%s\n' "unknown" ;;
         esac
     else

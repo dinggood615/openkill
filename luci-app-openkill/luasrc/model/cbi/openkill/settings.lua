@@ -255,7 +255,18 @@ o:depends("en_mode", "fake-ip-mix")
 o:value("system", translate("System"))
 o:value("gvisor", translate("gVisor"))
 o:value("mixed", translate("Mixed"))
-o.default = "mixed"
+o:value("mips", translate("Mihomo mips (recommended)"))
+o.default = "mips"
+
+o = s:taboption("op_mode", ListValue, "tun_congestion_controller", translate("TUN TCP Congestion Control"))
+o.description = translate("Used by the Mihomo mips TUN stack. BBR3 is selected by default on v1.19.32; older or non-mips cores ignore it safely.")
+o:value("cubic", "cubic")
+o:value("reno", "reno")
+o:value("bbr", "BBR")
+o:value("bbr3", "BBR3 (v1.19.32, mips)")
+o.default = "bbr3"
+o.rmempty = false
+for _, mode in ipairs({"redir-host-tun", "fake-ip-tun", "redir-host-mix", "fake-ip-mix"}) do o:depends("en_mode", mode) end
 
 o = s:taboption("op_mode", Flag, "tun_auto_detect_interface", translate("TUN Auto Detect Interface"))
 o.description = translate("Let Mihomo select the active uplink interface; recommended for multi-WAN and IPv6 networks.")
@@ -1562,8 +1573,8 @@ o.datatype = "range(1,240)"
 o.default = "60"
 o.rmempty = false
 
----- Mihomo optional features
-o = s:taboption("mihomo_features", DummyValue, "capability_summary", translate("Detected Core Capabilities"))
+---- Mihomo core compatibility (read-only; protocol fields live with nodes)
+o = s:taboption("mihomo_features", DummyValue, "capability_summary", translate("Mihomo Core & Compatibility"))
 o.rawhtml = true
 o.cfgvalue = function()
 	local summary = SYS.exec("/usr/share/openkill/openkill_capabilities.sh --summary 2>/dev/null") or ""
@@ -1571,7 +1582,7 @@ o.cfgvalue = function()
 end
 
 o = s:taboption("mihomo_features", Button, "refresh_capabilities", translate("Capability Probe"))
-o.description = translate("Run Mihomo -t probes without starting a listener. Optional fields should only be enabled when the probe reports support.")
+o.description = translate("The core and protocol fields are selected automatically by the active node and runtime profile. This check only reports support and does not enable a separate feature gate.")
 o.inputtitle = translate("Refresh Probe")
 o.inputstyle = "reload"
 o.write = function()
@@ -1579,35 +1590,13 @@ o.write = function()
 	HTTP.redirect(DISP.build_url("admin", "services", "openkill"))
 end
 
-o = s:taboption("mihomo_features", Flag, "feature_h2c", translate("Enable H2C / QUIC v2"))
-o.description = translate("Expose the H2C transport switch for VMess and the v2 value in ShadowQUIC. Disabled by default for compatibility.")
-o.default = 0
-o.rmempty = false
-
-o = s:taboption("mihomo_features", Flag, "feature_shadowquic", translate("Enable ShadowQUIC"))
-o.description = translate("Enable ShadowQUIC/QUIC v2 fields in node configuration. Verify the detected core capability first.")
-o.default = 0
-o.rmempty = false
-
-o = s:taboption("mihomo_features", Flag, "feature_masque", translate("Enable MASQUE Advanced Fields"))
-o.description = translate("Allow MASQUE network, IP stack, handshake timeout and congestion settings when the node advanced switch is enabled.")
-o.default = 0
-o.rmempty = false
-
-o = s:taboption("mihomo_features", Flag, "feature_amnezia_wg", translate("Enable AmneziaWG"))
-o.description = translate("Allow the AmneziaWG option fields on WireGuard nodes. No kernel module is installed by OpenKill.")
-o.default = 0
-o.rmempty = false
-
-o = s:taboption("mihomo_features", Flag, "feature_anytls_metadata", translate("Enable AnyTLS Client Metadata"))
-o.description = translate("Send explicitly configured client-metadata to an AnyTLS server. It is off by default for privacy and compatibility.")
-o.default = 0
-o.rmempty = false
-
-o = s:taboption("mihomo_features", Flag, "feature_bbr3", translate("Enable BBR3"))
-o.description = translate("Allow BBR3 in MASQUE and ZeroTier IP-stack congestion control. It has no effect with the gVisor stack and requires core support.")
-o.default = 0
-o.rmempty = false
+o = s:taboption("mihomo_features", DummyValue, "capability_policy", translate("Capability policy"))
+o.rawhtml = true
+o.cfgvalue = function()
+	return "<div class='openkill-capability-policy'>" ..
+		translate("Protocol options are shown in their node or network context. OpenKill preserves the legacy UCI keys for upgrade compatibility, but they are no longer required to activate a supported Mihomo field.") ..
+		"</div>"
+end
 
 ---- ZeroTier optional overlay
 o = s:taboption("zerotier", DummyValue, "zerotier_status", translate("ZeroTier Status"))
@@ -1617,8 +1606,8 @@ o.cfgvalue = function()
 	return "<pre class='openkill-zerotier-status'>" .. UTIL.pcdata(status) .. "</pre>"
 end
 
-o = s:taboption("zerotier", Flag, "feature_zerotier", translate("Enable ZeroTier Support"))
-o.description = translate("Enables Mihomo built-in type: zerotier nodes. A separate system ZeroTier service is optional and is only managed by the Apply button.")
+o = s:taboption("zerotier", Flag, "feature_zerotier", translate("Manage System ZeroTier Service"))
+o.description = translate("Controls only the optional host ZeroTier service. Mihomo built-in ZeroTier nodes are available from the node editor without this switch.")
 o.default = 0
 o.rmempty = false
 
@@ -1722,7 +1711,8 @@ o:depends({ipv6_mode= "3", en_mode = "fake-ip"})
 o:value("system", translate("System"))
 o:value("gvisor", translate("gVisor"))
 o:value("mixed", translate("Mixed"))
-o.default = "mixed"
+o:value("mips", translate("Mihomo mips (recommended)"))
+o.default = "mips"
 
 o = s:taboption("ipv6", Flag, "enable_v6_udp_proxy", translate("Proxy UDP Traffics"))
 o.description = translate("The Servers Must Support UDP forwarding").."<br>"..font_red..bold_on..translate("If Docker is Installed, UDP May Not Forward Normally")..bold_off..font_off

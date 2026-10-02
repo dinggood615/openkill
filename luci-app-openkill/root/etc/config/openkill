@@ -141,7 +141,10 @@ config openkill 'config'
 	option enable_respect_rules '0'
 	option default_dashboard 'metacubexd'
 	option core_type 'Meta'
-	option stack_type 'system'
+	option stack_type 'mips'
+	option stack_type_v6 'mips'
+	option tun_congestion_controller 'bbr3'
+	option mihomo_profile_version '2026-1207'
 	option ipv6_mode '2'
 	option fakeip_range '0'
 	option fakeip_range6 '0'
@@ -178,9 +181,8 @@ config openkill 'config'
 	option geoasn_custom_url 'https://testingcf.jsdelivr.net/gh/xishang0128/geoip@release/GeoLite2-ASN.mmdb'
 	option chnr_custom_url 'https://ispip.clang.cn/all_cn.txt'
 	option chnr6_custom_url 'https://ispip.clang.cn/all_cn_ipv6.txt'
-	# Optional Mihomo capabilities. They are disabled by default so older cores
-	# keep the same generated YAML. Enable a capability only after the status
-	# probe reports support; per-node advanced switches provide a second guard.
+	# Legacy feature_* keys are retained for upgrade compatibility.  Protocol
+	# fields are now enabled by their node context; these keys are not gates.
 	option feature_h2c '0'
 	option feature_shadowquic '0'
 	option feature_masque '0'

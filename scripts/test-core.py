@@ -76,17 +76,22 @@ def api(port, password):
         conn.close()
 
 
-def run_tests(core, directory):
+def run_tests(core, directory, release='v1.19.30'):
     baseline = {'mode': 'rule', 'log-level': 'warning', 'rules': ['MATCH,DIRECT'],
                 'proxies': [], 'proxy-groups': []}
     count = 0
     for owner in ['openkill', 'mihomo']:
         for ipv6 in [False, True]:
-            for stack in ['system', 'mixed']:
+            stacks = ['system', 'mixed']
+            if release >= 'v1.19.31':
+                stacks.append('mips')
+            for stack in stacks:
                 config = dict(baseline, ipv6=ipv6)
                 config['tun'] = {'enable': True, 'device': 'utun', 'stack': stack,
                                  'auto-route': owner == 'mihomo', 'auto-redirect': owner == 'mihomo',
                                  'dns-hijack': ['any:53', 'tcp://any:53']}
+                if stack == 'mips' and release >= 'v1.19.32':
+                    config['tun']['congestion-controller'] = 'bbr3'
                 file = directory / 'validate.yaml'
                 file.write_text(json.dumps(config), encoding='utf-8')
                 subprocess.run([str(core), '-t', '-d', str(directory), '-f', str(file)], check=True,
@@ -182,7 +187,7 @@ if __name__ == '__main__':
         try:
             if not args.core:
                 print('Testing official stable', download_core(args.release, core))
-            run_tests(core, directory)
+            run_tests(core, directory, args.release)
         except CoreReleaseUnavailable as error:
             print(
                 "OPENKILL_ENVIRONMENT_LIMIT=CORE_RELEASE_UNAVAILABLE\n"

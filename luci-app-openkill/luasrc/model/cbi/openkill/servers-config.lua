@@ -636,7 +636,7 @@ o.default = "/"
 o:depends("obfs_vmess", "h2")
 
 o = s:option(Flag, "h2c_enable", translate("H2C Cleartext HTTP/2"))
-o.description = translate("For VMess H2 transport only. Enables network h2 with TLS disabled; the global H2C/QUIC v2 switch is an optional safety gate.")
+o.description = translate("For VMess H2 transport only. Enables network h2 with TLS disabled when this node explicitly requests H2C.")
 o.rmempty = true
 o.default = 0
 o:depends("obfs_vmess", "h2")
@@ -1007,7 +1007,7 @@ o.default = "0"
 o:depends("type", "anytls")
 
 o = s:option(Flag, "anytls_advanced", translate("AnyTLS Advanced Metadata"))
-o.description = translate("Enable the explicit client-metadata field for this node. The global AnyTLS metadata switch must also be enabled.")
+o.description = translate("Enable the explicit client-metadata field for this node. Metadata is not sent unless a value is entered.")
 o.rmempty = true
 o.default = 0
 o:depends("type", "anytls")
@@ -1142,7 +1142,7 @@ o.placeholder = translate("8.8.8.8")
 o:depends("type", "masque")
 
 o = s:option(Flag, "masque_advanced", translate("MASQUE Advanced Settings"))
-o.description = translate("Enable the official MASQUE IP-stack, network and handshake options for this node. The global MASQUE switch must also be enabled.")
+o.description = translate("Show the official MASQUE IP-stack, network and handshake options for this node.")
 o.rmempty = true
 o.default = 0
 o:depends("type", "masque")
@@ -1191,7 +1191,7 @@ o:depends({type = "masque", masque_advanced = true})
 
 -- [[ ZeroTier (built-in Mihomo proxy) ]] --
 o = s:option(Flag, "zerotier_advanced", translate("ZeroTier Advanced Settings"))
-o.description = translate("Expose the official ZeroTier transport, IP-stack and fallback options for this node. The global ZeroTier switch must also be enabled.")
+o.description = translate("Show the official ZeroTier transport, IP-stack and fallback options for this node.")
 o.rmempty = true
 o.default = 0
 o:depends("type", "zerotier")
@@ -1313,7 +1313,7 @@ o:depends("type", "zerotier")
 
 -- [[ AmneziaWG ]] --
 o = s:option(Flag, "amnezia_wg_enable", translate("Enable AmneziaWG Options"))
-o.description = translate("WireGuard remains compatible when this is off. The global AmneziaWG switch must also be enabled.")
+o.description = translate("WireGuard remains compatible when this is off. Enable it only when this node uses AmneziaWG parameters.")
 o.rmempty = true
 o.default = 0
 o:depends("type", "wireguard")

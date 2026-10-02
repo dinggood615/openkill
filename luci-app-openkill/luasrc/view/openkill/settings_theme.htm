@@ -14,7 +14,7 @@
     var CARD_LAYOUTS = {
         basic: [
             {id: 'runtime-core', title: '<%:Operation & Core%>', keys: [
-                'en_mode', 'enable_udp_proxy', 'stack_type',
+                'en_mode', 'enable_udp_proxy', 'stack_type', 'tun_congestion_controller',
                 'tun_auto_detect_interface', 'tun_strict_route',
                 'tun_endpoint_independent_nat', 'proxy_mode', 'delay_start', 'log_size'
             ]},
@@ -103,9 +103,7 @@
                 'version_update_panel', 'firewall_custom'
             ]},
             {id: 'mihomo-capabilities', title: '<%:Mihomo Capabilities%>', keys: [
-                'capability_summary', 'refresh_capabilities', 'feature_h2c',
-                'feature_shadowquic', 'feature_masque', 'feature_amnezia_wg',
-                'feature_anytls_metadata', 'feature_bbr3'
+                'capability_summary', 'refresh_capabilities', 'capability_policy'
             ]}
         ]
     };

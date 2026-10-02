@@ -134,7 +134,12 @@ tun = config['tun']
 if tun
   fail.call('tun must be a mapping') unless tun.is_a?(Hash)
   if tun.key?('stack')
-    fail.call('tun.stack is invalid') unless %w[system gvisor mixed].include?(tun['stack'].to_s)
+    fail.call('tun.stack is invalid') unless %w[system gvisor mixed mips].include?(tun['stack'].to_s)
+  end
+  if tun.key?('congestion-controller')
+    congestion = tun['congestion-controller'].to_s
+    fail.call('tun.congestion-controller is invalid') unless %w[cubic reno bbr bbr3].include?(congestion)
+    fail.call('tun.congestion-controller bbr3 requires mips or mixed stack') if congestion == 'bbr3' && !%w[mips mixed].include?(tun['stack'].to_s)
   end
   # Routing and transparent firewall programming have one owner.  The shell
   # service exports the selected UCI mode for this check; standalone callers

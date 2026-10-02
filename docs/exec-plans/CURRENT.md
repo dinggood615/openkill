@@ -1,5 +1,28 @@
 # Current status
 
+## 2026-10-02 2026-1207 Mihomo v1.19.32 适配（发布门禁进行中）
+
+- 基线重新核实为 `dad7c329a6825cf4f2b48398da7c65dfe74c508e`，源版本为
+  `2026-1206`；工作区仅保留此前未跟踪的 `.rc-*` 审计目录，未修改或纳入本轮提交。
+- 已完成代码阶段：TUN 允许 `mips`，新安装默认 `mips + bbr3`；IPv4/IPv6 选择共享
+  实际 TUN 配置；旧 `system/mixed` 默认组合通过一次性 `mihomo_profile_version`
+  迁移；核心低于 v1.19.31/v1.19.32 时分别使用有界 `mixed/cubic` 或 `mixed/bbr`
+  兼容回退，并记录原因。
+- 已移除协议生成器对 H2C、ShadowQUIC、MASQUE、AmneziaWG、AnyTLS metadata、
+  BBR3 和 Mihomo 内置 ZeroTier 的全局 feature 门槛。旧 UCI 键仍保留，但不再决定
+  节点字段是否输出。能力页改为只读核心与兼容摘要，协议选项归入节点编辑。
+- 受影响文件包括 `settings.lua`、`settings_theme.htm`、`servers-config.lua`、
+  `openkill_semantic_check.sh`、`yml_change.sh`、`yml_proxys_set.sh`、核心能力探测、
+  init 迁移逻辑、默认 YAML、UCI 默认配置及测试脚本。
+- 已通过：WSL 中 `scripts/test-runtime.py` 34 项（3 skip）、官方 Mihomo v1.19.31
+  与 v1.19.32 `scripts/test-core.py` 各 12 项、LuCI 合同 32 项、安装测试 15 项、
+  UCI 生命周期 19 项、核心下载契约 4 项、测试门禁 25 项，以及
+  `sh scripts/local-gate.sh`。Windows 直接执行 Linux 核心的失败仅为宿主格式限制，
+  已用 WSL 同等环境复验。
+- 版本已从 `2026-1206` 提升为 `2026-1207`，发布说明为
+  `docs/release/notes/2026-1207.md`。尚未完成精确提交 CI、RC 构建、测试机安装和
+  Formal Release；这些是下一阶段的硬门禁，不能以当前本地测试代替。
+
 ## 2026-10-01 2026-1206 UI 字段顺序与运行状态页宽度（正式验收完成）
 
 - 本轮严格限定为 LuCI UI：未修改 DNS 机制、NaiveProxy、核心启动、WAN、路由、TUN、
