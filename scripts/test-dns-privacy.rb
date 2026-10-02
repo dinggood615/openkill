@@ -90,4 +90,28 @@ class DnsPrivacyTest < Minitest::Test
     assert_nil managed['proxies']
     assert_equal ['https://dns.example/dns-query#OpenKill-DNS'], v['dns']['nameserver']
   end
+
+  def test_domestic_business_rules_are_added_before_match_and_are_idempotent
+    v = profile.merge('rules' => ['DOMAIN-SUFFIX,example.test,existing', 'MATCH,existing'])
+    OpenKillDnsPrivacy.ensure_domestic_business_rules(v)
+    assert_equal ['DOMAIN-SUFFIX,example.test,existing',
+                  'GEOSITE,cn,DIRECT',
+                  'GEOIP,CN,DIRECT,no-resolve',
+                  'MATCH,existing'], v['rules']
+    first = v['rules'].dup
+    OpenKillDnsPrivacy.ensure_domestic_business_rules(v)
+    assert_equal first, v['rules']
+  end
+
+  def test_domestic_business_rules_preserve_explicit_user_decisions
+    v = profile.merge('rules' => ['GEOSITE,cn,existing', 'GEOIP,CN,existing', 'MATCH,existing'])
+    OpenKillDnsPrivacy.ensure_domestic_business_rules(v)
+    assert_equal ['GEOSITE,cn,existing', 'GEOIP,CN,existing', 'MATCH,existing'], v['rules']
+  end
+
+  def test_domestic_business_rules_can_be_disabled
+    v = profile.merge('rules' => ['MATCH,existing'])
+    OpenKillDnsPrivacy.ensure_domestic_business_rules(v, false)
+    assert_equal ['MATCH,existing'], v['rules']
+  end
 end

@@ -49,6 +49,36 @@ module OpenKillDnsPrivacy
   rescue ArgumentError
     false
   end
+
+  # Keep business traffic policy separate from DNS transport policy.  Strict
+  # DNS privacy owns how a resolver is reached; it must not make every
+  # resolved connection use the privacy proxy.  When a rule profile has no
+  # explicit China-domain/IP decision, add the two standard direct decisions
+  # immediately before the catch-all.  Existing user decisions (including a
+  # deliberate proxy decision) are preserved verbatim.
+  def self.ensure_domestic_business_rules(value, enabled = true)
+    return value unless enabled
+
+    rules = Array(value['rules']).map(&:to_s)
+    has_match = lambda do |rule, kind, matcher|
+      fields = rule.split(',')
+      fields.length >= 2 && fields[0].to_s.casecmp?(kind) && fields[1].to_s.casecmp?(matcher)
+    end
+
+    additions = []
+    additions << 'GEOSITE,cn,DIRECT' unless rules.any? { |rule| has_match.call(rule, 'GEOSITE', 'cn') }
+    additions << 'GEOIP,CN,DIRECT,no-resolve' unless rules.any? { |rule| has_match.call(rule, 'GEOIP', 'CN') }
+    return value if additions.empty?
+
+    # Remove only a previous copy of our canonical additions.  This makes the
+    # transformation idempotent while leaving user variants untouched.
+    rules.reject! { |rule| additions.include?(rule) }
+    index = rules.index { |rule| rule.match?(/\A\s*(?:MATCH|FINAL),/i) } || rules.length
+    rules.insert(index, *additions)
+    value['rules'] = rules.uniq
+    value
+  end
+
   def self.apply(value, mode, group)
     dns = value.fetch('dns')
     if mode == 'strict'

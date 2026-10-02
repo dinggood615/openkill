@@ -72,6 +72,8 @@ def main() -> int:
     assert "rules.unshift(*adblock_allow.map" not in yml
     assert "(?:https|tls|quic|h3)" in yml and "https?" not in yml[yml.index("encrypted_server") : yml.index("encrypted_server") + 180]
     assert "strict DNS privacy requires at least one selectable proxy group" in yml
+    assert "OpenKillDnsPrivacy.ensure_domestic_business_rules" in yml
+    assert "mode == 'rule' && (china_ip_route || china_ip6_route)" in yml
     assert "provider_effective=1" in adblock and "source_sha256=" in adblock
     assert 'DEFAULT_ADBLOCK_URL="https://anti-ad.net/domains.txt"' in adblock
     assert "validate_download \"$DEFAULT_ADBLOCK_URL\"" in adblock

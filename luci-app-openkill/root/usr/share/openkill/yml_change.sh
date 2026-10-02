@@ -1121,6 +1121,14 @@ begin
 
       require '/usr/share/openkill/dns_privacy'
       OpenKillDnsPrivacy.apply(Value, dns_privacy_mode, '$dns_privacy_group')
+      # Strict DNS transport must not turn domestic business connections into
+      # proxy connections.  Add canonical CN domain/IP direct decisions only
+      # when the rule profile has no explicit decision of its own; the user's
+      # existing rule order and explicit targets remain authoritative.
+      OpenKillDnsPrivacy.ensure_domestic_business_rules(
+         Value,
+         mode == 'rule' && (china_ip_route || china_ip6_route)
+      )
 
       # Ad filtering is a separate routing decision. User blocks win over user
       # allows; allow entries are applied while generating the shared provider
