@@ -17,6 +17,11 @@
   `36978335137` 已成功：
   https://github.com/dinggood615/openkill/actions/runs/36978335137 。本轮不需要重建或覆盖
   `2026-2000` 正式包：短入口直接读取 `master` 安装器，且没有改变包内运行时代码或版本门禁。
+- 随后的输入组合保护提交为 `130f0c2d8ee478b6efc2f226b250a7d9974deb7a`，其
+  Development CI `36978798138` 已成功：
+  https://github.com/dinggood615/openkill/actions/runs/36978798138；同提交的缓存清理任务
+  `36978797831` 也已成功。`--version` 与 `--package-file` 现在会明确互斥，避免用户误以为
+  本地包已按远端版本选择完成。
 
 ## 2026-10-02 2026-2000 大版本适配（正式发布完成，保留数据面限制）
 
