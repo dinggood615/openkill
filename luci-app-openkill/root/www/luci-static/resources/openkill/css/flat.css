@@ -2460,3 +2460,115 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill .oc.openkill-myip
         padding-inline: 8px !important;
     }
 }
+
+/* ===== OpenKill settings card rhythm (2026-2003) =====
+ * Keep each card content-sized. Earlier compatibility layers used stretch
+ * and flex growth for dashboard rows, which made short settings cards inherit
+ * a neighbour's height and left a large empty tail below their fields. */
+#cbi-openkill.openkill-settings .openkill-settings-card-stack {
+    align-items: start;
+    grid-auto-rows: max-content;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card {
+    align-self: start;
+    height: auto;
+    min-height: 0;
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-body {
+    flex: 0 0 auto;
+    display: block;
+    padding: var(--ok-space-2, 8px) var(--ok-space-4, 16px) var(--ok-space-3, 12px);
+}
+
+#cbi-openkill.openkill-settings .openkill-settings-card-body .cbi-value {
+    min-height: 42px;
+    margin: 0;
+    padding: var(--ok-space-3, 12px) 0;
+}
+
+/* The source rule editor remains the native CBI section and keeps all its
+ * controls, but its heading and explanation are visible inside Traffic
+ * Routing so an empty list is still identifiable. */
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"] > h3 {
+    display: block;
+    margin: 0;
+    padding: var(--ok-space-3, 12px) 0 var(--ok-space-2, 8px);
+    color: var(--ok-ui-text);
+    font-size: 1rem;
+    line-height: 1.35;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"] > .cbi-section-descr {
+    display: block;
+    margin: 0 0 var(--ok-space-3, 12px);
+    color: var(--ok-ui-muted);
+    line-height: 1.5;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td[data-source-role="serial"] {
+    display: none;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td:first-child[data-source-label] {
+    display: block;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td:first-child[data-source-label]::before {
+    display: block;
+    margin: 0 0 4px;
+    color: var(--ok-ui-muted);
+    content: attr(data-source-label);
+    font-size: .78rem;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td[data-source-role="action"] {
+    grid-column: 1 / -1;
+    align-self: end;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.cbi-section-table-row.placeholder {
+    display: block;
+    width: 100%;
+    margin: 0 0 var(--ok-space-3, 12px);
+    padding: var(--ok-space-4, 16px);
+    box-sizing: border-box;
+    border: 1px dashed var(--ok-ui-border);
+    border-radius: var(--ok-radius-md, 8px);
+    background: var(--ok-ui-surface-muted);
+    text-align: center;
+}
+
+@media (max-width: 640px) {
+    #cbi-openkill.openkill-settings .openkill-settings-card-body {
+        padding-left: var(--ok-space-3, 12px);
+        padding-right: var(--ok-space-3, 12px);
+    }
+
+    #cbi-openkill.openkill-settings
+     .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+     tr.openkill-source-rule-card {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    #cbi-openkill.openkill-settings
+     .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+     tr.openkill-source-rule-card > td[data-source-role="action"] {
+        grid-column: auto;
+    }
+}

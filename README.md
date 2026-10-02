@@ -2,19 +2,19 @@
 
 OpenKill 是面向 OpenWrt 的轻量化 Mihomo（Meta）客户端 LuCI 插件，基于 OpenClash 兼容架构重构，提供稳定的代理接管、规则分流、双栈 DNS/IPv6 与可回滚运行管理。
 
-当前版本：`2026-2002`
+当前版本：`2026-2003`
 
 ## 一键安装
 
 每条命令都是独立的一行，可直接复制。默认安装最新正式版；指定版本时会从对应
-Release 下载并校验 SHA256。把示例中的 `2026-2002` 替换为需要的正式版本号。
+Release 下载并校验 SHA256。把示例中的 `2026-2003` 替换为需要的正式版本号。
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh -s -- --install
 ```
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh -s -- --install --version 2026-2002
+curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh -s -- --install --version 2026-2003
 ```
 
 ```sh
@@ -26,6 +26,11 @@ curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh 
 ```
 
 安装器会自动识别 `opkg`/`apk`、设备架构、依赖和可用镜像，并校验软件包 SHA256。更新会保留用户配置和上一份可用内核；卸载只移除 OpenKill 数据，不删除共享依赖。独立 NaiveProxy 组件、Geo 数据和官方 Mihomo/Meta 内核会分别校验，失败时单独报告。
+
+全新安装使用 `performance-dual-stack` 初始配置：IPv4/IPv6 开启、`fake-ip-tun`、
+Mihomo `mips` 双栈、BBR3、TCP 并发、统一延迟、标准 Geo、增强广告规则和防火墙 DNS
+转发。该配置只包含设备无关的通用设置，不包含节点、订阅、密码、用户 YAML、设备地址
+或个人规则；升级和重装保留用户已有选择。
 
 ## 功能
 

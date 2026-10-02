@@ -15,6 +15,17 @@ set_default() {
     fi
 }
 
+# The fresh-install profile is deliberately device independent.  These two
+# fields identify the profile only; all user-selected values remain untouched
+# on upgrade, reinstall and migration.
+set_default default_profile performance-dual-stack
+set_default default_profile_version 2026-2003
+default_profile="$(uci -q get openkill.config.default_profile 2>/dev/null || true)"
+case "$default_profile" in
+    performance-dual-stack) ;;
+    *) uci -q set openkill.config.default_profile=performance-dual-stack; changed=1 ;;
+esac
+
 set_default en_mode fake-ip
 set_default proxy_mode rule
 set_default find_process_mode off

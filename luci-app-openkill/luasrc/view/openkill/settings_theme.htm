@@ -451,14 +451,32 @@
         target.removeAttribute('aria-hidden');
 
         var ruleRows = target.querySelectorAll('tr.cbi-section-table-row:not(.placeholder)');
-        var ruleLabels = ['序号', '备注', '启用', '来源地址', '来源端口',
-            '协议', '地址族', '接口', '来源用户', 'DSCP', '处理对象', '排序', '操作'];
+        /* Resolve labels from the actual control name.  Positional labels are
+         * unsafe when a LuCI theme omits an optional column. */
+        var sourceLabels = {
+            comment: '备注', enabled: '启用', src_ip: '来源地址',
+            src_port: '来源端口', proto: '协议', family: '地址族',
+            interface: '接口', user: '来源用户', dscp: 'DSCP', target: '处理对象'
+        };
+        var headings = target.querySelectorAll('.cbi-section-table-titles th');
         for (var r = 0; r < ruleRows.length; r++) {
             ruleRows[r].classList.add('openkill-source-rule-card');
             ruleRows[r].setAttribute('data-openkill-rule-card', '1');
             var cells = ruleRows[r].children || [];
-            for (var c = 0; c < cells.length && c < ruleLabels.length; c++) {
-                cells[c].setAttribute('data-source-label', ruleLabels[c]);
+            for (var c = 0; c < cells.length; c++) {
+                var cell = cells[c];
+                if (c === 0 && !cell.querySelector('input, select, textarea, .cbi-dropdown')) {
+                    cell.setAttribute('data-source-role', 'serial');
+                    continue;
+                }
+                var control = cell.querySelector('input[name], select[name], textarea[name], [data-name]');
+                var controlName = control && (control.name || control.getAttribute('data-name') || '');
+                var optionName = String(controlName).split('.').pop();
+                var label = sourceLabels[optionName];
+                if (!label && headings[c]) label = (headings[c].textContent || '').replace(/\s+/g, ' ').trim();
+                if (label) cell.setAttribute('data-source-label', label);
+                else if (cell.querySelector('button, input[type="button"], input[type="submit"]'))
+                    cell.setAttribute('data-source-role', 'action');
             }
         }
 
@@ -485,7 +503,10 @@
             panel.setAttribute('data-openkill-cards-ready', '1');
             var stack = document.createElement('div');
             stack.className = 'openkill-settings-card-stack';
-            if (fields[0].parentNode === content) content.insertBefore(stack, fields[0]);
+            /* keepEmpty cards may be rendered with no direct CBI fields when
+             * dependencies hide every option.  Append the stack in that case
+             * instead of dereferencing a missing first field. */
+            if (fields.length && fields[0].parentNode === content) content.insertBefore(stack, fields[0]);
             else content.appendChild(stack);
             var remaining = fields.slice();
             var cardIndex = 0;
