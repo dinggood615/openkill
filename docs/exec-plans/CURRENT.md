@@ -2,7 +2,7 @@
 
 ## 2026-10-03 严格 DNS 受管组故障转移与国内分流复验（2026-2011）
 
-- 源码提交为 `0791c023c324e9b1c0adb6cd2c692b0c783b5055`，版本为 `2026-2011`；工作区只保留既有未跟踪 RC/正式审计目录。对应 Development CI 已通过，RC 构建已通过包内容审计。
+- 代码源提交为 `98c3dc2f9e4c513c080e0a01bf6600a3593069e1`，版本为 `2026-2011`；Formal Release `37041416008` 已成功，正式标签为 `v2026-2011-ipk`。本次文档收尾提交只更新本记录，不改变已发布包内容；工作区只保留既有未跟踪 RC/正式审计目录。对应 Development CI、RC 构建及正式包审计均已通过。
 - 授权设备仍仅为 `192.168.1.103`。设备为 Kwrt 25.12-SNAPSHOT / x86_64，Mihomo Meta v1.19.32；本轮写入前受保护备份为 `/root/openkill-dns-audit-20261003-0052/openkill-state.tar.gz`（目录 700、归档 600）。
 - 2026-2010 的故障根因是严格 DNS 受管组仍为手动 `select`，3 个成员中有失效成员且当前选择被钉死；控制器可访问但严格查询与代理请求失败。它不是国内业务规则把所有流量改走代理的证据。
 - 2026-2011 将该组生成为不含 `DIRECT` 的 `fallback`，带固定 HTTPS 健康探测、有限失败次数和有限启动等待；没有可用成员时仍失败关闭，不明文回退。实际运行 YAML 中该组为 `fallback`、3 个成员均报告可用，严格状态为 `effective=1/runtime_verified=1/ordinary_encrypted=1/bootstrap_exception=1`。
@@ -10,7 +10,8 @@
 - DNS 数据面复验：测试客户端经 `192.168.1.103` 指定解析入口的 UDP、TCP 查询均成功；唯一测试域名的 NXDOMAIN 被返回为预期错误。设备现有 IPv4/IPv6 53 处理规则共 5 条；设备 LAN 侧没有 global IPv6 地址，因此 LAN IPv6 数据面尚未完成。宿主机虽有 global IPv6，但不能据此替代经过测试机的 IPv6 验收。
 - 已确认的边界仍需保留：默认本机解析未在物理 WAN 观察到 53 端口包；显式指定外部 DNS 的路由器本地查询曾产生 4 个物理 WAN 53 端口包。这是未授权的本机/全网 DNS kill-switch 范围，不能在没有影响评估和回滚确认的情况下部署。LAN 客户端浏览器自建 DoH 也不在本轮可证明范围内。
 - 广告屏蔽运行态为 `generated/effective/provider_effective/dns_loaded/core_loaded/verified=1`，provider、dnsmasq 视图和核心规则来自同一份经校验缓存；本轮未改变来源或允许列表。规则行为以受控 provider 夹具及运行态验证为证，不宣称浏览器内容广告全部消除。
-- 本轮修改文件集中在 `dns_privacy.rb`、`openkill` 服务启动等待、对应 DNS/运行回归测试、版本同步及发布记录；未改 WAN、用户代理组、路由或全网 DNS 阻断。正式发布前还需用同一源提交完成 Formal Release 并安装正式包复验。
+- 本轮修改文件集中在 `dns_privacy.rb`、`openkill` 服务启动等待、对应 DNS/运行回归测试、版本同步及发布记录；未改 WAN、用户代理组、路由或全网 DNS 阻断。正式 IPK 已安装到测试机并复验：大小 7,936,078 字节，SHA256 `d10636459e9c02d981f313a0e16272d0a86643e1b27b295328130fde6d1f8736`；安装返回码为 0，包版本为 `2026-2011`，服务和 Mihomo v1.19.32 保持运行，严格 DNS 与广告运行态仍为有效。发布资产见 https://github.com/dinggood615/openkill/releases/tag/v2026-2011-ipk 。
+- Formal Release 的编译日志有一个 GitHub Actions Node.js 20 弃用提示，但不影响本次作业成功；IPv6 LAN 数据面、浏览器自建 DoH 和全网 OUTPUT DNS kill-switch 仍按上文边界未宣称覆盖。
 
 ## 2026-10-02 严格 DNS 与国内业务分流复核（本地修复，设备证据待补）
 
