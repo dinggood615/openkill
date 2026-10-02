@@ -412,6 +412,9 @@ class DualStackRoutingTests(unittest.TestCase):
         init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
         self.assertIn('recover_fail checkpoint-missing', recovery)
         self.assertIn('recover_fail checkpoint-config-invalid', recovery)
+        self.assertIn('recover_fail checkpoint-core-metadata-missing', recovery)
+        self.assertIn('recover_fail checkpoint-core-metadata-invalid', recovery)
+        self.assertIn('recover_fail current-core-unreadable', recovery)
         self.assertIn('recovery_reason=', init)
         self.assertIn('no verified checkpoint is available for this core', init)
 

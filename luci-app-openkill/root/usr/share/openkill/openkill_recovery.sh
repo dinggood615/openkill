@@ -44,15 +44,27 @@ case "${1:-}" in
     [ -s "$checkpoint/config.yaml" ] && [ -s "$checkpoint/config.uci" ] || recover_fail checkpoint-missing
     # Cleared only by an explicit fresh start, never by an automatic retry.
     mkdir /tmp/openkill-recovery.once 2>/dev/null || recover_fail recovery-already-attempted
-    current=$(sha256sum /etc/openkill/clash | awk '{print $1}')
-    saved=$(cat "$checkpoint/core.sha256")
+    # A partial checkpoint must be reported as such.  With `set -e`, an
+    # unchecked cat/sha256sum would otherwise bypass recover_fail() and leave
+    # the caller with an unhelpful generic recovery error.
+    [ -s "$checkpoint/core.sha256" ] || recover_fail checkpoint-core-metadata-missing
+    saved=$(cat "$checkpoint/core.sha256" 2>/dev/null) || recover_fail checkpoint-core-metadata-unreadable
+    case "$saved" in
+      ''|*[!0-9A-Fa-f]*) recover_fail checkpoint-core-metadata-invalid ;;
+    esac
+    [ "${#saved}" -eq 64 ] || recover_fail checkpoint-core-metadata-invalid
+    current=$(sha256sum /etc/openkill/clash 2>/dev/null | awk '{print $1}') || recover_fail current-core-unreadable
+    [ -n "$current" ] || recover_fail current-core-unreadable
     # A snapshot is only valid for its verified core. Do not silently roll
     # a configuration back across an unverified core upgrade.
     if [ "$current" != "$saved" ]; then
-        target=$(readlink -f /etc/openkill/clash)
+        target=$(readlink -f /etc/openkill/clash 2>/dev/null) || recover_fail recovery-target-unreadable
+        [ -n "$target" ] || recover_fail recovery-target-unreadable
         previous="$target.previous"
         [ -s "$previous" ] || recover_fail prior-core-missing
-        [ "$(sha256sum "$previous" | awk '{print $1}')" = "$saved" ] || recover_fail prior-core-mismatch
+        previous_sha=$(sha256sum "$previous" 2>/dev/null | awk '{print $1}') || recover_fail prior-core-unreadable
+        [ -n "$previous_sha" ] || recover_fail prior-core-unreadable
+        [ "$previous_sha" = "$saved" ] || recover_fail prior-core-mismatch
         candidate="$previous"
     else
         candidate=/etc/openkill/clash
