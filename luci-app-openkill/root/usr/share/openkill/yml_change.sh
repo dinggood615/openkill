@@ -1058,7 +1058,7 @@ begin
           raise 'strict DNS privacy requires at least one selectable proxy group (add a group with a proxy, provider, or include-all target)' unless proxy_path
          # Strict mode deliberately does not pre-append #RULES. The dedicated
          # group is installed by dns_privacy.rb as the single routing selector;
-         # doing both would create an ambiguous `#RULES&group` suffix.
+         # doing both would create an ambiguous RULES-plus-group suffix.
          Value['dns']['respect-rules'] = false
          YAML.LOG_TIP('Strict DNS privacy removed plain public resolvers and binds ordinary DNS to the dedicated proxy group; proxy-server-nameserver remains the node bootstrap exception.')
       end
