@@ -220,7 +220,9 @@ class LuCIContractTests(unittest.TestCase):
         config = (ROOT / "luci-app-openkill/root/etc/config/openkill").read_text(encoding="utf-8")
         normalizer = (ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_config_normalize.sh").read_text(encoding="utf-8")
         self.assertIn("fields.length && fields[0].parentNode === content", theme)
-        self.assertIn("align-items: start;", css)
+        self.assertIn("align-items: stretch;", css)
+        self.assertIn("align-self: stretch;", css)
+        self.assertIn("flex: 1 1 auto;", css)
         self.assertIn("height: auto;", css)
         self.assertIn("option default_profile 'performance-dual-stack'", config)
         self.assertIn("option default_profile_version '2026-2005'", config)
@@ -266,15 +268,34 @@ class LuCIContractTests(unittest.TestCase):
         theme = SETTINGS_THEME.read_text(encoding="utf-8")
         css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css").read_text(encoding="utf-8")
         self.assertIn("{id: 'openvpn-compatibility'", theme)
+        compatibility = theme.split("compatibility: [", 1)[1].split("advanced: [", 1)[0]
+        self.assertLess(compatibility.index("{id: 'openvpn-compatibility'"), compatibility.index("{id: 'remote-service'"))
         self.assertIn("{id: 'zerotier'", theme)
         self.assertIn("{id: 'naiveproxy-service'", theme)
-        remote = theme.split("{id: 'remote-service'", 1)[1].split("{id: 'openvpn-compatibility'", 1)[0]
+        remote = theme.split("{id: 'remote-service'", 1)[1].split("{id: 'zerotier'", 1)[0]
         zerotier = theme.split("{id: 'zerotier'", 1)[1].split("advanced:", 1)[0]
         self.assertNotIn("zerotier_status", remote)
         self.assertIn("'zerotier_status', 'feature_zerotier'", zerotier)
         self.assertIn("s:tab(\"naive_service\", \"NaiveProxy与服务\")", (ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua").read_text(encoding="utf-8"))
         self.assertIn("moveExplicitFieldsToCategory(map, tabItems, 'naive_service', ['_naive_component_info'])", theme)
         self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", css)
+        self.assertIn("align-items: stretch;", css)
+
+    def test_network_cards_and_source_theme_have_stable_order(self) -> None:
+        theme = SETTINGS_THEME.read_text(encoding="utf-8")
+        css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css").read_text(encoding="utf-8")
+        network = theme.split("network: [", 1)[1].split("naive_service: [", 1)[0]
+        card_order = (
+            "{id: 'dns-local'",
+            "{id: 'traffic-routing'",
+            "{id: 'ipv6-tun'",
+            "{id: 'lan-wan'",
+        )
+        positions = [network.index(marker) for marker in card_order]
+        self.assertEqual(positions, sorted(positions))
+        self.assertIn("Settings UI closeout (2026-2006)", css)
+        self.assertIn("var(--ok-ui-surface-muted)", css)
+        self.assertIn("var(--ok-ui-border)", css)
         self.assertIn("align-items: stretch;", css)
 
     def test_maintenance_precedes_mihomo_in_equal_width_advanced_grid(self) -> None:

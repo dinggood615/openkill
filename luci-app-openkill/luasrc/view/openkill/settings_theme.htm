@@ -31,6 +31,10 @@
                 'adblock_mode', 'adblock_rule_url', 'adblock_rule_format', 'adblock_update_interval',
                 'adblock_allowlist', 'adblock_blocklist'
             ]},
+            {id: 'traffic-routing', title: '<%:Traffic Routing%>', keepEmpty: true, keys: [
+                'router_self_proxy', 'disable_udp_quic', 'skip_proxy_address',
+                'common_ports', 'china_ip_route', 'chnroute_pass'
+            ]},
             {id: 'ipv6-tun', title: '<%:IPv6 & TUN%>', keys: [
                 'ipv6_enable', 'ipv6_mode', 'stack_type_v6', 'enable_v6_udp_proxy',
                 'ipv6_dns', 'native_ipv6_state', 'effective_ipv6_mode', 'fakeip_range6',
@@ -44,10 +48,6 @@
             ]},
             {id: 'wan-ac', title: 'WAN 访问控制', keys: [
                 'wan_ac_black_ips', 'wan_ac_black_ports'
-            ]},
-            {id: 'traffic-routing', title: '<%:Traffic Routing%>', keepEmpty: true, keys: [
-                'router_self_proxy', 'disable_udp_quic', 'skip_proxy_address',
-                'common_ports', 'china_ip_route', 'chnroute_pass'
             ]}
         ],
         naive_service: [
@@ -84,16 +84,16 @@
                 '_compat_policy', '_compat_scope', 'compatibility_profile',
                 'disable_quic_go_gso', 'small_flash_memory', 'bypass_gateway_compatible'
             ]},
-            {id: 'remote-service', title: '远程访问绕过', keys: [
-                'remote_service_bypass', 'rustdesk_compatibility', 'rustdesk_server_domains', 'remote_service_ports', 'wan_ac_black_ips',
-                'wan_ac_black_ports', 'wan_interface_mode', 'wan_interface_name',
-            ]},
             {id: 'openvpn-compatibility', title: 'OpenVPN 精确兼容', keys: [
                 'openvpn_compatibility', 'openvpn_role', 'openvpn_transport_bypass',
                 'openvpn_transport_protocol', 'openvpn_server_ports', 'openvpn_server_ips',
                 'openvpn_server_domains', 'openvpn_client_ips', 'openvpn_tunnel_policy',
                 'openvpn_real_ip', 'openvpn_adblock_exception', 'openvpn_dns_mode',
                 '_openvpn_status_contract'
+            ]},
+            {id: 'remote-service', title: '远程访问绕过', keys: [
+                'remote_service_bypass', 'rustdesk_compatibility', 'rustdesk_server_domains', 'remote_service_ports', 'wan_ac_black_ips',
+                'wan_ac_black_ports', 'wan_interface_mode', 'wan_interface_name',
             ]},
             {id: 'zerotier', title: 'ZeroTier', keys: [
                 'zerotier_status', 'feature_zerotier', 'zerotier_network_id',

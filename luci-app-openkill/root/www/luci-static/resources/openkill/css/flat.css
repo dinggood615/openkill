@@ -2588,23 +2588,25 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill .oc.openkill-myip
     }
 }
 
-/* ===== OpenKill settings card rhythm (2026-2003) =====
- * Keep each card content-sized. Earlier compatibility layers used stretch
- * and flex growth for dashboard rows, which made short settings cards inherit
- * a neighbour's height and left a large empty tail below their fields. */
+/* ===== OpenKill settings card rhythm (2026-2006) =====
+ * Equalise only cards that share a desktop grid row.  Grid track sizing stays
+ * content-driven, so a long card grows its row without imposing a fixed page
+ * height or leaving the mobile single-column layout with artificial space. */
 #cbi-openkill.openkill-settings .openkill-settings-card-stack {
-    align-items: start;
+    align-items: stretch;
     grid-auto-rows: max-content;
 }
 
 #cbi-openkill.openkill-settings .openkill-settings-card {
-    align-self: start;
+    align-self: stretch;
     height: auto;
     min-height: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 #cbi-openkill.openkill-settings .openkill-settings-card-body {
-    flex: 0 0 auto;
+    flex: 1 1 auto;
     display: block;
     padding: var(--ok-space-2, 8px) var(--ok-space-4, 16px) var(--ok-space-3, 12px);
 }
@@ -2697,6 +2699,56 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill .oc.openkill-myip
      .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
      tr.openkill-source-rule-card > td[data-source-role="action"] {
         grid-column: auto;
+    }
+}
+
+/* ===== Settings UI closeout (2026-2006) =====
+ * Source traffic is a child editor of the Traffic Routing card.  Its
+ * controls use the same surface, border and typography tokens as every other
+ * settings card while retaining the native CBI controls and submit hooks. */
+#cbi-openkill.openkill-settings
+ .openkill-settings-card[data-openkill-card="traffic-routing"]
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"] {
+    color: var(--ok-ui-text);
+    border-color: var(--ok-ui-border);
+    background: transparent;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-settings-card[data-openkill-card="traffic-routing"]
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"] .cbi-section-table {
+    color: var(--ok-ui-text);
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-settings-card[data-openkill-card="traffic-routing"]
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card {
+    background: var(--ok-ui-surface-muted);
+    border-color: var(--ok-ui-border);
+    box-shadow: none;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-settings-card[data-openkill-card="traffic-routing"]
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td[data-source-label]::before {
+    color: var(--ok-ui-muted);
+    font-size: .78rem;
+    font-weight: 600;
+    letter-spacing: .01em;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-settings-card[data-openkill-card="traffic-routing"]
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td[data-source-role="action"] {
+    border-top-color: var(--ok-ui-border);
+}
+
+@media (max-width: 900px) {
+    #cbi-openkill.openkill-settings .openkill-settings-card {
+        align-self: stretch;
     }
 }
 
