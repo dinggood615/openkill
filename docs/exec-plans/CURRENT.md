@@ -1,11 +1,25 @@
 # Current status
 
-## 2026-10-02 来源规则字段标签补充（进行中）
+## 2026-10-02 来源规则字段标签补充（已完成代码/发布，设备验收受门禁限制）
 
 - 在 `2026-2001` 已发布代码上补充纵向来源规则卡片的显式字段标签，避免 CBI 表头隐藏后
   输入失去语义；不改变 UCI 键、排序、校验、提交或任何网络策略。
-- 版本拟提升为 `2026-2002`，需重新通过本地门禁、精确提交 Development CI、RC 和 Formal
-  Release；设备/真实浏览器仍受 `AGENTS.md` 明确禁令限制。
+- 版本已提升为 `2026-2002`。本地运行时 38 项、LuCI 合同 34 项、预览/浏览器模板、
+  交互、安装器和 `sh scripts/local-gate.sh` 均通过；精确源提交为
+  `90bde588886f08d13a73f060c7d798f9080df11e`，Development CI `36983489281` 成功：
+  https://github.com/dinggood615/openkill/actions/runs/36983489281 。
+- RC Build `36983626513` 成功：https://github.com/dinggood615/openkill/actions/runs/36983626513 ，
+  候选 IPK `luci-app-openkill_2026-2002_all.ipk` SHA256
+  `234106ba164790be868cedb9af26897d9c3d758777294f788b0576aeb6f88838`；包元数据、conffile、
+  维护脚本和敏感数据审计通过。
+- Formal Release `36983807339` 成功：https://github.com/dinggood615/openkill/actions/runs/36983807339 ，
+  正式标签/Release 为 `v2026-2002-ipk`：
+  https://github.com/dinggood615/openkill/releases/tag/v2026-2002-ipk 。正式 IPK 为
+  7,927,702 字节，SHA256 `d18a74498d7a13573760921195741270db1a8273f9b50f7a7fca8837dae7fede`，
+  package channel 已同步。
+- 设备访问、正式包安装、真实 LuCI 会话/视觉验收仍受 `AGENTS.md` 明确禁令限制；本轮不得
+  将本地合同结果描述为测试机验收。恢复授权后需安装正式 IPK，验证来源规则卡片 CRUD/排序、
+  字段标签、五项状态证据、主题/缩放/窄屏及既有功能回归。
 
 ## 2026-10-02 来源规则卡片与运行状态契约（已完成代码/发布，设备验收受门禁限制）
 
