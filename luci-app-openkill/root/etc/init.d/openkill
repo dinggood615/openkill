@@ -520,11 +520,16 @@ start_fail()
    if [ "${OPENKILL_RECOVERY:-0}" != 1 ] && [ -s /etc/openkill/.last-good/config.yaml ]; then
       LOG_WARN "Startup failed; scheduling one verified checkpoint recovery."
       ( /usr/share/openkill/openkill_recovery.sh restore "$OPENKILL_START_TOKEN" || {
-           LOG_ERROR "Checkpoint recovery could not complete; manual review is required."
+           recovery_reason="$(sed -n 's/^reason=//p' /tmp/openkill-recovery.state 2>/dev/null | head -n 1)"
+           [ -n "$recovery_reason" ] || recovery_reason=checkpoint-recovery-failed
+           LOG_ERROR "Checkpoint recovery could not complete (${recovery_reason}); manual review is required."
            openkill_current_start && OPENKILL_KEEP_INCLUDE=1 /etc/init.d/openkill stop
         } ) </dev/null >>"$LOG_FILE" 2>&1 &
+   elif [ "${OPENKILL_RECOVERY:-0}" = 1 ]; then
+      LOG_ERROR "Startup stopped: the verified checkpoint recovery also failed."
+      OPENKILL_KEEP_INCLUDE=1 stop_service
    else
-      LOG_ERROR "Startup stopped: no compatible checkpoint or recovery already attempted."
+      LOG_ERROR "Startup stopped: no verified checkpoint is available for this core."
       OPENKILL_KEEP_INCLUDE=1 stop_service
    fi
    exit 1
@@ -1371,7 +1376,9 @@ check_core_status()
       fi
       if [ "$(uci -q get openkill.config.dns_privacy_mode 2>/dev/null)" = strict ]; then
          openkill_dns_privacy_runtime_check || {
-            LOG_ERROR "Strict DNS privacy runtime verification failed; refusing to report service ready."
+            OPENKILL_START_FAILURE_REASON="$(sed -n 's/^reason=//p' /tmp/openkill-dns-privacy.state 2>/dev/null | head -n 1)"
+            [ -n "$OPENKILL_START_FAILURE_REASON" ] || OPENKILL_START_FAILURE_REASON=strict-dns-runtime-verification-failed
+            LOG_ERROR "Strict DNS privacy runtime verification failed (${OPENKILL_START_FAILURE_REASON}); refusing to report service ready."
             start_fail
          }
       fi

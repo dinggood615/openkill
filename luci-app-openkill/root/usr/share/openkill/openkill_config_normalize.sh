@@ -19,7 +19,7 @@ set_default() {
 # fields identify the profile only; all user-selected values remain untouched
 # on upgrade, reinstall and migration.
 set_default default_profile performance-dual-stack
-set_default default_profile_version 2026-2005
+set_default default_profile_version 2026-2007
 default_profile="$(uci -q get openkill.config.default_profile 2>/dev/null || true)"
 case "$default_profile" in
     performance-dual-stack) ;;
@@ -47,7 +47,12 @@ case "$log_level" in
     *) uci -q set openkill.config.log_level=0; changed=1 ;;
 esac
 dns_privacy_mode="$(uci -q get openkill.config.dns_privacy_mode 2>/dev/null || true)"
-case "$dns_privacy_mode" in split|strict) ;; *) uci -q set openkill.config.dns_privacy_mode=split; changed=1 ;; esac
+case "$dns_privacy_mode" in split|strict) ;; *) uci -q set openkill.config.dns_privacy_mode=strict; changed=1 ;; esac
+dns_privacy_group="$(uci -q get openkill.config.dns_privacy_group 2>/dev/null || true)"
+case "$dns_privacy_group" in
+    ''|*[!A-Za-z0-9_-]*) uci -q set openkill.config.dns_privacy_group=OpenKill-DNS; changed=1 ;;
+    *) [ "${#dns_privacy_group}" -le 64 ] || { uci -q set openkill.config.dns_privacy_group=OpenKill-DNS; changed=1; } ;;
+esac
 
 # Optional anti-AD integration is fail-closed: an invalid mode is disabled,
 # while an unavailable list keeps the last valid generated file.

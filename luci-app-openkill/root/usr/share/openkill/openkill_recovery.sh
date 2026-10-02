@@ -4,6 +4,17 @@ set -eu
 umask 077
 checkpoint=/etc/openkill/.last-good
 token_file=/tmp/openkill-start.token
+recovery_state=/tmp/openkill-recovery.state
+write_recovery_state() {
+    reason="$1"
+    tmp="${recovery_state}.$$"
+    printf 'status=failed\nreason=%s\nchecked_at=%s\n' "$reason" "$(date +%s)" > "$tmp" 2>/dev/null && mv -f "$tmp" "$recovery_state" 2>/dev/null
+    rm -f "$tmp"
+}
+recover_fail() {
+    write_recovery_state "$1"
+    exit 1
+}
 case "${1:-}" in
   save)
     file="$2"
@@ -30,9 +41,9 @@ case "${1:-}" in
     # Let rc.common finish its procd transaction before requesting a stop.
     sleep 2
     [ "$(cat "$token_file" 2>/dev/null)" = "$expected" ] || exit 0
-    [ -s "$checkpoint/config.yaml" ] && [ -s "$checkpoint/config.uci" ] || exit 1
+    [ -s "$checkpoint/config.yaml" ] && [ -s "$checkpoint/config.uci" ] || recover_fail checkpoint-missing
     # Cleared only by an explicit fresh start, never by an automatic retry.
-    mkdir /tmp/openkill-recovery.once 2>/dev/null || exit 1
+    mkdir /tmp/openkill-recovery.once 2>/dev/null || recover_fail recovery-already-attempted
     current=$(sha256sum /etc/openkill/clash | awk '{print $1}')
     saved=$(cat "$checkpoint/core.sha256")
     # A snapshot is only valid for its verified core. Do not silently roll
@@ -40,13 +51,13 @@ case "${1:-}" in
     if [ "$current" != "$saved" ]; then
         target=$(readlink -f /etc/openkill/clash)
         previous="$target.previous"
-        [ -s "$previous" ] || exit 1
-        [ "$(sha256sum "$previous" | awk '{print $1}')" = "$saved" ] || exit 1
+        [ -s "$previous" ] || recover_fail prior-core-missing
+        [ "$(sha256sum "$previous" | awk '{print $1}')" = "$saved" ] || recover_fail prior-core-mismatch
         candidate="$previous"
     else
         candidate=/etc/openkill/clash
     fi
-    SAFE_PATHS=/usr/share/openkill:/etc/ssl:/tmp "$candidate" -t -d /etc/openkill -f "$checkpoint/config.yaml" >/tmp/openkill-recovery-check.log 2>&1 || exit 1
+    SAFE_PATHS=/usr/share/openkill:/etc/ssl:/tmp "$candidate" -t -d /etc/openkill -f "$checkpoint/config.yaml" >/tmp/openkill-recovery-check.log 2>&1 || recover_fail checkpoint-config-invalid
     [ "$(cat "$token_file" 2>/dev/null)" = "$expected" ] || exit 0
     /etc/init.d/openkill stop
     if [ "$candidate" != /etc/openkill/clash ]; then
@@ -55,7 +66,7 @@ case "${1:-}" in
     fi
     cp "$checkpoint/config.uci" /etc/config/openkill.recovery
     mv -f /etc/config/openkill.recovery /etc/config/openkill
-    OPENKILL_RECOVERY=1 /etc/init.d/openkill start
+    OPENKILL_RECOVERY=1 /etc/init.d/openkill start || recover_fail recovered-start-rejected
     ;;
   *) exit 2 ;;
 esac

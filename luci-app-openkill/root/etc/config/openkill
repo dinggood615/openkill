@@ -4,7 +4,7 @@ config openkill 'config'
 	# marker is informational and lets migrations distinguish the fresh-install
 	# profile from a user's explicit settings.
 	option default_profile 'performance-dual-stack'
-	option default_profile_version '2026-2005'
+	option default_profile_version '2026-2007'
 	option remote_service_bypass '0'
 	# Fresh installs use the audited dual-stack performance profile. Existing
 	# conffiles keep their explicit profile during upgrades.
@@ -36,11 +36,15 @@ config openkill 'config'
 	# DNS remains local because dnsmasq redirects queries to this listener.
 	option dns_listen_address '127.0.0.1'
 	option dashboard_forward_ssl '0'
-	option enable_custom_dns '1'
-	# split keeps direct/ proxy DNS decisions separate; strict removes plain
-	# public resolvers from ordinary query paths and fails closed to encrypted
-	# fallback. Node bootstrap remains an explicit, visible exception.
-	option dns_privacy_mode 'split'
+	# The audited generic profile lets Mihomo generate its encrypted resolver
+	# set. It never imports a router-specific custom DNS entry.
+	option enable_custom_dns '0'
+	# Strict keeps ordinary DNS on the dedicated encrypted DNS proxy group and
+	# refuses a plaintext/DIRECT fallback. Node bootstrap remains an explicit,
+	# certificate-verified exception; a fresh install without a usable profile
+	# remains pending instead of pretending the service is ready.
+	option dns_privacy_mode 'strict'
+	option dns_privacy_group 'OpenKill-DNS'
 	# Ad blocking is independent from DNS privacy and proxy routing. The fresh
 	# profile uses the enhanced anti-AD domain filter plus a Mihomo rule
 	# provider; both modes share one validated canonical generation.

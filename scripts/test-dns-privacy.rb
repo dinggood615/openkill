@@ -35,6 +35,26 @@ class DnsPrivacyTest < Minitest::Test
     OpenKillDnsPrivacy.apply(v,'strict','OpenKill-DNS')
     assert_equal OpenKillDnsPrivacy::BOOTSTRAP, v['dns']['proxy-server-nameserver']
   end
+  def test_rules_selector_is_replaced_while_safe_connection_parameter_survives
+    v=profile
+    v['dns']['nameserver']=['https://dns.example/dns-query#RULES&h3=true']
+    OpenKillDnsPrivacy.apply(v,'strict','OpenKill-DNS')
+    assert_equal ['https://dns.example/dns-query#OpenKill-DNS&h3=true'], v['dns']['nameserver']
+    assert OpenKillDnsPrivacy.strict_routed?(v['dns']['nameserver'].first, 'OpenKill-DNS')
+  end
+  def test_explicit_competing_selector_is_rejected_instead_of_silently_rewritten
+    v=profile
+    v['dns']['nameserver']=['https://dns.example/dns-query#wan']
+    error=assert_raises(ArgumentError) { OpenKillDnsPrivacy.apply(v,'strict','OpenKill-DNS') }
+    assert_match(/explicit upstream selector/, error.message)
+  end
+  def test_multiple_selectors_are_rejected_but_single_selector_with_parameters_is_valid
+    assert_raises(ArgumentError) { OpenKillDnsPrivacy.parts('https://dns.example/dns-query#RULES&wan') }
+    base, selector, parameters=OpenKillDnsPrivacy.parts('https://dns.example/dns-query#RULES&disable-ipv6=true')
+    assert_equal 'https://dns.example/dns-query', base
+    assert_equal 'RULES', selector
+    assert_equal ['disable-ipv6=true'], parameters
+  end
   def test_local_socks_bridge_excluded_to_avoid_external_dns_cycle
     v=profile
     v['proxies'] << {'name'=>'local-bridge','type'=>'socks5','server'=>'127.0.0.1'}

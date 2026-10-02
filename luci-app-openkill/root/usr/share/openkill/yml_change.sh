@@ -314,7 +314,7 @@ yml_dns_get()
    if [ -z "$interface" ] && [ -n "$dns_wan_interface" ] && {
       [ "$group" = "default" ] || [ "$group" = "nameserver" ] ||
       [ "$node_resolve" = "1" ] || [ "$direct_nameserver" = "1" ];
-   }; then
+   } && { [ "$dns_privacy_mode" != "strict" ] || [ "$group" != "nameserver" ]; }; then
       interface="$dns_wan_interface"
    fi
    [ "$interface" != "Disable" ] && [ -n "$interface" ] && interface_param="$interface" || interface_param=""
@@ -1056,24 +1056,11 @@ begin
              explicit || provider || (include_all && (proxy_names.any? || provider_names.any?))
           end
           raise 'strict DNS privacy requires at least one selectable proxy group (add a group with a proxy, provider, or include-all target)' unless proxy_path
-         has_rules_suffix = lambda { |server| server.to_s.match?(/#RULES(?:&|\z)/i) }
-         with_rules_suffix = lambda do |server|
-            text = server.to_s
-            has_rules_suffix.call(text) ? text : (text.include?('#') ? text.sub('#', '#RULES&') : text + '#RULES')
-         end
-         Value['dns']['nameserver'] = Value['dns']['nameserver'].map do |server|
-            with_rules_suffix.call(server)
-         end.uniq
-         if Value['dns']['direct-nameserver'].is_a?(Array)
-            Value['dns']['direct-nameserver'] = Value['dns']['direct-nameserver'].map { |server| with_rules_suffix.call(server) }.uniq
-         end
-         if Value['dns']['nameserver-policy'].is_a?(Hash)
-            Value['dns']['nameserver-policy'].each do |key, value|
-               Value['dns']['nameserver-policy'][key] = value.is_a?(Array) ? value.map { |server| with_rules_suffix.call(server) }.uniq : with_rules_suffix.call(value)
-            end
-         end
-         Value['dns']['respect-rules'] = true
-         YAML.LOG_TIP('Strict DNS privacy removed plain public resolvers; proxy-server-nameserver remains the node bootstrap exception.')
+         # Strict mode deliberately does not pre-append #RULES. The dedicated
+         # group is installed by dns_privacy.rb as the single routing selector;
+         # doing both would create an ambiguous `#RULES&group` suffix.
+         Value['dns']['respect-rules'] = false
+         YAML.LOG_TIP('Strict DNS privacy removed plain public resolvers and binds ordinary DNS to the dedicated proxy group; proxy-server-nameserver remains the node bootstrap exception.')
       end
 
       # Overseas fallback DNS must not be sent directly through a restricted
@@ -1082,7 +1069,7 @@ begin
       # queried domain.  Keep explicit user parameters untouched and leave
       # direct IPv4 bootstrap resolvers in proxy-server-nameserver to avoid a
       # proxy-node/DNS chicken-and-egg loop.
-      if Value.dig('dns', 'fallback').is_a?(Array)
+      if dns_privacy_mode != 'strict' && Value.dig('dns', 'fallback').is_a?(Array)
          Value['dns']['fallback'] = Value['dns']['fallback'].map do |server|
             text = server.to_s
             text.match?(/#RULES(?:&|\z)/i) ? text : (text.include?('#') ? text.sub('#', '#RULES&') : text + '#RULES')
@@ -1206,7 +1193,7 @@ ensure
          encrypted_dns = lambda { |server| server.to_s.match?(/\A(?:https|tls|quic|h3):\/\//i) }
          ordinary_servers = Array(dns_value['nameserver']) + Array(dns_value['fallback'])
          ordinary_encrypted = !ordinary_servers.empty? && ordinary_servers.all? { |server| encrypted_dns.call(server) }
-         strict_routed = '$dns_privacy_mode' != 'strict' || ordinary_servers.all? { |server| server.to_s.end_with?('#$dns_privacy_group') }
+         strict_routed = '$dns_privacy_mode' != 'strict' || ordinary_servers.all? { |server| OpenKillDnsPrivacy.strict_routed?(server, '$dns_privacy_group') }
          redirect_ready = %w[1 2].include?('$enable_redirect_dns')
          # Generated configuration is not runtime/packet-path verification.
          configured = ordinary_encrypted && strict_routed && redirect_ready

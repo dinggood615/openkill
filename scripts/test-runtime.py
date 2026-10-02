@@ -391,6 +391,30 @@ class DualStackRoutingTests(unittest.TestCase):
         for forbidden in ('yml_change.sh', 'uci set', 'uci commit', 'allocate_port'):
             self.assertNotIn(forbidden, helper)
 
+    def test_strict_dns_runtime_checker_distinguishes_dns_protocol_statuses(self):
+        checker = (SHARE / 'openkill_dns_runtime_check.sh').read_text(encoding='utf-8')
+        self.assertIn('name=example.com&type=A', checker)
+        self.assertIn('controller-query-nxdomain', checker)
+        self.assertIn('controller-query-servfail', checker)
+        self.assertIn('JSON.parse', checker)
+        self.assertIn('runtime_verified=0', checker)
+
+    def test_strict_dns_generation_uses_a_single_route_selector(self):
+        change = (SHARE / 'yml_change.sh').read_text(encoding='utf-8')
+        privacy = (SHARE / 'dns_privacy.rb').read_text(encoding='utf-8')
+        self.assertIn("if dns_privacy_mode != 'strict' && Value.dig('dns', 'fallback').is_a?(Array)", change)
+        self.assertIn("Value['dns']['respect-rules'] = false", change)
+        self.assertIn('Strict DNS conflicts with an explicit upstream selector', privacy)
+        self.assertIn('SAFE_PARAMETERS', privacy)
+
+    def test_recovery_reports_a_specific_checkpoint_failure(self):
+        recovery = (SHARE / 'openkill_recovery.sh').read_text(encoding='utf-8')
+        init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        self.assertIn('recover_fail checkpoint-missing', recovery)
+        self.assertIn('recover_fail checkpoint-config-invalid', recovery)
+        self.assertIn('recovery_reason=', init)
+        self.assertIn('no verified checkpoint is available for this core', init)
+
     def test_naive_manifest_parser_does_not_use_unsupported_lua_alternation(self):
         controller = (ROOT / 'luci-app-openkill/luasrc/controller/openkill.lua').read_text(encoding='utf-8')
         self.assertIn('local function naive_manifest_value(line, field)', controller)
