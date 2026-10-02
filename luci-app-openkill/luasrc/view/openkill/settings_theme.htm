@@ -2,8 +2,10 @@
     local fs = require "luci.openkill"
     local plugin_version = fs.oc_version()
 %>
-<link rel="stylesheet" href="/luci-static/resources/openkill/css/oc.css?v=<%=plugin_version%>">
-<link rel="stylesheet" href="/luci-static/resources/openkill/css/flat.css?v=<%=plugin_version%>">
+<!-- Keep a distinct UI asset key for same-version RC/formal installs so a
+     browser cannot reuse a cached stylesheet from an earlier candidate. -->
+<link rel="stylesheet" href="/luci-static/resources/openkill/css/oc.css?v=<%=plugin_version%>&ui=2026-2006-2">
+<link rel="stylesheet" href="/luci-static/resources/openkill/css/flat.css?v=<%=plugin_version%>&ui=2026-2006-2">
 <script type="text/javascript">
 (function() {
     var SEARCH_HINT = '<%:Search settings by name or description%>';
