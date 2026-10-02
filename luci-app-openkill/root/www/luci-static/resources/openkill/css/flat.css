@@ -240,6 +240,133 @@
     }
 }
 
+/* ===== Source rule editor final layout (2026-2004) =====
+ * Keep native CBI controls and ordering, but remove the table's intrinsic
+ * minimum width so each rule is readable as a vertical card. */
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"] .cbi-section-node,
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"] .cbi-section-table {
+    min-width: 0 !important;
+    max-width: 100%;
+    overflow: visible;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"] .cbi-section-table > tbody {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--ok-layout-card-gap, 12px);
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 var(--ok-layout-card-gap, 12px);
+    width: 100%;
+    margin: 0;
+    padding: 10px 12px;
+    box-sizing: border-box;
+    border: 1px solid var(--ok-ui-border, #475569);
+    border-radius: var(--ok-radius-md, 8px);
+    background: var(--ok-ui-surface-muted, #273449);
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td {
+    display: flex !important;
+    min-width: 0;
+    width: auto;
+    box-sizing: border-box;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+    padding: 8px 0;
+    border: 0;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td[data-source-label]::before {
+    display: block;
+    margin: 0 0 2px;
+    color: var(--ok-ui-muted, #94a3b8);
+    content: attr(data-source-label);
+    font-size: .78rem;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td[data-source-role="serial"] {
+    display: none !important;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td[data-source-role="action"] {
+    grid-column: 1 / -1;
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--ok-ui-border, #475569);
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td[data-source-role="action"]::before {
+    margin-right: auto;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.cbi-section-table-row.placeholder {
+    display: block !important;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 16px;
+    border: 1px dashed var(--ok-ui-border, #475569);
+    border-radius: var(--ok-radius-md, 8px);
+    background: var(--ok-ui-surface-muted, #273449);
+    text-align: center;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card input,
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card select,
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card .cbi-dropdown {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+@media (max-width: 720px) {
+    #cbi-openkill.openkill-settings
+     .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+     tr.openkill-source-rule-card {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    #cbi-openkill.openkill-settings
+     .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+     tr.openkill-source-rule-card > td[data-source-role="action"] {
+        grid-column: 1;
+        justify-content: flex-start;
+    }
+}
+
 body[data-page^="admin-services-openkill"] .oc.openkill-status-page .security-status-card .card-title {
     white-space: normal;
     word-break: normal;
@@ -2570,5 +2697,102 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill .oc.openkill-myip
      .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
      tr.openkill-source-rule-card > td[data-source-role="action"] {
         grid-column: auto;
+    }
+}
+
+/* ===== Source rule editor final precedence (2026-2004) ===== */
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"] .cbi-section-node,
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"] .cbi-section-table {
+    min-width: 0 !important;
+    max-width: 100%;
+    overflow: visible;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"] .cbi-section-table > tbody {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--ok-layout-card-gap, 12px);
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0 var(--ok-layout-card-gap, 12px);
+    width: 100%;
+    margin: 0;
+    padding: 10px 12px;
+    box-sizing: border-box;
+    border: 1px solid var(--ok-ui-border, #475569);
+    border-radius: var(--ok-radius-md, 8px);
+    background: var(--ok-ui-surface-muted, #273449);
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td {
+    display: flex !important;
+    min-width: 0;
+    width: auto;
+    box-sizing: border-box;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 5px;
+    padding: 8px 0;
+    border: 0;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td[data-source-label]::before {
+    display: block;
+    margin: 0 0 2px;
+    color: var(--ok-ui-muted, #94a3b8);
+    content: attr(data-source-label);
+    font-size: .78rem;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td[data-source-role="serial"] {
+    display: none !important;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td[data-source-role="action"] {
+    grid-column: 1 / -1;
+    flex-direction: row !important;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid var(--ok-ui-border, #475569);
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td[data-source-role="action"]::before {
+    margin-right: auto;
+}
+
+@media (max-width: 720px) {
+    #cbi-openkill.openkill-settings
+     .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+     tr.openkill-source-rule-card {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    #cbi-openkill.openkill-settings
+     .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+     tr.openkill-source-rule-card > td[data-source-role="action"] {
+        grid-column: 1;
+        justify-content: flex-start;
     }
 }

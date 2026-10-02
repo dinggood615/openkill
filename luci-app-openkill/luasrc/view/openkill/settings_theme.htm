@@ -396,14 +396,22 @@
         return /来源流量规则|来源流量访问控制|lan traffic access list/i.test(text);
     }
 
-    function keepSourceTrafficInNetwork(map, tabItems) {
-        var networkPanel = null;
+    function findNetworkPanel(map, tabItems) {
         for (var i = 0; i < tabItems.length; i++) {
-            if (/网络与分流|Network\s*&\s*Routing/i.test(tabLabel(tabItems[i]))) {
-                networkPanel = tabPanel(tabItems[i]);
-                break;
+            if (tabCategory(tabItems[i]) === 'network') {
+                var panel = tabPanel(tabItems[i]);
+                if (panel) return panel;
             }
         }
+        /* Some LuCI themes render hidden tab panels after the initial pass or
+         * omit the tab link href.  The generated id is stable and is safer
+         * than searching by a translated heading. */
+        return document.getElementById('container.openkill.config.network') ||
+            map.querySelector('[id="container.openkill.config.network"]');
+    }
+
+    function keepSourceTrafficInNetwork(map, tabItems) {
+        var networkPanel = findNetworkPanel(map, tabItems);
         if (!networkPanel) return;
 
         var sections = [];
@@ -422,20 +430,10 @@
          * body.  The section is moved, never cloned, so LuCI keeps its
          * existing names, ids, validation and submit hooks. */
         var trafficCard = networkPanel.querySelector('[data-openkill-card="traffic-routing"]');
-        if (!trafficCard) {
-            /* Defensive fallback for themes that expose the tab panel before
-             * the normal card pass.  The host is still the settings card
-             * stack, never the tab root, so a failed late pass cannot leak a
-             * full-width source section back onto the page. */
-            var stack = networkPanel.querySelector('.openkill-settings-card-stack');
-            if (stack) {
-                trafficCard = createCard(networkPanel, {
-                    id: 'traffic-routing',
-                    title: '<%:Traffic Routing%>',
-                    keepEmpty: true
-                }, [], 'network-source-traffic', stack);
-            }
-        }
+        /* The first paint may happen before the hidden network panel has been
+         * cardified.  Do not move the section to an anonymous root in that
+         * case; a later bounded retry will resolve the real card. */
+        if (!trafficCard) return;
         var destination = trafficCard && trafficCard.querySelector('.openkill-settings-card-body');
         /* A forced traffic card is created even when all of its ordinary
          * fields are hidden by a device-specific dependency.  Never fall
@@ -475,8 +473,10 @@
                 var label = sourceLabels[optionName];
                 if (!label && headings[c]) label = (headings[c].textContent || '').replace(/\s+/g, ' ').trim();
                 if (label) cell.setAttribute('data-source-label', label);
-                else if (cell.querySelector('button, input[type="button"], input[type="submit"]'))
+                else if (cell.querySelector('button, input[type="button"], input[type="submit"]')) {
                     cell.setAttribute('data-source-role', 'action');
+                    cell.setAttribute('data-source-label', '操作');
+                }
             }
         }
 
@@ -484,6 +484,15 @@
             sections[k].hidden = true;
             sections[k].setAttribute('aria-hidden', 'true');
         }
+    }
+
+    function retrySourceTrafficMount(map, tabItems) {
+        /* Build all category cards first, then move the original TypedSection
+         * into its stable traffic card.  The retries are bounded and
+         * idempotent; they only change DOM presentation and never submit or
+         * rewrite a UCI value. */
+        buildCards(tabItems, false);
+        keepSourceTrafficInNetwork(map, tabItems);
     }
 
     function buildCards(tabItems, activeOnly) {
@@ -641,6 +650,11 @@
         } else {
             window.setTimeout(deferCards, 120);
         }
+        /* Hidden CBI panels can be inserted after the first idle callback on
+         * slower LuCI builds.  Give the renderer two short, bounded chances
+         * to mount the source-rule section; never use an unbounded observer. */
+        window.setTimeout(function() { retrySourceTrafficMount(map, tabItems); }, 260);
+        window.setTimeout(function() { retrySourceTrafficMount(map, tabItems); }, 900);
 
         var advancedItems = tabItems.filter(function(item) {
             return /(高级|系统|advanced|maintenance)/i.test(tabLabel(item));
