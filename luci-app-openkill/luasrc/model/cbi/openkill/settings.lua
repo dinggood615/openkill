@@ -541,7 +541,7 @@ o.datatype = "or(port, portrange)"
 o.description = translate("In The Fake-IP Mode, Only Pure IP Requests Are Supported, Please Setting Fake-IP-Filter First If You Need Domain Type Requests")
 
 s2 = m:section(TypedSection, "lan_ac_traffic", "来源流量规则",
-	"1. "..translate("The Traffic From The Local Specified Port Will Not Pass The Core, Try To Set When The Bypass Gateway Forwarding Fails").."; ".."2. "..translate("In The Fake-IP Mode, Only Pure IP Requests Are Supported, Please Setting Fake-IP-Filter First If You Need Domain Type Requests"))
+	"按来源地址、端口和协议匹配流量，并将匹配结果交给指定处理对象。Fake-IP 模式下，域名请求仍需先加入 Fake-IP 过滤例外。")
 
 s2.template = "cbi/tblsection"
 s2.sortable = true

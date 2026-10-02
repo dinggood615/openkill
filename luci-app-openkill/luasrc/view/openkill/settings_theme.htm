@@ -45,7 +45,7 @@
             {id: 'wan-ac', title: 'WAN 访问控制', keys: [
                 'wan_ac_black_ips', 'wan_ac_black_ports'
             ]},
-            {id: 'traffic-routing', title: '<%:Traffic Routing%>', keys: [
+            {id: 'traffic-routing', title: '<%:Traffic Routing%>', keepEmpty: true, keys: [
                 'router_self_proxy', 'disable_udp_quic', 'skip_proxy_address',
                 'common_ports', 'china_ip_route', 'chnroute_pass'
             ]}
@@ -284,7 +284,8 @@
     }
 
     function createCard(content, definition, fields, index, host) {
-        if (!fields.length) return null;
+        fields = fields || [];
+        if (!fields.length && !definition.keepEmpty) return null;
         var card = document.createElement('section');
         card.className = 'openkill-settings-card';
         card.setAttribute('data-openkill-card', definition.id);
@@ -384,7 +385,12 @@
         if (!section) return false;
         var id = String(section.id || '').toLowerCase();
         var sectionType = String(section.getAttribute('data-section-type') || '').toLowerCase();
-        if (id.indexOf('lan_ac_traffic') !== -1 || sectionType === 'lan_ac_traffic') return true;
+        /* The CBI id is stable across LuCI themes.  Prefer it over visible
+         * translated headings so a theme or language change cannot detach
+         * the rule editor from its owning card. */
+        if (id === 'cbi-openkill-lan_ac_traffic' ||
+            id.indexOf('cbi-openkill-lan_ac_traffic-') === 0 ||
+            id.indexOf('lan_ac_traffic') !== -1 || sectionType === 'lan_ac_traffic') return true;
         var title = section.querySelector('.cbi-section-title, .cbi-section-descr, h3, legend');
         var text = title ? (title.textContent || '') : '';
         return /来源流量规则|来源流量访问控制|lan traffic access list/i.test(text);
@@ -416,14 +422,39 @@
          * body.  The section is moved, never cloned, so LuCI keeps its
          * existing names, ids, validation and submit hooks. */
         var trafficCard = networkPanel.querySelector('[data-openkill-card="traffic-routing"]');
+        if (!trafficCard) {
+            /* Defensive fallback for themes that expose the tab panel before
+             * the normal card pass.  The host is still the settings card
+             * stack, never the tab root, so a failed late pass cannot leak a
+             * full-width source section back onto the page. */
+            var stack = networkPanel.querySelector('.openkill-settings-card-stack');
+            if (stack) {
+                trafficCard = createCard(networkPanel, {
+                    id: 'traffic-routing',
+                    title: '<%:Traffic Routing%>',
+                    keepEmpty: true
+                }, [], 'network-source-traffic', stack);
+            }
+        }
         var destination = trafficCard && trafficCard.querySelector('.openkill-settings-card-body');
-        if (!destination) destination = panelContent(networkPanel);
-        if (destination && target.parentNode !== destination) destination.appendChild(target);
+        /* A forced traffic card is created even when all of its ordinary
+         * fields are hidden by a device-specific dependency.  Never fall
+         * back to the tab root: that was the reason the source-rule table
+         * appeared as a separate wide section in some LuCI renders. */
+        if (!destination) return;
+        if (target.parentNode !== destination) destination.appendChild(target);
         target.classList.add('openkill-network-only-section');
         target.setAttribute('data-openkill-network-card', 'source-traffic');
         target.setAttribute('data-openkill-traffic-card', 'source-traffic');
+        target.setAttribute('data-openkill-section-kind', 'source-traffic');
         target.hidden = false;
         target.removeAttribute('aria-hidden');
+
+        var ruleRows = target.querySelectorAll('tr.cbi-section-table-row:not(.placeholder)');
+        for (var r = 0; r < ruleRows.length; r++) {
+            ruleRows[r].classList.add('openkill-source-rule-card');
+            ruleRows[r].setAttribute('data-openkill-rule-card', '1');
+        }
 
         for (var k = 1; k < sections.length; k++) {
             sections[k].hidden = true;
@@ -443,7 +474,8 @@
             if (!layout || panel.getAttribute('data-openkill-cards-ready') === '1') return;
             var content = panelContent(panel);
             var fields = directFields(content);
-            if (!fields.length) return;
+            var hasForcedCard = layout.some(function(definition) { return !!definition.keepEmpty; });
+            if (!fields.length && !hasForcedCard) return;
             panel.setAttribute('data-openkill-cards-ready', '1');
             var stack = document.createElement('div');
             stack.className = 'openkill-settings-card-stack';

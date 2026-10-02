@@ -177,7 +177,7 @@
                                 </div>
                             </div>
                             <div class="sub-card security-status-card" data-security-card="openvpn">
-                                <div class="card-title">OpenVPN 兼容<a href="javascript:void(0);" onclick="window.open('<%=luci.dispatcher.build_url('admin','services','openkill','settings')%>#compatibility', '_blank');" class="help-link" title="查看 OpenVPN 精确绕过设置"><svg width="12" height="12"><use href="#oc-icon-help"/></svg></a></div>
+                                <div class="card-title">OpenVPN<a href="javascript:void(0);" onclick="window.open('<%=luci.dispatcher.build_url('admin','services','openkill','settings')%>#compatibility', '_blank');" class="help-link" title="查看 OpenVPN 兼容设置"><svg width="12" height="12"><use href="#oc-icon-help"/></svg></a></div>
                                 <div class="card-content security-status-content">
                                     <span id="openvpn-status" class="security-status-value is-unknown" data-state="unknown">—</span>
                                     <span id="openvpn-detail" class="security-status-detail" aria-hidden="true"></span>
@@ -987,14 +987,14 @@
             if (reliable) securityCardLastReliable[name] = state;
             if (element) {
                 element.textContent = displayText;
-                element.className = 'security-status-value is-' + (reliable ? state : 'unknown');
-                element.dataset.state = state;
+                element.className = 'security-status-value is-' + displayState;
+                element.dataset.state = displayState;
                 element.dataset.stale = reliable ? '0' : (previous ? '1' : '0');
                 if (detail) element.setAttribute('aria-label', detail);
                 else element.removeAttribute('aria-label');
             }
             if (card) {
-                card.dataset.state = state;
+                card.dataset.state = displayState;
                 card.dataset.stale = reliable ? '0' : (previous ? '1' : '0');
             }
             var detailElement = card && card.querySelector ? card.querySelector('.security-status-detail') : null;
@@ -1013,20 +1013,17 @@
             return;
         }
 
-        var unknown = false;
         var running = asBool(status.clash);
         var dnsMode = status.dns_privacy_mode === 'strict' || status.dns_privacy_mode === 'split';
         var dnsEffective = asBool(status.dns_privacy_effective) && running;
         if (!hasField('dns_privacy_mode')) {
             setCard('dns', 'unknown', 'DNS 隐私状态不可用');
-            unknown = true;
         } else if (!dnsMode) {
             setCard('dns', 'disabled', 'DNS 隐私档位未启用');
         } else if (dnsEffective) {
             setCard('dns', 'enabled', 'DNS 隐私链路已加载');
         } else {
-            setCard('dns', 'unknown', 'DNS 隐私已配置但尚未确认生效');
-            unknown = true;
+            setCard('dns', 'disabled', 'DNS 隐私已配置但当前未生效');
         }
 
         var adMode = status.adblock_mode === 'standard' || status.adblock_mode === 'enhanced';
@@ -1036,31 +1033,26 @@
                 asBool(status.adblock_dns_effective) || asBool(status.adblock_provider_effective));
         if (!hasField('adblock_mode')) {
             setCard('adblock', 'unknown', '广告拦截状态不可用');
-            unknown = true;
         } else if (!adMode) {
             setCard('adblock', 'disabled', '广告拦截开关已关闭');
         } else if (adFailed) {
-            setCard('adblock', 'unknown', '广告规则应用失败');
-            unknown = true;
+            setCard('adblock', 'disabled', '广告规则应用失败');
         } else if (adApplied) {
             setCard('adblock', 'enabled', '广告规则已加载并验证');
         } else {
-            setCard('adblock', 'unknown', '广告规则尚未确认生效');
-            unknown = true;
+            setCard('adblock', 'disabled', '广告规则尚未生效');
         }
 
         var vpnConfigured = asBool(status.openvpn_compatibility);
-        var vpnApplied = asBool(status.openvpn_applied) && status.openvpn_tunnel_state === 'established';
+        var vpnApplied = running && asBool(status.openvpn_applied);
         var vpnFailed = status.openvpn_reason === 'failed' || status.openvpn_reason === 'invalid-protocol' ||
             status.openvpn_reason === 'server-role-no-transport';
         if (!hasField('openvpn_compatibility')) {
             setCard('openvpn', 'unknown', 'OpenVPN 兼容状态不可用');
-            unknown = true;
         } else if (!vpnConfigured) {
             setCard('openvpn', 'disabled', 'OpenVPN 兼容开关已关闭');
         } else if (vpnFailed || !vpnApplied) {
-            setCard('openvpn', 'unknown', vpnFailed ? 'OpenVPN 兼容应用失败' : 'OpenVPN 兼容尚未确认生效');
-            unknown = true;
+            setCard('openvpn', 'disabled', vpnFailed ? 'OpenVPN 兼容应用失败' : 'OpenVPN 兼容尚未生效');
         } else {
             setCard('openvpn', 'enabled', 'OpenVPN 兼容规则已应用');
         }
@@ -1069,12 +1061,10 @@
         var rustApplied = asBool(status.rustdesk_applied) && asBool(status.rustdesk_verified);
         if (!hasField('rustdesk_compatibility')) {
             setCard('rustdesk', 'unknown', 'RustDesk 兼容状态不可用');
-            unknown = true;
         } else if (!rustConfigured) {
             setCard('rustdesk', 'disabled', 'RustDesk 兼容开关已关闭');
-        } else if (status.rustdesk_reason === 'failed' || !rustApplied) {
-            setCard('rustdesk', 'unknown', status.rustdesk_reason === 'failed' ? 'RustDesk 兼容应用失败' : 'RustDesk 兼容尚未确认生效');
-            unknown = true;
+        } else if (status.rustdesk_reason === 'failed' || !running || !rustApplied) {
+            setCard('rustdesk', 'disabled', status.rustdesk_reason === 'failed' ? 'RustDesk 兼容应用失败' : 'RustDesk 兼容尚未生效');
         } else {
             setCard('rustdesk', 'enabled', 'RustDesk 兼容规则已应用');
         }
@@ -1083,19 +1073,23 @@
         var naiveConfigured = Number(status.naive_configured || 0);
         var naiveRunning = asBool(status.naive_local_ready) && status.naive_state === 'running';
         var naiveFailed = status.naive_state === 'failed' || status.naive_reason === 'standalone-health-failed';
-        if (!naiveManifest) {
+        if (!hasField('naive_manifest_present')) {
             setCard('naiveproxy', 'unknown', 'NaiveProxy 独立服务尚未检测');
-            unknown = true;
+        } else if (!naiveManifest) {
+            setCard('naiveproxy', 'disabled', 'NaiveProxy 组件不可用');
         } else if (!naiveConfigured) {
             setCard('naiveproxy', 'disabled', 'NaiveProxy 未配置节点');
         } else if (naiveFailed || !naiveRunning) {
-            setCard('naiveproxy', 'unknown', naiveFailed ? 'NaiveProxy 实例异常' : 'NaiveProxy 实例尚未就绪');
-            unknown = true;
+            setCard('naiveproxy', 'disabled', naiveFailed ? 'NaiveProxy 实例异常' : 'NaiveProxy 实例尚未就绪');
         } else {
             setCard('naiveproxy', 'enabled', 'NaiveProxy 独立实例正在运行');
         }
 
-        setNotice(fetchFailed ? '状态获取失败，显示上次结果' : (unknown ? '部分功能状态尚未确认' : ''));
+        /* Keep the card contract binary once a response is available.  A
+         * failed first read remains an accessible placeholder/last value and
+         * is diagnosable from the card aria-label; no persistent banner or
+         * stale success text is injected into the dashboard. */
+        setNotice('');
     }
 
     function setRuntimeControlsAvailable(available) {

@@ -2303,6 +2303,141 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill .oc.openkill-myip
     line-height: 1.35;
 }
 
+/* ===== OpenKill source-traffic card closeout =====
+ * The source rule section is a real CBI section moved into the stable
+ * traffic-routing card.  Keep the original controls and submit names, but
+ * present each rule as a vertical editor instead of a viewport-wide table. */
+#cbi-openkill.openkill-settings
+ .openkill-settings-card[data-openkill-card="traffic-routing"]
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"] {
+    width: 100%;
+    max-width: 100%;
+    margin: var(--ok-space-3, 12px) 0 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"] > h3,
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"] > .cbi-section-descr {
+    display: none;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"] .cbi-section-table {
+    display: block;
+    width: 100%;
+    border: 0;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"] .cbi-section-table-titles,
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"] .cbi-section-table-descr {
+    display: none;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--ok-space-3, 12px);
+    width: 100%;
+    margin: 0 0 var(--ok-space-3, 12px);
+    padding: var(--ok-space-3, 12px);
+    box-sizing: border-box;
+    border: 1px solid var(--ok-ui-border);
+    border-radius: var(--ok-radius-md, 8px);
+    background: var(--ok-ui-surface-muted);
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td {
+    display: block;
+    min-width: 0;
+    width: auto;
+    padding: 0;
+    border: 0;
+    box-sizing: border-box;
+}
+
+/* Hide the generated serial-number cell; ordering is retained by the hidden
+ * cbi.sts input and the remaining cells follow the original UCI option order. */
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td:first-child {
+    display: none;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td:nth-last-child(-n+2) {
+    align-self: end;
+}
+
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ .cbi-section-create {
+    margin-top: var(--ok-space-2, 8px);
+}
+
+@media (max-width: 640px) {
+    #cbi-openkill.openkill-settings
+     .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+     tr.openkill-source-rule-card {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* The binary state cards never show the old unresolved banner.  Diagnostic
+ * detail remains available through each card's accessible label/help link. */
+.oc.openkill-status-page .security-status-notice {
+    display: none !important;
+}
+
+@media (min-width: 1201px) {
+    .oc.openkill-status-page .dashboard-security-section {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 769px) and (max-width: 1200px) {
+    .oc.openkill-status-page .dashboard-security-section {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+.oc.openkill-status-page .security-status-card {
+    min-width: 0;
+    min-height: 86px;
+}
+
+.oc.openkill-status-page .security-status-card .card-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    white-space: nowrap;
+    font-size: clamp(13px, 1.4vw, 16px);
+    line-height: 1.25;
+}
+
+.oc.openkill-status-page .security-status-card .card-title .help-link {
+    flex: 0 0 auto;
+}
+
+.oc.openkill-status-page .security-status-content {
+    min-height: 32px;
+    justify-content: flex-start;
+}
+
 .oc.openkill-status-page .security-status-value.is-unknown {
     color: var(--ok-flat-muted, #69758a);
 }
