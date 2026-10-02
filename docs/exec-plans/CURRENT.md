@@ -1,15 +1,16 @@
 # Current status
 
-## 2026-10-03 严格 DNS 受管组故障转移与国内分流复验（2026-2011，进行中）
+## 2026-10-03 严格 DNS 受管组故障转移与国内分流复验（2026-2011）
 
-- 当前源码基线为 `dcff6640965c067fbd2d5e0acdaa4560c681595a`，工作区只保留既有未跟踪 RC/正式审计目录；本轮拟发布版本为 `2026-2011`。
-- 授权设备仍仅为 `192.168.1.103`。设备为 Kwrt 25.12-SNAPSHOT / x86_64，Mihomo Meta v1.19.32；写入前的受保护备份为 `/root/openkill-dns-audit-20261002-235546/openkill-state.tar.gz`（权限目录 700、归档 600）。RC `2026-2010` 已实际安装并保留 UCI、源/运行 YAML、独立 Naive 数据。
-- 复验发现严格 DNS 的受管组仍是手动 `select`：3 个成员中 1 个可用、2 个不可用，当前选择成员不可用；控制器本身可访问，但经本机 SOCKS/混合端口的 3 轮国内/海外请求均返回 000。该证据解释了“严格模式启动或业务请求失败”，不是把国内业务规则误判为代理的证据。
-- RC 生成的实际运行 YAML 已包含 `GEOSITE,cn,DIRECT` 和 `GEOIP,CN,DIRECT,no-resolve`，均位于 `MATCH` 前；业务模式保持 rule，故严格 DNS 传输与国内业务出站已分离。之前检查的源 YAML 与核心实际加载 YAML 路径不同，后续验证以核心命令行指向的运行文件为准。
-- 设备上的广告屏蔽运行态为 `generated/effective/provider_effective/dns_loaded/core_loaded/verified=1`，受管 provider 与 dnsmasq 视图来自同一份缓存；本轮未改变规则源或用户允许列表。
-- 已确认的 DNS 旁路边界：默认本机解析未在物理 WAN 观察到 53 端口包；显式指定外部 DNS 的路由器本地查询曾在物理 WAN 产生 4 个 53 端口包。完整阻断该路径需要全网/本机 OUTPUT DNS kill-switch，按授权要求不得在未确认影响和回滚方式前部署。LAN 客户端、IPv6 客户端和浏览器自建 DoH 仍需单独拓扑验证。
-- 本轮修复：`dns_privacy.rb` 将受管 DNS 组改为不含 `DIRECT` 的 `fallback` 健康探测组（固定 HTTPS 探测、有限失败次数），启动严格验证由 3 次增加为 5 次有界重试；不修改用户代理组、WAN、路由或全网 DNS 阻断。对应回归测试已补充，下一步先跑本地门禁和精确提交 CI，再重建/安装 RC 复验健康成员切换。
-- 验收门槛：受管组必须在有可用成员时自动离开失效选择，严格 DNS 生成/运行验证通过；国内规则与代理目标需取得实际连接命中证据；广告屏蔽保持双视图运行态有效；上游全部不可达时仍失败关闭且不明文回退。正式包、正式标签和正式安装在上述证据完成前不触发。
+- 源码提交为 `0791c023c324e9b1c0adb6cd2c692b0c783b5055`，版本为 `2026-2011`；工作区只保留既有未跟踪 RC/正式审计目录。对应 Development CI 已通过，RC 构建已通过包内容审计。
+- 授权设备仍仅为 `192.168.1.103`。设备为 Kwrt 25.12-SNAPSHOT / x86_64，Mihomo Meta v1.19.32；本轮写入前受保护备份为 `/root/openkill-dns-audit-20261003-0052/openkill-state.tar.gz`（目录 700、归档 600）。
+- 2026-2010 的故障根因是严格 DNS 受管组仍为手动 `select`，3 个成员中有失效成员且当前选择被钉死；控制器可访问但严格查询与代理请求失败。它不是国内业务规则把所有流量改走代理的证据。
+- 2026-2011 将该组生成为不含 `DIRECT` 的 `fallback`，带固定 HTTPS 健康探测、有限失败次数和有限启动等待；没有可用成员时仍失败关闭，不明文回退。实际运行 YAML 中该组为 `fallback`、3 个成员均报告可用，严格状态为 `effective=1/runtime_verified=1/ordinary_encrypted=1/bootstrap_exception=1`。
+- 国内业务分流已在实际连接中复验：一条国内 HTTPS 连接命中国内规则并走 `DIRECT`，一条境外 HTTPS 连接命中 `MATCH` 并走代理链；两条均通过测试机 SOCKS5 返回 HTTP 成功。严格 DNS 传输与业务出站保持分离。
+- DNS 数据面复验：测试客户端经 `192.168.1.103` 指定解析入口的 UDP、TCP 查询均成功；唯一测试域名的 NXDOMAIN 被返回为预期错误。设备现有 IPv4/IPv6 53 处理规则共 5 条；设备 LAN 侧没有 global IPv6 地址，因此 LAN IPv6 数据面尚未完成。宿主机虽有 global IPv6，但不能据此替代经过测试机的 IPv6 验收。
+- 已确认的边界仍需保留：默认本机解析未在物理 WAN 观察到 53 端口包；显式指定外部 DNS 的路由器本地查询曾产生 4 个物理 WAN 53 端口包。这是未授权的本机/全网 DNS kill-switch 范围，不能在没有影响评估和回滚确认的情况下部署。LAN 客户端浏览器自建 DoH 也不在本轮可证明范围内。
+- 广告屏蔽运行态为 `generated/effective/provider_effective/dns_loaded/core_loaded/verified=1`，provider、dnsmasq 视图和核心规则来自同一份经校验缓存；本轮未改变来源或允许列表。规则行为以受控 provider 夹具及运行态验证为证，不宣称浏览器内容广告全部消除。
+- 本轮修改文件集中在 `dns_privacy.rb`、`openkill` 服务启动等待、对应 DNS/运行回归测试、版本同步及发布记录；未改 WAN、用户代理组、路由或全网 DNS 阻断。正式发布前还需用同一源提交完成 Formal Release 并安装正式包复验。
 
 ## 2026-10-02 严格 DNS 与国内业务分流复核（本地修复，设备证据待补）
 
