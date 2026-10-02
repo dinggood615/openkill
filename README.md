@@ -14,10 +14,6 @@ curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh 
 ```
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh -s -- --install --version 2026-2008
-```
-
-```sh
 curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh -s -- --update
 ```
 
