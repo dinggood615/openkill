@@ -26,7 +26,7 @@ OpenKill installer
   --install       Install or repair OpenKill
   --update        Update OpenKill and its official stable Mihomo/Meta core
   --uninstall     Remove OpenKill and its data
-  --version       Install an exact published version (YYYY-NNNN)
+  --version VERSION  Install an exact published version (YYYY-NNNN)
   --package-file  Install a local IPK/APK file
 EOF
 }

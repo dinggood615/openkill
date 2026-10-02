@@ -65,7 +65,7 @@ grep -q -- '-f mirror install local.ipk' "$WORK_DIR/calls"
 
     def test_exact_version_install_is_release_pinned_and_digest_verified(self):
         self.assertIn('REQUESTED_VERSION=""', SOURCE)
-        self.assertIn('--version       Install an exact published version (YYYY-NNNN)', SOURCE)
+        self.assertIn('--version VERSION  Install an exact published version (YYYY-NNNN)', SOURCE)
         self.assertIn('Invalid version: $REQUESTED_VERSION (expected YYYY-NNNN)', SOURCE)
         self.assertIn('releases/tags/$requested_tag', SOURCE)
         self.assertIn('asset["digest"]', SOURCE)
