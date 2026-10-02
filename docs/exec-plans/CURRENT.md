@@ -1,12 +1,51 @@
 # Current status
 
-## 2026-10-02 2026-2000 大版本适配（实施中）
+## 2026-10-02 2026-2000 大版本适配（正式发布完成，保留数据面限制）
 
-- 本轮目标：将“来源流量规则”移至“流量转发”卡片，提炼无个人数据的全新安装默认值，审计设置项从 LuCI 保存到运行配置的链路，并验证 DNS、广告、mips TUN、BBR3、IPv4/IPv6 及区域旁路的真实能力边界。
-- 基线正式版本为 `2026-1209-ipk`，工作区保留既有 `.rc-*` 未跟踪审计目录，不纳入提交。测试机为授权的 OpenWrt x86_64 环境；设备写入前已建立受保护备份，未读取或提交个人节点、订阅和密钥。
-- 已完成代码阶段：来源规则采用原表单定义归类到“流量转发”卡片；字段标签改为来源语义；全新默认配置采用 performance、mips/mips、IPv6、BBR3、标准 Geo、QUIC 关闭、增强 anti-AD 和防火墙 DNS 转发；升级仍保留显式用户值。严格 DNS 保持 split 新装默认，以避免无节点设备在首次启动时闭锁。
-- anti-AD 状态新增只读运行态核验：仅在 dnsmasq include、Mihomo provider 标记和受管核心进程均存在时报告有效；状态文件原子替换且不包含凭据。其余设置项与 DNS/区域旁路验收将在本轮测试、候选安装和正式包安装后逐项更新为通过、失败、未验证或不适用。
-- 浏览器 LuCI 视觉验收和独立可控 LAN 客户端的 UDP/TCP 53 数据面验收，若当前工具或网络拓扑仍不可用，必须保留为未验证；不得以配置文本、HTTP 200 或单个在线检测站点代替。
+- 基线正式版本为 `2026-1209-ipk`；实现提交为
+  `be023344ca212d0e2867f019a9e70b6728fccefb`。来源流量规则现在归入“流量转发”卡片，
+  原 UCI section、顺序、校验和 CRUD 行为保持不变，字段改为来源语义并在窄屏局部滚动。
+- 全新安装默认值已统一到默认 UCI、归一化脚本、LuCI 和安装器：performance、mips/mips、
+  IPv6、标准 Geo、TCP 并发、统一延迟、BBR3 字段、QUIC/UDP 关闭、增强 anti-AD 和防火墙
+  DNS 转发。严格 DNS 保持 split 新装默认，以避免无节点设备在首次启动时闭锁；升级、重装
+  及已有 conffile 保留用户显式选择。默认值不含节点、订阅、密码、设备地址、用户 YAML 或
+  个人规则。
+- anti-AD 仍由一份校验后的域名列表生成 dnsmasq 和 Mihomo 两个视图；新增只读运行态核验，
+  只有 dnsmasq include、Mihomo provider 标记和受管核心进程同时存在才报告 `verified=1`，
+  状态文件以 0600 原子替换。正式包安装后设备状态为 `runtime-loaded`。
+- 本地 WSL 门禁通过：运行时 38 项、LuCI 合同 33 项、安装器 15 项、网络模型 65 项、DNS
+  当前语义 10 项，`scripts/local-gate.sh` 和 `git diff --check` 均通过。精确提交
+  Development CI `36973248523`：
+  https://github.com/dinggood615/openkill/actions/runs/36973248523 。
+- RC Build `36973407767` 成功：
+  https://github.com/dinggood615/openkill/actions/runs/36973407767 。候选 IPK
+  `luci-app-openkill_2026-2000_all.ipk` 为 7,724,516 bytes，SHA256
+  `76439c03b57754411c6cdd32b4dca8c08e855929edafeb31fded4e1a2b6d4a49`；包元数据、
+  conffile 保留、维护脚本、权限及个人数据污染审计通过。候选包已在授权设备以
+  `opkg --force-reinstall` 实际安装并启动。
+- Formal Release `36974244535` 成功：
+  https://github.com/dinggood615/openkill/actions/runs/36974244535 。正式标签及 Release
+  为 `v2026-2000-ipk`：
+  https://github.com/dinggood615/openkill/releases/tag/v2026-2000-ipk ，源提交为
+  `be023344ca212d0e2867f019a9e70b6728fccefb`。正式 IPK 为 7,926,626 bytes，SHA256
+  `d1d67334c3408b343716ce9d8e1c869d2df6bf9ac3e81fe547099f3e3b517025`；package channel
+  `package/master/latest-ipk.json` 已同步该版本、源提交、下载地址及哈希。候选与正式包因
+  构建时间元数据不同分别记录哈希，未声称二者相同。
+- 正式包已在 `192.168.1.103` 通过 `opkg --force-reinstall` 实际替换。设备确认
+  OpenWrt 25.12-SNAPSHOT x86_64、Mihomo Meta v1.19.32、核心运行、mips TUN、IPv6、
+  BBR3 配置字段、标准 Geo、TCP 并发、统一延迟、anti-AD provider 和 IPv4/IPv6 区域集合；
+  防火墙 DNS 专用链包含 UDP/TCP 53 的两条族规则。正式包关键文件哈希与包解包内容一致。
+- 独立 Naive SOCKS5 保持运行，两个 HTTPS 目标各一次返回 200；这证明独立组件链路未被
+  本轮默认值/UI/安装流程破坏。当前 Mihomo 既有远端代理组两次 HTTPS 请求均因原有远端
+  上游连接超时返回失败，而同设备直连请求返回 200；日志阶段为远端拨号超时，未发现本轮
+  包导致的核心崩溃或配置解析错误，也未改写用户 YAML 或代理组。
+- 通过测试机本身无法证明 LAN 客户端 UDP/TCP 53 已穿过本机：测试电脑默认网关不是
+  `192.168.1.103`，现场没有第二台可控客户端；因此 DNS 无泄漏的完整数据面、IPv4/IPv6
+  客户端计数、区域旁路的真实代理链和广告域名查询仍标记“未验证/受拓扑限制”。Chrome
+  LuCI 视觉逐页验收在当前工具环境不可见，也未用 SSH 或 HTTP 200 冒充浏览器结果。
+- 受保护设备备份保留在 `/root/openkill-defaults-audit-20261002`（目录 700，敏感文件
+  600）。回滚可安装上一正式版 IPK 并恢复该备份；不需要整机重启。上述限制不影响本次
+  `2026-2000` 正式包发布事实，但不能被描述为绝对无 DNS 泄漏或所有远端代理均可用。
 
 ## 2026-10-02 2026-1209 TUN 防火墙 DNS 转发与网络分流页面（正式验收完成）
 
