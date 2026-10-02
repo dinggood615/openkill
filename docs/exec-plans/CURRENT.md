@@ -34,8 +34,9 @@
 - 授权测试机 192.168.1.103 已使用 `opkg --force-reinstall` 实际替换正式包，`opkg`
   显示 2026-1208；设备 `/etc/init.d/openkill` 与严格 DNS 运行检查脚本的 SHA256
   与正式 IPK 解包文件一致。用户 conffile、独立 Naive 数据和既有 YAML 均保留。正式
-  安装后的最终状态为 `running`，Mihomo Meta v1.19.32，运行配置加载 `mips` TUN 与
-  `bbr3`，严格 DNS state 为 `runtime_verified=1`。
+  安装后的最终状态为 `running`，Mihomo Meta v1.19.32，当前用户明确保留的运行配置为
+  `mixed` TUN 与 `bbr3`（未擅自覆盖用户选择）；新安装/由 OpenKill 管理的默认配置仍为
+  `mips`＋`bbr3`，严格 DNS state 为 `runtime_verified=1`。
 - 正式包安装后重复启停出现过严格 DNS 上游不可达导致的 `startup-failed`，随后重试在
   同一包、同一配置下成功；这证明新增重试改善了瞬时竞态，但不能消除远端代理不可用。
   分流模式下核心可稳定运行；独立 Naive SOCKS5 经两个 HTTPS 目标返回成功（一个目标
