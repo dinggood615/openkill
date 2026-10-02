@@ -2711,7 +2711,7 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill .oc.openkill-myip
  .openkill-network-only-section[data-openkill-section-kind="source-traffic"] {
     color: var(--ok-ui-text);
     border-color: var(--ok-ui-border);
-    background: transparent;
+    background: transparent !important;
 }
 
 #cbi-openkill.openkill-settings
@@ -2724,7 +2724,7 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill .oc.openkill-myip
  .openkill-settings-card[data-openkill-card="traffic-routing"]
  .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
  tr.openkill-source-rule-card {
-    background: var(--ok-ui-surface-muted);
+    background: var(--ok-ui-surface-muted) !important;
     border-color: var(--ok-ui-border);
     box-shadow: none;
 }

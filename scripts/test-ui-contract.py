@@ -296,6 +296,8 @@ class LuCIContractTests(unittest.TestCase):
         self.assertIn("Settings UI closeout (2026-2006)", css)
         self.assertIn("var(--ok-ui-surface-muted)", css)
         self.assertIn("var(--ok-ui-border)", css)
+        self.assertIn("background: transparent !important;", css)
+        self.assertIn("background: var(--ok-ui-surface-muted) !important;", css)
         self.assertIn("align-items: stretch;", css)
 
     def test_maintenance_precedes_mihomo_in_equal_width_advanced_grid(self) -> None:
