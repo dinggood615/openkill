@@ -1184,6 +1184,27 @@ openkill_current_start()
    [ -z "${OPENKILL_START_TOKEN:-}" ] || [ "$(cat /tmp/openkill-start.token 2>/dev/null)" = "$OPENKILL_START_TOKEN" ]
 }
 
+# A strict-DNS readiness query can race the first proxy/DNS connection after
+# procd has committed the instance. Retry only this read-only evidence check
+# a small, bounded number of times; a persistent failure still fails closed
+# and never reports the service as ready.
+openkill_dns_privacy_runtime_check()
+{
+   local attempt=1 max_attempts=3
+   while [ "$attempt" -le "$max_attempts" ]; do
+      if OPENKILL_DNS_PRIVACY_GROUP="$(uci -q get openkill.config.dns_privacy_group 2>/dev/null || printf '%s' OpenKill-DNS)" \
+         /usr/share/openkill/openkill_dns_runtime_check.sh "$CONFIG_FILE" /tmp/openkill-dns-privacy.state; then
+         return 0
+      fi
+      if [ "$attempt" -lt "$max_attempts" ]; then
+         LOG_TIP "Strict DNS privacy runtime verification retry ${attempt}/${max_attempts}."
+         sleep 2
+      fi
+      attempt=$((attempt + 1))
+   done
+   return 1
+}
+
 check_core_status()
 {
    local deadline stage last_stage="" now
@@ -1260,11 +1281,10 @@ check_core_status()
          start_fail
       fi
       if [ "$(uci -q get openkill.config.dns_privacy_mode 2>/dev/null)" = strict ]; then
-         OPENKILL_DNS_PRIVACY_GROUP="$(uci -q get openkill.config.dns_privacy_group 2>/dev/null || printf '%s' OpenKill-DNS)" \
-            /usr/share/openkill/openkill_dns_runtime_check.sh "$CONFIG_FILE" /tmp/openkill-dns-privacy.state || {
-               LOG_ERROR "Strict DNS privacy runtime verification failed; refusing to report service ready."
-               start_fail
-            }
+         openkill_dns_privacy_runtime_check || {
+            LOG_ERROR "Strict DNS privacy runtime verification failed; refusing to report service ready."
+            start_fail
+         }
       fi
    fi
    if [ "$tun_owner" = openkill ]; then

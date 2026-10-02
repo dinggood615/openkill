@@ -347,6 +347,18 @@ class DualStackRoutingTests(unittest.TestCase):
         self.assertIn("bootstrap_servers = Array(dns_value['proxy-server-nameserver']) + Array(dns_value['default-nameserver'])", change)
         self.assertIn("File.rename(dns_state_tmp, '/tmp/openkill-dns-privacy.state')", change)
 
+    def test_strict_dns_readiness_has_bounded_runtime_retries(self):
+        init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        self.assertIn('openkill_dns_privacy_runtime_check()', init)
+        self.assertIn('local attempt=1 max_attempts=3', init)
+        self.assertIn('Strict DNS privacy runtime verification retry', init)
+        self.assertIn('openkill_dns_privacy_runtime_check || {', init)
+        # The retry helper must remain a read-only evidence check; it must not
+        # regenerate YAML, allocate ports, or mutate UCI state.
+        helper = init.split('openkill_dns_privacy_runtime_check()', 1)[1].split('\ncheck_core_status()', 1)[0]
+        for forbidden in ('yml_change.sh', 'uci set', 'uci commit', 'allocate_port'):
+            self.assertNotIn(forbidden, helper)
+
     def test_naive_manifest_parser_does_not_use_unsupported_lua_alternation(self):
         controller = (ROOT / 'luci-app-openkill/luasrc/controller/openkill.lua').read_text(encoding='utf-8')
         self.assertIn('local function naive_manifest_value(line, field)', controller)
