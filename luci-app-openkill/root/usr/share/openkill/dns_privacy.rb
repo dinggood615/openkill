@@ -99,7 +99,20 @@ module OpenKillDnsPrivacy
       end.map { |p| p['name'] }.uniq
       providers = value['proxy-providers'].is_a?(Hash) ? value['proxy-providers'].keys.map(&:to_s).reject(&:empty?).uniq : []
       raise ArgumentError, 'Strict DNS requires at least one concrete proxy node or proxy provider' if nodes.empty? && providers.empty?
-      managed = {'name'=>group, 'type'=>'select'}
+      # A manual select group can remain pinned to a dead node. That makes
+      # every strict-DNS query fail even when another managed member is
+      # healthy. Keep the group private to DNS, but let Mihomo perform a
+      # bounded health check and fail over without adding DIRECT.
+      managed = {
+        'name' => group,
+        'type' => 'fallback',
+        'url' => 'https://www.gstatic.com/generate_204',
+        'interval' => 180,
+        'timeout' => 5000,
+        'max-failed-times' => 2,
+        'lazy' => false,
+        'expected-status' => 204
+      }
       managed['proxies'] = nodes unless nodes.empty?
       managed['use'] = providers unless providers.empty?
       groups << managed

@@ -382,7 +382,7 @@ class DualStackRoutingTests(unittest.TestCase):
     def test_strict_dns_readiness_has_bounded_runtime_retries(self):
         init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
         self.assertIn('openkill_dns_privacy_runtime_check()', init)
-        self.assertIn('local attempt=1 max_attempts=3', init)
+        self.assertIn('local attempt=1 max_attempts=5', init)
         self.assertIn('Strict DNS privacy runtime verification retry', init)
         self.assertIn('openkill_dns_privacy_runtime_check || {', init)
         # The retry helper must remain a read-only evidence check; it must not

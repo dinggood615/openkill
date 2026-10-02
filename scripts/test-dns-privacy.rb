@@ -26,7 +26,15 @@ class DnsPrivacyTest < Minitest::Test
   def test_dedicated_group_never_imports_nested_direct
     v=profile
     OpenKillDnsPrivacy.apply(v, 'strict', 'OpenKill-DNS')
-    assert_equal ['fixture'], v['proxy-groups'].last['proxies']
+    managed = v['proxy-groups'].last
+    assert_equal 'fallback', managed['type']
+    assert_equal ['fixture'], managed['proxies']
+    assert_equal 'https://www.gstatic.com/generate_204', managed['url']
+    assert_equal 180, managed['interval']
+    assert_equal 5000, managed['timeout']
+    assert_equal 2, managed['max-failed-times']
+    assert_equal false, managed['lazy']
+    assert_equal 204, managed['expected-status']
     assert_equal ['DIRECT','fixture'], v['proxy-groups'].first['proxies']
     assert_equal ['https://dns.example/dns-query#OpenKill-DNS'], v['dns']['nameserver']
     assert v['dns']['default-nameserver'].all? { |x| x.start_with?('https://') }

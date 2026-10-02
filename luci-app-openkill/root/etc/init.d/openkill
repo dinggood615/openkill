@@ -1195,7 +1195,10 @@ openkill_current_start()
 # and never reports the service as ready.
 openkill_dns_privacy_runtime_check()
 {
-   local attempt=1 max_attempts=3
+   # The managed DNS group now uses a bounded fallback health check. Allow
+   # that check to move away from a stale selected member before declaring
+   # strict privacy unavailable, while keeping the total wait finite.
+   local attempt=1 max_attempts=5
    while [ "$attempt" -le "$max_attempts" ]; do
       if OPENKILL_DNS_PRIVACY_GROUP="$(uci -q get openkill.config.dns_privacy_group 2>/dev/null || printf '%s' OpenKill-DNS)" \
          /usr/share/openkill/openkill_dns_runtime_check.sh "$CONFIG_FILE" /tmp/openkill-dns-privacy.state; then
