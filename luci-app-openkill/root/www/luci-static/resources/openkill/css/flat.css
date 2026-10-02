@@ -2368,6 +2368,18 @@ body[data-page="admin-services-openkill-client"] #cbi-openkill .oc.openkill-myip
     box-sizing: border-box;
 }
 
+#cbi-openkill.openkill-settings
+ .openkill-network-only-section[data-openkill-section-kind="source-traffic"]
+ tr.openkill-source-rule-card > td[data-source-label]:not(:first-child)::before {
+    display: block;
+    margin: 0 0 4px;
+    color: var(--ok-ui-muted);
+    content: attr(data-source-label);
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
 /* Hide the generated serial-number cell; ordering is retained by the hidden
  * cbi.sts input and the remaining cells follow the original UCI option order. */
 #cbi-openkill.openkill-settings

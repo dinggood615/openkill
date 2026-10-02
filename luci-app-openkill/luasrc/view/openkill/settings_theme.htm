@@ -451,9 +451,15 @@
         target.removeAttribute('aria-hidden');
 
         var ruleRows = target.querySelectorAll('tr.cbi-section-table-row:not(.placeholder)');
+        var ruleLabels = ['序号', '备注', '启用', '来源地址', '来源端口',
+            '协议', '地址族', '接口', '来源用户', 'DSCP', '处理对象', '排序', '操作'];
         for (var r = 0; r < ruleRows.length; r++) {
             ruleRows[r].classList.add('openkill-source-rule-card');
             ruleRows[r].setAttribute('data-openkill-rule-card', '1');
+            var cells = ruleRows[r].children || [];
+            for (var c = 0; c < cells.length && c < ruleLabels.length; c++) {
+                cells[c].setAttribute('data-source-label', ruleLabels[c]);
+            }
         }
 
         for (var k = 1; k < sections.length; k++) {
