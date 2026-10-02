@@ -14,6 +14,12 @@
 - 正式资产已通过已登录 LuCI 软件包页面上传，随后在设备上以 `opkg install --force-reinstall /tmp/upload.ipk` 实际替换，返回码 0，包版本为 `2026-2008`；因此未把页面的同版本“已是最新”提示单独当作安装证据。强制重装后重新执行启动和严格验证，核心配置语法及生成阶段通过，但当前受管 DNS 代理组内的既有远端上游在本次时间窗内全部连接超时，严格运行检查返回 `controller-query-http`，服务按失败关闭策略停止，未明文回退。该结果是外部上游可达性阻塞，不是配置事务歧义或运行检查解析器缺失；独立 Naive SOCKS5 仍保持可用，不能将当前 Mihomo 默认远端链路宣称为已通过。
 - 正式包安装后的设备结论：`opkg` 版本和关键文件来自正式包，用户配置/独立组件数据保留；由于严格模式的真实代理链当前不可达，`effective/runtime_verified/ready` 在失败后为 0，不能报告服务就绪。受保护备份仍为 `/root/openkill-dns-strict-20261002-2004/openkill-state.tar.gz`（目录 700、归档 600）。待上游恢复后可直接重新启动验证；若需回滚，停止 OpenKill 后从该归档恢复配置与运行材料，再以同一正式包或上一已验证版本恢复。
 
+## 2026-10-02 指定版本安装器兼容修复（不改变包版本）
+
+- 根因：`scripts/install-openkill.sh` 的精确版本路径虽然在依赖检查阶段允许使用 OpenWrt `jsonfilter`，但 `resolve_requested_package()` 仍无条件调用 `ruby -rjson` 解析 GitHub Release API；缺少 `ruby-json` 的精简固件因此把存在的历史 Release 误报为“版本不存在”。
+- 修复：精确版本解析现在优先使用系统 `jsonfilter` 提取 tag、草稿/预发布状态、目标资产 digest 和下载地址；仅在 `jsonfilter` 不可用时回退 Ruby JSON，并对目标 tag 没有对应 IPK/APK 资产给出明确错误。下载仍要求 HTTPS、Release 资产 URL 完全匹配及 SHA256 校验。
+- 回归覆盖：新增无 Ruby JSON、模拟 `2026-1206` IPK Release 元数据的解析测试；`bash -n scripts/install-openkill.sh`、`scripts/test-installer.py`（18 项）及 `sh scripts/local-gate.sh` 均通过。本次仅更新安装器和测试/执行记录，不改变 OpenKill 包版本或设备配置；推送后需核对精确源提交的 Development CI。
+
 ## 2026-10-02 插件设置页面顺序、来源规则主题与等高布局（2026-2006，正式发布完成）
 
 - 本轮范围限定为 LuCI UI：网络与分流卡片顺序、兼容与辅助卡片顺序、来源流量规则子区域主题/排版，以及同一桌面网格行内的自然等高；不改变 DNS、NaiveProxy、服务生命周期、WAN、防火墙、路由、TUN 或全网代理策略。

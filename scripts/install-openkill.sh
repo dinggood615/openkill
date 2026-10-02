@@ -708,6 +708,8 @@ resolve_requested_package(){
   requested_json="$WORK_DIR/release-${REQUESTED_VERSION}-${EXT}.json"
   requested_metadata="$WORK_DIR/metadata"
   requested_api_ok=0
+  requested_tag_seen=0
+  requested_asset_seen=0
   # Resolve the tag through the Releases API instead of the moving package
   # channel.  The selected asset's publisher digest is required before any
   # package transaction is started.
@@ -717,34 +719,74 @@ resolve_requested_package(){
     "https://github.dpik.top/https://api.github.com/repos/$REPO/releases/tags/$requested_tag" \
     "https://gh-proxy.com/https://api.github.com/repos/$REPO/releases/tags/$requested_tag"; do
     detail "Checking published version: $REQUESTED_VERSION"
-    if download "$api" "$requested_json" 15 >/dev/null 2>&1 &&
-       ruby -rjson -e '
-         begin
-           release=JSON.parse(File.read(ARGV[0]))
-           tag=ARGV[1]
-           ext=ARGV[2]
-           version=ARGV[3]
-           repo=ARGV[4]
-           abort unless release["tag_name"] == tag
-           abort if release["draft"] == true || release["prerelease"] == true
-           package_version = ext == "apk" ? version.sub("-", ".") : version
-           expected = ext == "apk" ? "luci-app-openkill-#{package_version}.apk" : "luci-app-openkill_#{package_version}_all.ipk"
-           expected_url = "https://github.com/#{repo}/releases/download/#{tag}/#{expected}"
-           asset=(release["assets"]||[]).find{|entry| entry["name"].to_s == expected}
-           abort unless asset
-           digest=asset["digest"].to_s.sub(/^sha256:/, "").downcase
-           abort unless digest.match?(/\A[0-9a-f]{64}\z/)
-           abort unless asset["browser_download_url"].to_s == expected_url
-           puts [version, expected, digest, expected_url]
-         rescue StandardError
-           exit 1
-         end
-       ' "$requested_json" "$requested_tag" "$EXT" "$REQUESTED_VERSION" "$REPO" > "$requested_metadata"; then
+    download "$api" "$requested_json" 15 >/dev/null 2>&1 || continue
+
+    package_version="$REQUESTED_VERSION"
+    [ "$EXT" = apk ] && package_version=$(printf '%s' "$REQUESTED_VERSION" | sed 's/-/./')
+    expected="luci-app-openkill_${package_version}_all.ipk"
+    [ "$EXT" = apk ] && expected="luci-app-openkill-${package_version}.apk"
+    expected_url="https://github.com/$REPO/releases/download/$requested_tag/$expected"
+
+    # jsonfilter is part of the required OpenWrt runtime and works on images
+    # that intentionally omit ruby-json.  The previous implementation only
+    # used jsonfilter for channel manifests, then unconditionally required
+    # Ruby JSON here, making every exact-version install fail on minimal
+    # firmware even when the requested release and asset existed.
+    if command -v jsonfilter >/dev/null 2>&1; then
+      release_tag=$(jsonfilter -i "$requested_json" -e '@.tag_name' 2>/dev/null | sed -n '1p' | tr -d '\r\n')
+      [ "$release_tag" = "$requested_tag" ] || continue
+      requested_tag_seen=1
+      release_draft=$(jsonfilter -i "$requested_json" -e '@.draft' 2>/dev/null | sed -n '1p' | tr -d '\r\n')
+      release_prerelease=$(jsonfilter -i "$requested_json" -e '@.prerelease' 2>/dev/null | sed -n '1p' | tr -d '\r\n')
+      case "$release_draft:$release_prerelease" in
+        1:*|true:*|*:1|*:true) continue;;
+      esac
+      asset_digest=$(jsonfilter -i "$requested_json" -e "@.assets[@.name='$expected'].digest" 2>/dev/null | sed -n '1p' | sed 's/^sha256://' | tr -d '\r\n' | tr 'A-F' 'a-f')
+      asset_url=$(jsonfilter -i "$requested_json" -e "@.assets[@.name='$expected'].browser_download_url" 2>/dev/null | sed -n '1p' | tr -d '\r\n')
+      [ -n "$asset_digest" ] || continue
+      requested_asset_seen=1
+      case "$asset_digest" in
+        ''|*[!0-9a-f]*) continue;;
+      esac
+      [ "${#asset_digest}" -eq 64 ] || continue
+      [ "$asset_url" = "$expected_url" ] || continue
+      printf '%s\n%s\n%s\n%s\n' "$REQUESTED_VERSION" "$expected" "$asset_digest" "$expected_url" > "$requested_metadata"
       requested_api_ok=1
       break
+    elif ruby -rjson -e 'exit 0' >/dev/null 2>&1; then
+      if ruby -rjson -e '
+           begin
+             release=JSON.parse(File.read(ARGV[0]))
+             tag=ARGV[1]
+             ext=ARGV[2]
+             version=ARGV[3]
+             repo=ARGV[4]
+             abort unless release["tag_name"] == tag
+             abort if release["draft"] == true || release["prerelease"] == true
+             package_version = ext == "apk" ? version.sub("-", ".") : version
+             expected = ext == "apk" ? "luci-app-openkill-#{package_version}.apk" : "luci-app-openkill_#{package_version}_all.ipk"
+             expected_url = "https://github.com/#{repo}/releases/download/#{tag}/#{expected}"
+             asset=(release["assets"]||[]).find{|entry| entry["name"].to_s == expected}
+             abort unless asset
+             digest=asset["digest"].to_s.sub(/^sha256:/, "").downcase
+             abort unless digest.match?(/\A[0-9a-f]{64}\z/)
+             abort unless asset["browser_download_url"].to_s == expected_url
+             puts [version, expected, digest, expected_url]
+           rescue StandardError
+             exit 1
+           end
+         ' "$requested_json" "$requested_tag" "$EXT" "$REQUESTED_VERSION" "$REPO" > "$requested_metadata"; then
+        requested_api_ok=1
+        break
+      fi
     fi
   done
-  [ "$requested_api_ok" -eq 1 ] || die "Published $EXT version $REQUESTED_VERSION was not found or has no verified package digest"
+  if [ "$requested_api_ok" -ne 1 ]; then
+    if [ "$requested_tag_seen" -eq 1 ] && [ "$requested_asset_seen" -eq 0 ]; then
+      die "Published tag $requested_tag has no verified $EXT asset; this version may only publish the other package format"
+    fi
+    die "Published $EXT version $REQUESTED_VERSION was not found or has no verified package digest"
+  fi
   ver=$(sed -n '1p' "$requested_metadata")
   name=$(sed -n '2p' "$requested_metadata")
   checksum=$(sed -n '3p' "$requested_metadata")

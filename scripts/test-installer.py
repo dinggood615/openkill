@@ -77,6 +77,45 @@ grep -q -- '-f mirror install local.ipk' "$WORK_DIR/calls"
         self.assertIn('expected_url', requested_block)
         self.assertIn('browser_download_url', requested_block)
         self.assertIn('sha256sum "$PACKAGE_FILE"', requested_block)
+        self.assertIn('command -v jsonfilter', requested_block)
+        self.assertIn('jsonfilter -i "$requested_json"', requested_block)
+        self.assertIn('has no verified $EXT asset', requested_block)
+
+    def test_exact_version_resolution_works_without_ruby_json(self):
+        requested_start = SOURCE.index("resolve_requested_package(){")
+        requested_end = SOURCE.index("resolve_package(){", requested_start)
+        resolver = SOURCE[requested_start:requested_end]
+        harness = r'''
+set -eu
+WORK_DIR=$(mktemp -d)
+trap 'rm -rf "$WORK_DIR"' EXIT
+REPO=dinggood615/openkill
+EXT=ipk
+REQUESTED_VERSION=2026-1206
+PACKAGE_FILE=""
+detail(){ :; }
+step(){ :; }
+log(){ :; }
+die(){ printf '%s\n' "$*" >&2; exit 1; }
+download(){ : > "$2"; return 0; }
+sha256sum(){ printf '%s  %s\n' 279b7fa5e9912f9fe29a38efe0afcf19616a2ef9d681e58b2a80874ad8fa8e98 "$1"; }
+jsonfilter(){
+  expr="$4"
+  case "$expr" in
+    '@.tag_name') printf 'v2026-1206-ipk\n';;
+    '@.draft'|'@.prerelease') printf 'false\n';;
+    *'.digest') printf 'sha256:279b7fa5e9912f9fe29a38efe0afcf19616a2ef9d681e58b2a80874ad8fa8e98\n';;
+    *'.browser_download_url') printf 'https://github.com/dinggood615/openkill/releases/download/v2026-1206-ipk/luci-app-openkill_2026-1206_all.ipk\n';;
+    *) return 1;;
+  esac
+}
+resolve_requested_package
+[ "$(sed -n '1p' "$WORK_DIR/metadata")" = 2026-1206 ]
+[ "$(sed -n '2p' "$WORK_DIR/metadata")" = luci-app-openkill_2026-1206_all.ipk ]
+[ "$(sed -n '3p' "$WORK_DIR/metadata")" = 279b7fa5e9912f9fe29a38efe0afcf19616a2ef9d681e58b2a80874ad8fa8e98 ]
+'''
+        harness = harness.replace("resolve_requested_package\n", resolver + "\nresolve_requested_package\n")
+        subprocess.run([BASH], input=harness, text=True, check=True)
 
     def test_invalid_selected_version_is_rejected_before_package_manager_access(self):
         result = subprocess.run(
