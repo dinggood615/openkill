@@ -1,6 +1,6 @@
 # Current status
 
-## 2026-10-02 2026-1209 TUN 防火墙 DNS 转发与网络分流页面（候选验收完成，正式发布待执行）
+## 2026-10-02 2026-1209 TUN 防火墙 DNS 转发与网络分流页面（正式验收完成）
 
 - 本轮重新核实此前 `2026-1208` 正式包和工作区，代码修复提交为
   `9804301508b0ff971f9de8090b82ff24c7e2a9ae`，随后补充合同测试修复提交为
@@ -41,9 +41,27 @@
   来取得 UDP/TCP 53 转发计数；因此“客户端实际穿过防火墙转发”的设备证据仍标记为未验证，
   没有用本机 Fake-IP 或 HTTP 200 冒充该项。Chrome/LuCI 视觉逐页会话在当前工具环境中
   不可见，真实浏览器验收同样标记为未验证；源码合同与设备规则检查已完成。
-- 目前尚未触发 Formal Release；必须以包含本记录的最终源提交重新通过 Development CI，
-  再构建候选并按仓库门禁发布。正式包安装后还需复验包版本、模式切换和服务状态；未完成前
-  不宣称本轮发布闭环。
+- Formal Release `36967214614` 成功：
+  https://github.com/dinggood615/openkill/actions/runs/36967214614 。正式标签与 Release
+  为 `v2026-1209-ipk`，源提交为 `2dbdd95d4e4509d9df9316dc1e2269b0e28eab65`：
+  https://github.com/dinggood615/openkill/releases/tag/v2026-1209-ipk 。正式 IPK
+  `luci-app-openkill_2026-1209_all.ipk` 大小 7,925,234 bytes，SHA256
+  `d13b92a55d7d3d57c2deb40953f7ff4b4afb54a7937327e08311e8be73f78152`；正式包与候选包
+  因构建时间元数据不同分别记录哈希，未声称二者相同。正式 Release 的修复说明、升级和
+  回滚说明已随 `docs/release/notes/2026-1209.md` 发布。
+- 正式 IPK 已在 `192.168.1.103` 使用 `opkg --force-reinstall` 实际安装，`opkg` 显示
+  `2026-1209`；安装后的 `/etc/init.d/openkill` 和
+  `/usr/share/openkill/openkill_config_normalize.sh` SHA256 分别为
+  `87817b52c3b6caae27f44e8570eb70e1b0fc54094a2f3c29fbdd395f93b9c950` 与
+  `949c3a7b4b10cf5320749c198b779a1a8319d644c9d57812cc36708086696e80`，与正式包解包内容
+  一致。安装维护脚本保留了现有 conffile、YAML、Naive 数据和节点；安装后的 mode 2
+  重定向及 HTTPS 冒烟通过，随后恢复用户原先的 mode 1，当前核心进程仍在运行且 mode 2
+  专用链已清理、mode 1 规则保留。
+- 正式包的四次实际 HTTPS 冒烟（两个目标各两轮）均退出码 0、HTTP 200；候选包阶段已
+  完成两个目标各三轮。正式包安装前后的规则切换和重复 reload 均未发现重复跳转或新增
+  崩溃。Chrome/LuCI 真实视觉页面仍受当前工具会话不可见限制，源码/设备规则与安装包
+  验收不能替代该项；独立 LAN 客户端 DNS UDP/TCP 计数也因测试电脑网关不是
+  `192.168.1.103` 而标记未验证。
 
 ## 2026-10-02 2026-1208 严格 DNS 启动重试与 Mihomo v1.19.32 正式包验收
 
