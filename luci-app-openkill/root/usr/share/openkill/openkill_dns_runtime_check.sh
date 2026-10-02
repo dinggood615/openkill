@@ -41,17 +41,21 @@ case "$CONTROLLER" in
   \[::\]:*) CONTROLLER="[::1]:${CONTROLLER#*]:}" ;;
 esac
 
-profile_ok="$(ruby -ryaml -e '
+profile_ok="$(ruby -ryaml -I /usr/share/openkill -e '
 begin
+  require "dns_privacy"
   v=YAML.load_file(ARGV.fetch(0)); d=v["dns"] || {}
   enc=lambda{|x| x.to_s.match?(/\A(?:https|tls|quic|h3):\/\//i)}
   ns=Array(d["nameserver"])+Array(d["fallback"])
   groups=Array(v["proxy-groups"]); name=ARGV.fetch(1)
   g=groups.find{|x| x.is_a?(Hash) && x["name"].to_s==name}
   members=Array(g && g["proxies"])
-  concrete=members.any?{|m| Array(v["proxies"]).any?{|p| p.is_a?(Hash) && p["name"].to_s==m.to_s}}
+  provider_names=(v["proxy-providers"].is_a?(Hash) ? v["proxy-providers"].keys.map(&:to_s) : [])
+  provider_members=Array(g && g["use"]).any?{|m| provider_names.include?(m.to_s)}
+  concrete=members.any?{|m| Array(v["proxies"]).any?{|p| p.is_a?(Hash) && p["name"].to_s==m.to_s}} || provider_members
   safe=members.none?{|m| %w[DIRECT REJECT GLOBAL COMPATIBLE PASS].include?(m.to_s)}
-  ok=!ns.empty? && ns.all?{|x| enc.call(x) && x.to_s.end_with?("##{name}")} && concrete && safe && Array(d["default-nameserver"]).all?{|x| enc.call(x)} && Array(d["proxy-server-nameserver"]).all?{|x| enc.call(x)}
+  routed=ns.all?{|x| OpenKillDnsPrivacy.strict_routed?(x, name)}
+  ok=!ns.empty? && ns.all?{|x| enc.call(x)} && routed && concrete && safe && Array(d["default-nameserver"]).all?{|x| enc.call(x)} && Array(d["proxy-server-nameserver"]).all?{|x| enc.call(x)}
   puts(ok ? "1" : "0")
 rescue Exception
   puts "0"
@@ -70,16 +74,28 @@ http_code="$(curl --noproxy '*' --silent --show-error --connect-timeout 3 --max-
 if [ "$http_code" != 200 ]; then
   fail controller-query-http "$CONFIG_HASH" 7
 fi
-query_status="$(ruby -rjson -e '
-begin
-  value=JSON.parse(File.read(ARGV.fetch(0)))
-  status=value["Status"]
-  raise "missing status" unless status.is_a?(Integer)
-  puts status
-rescue Exception
-  exit 1
-end
-' "$WORK/body" 2>/dev/null)" || fail controller-query-malformed "$CONFIG_HASH" 7
+# jsonfilter is part of the package's required OpenWrt runtime and avoids
+# making the strict-DNS readiness path depend on the optional ruby-json
+# extension.  Keep a Ruby fallback for development images that omit
+# jsonfilter, but never treat a missing parser as a successful query.
+query_status=""
+if command -v jsonfilter >/dev/null 2>&1; then
+  query_status="$(jsonfilter -i "$WORK/body" -e '@.Status' 2>/dev/null | sed -n '1p')"
+else
+  query_status="$(ruby -rjson -e '
+  begin
+    value=JSON.parse(File.read(ARGV.fetch(0)))
+    status=value["Status"]
+    raise "missing status" unless status.is_a?(Integer)
+    puts status
+  rescue Exception
+    exit 1
+  end
+  ' "$WORK/body" 2>/dev/null)"
+fi
+case "$query_status" in
+  ''|*[!0-9]*) fail controller-query-malformed "$CONFIG_HASH" 7 ;;
+esac
 case "$query_status" in
   0) ;;
   3) fail controller-query-nxdomain "$CONFIG_HASH" 7 ;;
@@ -89,6 +105,6 @@ esac
 
 now="$(date +%s)"
 tmp="${STATE_FILE}.$$"
-printf 'mode=strict\nconfigured=1\neffective=1\nruntime_verified=1\nordinary_encrypted=1\nbootstrap_exception=0\nreason=runtime-query-and-profile-verified\nconfig_sha256=%s\nchecked_at=%s\n' "$CONFIG_HASH" "$now" > "$tmp" || exit 8
+printf 'mode=strict\nconfigured=1\neffective=1\nruntime_verified=1\nordinary_encrypted=1\nbootstrap_exception=1\nreason=runtime-query-and-profile-verified\nconfig_sha256=%s\nchecked_at=%s\n' "$CONFIG_HASH" "$now" > "$tmp" || exit 8
 mv "$tmp" "$STATE_FILE" || exit 9
 exit 0

@@ -399,6 +399,13 @@ class DualStackRoutingTests(unittest.TestCase):
         self.assertIn('JSON.parse', checker)
         self.assertIn('runtime_verified=0', checker)
 
+    def test_strict_dns_runtime_checker_uses_required_jsonfilter_without_ruby_json(self):
+        checker = (SHARE / 'openkill_dns_runtime_check.sh').read_text(encoding='utf-8')
+        self.assertIn('command -v jsonfilter', checker)
+        self.assertIn("jsonfilter -i \"$WORK/body\" -e '@.Status'", checker)
+        self.assertIn('require "dns_privacy"', checker)
+        self.assertIn('OpenKillDnsPrivacy.strict_routed?', checker)
+
     def test_strict_dns_generation_uses_a_single_route_selector(self):
         change = (SHARE / 'yml_change.sh').read_text(encoding='utf-8')
         privacy = (SHARE / 'dns_privacy.rb').read_text(encoding='utf-8')

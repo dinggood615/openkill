@@ -55,8 +55,11 @@ module OpenKillDnsPrivacy
       raise ArgumentError, 'Invalid DNS group name' unless group.match?(/\A[A-Za-z0-9_-]{1,64}\z/)
       groups = value['proxy-groups'] ||= []
       raise ArgumentError, 'DNS group name conflicts with existing profile' if groups.any? { |g| g['name'] == group } || Array(value['proxies']).any? { |p| p['name'] == group }
-      # Only concrete nodes: no nested groups, providers or implicit DIRECT.
-      # Provider-only profiles require explicit materialization before strict mode.
+      # Keep concrete nodes and provider-backed profiles eligible.  Nested
+      # groups and implicit DIRECT are intentionally not copied into the
+      # managed DNS group, because they can re-introduce a routing loop or a
+      # silent clear-text fallback.  Provider names are attached with Mihomo's
+      # documented `use` field and are checked again by the runtime verifier.
       nodes = Array(value['proxies']).select do |p|
         p.is_a?(Hash) && !p['name'].to_s.empty? &&
           !%w[direct reject dns].include?(p['type'].to_s.downcase) &&
@@ -64,8 +67,12 @@ module OpenKillDnsPrivacy
           !p['server'].to_s.match?(/\A(?:localhost|127\.|::1|\[::1\])/i) &&
           p['dialer-proxy'].to_s.empty?
       end.map { |p| p['name'] }.uniq
-      raise ArgumentError, 'Strict DNS requires concrete proxy nodes without dialer dependencies' if nodes.empty?
-      groups << {'name'=>group, 'type'=>'select', 'proxies'=>nodes}
+      providers = value['proxy-providers'].is_a?(Hash) ? value['proxy-providers'].keys.map(&:to_s).reject(&:empty?).uniq : []
+      raise ArgumentError, 'Strict DNS requires at least one concrete proxy node or proxy provider' if nodes.empty? && providers.empty?
+      managed = {'name'=>group, 'type'=>'select'}
+      managed['proxies'] = nodes unless nodes.empty?
+      managed['use'] = providers unless providers.empty?
+      groups << managed
       %w[nameserver fallback direct-nameserver].each do |key|
         next unless dns.key?(key)
         dns[key] = Array(dns[key]).map { |s| upstream(s, group) }.uniq

@@ -61,4 +61,17 @@ class DnsPrivacyTest < Minitest::Test
     OpenKillDnsPrivacy.apply(v,'strict','OpenKill-DNS')
     assert_equal ['fixture'],v['proxy-groups'].last['proxies']
   end
+
+  def test_provider_backed_profile_uses_provider_without_inventing_direct
+    v = profile
+    v['proxies'] = []
+    v['proxy-providers'] = {
+      'subscription' => {'type' => 'file', 'path' => './proxy_provider/subscription.yaml'}
+    }
+    OpenKillDnsPrivacy.apply(v, 'strict', 'OpenKill-DNS')
+    managed = v['proxy-groups'].last
+    assert_equal ['subscription'], managed['use']
+    assert_nil managed['proxies']
+    assert_equal ['https://dns.example/dns-query#OpenKill-DNS'], v['dns']['nameserver']
+  end
 end

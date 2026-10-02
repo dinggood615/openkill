@@ -1203,7 +1203,12 @@ ensure
          # when the source profile supplies default-nameserver instead of
          # proxy-server-nameserver.
          bootstrap_servers = Array(dns_value['proxy-server-nameserver']) + Array(dns_value['default-nameserver'])
-         bootstrap_exception = bootstrap_servers.any? { |server| !encrypted_dns.call(server) }
+         # Strict mode deliberately uses direct, certificate-verified
+         # encrypted bootstrap endpoints to resolve proxy/DoH hostnames before
+         # the managed DNS group is usable.  This is a routing exception even
+         # though the transport itself remains encrypted; expose it honestly
+         # in diagnostics instead of calling it a fully proxied path.
+         bootstrap_exception = '$dns_privacy_mode' == 'strict' && !bootstrap_servers.empty?
          reason = if configured
                     'generated-not-runtime-verified'
                   elsif effective
