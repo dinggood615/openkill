@@ -4,7 +4,7 @@ config openkill 'config'
 	# marker is informational and lets migrations distinguish the fresh-install
 	# profile from a user's explicit settings.
 	option default_profile 'performance-dual-stack'
-	option default_profile_version '2026-2004'
+	option default_profile_version '2026-2005'
 	option remote_service_bypass '0'
 	# Fresh installs use the audited dual-stack performance profile. Existing
 	# conffiles keep their explicit profile during upgrades.

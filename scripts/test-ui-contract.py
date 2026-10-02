@@ -198,6 +198,9 @@ class LuCIContractTests(unittest.TestCase):
         self.assertIn("function findNetworkPanel(map, tabItems)", theme)
         self.assertIn("function retrySourceTrafficMount(map, tabItems)", theme)
         self.assertIn("window.setTimeout(function() { retrySourceTrafficMount(map, tabItems); }, 900);", theme)
+        self.assertIn("!target.contains(candidateBody)", theme)
+        self.assertIn("target.contains(destination)", theme)
+        self.assertIn("!destination.contains(target)", theme)
         self.assertIn("cell.setAttribute('data-source-label', '操作');", theme)
         self.assertIn("data-openkill-traffic-card=\"source-traffic\"", css)
         self.assertIn("grid-template-columns: repeat(2, minmax(0, 1fr));", css)
@@ -220,9 +223,9 @@ class LuCIContractTests(unittest.TestCase):
         self.assertIn("align-items: start;", css)
         self.assertIn("height: auto;", css)
         self.assertIn("option default_profile 'performance-dual-stack'", config)
-        self.assertIn("option default_profile_version '2026-2004'", config)
+        self.assertIn("option default_profile_version '2026-2005'", config)
         self.assertIn("set_default default_profile performance-dual-stack", normalizer)
-        self.assertIn("set_default default_profile_version 2026-2004", normalizer)
+        self.assertIn("set_default default_profile_version 2026-2005", normalizer)
 
     def test_security_cards_use_binary_states_and_no_unresolved_banner(self) -> None:
         source = STATUS.read_text(encoding="utf-8")

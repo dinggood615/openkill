@@ -2,19 +2,19 @@
 
 OpenKill 是面向 OpenWrt 的轻量化 Mihomo（Meta）客户端 LuCI 插件，基于 OpenClash 兼容架构重构，提供稳定的代理接管、规则分流、双栈 DNS/IPv6 与可回滚运行管理。
 
-当前版本：`2026-2004`
+当前版本：`2026-2005`
 
 ## 一键安装
 
 每条命令都是独立的一行，可直接复制。默认安装最新正式版；指定版本时会从对应
-Release 下载并校验 SHA256。把示例中的 `2026-2004` 替换为需要的正式版本号。
+Release 下载并校验 SHA256。把示例中的 `2026-2005` 替换为需要的正式版本号。
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh -s -- --install
 ```
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh -s -- --install --version 2026-2004
+curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh -s -- --install --version 2026-2005
 ```
 
 ```sh

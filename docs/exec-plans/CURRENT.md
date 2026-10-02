@@ -1,5 +1,13 @@
 # Current status
 
+## 2026-10-02 来源规则重复挂载保护（2026-2005，待候选/正式设备验收）
+
+- 2026-2004 正式包的真实 LuCI 验收确认：来源流量规则已经位于“流量转发”卡片，纵向字段和七个设置页可见；但浏览器控制台记录了延迟挂载重试期间的 `HierarchyRequestError`。根因是挂载选择只比较直接父节点，未阻止目标规则 section 包含候选卡片 body 时的祖先/后代 `appendChild`。
+- `settings_theme.htm` 现在筛选不位于目标 section 内的 traffic card body，并在挂载前检查 `target.contains(destination)`、`destination.contains(target)`，保持原始 CBI section 单实例、字段、排序和提交钩子不变。该保护只影响 DOM 呈现，不改变 DNS、NaiveProxy、WAN、TUN 或服务生命周期。
+- 版本已提升为 `2026-2005`，同步 Makefile、短安装器、README、默认 profile 标记、归一化脚本和发布说明；默认配置仍是设备无关的 `performance-dual-stack`，不包含节点、订阅、密码、用户 YAML、设备地址或个人规则。
+- 本地验证：LuCI 合同 35 项、预览 2 项、交互 1 项、浏览器模板检查通过；WSL 安装器 17 项和 `scripts/local-gate.sh` 通过。下一步必须用精确源提交构建候选，安装到测试机，复验控制台无新增脚本错误后才可发布。
+- 验收条件：来源规则仍只在“流量转发”卡片中出现；初始化、260/900ms 重试均无 DOM 异常；七页切换、纵向规则字段、升级/重装保留和正式包安装通过。
+
 ## 2026-10-02 七页设置卡片节奏、来源规则纵向编辑与安全默认配置（2026-2004，待候选/正式设备包验收）
 
 - 本轮范围限定为 LuCI 页面结构、OpenKill 页面 CSS/模板以及全新安装默认配置标记；不改变

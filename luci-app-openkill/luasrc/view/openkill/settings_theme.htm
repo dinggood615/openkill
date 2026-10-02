@@ -429,7 +429,20 @@
          * cardification and move the original CBI section into that card
          * body.  The section is moved, never cloned, so LuCI keeps its
          * existing names, ids, validation and submit hooks. */
-        var trafficCard = networkPanel.querySelector('[data-openkill-card="traffic-routing"]');
+        var trafficCard = null;
+        var trafficCards = networkPanel.querySelectorAll('[data-openkill-card="traffic-routing"]');
+        /* A delayed retry can run while a theme is still moving the CBI
+         * section.  Select only a body that is not inside the section being
+         * moved; appending an ancestor to its own descendant raises a
+         * HierarchyRequestError and leaves the mount half-complete. */
+        for (var tc = 0; tc < trafficCards.length; tc++) {
+            var candidateCard = trafficCards[tc];
+            var candidateBody = candidateCard.querySelector('.openkill-settings-card-body');
+            if (candidateBody && candidateBody !== target && !target.contains(candidateBody)) {
+                trafficCard = candidateCard;
+                break;
+            }
+        }
         /* The first paint may happen before the hidden network panel has been
          * cardified.  Do not move the section to an anonymous root in that
          * case; a later bounded retry will resolve the real card. */
@@ -439,8 +452,8 @@
          * fields are hidden by a device-specific dependency.  Never fall
          * back to the tab root: that was the reason the source-rule table
          * appeared as a separate wide section in some LuCI renders. */
-        if (!destination) return;
-        if (target.parentNode !== destination) destination.appendChild(target);
+        if (!destination || destination === target || target.contains(destination)) return;
+        if (!destination.contains(target)) destination.appendChild(target);
         target.classList.add('openkill-network-only-section');
         target.setAttribute('data-openkill-network-card', 'source-traffic');
         target.setAttribute('data-openkill-traffic-card', 'source-traffic');
