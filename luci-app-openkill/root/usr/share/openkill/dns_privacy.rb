@@ -37,7 +37,7 @@ module OpenKillDnsPrivacy
     # replaced by the strict dedicated group. Any other selector can mean a
     # user-selected group or an egress interface; replacing it would alter
     # routing semantics, so fail with a precise reason.
-    if selector && !selector.casecmp?('RULES')
+    if selector && selector != group && !selector.casecmp?('RULES')
       raise ArgumentError, 'Strict DNS conflicts with an explicit upstream selector'
     end
     [base, ([group] + parameters).join('&')].join('#')
@@ -73,6 +73,14 @@ module OpenKillDnsPrivacy
       managed['proxies'] = nodes unless nodes.empty?
       managed['use'] = providers unless providers.empty?
       groups << managed
+      # DIRECT describes the business connection, not its DNS transport.
+      # Re-resolve direct exits with a domestic encrypted resolver for local
+      # CDN answers, while still binding that resolver to the privacy group.
+      # Never change rules or the global traffic mode to achieve DNS privacy.
+      if !dns.key?('direct-nameserver') || Array(dns['direct-nameserver']).empty?
+        dns['direct-nameserver'] = ['https://223.5.5.5/dns-query']
+        dns['direct-nameserver-follow-policy'] = false
+      end
       %w[nameserver fallback direct-nameserver].each do |key|
         next unless dns.key?(key)
         dns[key] = Array(dns[key]).map { |s| upstream(s, group) }.uniq

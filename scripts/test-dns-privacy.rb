@@ -2,6 +2,22 @@ require 'minitest/autorun'
 require_relative '../luci-app-openkill/root/usr/share/openkill/dns_privacy'
 
 class DnsPrivacyTest < Minitest::Test
+  def test_strict_dns_preserves_business_routing_and_local_direct_resolution
+    v=profile
+    v['mode']='rule'
+    v['rules']=['GEOSITE,cn,DIRECT','GEOIP,CN,DIRECT','MATCH,existing']
+    rules=v['rules'].dup
+    OpenKillDnsPrivacy.apply(v,'strict','OpenKill-DNS')
+    assert_equal rules,v['rules']
+    assert_equal 'rule',v['mode']
+    assert_equal ['https://223.5.5.5/dns-query#OpenKill-DNS'],v['dns']['direct-nameserver']
+    assert_equal false,v['dns']['direct-nameserver-follow-policy']
+  end
+
+  def test_existing_strict_selector_is_accepted_for_regeneration
+    assert_equal 'https://dns.example/dns-query#OpenKill-DNS&h3=true',
+      OpenKillDnsPrivacy.upstream('https://dns.example/dns-query#OpenKill-DNS&h3=true','OpenKill-DNS')
+  end
   def profile
     {'proxies'=>[{'name'=>'fixture','type'=>'ss','server'=>'192.0.2.1'}],
      'proxy-groups'=>[{'name'=>'existing','type'=>'select','proxies'=>['DIRECT','fixture']}],
