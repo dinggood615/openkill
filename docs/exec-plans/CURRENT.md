@@ -1,6 +1,6 @@
 # Current status
 
-## 2026-10-02 来源规则卡片与运行状态契约（进行中）
+## 2026-10-02 来源规则卡片与运行状态契约（已完成代码/发布，设备验收受门禁限制）
 
 - 基线已核对：工作区 HEAD 为 `a38812296ebecf3667dff4e34d86321877d1de45`，分支为
   `master`，仅保留既有未跟踪 `.rc-*` 审计目录；正式版本为 `2026-2000`。
@@ -14,9 +14,21 @@
 - 验收条件：规则只在“流量转发”卡片中出现且可新增/编辑/删除/排序/保存；五项卡片
   在可靠数据时只显示“已开启/已关闭”，首次无数据保留加载占位，失败不把未知伪装为关闭；
   桌面/窄屏/主题/缩放布局无溢出；自动化门禁通过。
-- 设备与浏览器验收按 `AGENTS.md` 当前边界暂缓：设备访问、包安装及真实 LuCI 会话
-  不在本迭代可执行范围；完成本地实现和精确提交 CI 后，保留该外部验证缺口并在发布说明
-  中明确，不以本地合同测试冒充设备证据。
+- 本地运行时、LuCI 合同、预览/浏览器模板、交互、安装器和 `sh scripts/local-gate.sh`
+  均通过；精确源提交为 `49ca6119d45d86304db94c186cedcc0ebe6dceb8`，Development CI
+  `36981707689` 成功：https://github.com/dinggood615/openkill/actions/runs/36981707689 。
+- RC Build `36981982191` 成功：https://github.com/dinggood615/openkill/actions/runs/36981982191 ，
+  候选 IPK `luci-app-openkill_2026-2001_all.ipk` 为 7,726,116 字节，SHA256
+  `1d2df8d9ab90d839ddda7118634afa6c4cfbc677a38e7f5a9e1a06abc2b05b2a`；包审计通过，未发现
+  个人节点、订阅或测试机数据。
+- Formal Release `36982377524` 成功：https://github.com/dinggood615/openkill/actions/runs/36982377524 ，
+  正式标签/Release 为 `v2026-2001-ipk`：
+  https://github.com/dinggood615/openkill/releases/tag/v2026-2001-ipk 。正式 IPK 为
+  7,927,584 字节，SHA256 `59f476c358e759ca9543238d68755f3461d1a0e7be102a26c18d37b67a7ca63e`，
+  package channel 已同步同一版本、提交、下载地址和哈希。
+- 按 `AGENTS.md` 当前边界，设备访问、正式包安装、真实 LuCI 会话/视觉验收和实际设备
+  规则编辑仍禁止执行；不能将本地合同/模板结果描述为测试机验收。设备恢复授权后，需用
+  正式 IPK 验证来源规则 CRUD/排序、五项状态与真实只读证据、主题/缩放/窄屏，并记录结果。
 
 ## 2026-10-02 安装器说明与精确版本安装（已完成）
 
