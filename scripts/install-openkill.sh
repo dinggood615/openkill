@@ -52,6 +52,7 @@ if [ -n "$REQUESTED_VERSION" ]; then
     *) die "Invalid version: $REQUESTED_VERSION (expected YYYY-NNNN)" ;;
   esac
   [ "$ACTION" != uninstall ] || die "--version cannot be used with --uninstall"
+  [ -z "$PACKAGE_FILE" ] || die "--version cannot be used with --package-file"
 fi
 if [ "$ORIGINAL_ARGS" -eq 0 ]; then
   if [ -r /dev/tty ]; then
