@@ -1,6 +1,6 @@
 # Current status
 
-## 2026-10-02 安装器说明与精确版本安装（进行中）
+## 2026-10-02 安装器说明与精确版本安装（已完成）
 
 - README 的一键安装说明改为每条命令独立代码块，保留安装、更新和卸载入口，补充
   `--install --version YYYY-NNNN` 的精确版本示例并说明版本替换规则。
@@ -12,7 +12,11 @@
   精确提交 Development CI 后再交付。正式包发布仅在版本门禁明确要求时进行。
 - WSL 本地门禁已通过：`scripts/local-gate.sh`（preflight、源码校验、CI 分离、DNS 语义）以及
   安装器的 17 项主机测试均通过；Windows 直接调用 Linux shell 的失败仅为宿主路径/换行限制，
-  未计入结果。下一步为提交本次安装器与 README 变更并验证精确提交的 Development CI。
+  未计入结果。
+- 实现提交为 `fcd8926f4849ad888a898860dd8a4f9a41bc4a56`，其 Development CI
+  `36978335137` 已成功：
+  https://github.com/dinggood615/openkill/actions/runs/36978335137 。本轮不需要重建或覆盖
+  `2026-2000` 正式包：短入口直接读取 `master` 安装器，且没有改变包内运行时代码或版本门禁。
 
 ## 2026-10-02 2026-2000 大版本适配（正式发布完成，保留数据面限制）
 
