@@ -1,14 +1,19 @@
 # Current status
 
-## 2026-10-02 来源规则重复挂载保护（2026-2005，待候选/正式设备验收）
+## 2026-10-02 来源规则重复挂载保护（2026-2005，正式发布与设备验收完成）
 
 - 2026-2004 正式包的真实 LuCI 验收确认：来源流量规则已经位于“流量转发”卡片，纵向字段和七个设置页可见；但浏览器控制台记录了延迟挂载重试期间的 `HierarchyRequestError`。根因是挂载选择只比较直接父节点，未阻止目标规则 section 包含候选卡片 body 时的祖先/后代 `appendChild`。
 - `settings_theme.htm` 现在筛选不位于目标 section 内的 traffic card body，并在挂载前检查 `target.contains(destination)`、`destination.contains(target)`，保持原始 CBI section 单实例、字段、排序和提交钩子不变。该保护只影响 DOM 呈现，不改变 DNS、NaiveProxy、WAN、TUN 或服务生命周期。
 - 版本已提升为 `2026-2005`，同步 Makefile、短安装器、README、默认 profile 标记、归一化脚本和发布说明；默认配置仍是设备无关的 `performance-dual-stack`，不包含节点、订阅、密码、用户 YAML、设备地址或个人规则。
-- 本地验证：LuCI 合同 35 项、预览 2 项、交互 1 项、浏览器模板检查通过；WSL 运行时 38 项、安装器 17 项和 `scripts/local-gate.sh` 通过。首个 Development CI 因 `scripts/test-runtime.py` 仍断言旧的单卡片查询字符串而失败，已将回归断言同步到稳定的 `querySelectorAll`/祖先保护契约；该失败不代表运行时代码失败，修正后须等待新的精确提交 CI。
-- 验收条件：来源规则仍只在“流量转发”卡片中出现；初始化、260/900ms 重试均无 DOM 异常；七页切换、纵向规则字段、升级/重装保留和正式包安装通过。
+- 本地验证：LuCI 合同 35 项、预览 2 项、交互 1 项、浏览器模板检查通过；WSL 运行时 38 项、安装器 17 项和 `scripts/local-gate.sh` 通过。首个 Development CI 因 `scripts/test-runtime.py` 仍断言旧的单卡片查询字符串而失败，已将回归断言同步到稳定的 `querySelectorAll`/祖先保护契约；精确修正提交 `c5ed2c2f6c14cd142311efab47744d7b6b9704ed` 的 Development CI `36993285634` 成功： https://github.com/dinggood615/openkill/actions/runs/36993285634 。
+- RC Build `36993622339` 成功： https://github.com/dinggood615/openkill/actions/runs/36993622339 。候选 IPK `luci-app-openkill_2026-2005_all.ipk` 为 7,728,557 字节，SHA256 `130795ed8c2819714a28dfc64ab7831c1df98a3c55e610231d5cc1824c199a65`；包元数据、conffile 保留、维护脚本持久化删除审计和敏感/测试机数据扫描通过。
+- 候选包强制重装到授权测试机后，opkg 版本为 `2026-2005`、返回码为 0，`/etc/config/openkill` 保留且权限为 600；OpenKill 服务由 procd 报告 running，Mihomo Meta 为 v1.19.32。正式 IPK 也以受保护备份为基线完成强制重装，返回码为 0，版本、服务、核心和配置保留结果一致。备份位于设备 `/root/openkill-backup-20261002/openkill-state.tar.gz`，目录 700、归档 600，最终归档 SHA256 `2761e495c9138d6d0589e082f64396e251bf415ae460260070a16742f9c1f13b`。
+- 真实 LuCI（正式包）逐项切换七个设置页均显示对应唯一面板；“网络与分流”中的“流量转发”包含唯一“来源流量规则” section，规则字段数 16、实际编辑行 `display:grid`、桌面列为 `355px 355px`、宽度 748px。页面加载及七页切换后，以测试开始时间为界新增 JavaScript 错误为 0；此前 2026-2004 会话中的旧错误不再作为当前结论。浏览器验收使用已登录 LuCI 会话完成，不改变用户配置或网络策略。
+- Formal Release `36994162314` 成功： https://github.com/dinggood615/openkill/actions/runs/36994162314 。正式标签/Release 为 `v2026-2005-ipk`： https://github.com/dinggood615/openkill/releases/tag/v2026-2005-ipk ，源提交为 `c5ed2c2f6c14cd142311efab47744d7b6b9704ed`。正式 IPK 为 7,930,268 字节，SHA256 `e3c7e00925b5f11a65d2fd894feadf6a1a3b4d687c81d6a46afbaa9dedf45d0b`；已在测试机再次强制重装并完成页面冒烟。RC 与正式包哈希分别记录，未把二者声称为相同。
+- 本轮不改变 DNS、NaiveProxy、WAN、TUN 或服务生命周期；安装维护脚本仍会输出历史 `Command failed: Not found` 提示，但两次正式/候选重装均以 opkg 返回码 0 完成，服务实际 running，不能把该提示误报为安装失败。
+- 验收结论：来源规则只在“流量转发”卡片中显示且无重复挂载异常；七页切换、纵向规则字段、默认 profile 标记、升级/同版本重装保留和正式包安装通过。默认 profile 为设备无关的 `performance-dual-stack`，不含节点、订阅、密码、用户 YAML、设备地址或个人规则。
 
-## 2026-10-02 七页设置卡片节奏、来源规则纵向编辑与安全默认配置（2026-2004，待候选/正式设备包验收）
+## 2026-10-02 七页设置卡片节奏、来源规则纵向编辑与安全默认配置（2026-2004，已由 2026-2005 取代）
 
 - 本轮范围限定为 LuCI 页面结构、OpenKill 页面 CSS/模板以及全新安装默认配置标记；不改变
   DNS、NaiveProxy 生命周期、WAN、TUN、路由或其他网络接管机制。
@@ -26,8 +31,8 @@
 - 本地 WSL 门禁已通过：`scripts/local-gate.sh`、运行时 38 项、UCI 生命周期 19 项、安装器
   17 项、LuCI 合同 35 项、预览/交互/浏览器模板检查均通过；Windows 直接调用 Linux shell 的
   失败属于宿主路径/换行限制，shell renderer 的 `/mnt//mnt` 路径失败同样是当前宿主测试夹具
-  路径转换问题，未作为代码结论。真实测试机候选包安装、规则 CRUD、七页逐项视觉验收和正式
-  包安装仍待本轮 RC/Release 流程完成，不能提前宣称已通过。
+  路径转换问题，未作为代码结论。2026-2004 的候选/正式安装已完成基本设备验证，但真实页面
+  会话随后发现重复挂载脚本错误；该问题已在 2026-2005 修复并重新走完 RC/正式门禁。
 - 验收条件：七个设置页卡片内容按字段自适应且无异常留白；来源规则只在“流量转发”卡片中
   显示、标题/全部选项/添加按钮可见且保存重读不丢字段；干净安装只得到通用默认值，升级和
   重装不覆盖用户配置；候选和正式包分别审计权限、脚本、敏感数据污染与 SHA256。
