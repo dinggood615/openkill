@@ -6,20 +6,28 @@ OpenKill 是面向 OpenWrt 的轻量化 Mihomo（Meta）客户端 LuCI 插件，
 
 ## 一键安装
 
-每条命令都是独立的一行，可直接复制。默认安装最新正式版；指定版本时会从对应
-Release 下载并校验 SHA256。把示例中的 `2026-2011` 替换为需要的正式版本号。
+每条命令都是独立的一行，可直接复制。第一条命令会打开一键操作菜单，可选择安装、更新
+或卸载；也可以直接执行下面对应的操作命令。安装器会从最新正式版下载并校验 SHA256。
+
+选择操作（安装、更新或卸载）：
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh
+```
+
+直接安装或修复：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh -s -- --install
 ```
 
-```sh
-curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh -s -- --install --version 2026-2011
-```
+直接更新软件包和内核：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh -s -- --update
 ```
+
+直接卸载并清理 OpenKill 数据：
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/dinggood615/openkill/master/i | sh -s -- --uninstall
