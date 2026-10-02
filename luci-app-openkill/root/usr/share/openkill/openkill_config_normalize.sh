@@ -18,8 +18,14 @@ set_default() {
 set_default en_mode fake-ip
 set_default proxy_mode rule
 set_default find_process_mode off
-set_default geodata_loader memconservative
+set_default geodata_loader standard
 set_default enable_tcp_concurrent 1
+set_default ipv6_enable 1
+set_default ipv6_dns 1
+set_default ipv6_mode 2
+set_default stack_type mips
+set_default stack_type_v6 mips
+set_default tun_congestion_controller bbr3
 # Older conffiles can predate the log_level option.  An empty value is passed
 # to yml_change.sh as an explicit YAML scalar and Mihomo rejects it as an
 # invalid log level, so repair both missing and stale values before rendering.
@@ -35,7 +41,7 @@ case "$dns_privacy_mode" in split|strict) ;; *) uci -q set openkill.config.dns_p
 # Optional anti-AD integration is fail-closed: an invalid mode is disabled,
 # while an unavailable list keeps the last valid generated file.
 adblock_mode="$(uci -q get openkill.config.adblock_mode 2>/dev/null || true)"
-case "$adblock_mode" in off|standard|enhanced) ;; *) uci -q set openkill.config.adblock_mode=off; changed=1 ;; esac
+case "$adblock_mode" in off|standard|enhanced) ;; *) uci -q set openkill.config.adblock_mode=enhanced; changed=1 ;; esac
 adblock_rule_format="$(uci -q get openkill.config.adblock_rule_format 2>/dev/null || true)"
 # The local same-generation provider is emitted as YAML. MRS remains a
 # documented future capability until the target core's binary-provider ABI is
@@ -65,7 +71,7 @@ case "$openvpn_dns_mode" in inherit|conditional) ;; *) uci -q set openkill.confi
 # remain untouched in an upgraded conffile for migration/rollback, while a
 # fresh installation uses only the independent /etc/naiveproxy service.
 set_default enable_unified_delay 1
-set_default disable_udp_quic 0
+set_default disable_udp_quic 1
 
 # TUN ownership is a single mutually-exclusive mode.  Older installations
 # only have the two boolean-ish legacy fields.  Preserve the one unambiguous
@@ -142,14 +148,14 @@ if [ -z "$compatibility_profile" ]; then
     if [ "$tun_owner" = "mihomo" ]; then
         compatibility_profile=native
     else
-        compatibility_profile=stable
+        compatibility_profile=performance
     fi
     uci -q set openkill.config.compatibility_profile="$compatibility_profile"
     changed=1
 fi
 case "$compatibility_profile" in
     stable|performance|native) ;;
-    *) compatibility_profile=stable; uci -q set openkill.config.compatibility_profile=stable; changed=1 ;;
+    *) compatibility_profile=performance; uci -q set openkill.config.compatibility_profile=performance; changed=1 ;;
 esac
 case "$compatibility_profile" in
     native)
@@ -305,10 +311,10 @@ esac
 # The service performs the listener/firmware readiness check before reporting
 # success; normalization must preserve the user's selected mode instead of
 # silently changing it to dnsmasq and hiding an apply failure.
-dns_redirect_mode="$(uci -q get openkill.config.enable_redirect_dns 2>/dev/null || echo 1)"
+dns_redirect_mode="$(uci -q get openkill.config.enable_redirect_dns 2>/dev/null || echo 2)"
 case "$dns_redirect_mode" in
     0|1|2) ;;
-    *) uci -q set openkill.config.enable_redirect_dns=1; changed=1 ;;
+    *) uci -q set openkill.config.enable_redirect_dns=2; changed=1 ;;
 esac
 
 # A deleted panel must never remain selected.  Pick the first installed panel

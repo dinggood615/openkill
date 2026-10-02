@@ -183,6 +183,16 @@ class LuCIContractTests(unittest.TestCase):
         self.assertNotIn('contain: layout paint;', css)
         self.assertNotIn('content-visibility: auto;', css)
 
+    def test_source_traffic_rules_are_nested_in_traffic_routing_card(self) -> None:
+        theme = SETTINGS_THEME.read_text(encoding="utf-8")
+        css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css").read_text(encoding="utf-8")
+        self.assertIn("[data-openkill-card=\"traffic-routing\"]", theme)
+        self.assertIn(".openkill-settings-card-body", theme)
+        self.assertIn("target.setAttribute('data-openkill-traffic-card', 'source-traffic')", theme)
+        self.assertIn("data-openkill-traffic-card=\"source-traffic\"", css)
+        self.assertIn("Source addresses", (ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua").read_text(encoding="utf-8"))
+        self.assertIn("Source ports", (ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua").read_text(encoding="utf-8"))
+
     def test_dashboard_promotes_equal_width_entry_row_and_settings_grid(self) -> None:
         source = STATUS.read_text(encoding="utf-8")
         css = (ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css").read_text(encoding="utf-8")

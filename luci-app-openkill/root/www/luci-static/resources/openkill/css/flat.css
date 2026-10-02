@@ -842,6 +842,30 @@ body[data-page="admin-services-openkill-client"] .openkill-myip-page .myip-conte
     overflow: hidden;
 }
 
+/* Source rules are rendered inside the Traffic Routing card.  Keep the
+ * native TypedSection full-width inside that body without recreating the
+ * old standalone black panel or forcing the parent card wider than its
+ * siblings. */
+#cbi-openkill.openkill-settings [data-openkill-card="traffic-routing"]
+    .openkill-settings-card-body > .openkill-network-only-section[data-openkill-traffic-card="source-traffic"] {
+    width: 100%;
+    max-width: 100%;
+    margin: var(--ok-layout-card-gap, 12px) 0 0;
+    padding: 0;
+    border-top: 1px solid var(--ok-border-subtle);
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+#cbi-openkill.openkill-settings [data-openkill-card="traffic-routing"]
+    .openkill-settings-card-body > .openkill-network-only-section[data-openkill-traffic-card="source-traffic"] .cbi-section-title {
+    padding-top: var(--ok-layout-card-gap, 12px);
+}
+
 #cbi-openkill.openkill-settings .openkill-network-only-section[data-openkill-network-card="source-traffic"] .cbi-section-title {
     font-size: var(--ok-type-title, 1rem);
     font-weight: 700;

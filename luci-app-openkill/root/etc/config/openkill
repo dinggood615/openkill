@@ -1,7 +1,9 @@
 
 config openkill 'config'
 	option remote_service_bypass '0'
-	option compatibility_profile 'stable'
+	# Fresh installs use the audited dual-stack performance profile. Existing
+	# conffiles keep their explicit profile during upgrades.
+	option compatibility_profile 'performance'
 	# When native Mihomo takeover is requested but fw4 preflight fails, the
 	# service safely falls back to OpenKill ownership and records the effective
 	# mode for the status page instead of reporting a false native takeover.
@@ -34,10 +36,13 @@ config openkill 'config'
 	# public resolvers from ordinary query paths and fails closed to encrypted
 	# fallback. Node bootstrap remains an explicit, visible exception.
 	option dns_privacy_mode 'split'
-	# Ad blocking is independent from DNS privacy and proxy routing.  The
-	# standard profile uses anti-AD domain filtering plus a Mihomo rule provider;
-	# Both modes use one validated canonical domain generation for dnsmasq and Mihomo.
-	option adblock_mode 'off'
+	# Ad blocking is independent from DNS privacy and proxy routing. The fresh
+	# profile uses the enhanced anti-AD domain filter plus a Mihomo rule
+	# provider; both modes share one validated canonical generation.
+	# The bundled anti-AD provider is enabled for fresh installs after its
+	# source, cache and failure behaviour have been validated. No personal
+	# rules or domains are included.
+	option adblock_mode 'enhanced'
 	option adblock_rule_url 'https://anti-ad.net/domains.txt'
 	option adblock_rule_format 'yaml'
 	option adblock_dns_url 'https://anti-ad.net/domains.txt'
@@ -73,10 +78,10 @@ config openkill 'config'
 	# Filled by the first-boot UCI defaults script from the firmware ABI.
 	# Keeping this dynamic is required for arm/mips/rockchip installations.
 	option core_arch '0'
-	# Keep LAN IPv4/IPv6 DNS on dnsmasq by default.  The firewall-forwarding
-	# mode is an explicit opt-in and redirects client UDP/TCP 53 traffic to the
-	# verified Mihomo listener without changing this safe default.
-	option enable_redirect_dns '1'
+	# Firewall forwarding is the audited dual-stack default. It is scoped to
+	# OpenKill's verified local DNS listener and removed on stop/failure. Existing
+	# conffiles preserve an explicitly selected mode during upgrades.
+	option enable_redirect_dns '2'
 	option disable_masq_cache '1'
 	option log_level '0'
 	option proxy_mode 'rule'
@@ -87,9 +92,9 @@ config openkill 'config'
 	option enable_unified_delay '1'
 	option find_process_mode 'off'
 	option geodata_loader 'standard'
-	# Keep UDP/QUIC available for HTTP/3 and Hysteria2; users can still opt out
-	# from the UI when a specific ISP or firewall requires TCP-only routing.
-	option disable_udp_quic '0'
+	# The audited baseline disables QUIC UDP/443 to avoid common router/ISP
+	# interception failures; users can opt back in for HTTP/3/Hysteria2.
+	option disable_udp_quic '1'
 	option lan_ac_mode '0'
 	option operation_mode 'fake-ip'
 	option enable_rule_proxy '0'

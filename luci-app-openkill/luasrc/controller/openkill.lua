@@ -1567,7 +1567,7 @@ function action_status()
 		metacubexd = fs.isdirectory("/usr/share/openkill/ui/metacubexd"),
 		zashboard = fs.isdirectory("/usr/share/openkill/ui/zashboard"),
 		core_type = fs.uci_get_config("config", "core_type") or "Meta",
-		compatibility_profile = fs.uci_get_config("config", "compatibility_profile") or "stable",
+		compatibility_profile = fs.uci_get_config("config", "compatibility_profile") or "performance",
 		compatibility_fallback = fs.uci_get_config("config", "compatibility_fallback") == "1",
 		compatibility_fallback_reason = fs.uci_get_config("config", "compatibility_fallback_reason") or "",
 		tun_owner = fs.uci_get_config("config", "tun_owner") or "openkill",
@@ -1587,7 +1587,7 @@ function action_status()
 		dns_privacy_bootstrap_exception = dns_privacy_value("bootstrap_exception", "0") == "1",
 		dns_privacy_checked_at = dns_privacy_value("checked_at", "unknown"),
 		dns_privacy_config_sha256 = dns_privacy_value("config_sha256", "unknown"),
-		adblock_mode = fs.uci_get_config("config", "adblock_mode") or "off",
+		adblock_mode = fs.uci_get_config("config", "adblock_mode") or "enhanced",
 		adblock_rule_format = fs.uci_get_config("config", "adblock_rule_format") or "yaml",
 		adblock_dns_effective = adblock_effective == "1",
 		adblock_provider_effective = adblock_provider_effective == "1",
@@ -1648,7 +1648,7 @@ function action_status()
 		china_ip_route_effective_reason = state_value("reason", "not-started"),
 		watchdog_interval = fs.uci_get_config("config", "watchdog_interval") or "60",
 		find_process_mode = fs.uci_get_config("config", "find_process_mode") or "off",
-		geodata_loader = fs.uci_get_config("config", "geodata_loader") or "memconservative",
+		geodata_loader = fs.uci_get_config("config", "geodata_loader") or "standard",
 		-- run_mode
 		run_mode = mode(),
 		-- rule_mode

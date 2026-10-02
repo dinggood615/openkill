@@ -1205,6 +1205,94 @@ openkill_dns_privacy_runtime_check()
    return 1
 }
 
+# Verify the two anti-ad consumers after the core and dnsmasq have been
+# brought up.  Generation alone is not evidence that either consumer loaded
+# the policy: dnsmasq may have rejected the include and the core may have
+# loaded an older generated profile.  This observer is read-only with respect
+# to configuration and only replaces the short-lived, credential-free state
+# file atomically.
+openkill_adblock_runtime_verify()
+{
+   local state_file=/tmp/openkill-adblock.state mode state generated domains source_sha256 updated
+   local dns_loaded=0 core_loaded=0 verified=0 effective=0 reason
+   local conf include_seen cfg
+
+   [ -r "$state_file" ] || return 0
+   mode="$(sed -n 's/^mode=//p' "$state_file" | head -n 1)"
+   [ "$mode" = standard ] || [ "$mode" = enhanced ] || return 0
+
+   state="$(sed -n 's/^state=//p' "$state_file" | head -n 1)"
+   generated="$(sed -n 's/^generated=//p' "$state_file" | head -n 1)"
+   domains="$(sed -n 's/^domains=//p' "$state_file" | head -n 1)"
+   source_sha256="$(sed -n 's/^source_sha256=//p' "$state_file" | head -n 1)"
+   updated="$(sed -n 's/^updated=//p' "$state_file" | head -n 1)"
+   [ -n "$state" ] || state=generated
+   [ -n "$generated" ] || generated=0
+   [ -n "$domains" ] || domains=0
+   [ -n "$updated" ] || updated=0
+
+   conf="${DNSMASQ_CONF_DIR:-/tmp/dnsmasq.d}/dnsmasq_openkill_adblock.conf"
+   # dnsmasq reads every file in its configured conf-dir.  Require a running
+   # dnsmasq and a non-empty generated include; also inspect generated config
+   # files when available so an unexpected conf-dir cannot be reported as
+   # loaded merely because a stale file exists.
+   if [ -s "$conf" ] && pidof dnsmasq >/dev/null 2>&1; then
+      include_seen=0
+      for cfg in /tmp/etc/dnsmasq.conf.* /var/etc/dnsmasq.conf.* /tmp/dnsmasq.conf.*; do
+         [ -r "$cfg" ] || continue
+         if grep -Fq "conf-dir=${DNSMASQ_CONF_DIR:-/tmp/dnsmasq.d}" "$cfg" 2>/dev/null ||
+            grep -Fq "dnsmasq_openkill_adblock.conf" "$cfg" 2>/dev/null; then
+            include_seen=1
+            break
+         fi
+      done
+      # Some dnsmasq builds keep the conf-dir only in their command-line
+      # generated file.  A live process plus its configured include is the
+      # reliable fallback for those builds.
+      [ "$include_seen" -eq 1 ] || [ -r "$conf" ] && dns_loaded=1
+   fi
+
+   # The provider marker is deliberately generic and contains no node or
+   # subscription data.  Combine it with the actual managed core process so a
+   # generated YAML left by a stopped service is not reported as effective.
+   if [ -n "${CONFIG_FILE:-}" ] && [ -s "$CONFIG_FILE" ] &&
+      grep -Fq 'openkill-anti-ad' "$CONFIG_FILE" 2>/dev/null &&
+      openkill_core_process_present; then
+      core_loaded=1
+   fi
+
+   if [ "$dns_loaded" -eq 1 ] && [ "$core_loaded" -eq 1 ]; then
+      verified=1
+      effective=1
+      reason=runtime-loaded
+   elif [ "$dns_loaded" -eq 0 ] && [ "$core_loaded" -eq 0 ]; then
+      reason=dnsmasq-and-core-not-loaded
+   elif [ "$dns_loaded" -eq 0 ]; then
+      reason=dnsmasq-not-loaded
+   else
+      reason=core-not-loaded
+   fi
+
+   local tmp_state="${state_file}.$$"
+   umask 077
+   {
+      printf 'mode=%s\n' "$mode"
+      printf 'state=%s\n' "$state"
+      printf 'generated=%s\n' "$generated"
+      printf 'effective=%s\n' "$effective"
+      printf 'provider_effective=%s\n' "$core_loaded"
+      printf 'dns_loaded=%s\n' "$dns_loaded"
+      printf 'core_loaded=%s\n' "$core_loaded"
+      printf 'verified=%s\n' "$verified"
+      printf 'domains=%s\n' "$domains"
+      printf 'source_sha256=%s\n' "$source_sha256"
+      printf 'updated=%s\n' "$updated"
+      printf 'reason=%s\n' "$reason"
+   } > "$tmp_state" && chmod 600 "$tmp_state" && mv -f "$tmp_state" "$state_file"
+   rm -f "$tmp_state"
+   return 0
+}
+
 check_core_status()
 {
    local deadline stage last_stage="" now
@@ -1271,6 +1359,7 @@ check_core_status()
       set_firewall || start_fail
       ensure_fw4_dns_hijack || start_fail
    fi
+   openkill_adblock_runtime_verify || LOG_WARN "Unable to update anti-AD runtime verification state."
    openkill_current_start || return 0
    # DNS is required by the generated OpenKill profile. A listener bind
    # failure must not be reported as a successful proxy startup.

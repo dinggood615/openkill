@@ -410,10 +410,18 @@
         if (!sections.length) return;
 
         var target = sections[0];
-        var destination = panelContent(networkPanel);
+        /* The source rule editor belongs to Traffic Routing, not to the
+         * network tab's anonymous root.  Resolve the generated card after
+         * cardification and move the original CBI section into that card
+         * body.  The section is moved, never cloned, so LuCI keeps its
+         * existing names, ids, validation and submit hooks. */
+        var trafficCard = networkPanel.querySelector('[data-openkill-card="traffic-routing"]');
+        var destination = trafficCard && trafficCard.querySelector('.openkill-settings-card-body');
+        if (!destination) destination = panelContent(networkPanel);
         if (destination && target.parentNode !== destination) destination.appendChild(target);
         target.classList.add('openkill-network-only-section');
         target.setAttribute('data-openkill-network-card', 'source-traffic');
+        target.setAttribute('data-openkill-traffic-card', 'source-traffic');
         target.hidden = false;
         target.removeAttribute('aria-hidden');
 
@@ -554,14 +562,15 @@
          * before card construction so the independent service is a peer of
          * VPN, remote access and OpenVPN instead of a full-width orphan. */
         moveExplicitFieldsToCategory(map, tabItems, 'naive_service', ['_naive_component_info']);
-        keepSourceTrafficInNetwork(map, tabItems);
         // Build only the visible category before the first paint.  The CBI
         // fields remain in their original panels until their tab is needed,
         // so a slow router does not synchronously rearrange every advanced
         // option on page load.
         buildCards(tabItems, true);
+        keepSourceTrafficInNetwork(map, tabItems);
         var deferCards = function() {
             buildCards(tabItems, false);
+            keepSourceTrafficInNetwork(map, tabItems);
             var deferredErrors = map.querySelectorAll(validationSelector());
             if (deferredErrors.length && advancedItems.some(function(item) {
                 return item.querySelector(validationSelector());

@@ -208,12 +208,12 @@ o.default = "保存并应用后重新生成防火墙规则"
 o.description = "目标地址和端口列表使用已有 OpenKill 访问控制功能。Fake-IP 域名需同时在覆写设置中加入 Fake-IP 过滤。当前不自动识别 OpenVPN、不自动生成域名直连规则；原生接管模式不使用这里的旧版服务端口规则。"
 
 o = s:taboption("compatibility", ListValue, "compatibility_profile", "兼容策略")
-o:value("stable", "稳定兼容（推荐）")
-o:value("performance", "高性能双栈")
+o:value("stable", "稳定兼容")
+o:value("performance", "高性能双栈（推荐）")
 o:value("native", "Mihomo 原生接管（高级）")
-o.default = "stable"
+o.default = "performance"
 o.rmempty = false
-o.description = "稳定兼容模式由 OpenKill 统一管理 TUN、DNS 和防火墙；高性能双栈会在 OpenKill 接管下启用 TCP 并发、统一延迟和标准 Geo 数据加载；原生接管模式由 Mihomo 管理 auto-route/auto-redirect。三者互斥，切换后需应用设置并重启。低内存设备建议使用稳定兼容。"
+o.description = "稳定兼容模式由 OpenKill 统一管理 TUN、DNS 和防火墙；高性能双栈会启用 TCP 并发、统一延迟、标准 Geo 数据、IPv4/IPv6 和 mips TUN 基线；原生接管模式由 Mihomo 管理 auto-route/auto-redirect。三者互斥，切换后需应用设置并重启。低内存设备建议使用稳定兼容。"
 
 o = s:taboption("compatibility", ListValue, "wan_interface_mode", "代理出口接口")
 o:value("auto", "自动识别物理 WAN（推荐）")
@@ -343,7 +343,7 @@ switch_mode.template = "openkill/switch_mode"
 ---- DNS Settings
 o = s:taboption("dns", ListValue, "enable_redirect_dns", font_red..bold_on..translate("Redirect Local DNS Setting")..bold_off..font_off)
 o.description = translate("Dnsmasq forwarding lets dnsmasq relay local queries to Mihomo. Firewall forwarding: firewall intercepts LAN DNS on port 53 and redirects client UDP/TCP 53 traffic to Mihomo's verified local DNS listener; it supports TUN and dual-stack profiles.")
-o.default = 1
+o.default = 2
 o:value("0", translate("Disable"))
 o:value("1", translate("Dnsmasq Redirect"))
 o:value("2", translate("Firewall Redirect"))
@@ -420,7 +420,7 @@ o = s:taboption("dns", ListValue, "adblock_mode", "广告屏蔽档位")
 o:value("off", "关闭（保留 DNS 隐私与代理策略）")
 o:value("standard", "标准（推荐，anti-AD 域名规则）")
 o:value("enhanced", "增强（同源核心规则，用户阻止更严格）")
-o.default = "off"
+o.default = "enhanced"
 o.rmempty = false
 o.description = "两个档位都使用同一份经校验的 anti-AD 域名生成 DNS 与 Mihomo 规则；增强档只提高用户阻止策略的显示级别，不宣称额外来源或重复下载。硬编码 IP、自建 DoH、第一方共域名广告和 HTTPS 内容不会被此功能完整识别。"
 
@@ -563,32 +563,32 @@ o.cfgvalue = function(...)
 	return Flag.cfgvalue(...) or "1"
 end
 
-ip_ac = s2:option(Value, "src_ip", translate("Internal addresses"))
+ip_ac = s2:option(Value, "src_ip", translate("Source addresses"))
 ip_ac.datatype = "or(ipmask, string)"
 ip_ac.placeholder = "0.0.0.0/0"
 ip_ac.rmempty = true
 ip_ac:value("localnetwork", translate("Local Network"))
 
-o = s2:option(Value, "src_port", translate("Internal ports"))
+o = s2:option(Value, "src_port", translate("Source ports"))
 o.datatype = "or(port, portrange)"
 o.placeholder = translate("5000 or 1234-2345")
 o.rmempty = true
 
-o = s2:option(ListValue, "proto", translate("Proto"))
+o = s2:option(ListValue, "proto", translate("Protocol"))
 o:value("both", translate("Both"))
 o:value("udp", translate("UDP"))
 o:value("tcp", translate("TCP"))
 o.default = "both"
 o.rmempty = false
 
-o = s2:option(ListValue, "family", translate("Family"))
+o = s2:option(ListValue, "family", translate("Address family"))
 o:value("both", translate("Both"))
 o:value("ipv4", translate("IPv4"))
 o:value("ipv6", translate("IPv6"))
 o.default = "both"
 o.rmempty = false
 
-o = s2:option(ListValue, "interface", translate("Interface"))
+o = s2:option(ListValue, "interface", translate("Ingress interface"))
 o:value("")
 o.default = ""
 for _, dev in ipairs(devices) do
@@ -596,7 +596,7 @@ for _, dev in ipairs(devices) do
 end
 o.rmempty = true
 
-o = s2:option(ListValue, "user", translate("User"))
+o = s2:option(ListValue, "user", translate("Source user"))
 o:value("")
 o.default = ""
 local passwd_content = fs.readfile("/etc/passwd")
@@ -624,7 +624,7 @@ for uid, username in string.gmatch(users, "(%d+):(%S+)") do
 end
 o.rmempty = true
 
-o = s2:option(Value, "dscp", translate("DSCP"))
+o = s2:option(Value, "dscp", translate("DSCP mark"))
 o.datatype = "range(0,63)"
 o.rmempty = true
 function o.validate(self, value)
@@ -638,7 +638,7 @@ function o.validate(self, value)
 	return value
 end
 
-o = s2:option(ListValue, "target", translate("Target"))
+o = s2:option(ListValue, "target", translate("Action"))
 o:value("return", translate("RETURN"))
 o:value("accept", translate("ACCEPT"))
 o:value("drop", translate("DROP"))
@@ -760,7 +760,7 @@ o:depends("en_mode", "redir-host-tun")
 o:depends("en_mode", "redir-host-mix")
 
 local function validate_region_route_mode(self, value, section)
-	local profile = HTTP.formvalue("cbid.openkill." .. section .. ".compatibility_profile") or uci:get("openkill", section, "compatibility_profile") or "stable"
+	local profile = HTTP.formvalue("cbid.openkill." .. section .. ".compatibility_profile") or uci:get("openkill", section, "compatibility_profile") or "performance"
 	if profile == "native" and value ~= "0" then
 		return nil, "Mihomo 原生接管当前不映射 OpenKill 区域 IP 集合；请先切换到稳定/高性能 OpenKill 接管模式。"
 	end
@@ -1678,15 +1678,15 @@ o.rawhtml = true
 
 ---- ipv6
 o = s:taboption("ipv6", Flag, "ipv6_enable", translate("Proxy IPv6 Traffic"))
-o.description = translate("Keep the router as the LAN IPv6 gateway and DNS. OpenKill keeps dual-stack DNS and uses the selected IPv6 proxy mode; if IPv6 is unavailable, keep IPv6 DNS disabled to avoid AAAA first-connection delays.")
-o.default = 0
+o.description = translate("Keep the router as the LAN IPv6 gateway and DNS. OpenKill keeps dual-stack DNS and uses the selected IPv6 proxy mode; the runtime probe disables only unsupported traffic interception while preserving an explicit AAAA setting.")
+o.default = 1
 
 o = s:taboption("ipv6", ListValue, "ipv6_mode", translate("IPv6 Proxy Mode"))
 o:value("0", translate("TProxy Mode"))
 o:value("1", translate("Redirect Mode"))
 o:value("2", translate("TUN Mode"))
 o:value("3", translate("Mix Mode"))
-o.default = "0"
+o.default = "2"
 o:depends("ipv6_enable", "1")
 
 o = s:taboption("ipv6", ListValue, "stack_type_v6", translate("Select Stack Type"))
@@ -1709,7 +1709,7 @@ o.default = 1
 
 o = s:taboption("ipv6", Flag, "ipv6_dns", translate("IPv6 DNS Resolve"))
 o.description = "独立控制 AAAA 解析。开启后允许返回 IPv6 DNS 记录，但不会自动开启 IPv6 流量接管；IPv6 流量代理仍由上面的总开关控制。"
-o.default = 0
+o.default = 1
 
 o = s:taboption("ipv6", DummyValue, "native_ipv6_state", "原生 IPv6 链路状态")
 o.cfgvalue = function()

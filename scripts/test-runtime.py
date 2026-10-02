@@ -254,6 +254,38 @@ class DualStackRoutingTests(unittest.TestCase):
         ):
             self.assertNotIn(legacy_gate, proxies)
 
+    def test_audit_defaults_and_adblock_runtime_evidence_are_explicit(self):
+        settings = (ROOT / 'luci-app-openkill/luasrc/model/cbi/openkill/settings.lua').read_text(encoding='utf-8')
+        uci = (ROOT / 'luci-app-openkill/root/etc/config/openkill').read_text(encoding='utf-8')
+        normalize = (SHARE / 'openkill_config_normalize.sh').read_text(encoding='utf-8')
+        init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        self.assertIn("o.default = \"performance\"", settings)
+        self.assertIn("option compatibility_profile 'performance'", uci)
+        self.assertIn("option adblock_mode 'enhanced'", uci)
+        self.assertIn("option enable_redirect_dns '2'", uci)
+        self.assertIn("option disable_udp_quic '1'", uci)
+        self.assertIn("option ipv6_mode '2'", uci)
+        self.assertIn("option stack_type_v6 'mips'", uci)
+        # Normalization must be idempotent and keep explicit user choices.
+        for marker in (
+            'set_default geodata_loader standard',
+            'set_default ipv6_enable 1',
+            'set_default ipv6_dns 1',
+            'set_default ipv6_mode 2',
+            'set_default stack_type mips',
+            'set_default stack_type_v6 mips',
+            'set_default tun_congestion_controller bbr3',
+            'set_default disable_udp_quic 1',
+        ):
+            self.assertIn(marker, normalize)
+        self.assertIn('compatibility_profile=performance', normalize)
+        self.assertIn('adblock_mode=enhanced', normalize)
+        self.assertIn('dns_redirect_mode=', normalize)
+        self.assertIn('openkill_adblock_runtime_verify()', init)
+        self.assertIn('dnsmasq-and-core-not-loaded', init)
+        self.assertIn('provider_effective=', init)
+        self.assertIn('openkill_adblock_runtime_verify || LOG_WARN', init)
+
     def test_benchmark_is_read_only_and_busybox_ash_compatible(self):
         source = (SHARE / 'openkill-benchmark.sh').read_text(encoding='utf-8')
         self.assertTrue(source.startswith('#!/bin/sh'))
@@ -291,7 +323,7 @@ class DualStackRoutingTests(unittest.TestCase):
         config = (ROOT / 'luci-app-openkill/root/etc/config/openkill').read_text(encoding='utf-8')
         normalize = (SHARE / 'openkill_config_normalize.sh').read_text(encoding='utf-8')
         self.assertIn("option remote_service_bypass '0'", config)
-        self.assertIn("option compatibility_profile 'stable'", config)
+        self.assertIn("option compatibility_profile 'performance'", config)
         self.assertIn('if [ -z "$compatibility_profile" ]', normalize)
         self.assertIn('set_default remote_service_bypass 0', normalize)
         self.assertIn('compat_migration_version=2026-1108', normalize)
@@ -391,7 +423,7 @@ class DualStackRoutingTests(unittest.TestCase):
         config = (ROOT / 'luci-app-openkill/root/etc/config/openkill').read_text(encoding='utf-8')
         normalize = (SHARE / 'openkill_config_normalize.sh').read_text(encoding='utf-8')
         settings = (ROOT / 'luci-app-openkill/luasrc/model/cbi/openkill/settings.lua').read_text(encoding='utf-8')
-        self.assertIn("option enable_redirect_dns '1'", config)
+        self.assertIn("option enable_redirect_dns '2'", config)
         self.assertIn('0|1|2)', normalize)
         self.assertNotIn('dns_direct_safe', normalize)
         self.assertIn('o:value("2", translate("Firewall Redirect"))', settings)
@@ -412,11 +444,16 @@ class DualStackRoutingTests(unittest.TestCase):
 
     def test_network_settings_group_dns_lan_and_source_traffic(self):
         theme = (ROOT / 'luci-app-openkill/luasrc/view/openkill/settings_theme.htm').read_text(encoding='utf-8')
+        settings = (ROOT / 'luci-app-openkill/luasrc/model/cbi/openkill/settings.lua').read_text(encoding='utf-8')
         self.assertIn("title: '局域网设备访问控制'", theme)
         self.assertIn("id: 'wan-ac'", theme)
         self.assertIn("'lan_ac_white_ips', 'lan_ac_white_macs', 'lan_interface_name'", theme)
+        self.assertIn("var trafficCard = networkPanel.querySelector('[data-openkill-card=\"traffic-routing\"]')", theme)
+        self.assertIn("target.setAttribute('data-openkill-traffic-card', 'source-traffic')", theme)
         self.assertIn("target.setAttribute('data-openkill-network-card', 'source-traffic')", theme)
         self.assertIn('/来源流量规则|来源流量访问控制|lan traffic access list/i', theme)
+        self.assertIn('translate("Source addresses")', settings)
+        self.assertIn('translate("Source ports")', settings)
 
     def test_fw4_include_defers_openkill_rule_rebuild_after_interface_change(self):
         init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')

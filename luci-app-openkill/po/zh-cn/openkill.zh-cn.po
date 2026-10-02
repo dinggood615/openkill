@@ -3198,23 +3198,23 @@ msgstr "配置文件参数检查失败，"
 msgid "Edit"
 msgstr "编辑"
 
-msgid "Proto"
+msgid "Protocol"
 msgstr "通讯协议"
 
-msgid "Family"
+msgid "Address family"
 msgstr "地址类型"
 
 msgid "Comment"
 msgstr "备注"
 
-msgid "Internal addresses"
-msgstr "内部地址"
+msgid "Source addresses"
+msgstr "来源地址"
 
-msgid "Internal ports"
-msgstr "内部端口"
+msgid "Source ports"
+msgstr "来源端口"
 
-msgid "Target"
-msgstr "对象"
+msgid "Action"
+msgstr "处理动作"
 
 msgid "Network Anomaly, Suspend Unlock Detection..."
 msgstr "网络异常，暂停解锁检测..."
@@ -4002,11 +4002,11 @@ msgstr "禁止连接复用"
 msgid "Write file failed:"
 msgstr "写入文件失败："
 
-msgid "Interface"
-msgstr "接口"
+msgid "Ingress interface"
+msgstr "入接口"
 
-msgid "User"
-msgstr "用户"
+msgid "Source user"
+msgstr "来源用户"
 
 msgid "Serial Number"
 msgstr "序号"
@@ -5056,8 +5056,8 @@ msgstr "禁用 MTU 探测"
 msgid "DNS"
 msgstr "DNS"
 
-msgid "DSCP"
-msgstr "DSCP"
+msgid "DSCP mark"
+msgstr "DSCP 标记"
 
 msgid "early-data-header-name"
 msgstr "Early Data 请求头名称"
