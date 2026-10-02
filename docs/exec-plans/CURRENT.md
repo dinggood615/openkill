@@ -1,5 +1,50 @@
 # Current status
 
+## 2026-10-02 2026-1209 TUN 防火墙 DNS 转发与网络分流页面（候选验收完成，正式发布待执行）
+
+- 本轮重新核实此前 `2026-1208` 正式包和工作区，代码修复提交为
+  `9804301508b0ff971f9de8090b82ff24c7e2a9ae`，随后补充合同测试修复提交为
+  `45209b3249a12cd2afe62b5ca148fc43fde0cfdd`；工作区未跟踪的 `.rc-*` 审计目录均为
+  既有或本轮构建产物，未纳入 Git。
+- 根因是 TUN 下前端和归一化逻辑把 `enable_redirect_dns=2` 当作不支持值，后端还拒绝
+  TUN、IPv6 和回环目标；fw4 规则检查只看端口监听，不能证明目标重定向实际存在，
+  fw3 的 IPv6 分支也缺少独立的 mode-2 处理。另有 Fake-IP 解析失败后继续调用
+  `resolveip/getent` 的旁路风险。
+- 修复 `settings.lua`、`openkill_config_normalize.sh`、默认 UCI、`settings_theme.htm`、
+  `flat.css`、`po/zh-cn/openkill.zh-cn.po`、`root/etc/init.d/openkill`、
+  `openkill_network.sh` 及运行时合同测试：mode 2 现在明确表示“防火墙转发”，允许
+  TUN/双栈；fw4 为 UDP/TCP 53 的 IPv4/IPv6 跳转链，fw3 增加有界、幂等的 IPv6
+  ip6tables 分支；白名单为空时不生成不存在的 nft set；就绪检查验证实际 redirect
+  规则；Fake-IP 的显式 `nslookup` 失败才允许受控解析回退。网络与分流页将 DNS、局域网
+  设备访问控制和来源流量规则归入独立卡片，保留 UCI 键和值。
+- 本地 WSL 测试：运行时 37 项、网络模型 65 项、LuCI 合同 32 项、DNS 当前语义 10 项，
+  `scripts/local-gate.sh` 和 `git diff --check` 均通过。精确提交 Development CI
+  `36964445878` 成功：
+  https://github.com/dinggood615/openkill/actions/runs/36964445878 。
+- 候选构建 `36964832231` 成功：
+  https://github.com/dinggood615/openkill/actions/runs/36964832231 。候选 IPK
+  `luci-app-openkill_2026-1209_all.ipk` 大小 7,723,278 bytes，SHA256
+  `46f7858ce1ad9f9c7d38c8e0301e76a674bad459ee7e3fd126a9678c6cd00309`。包元数据、
+  `/etc/config/openkill` conffile、维护脚本持久化删除审计、权限和敏感/测试机数据审计通过。
+- 授权测试机 `192.168.1.103` 身份为 Kwrt 25.12-SNAPSHOT x86/64，剩余 overlay 约
+  545.5 MB。受保护备份为 `/root/openkill-dns-hijack-backup-20261002`（目录 700，敏感
+  文件 600），包含 UCI、源/运行数据、规则集、服务状态及可恢复材料。候选包已用
+  `opkg --force-reinstall` 实际安装，设备包版本为 `2026-1209`，关键文件哈希与候选
+  包一致；节点、YAML、Naive 数据和用户配置未被清理。
+- 在候选包上以现有 TUN 配置实测：切换到 mode 2 后，Mihomo 进程和 `127.0.0.1:7874`
+  TCP/UDP 监听就绪，fw4 `dstnat` 有且仅有 IPv4/IPv6 两个跳转，专用链各有 UDP/TCP
+  53 redirect；重复 reload 不累积规则，切回 mode 1 后专用链和跳转被清理，原有两条
+  mode-1 规则恢复。当前设备最终已恢复用户原先的 mode 1 选择，服务进程稳定运行。
+- 现有 Mihomo SOCKS 入口经两个 HTTPS 目标各三轮请求均返回 HTTP 200、退出码 0；这
+  证明候选包安装后核心联网冒烟通过。由于测试电脑默认网关是 `192.168.1.1` 而非本次
+  测试机，且现场没有第二台可控 LAN 客户端，无法让外部客户端流量经过 `192.168.1.103`
+  来取得 UDP/TCP 53 转发计数；因此“客户端实际穿过防火墙转发”的设备证据仍标记为未验证，
+  没有用本机 Fake-IP 或 HTTP 200 冒充该项。Chrome/LuCI 视觉逐页会话在当前工具环境中
+  不可见，真实浏览器验收同样标记为未验证；源码合同与设备规则检查已完成。
+- 目前尚未触发 Formal Release；必须以包含本记录的最终源提交重新通过 Development CI，
+  再构建候选并按仓库门禁发布。正式包安装后还需复验包版本、模式切换和服务状态；未完成前
+  不宣称本轮发布闭环。
+
 ## 2026-10-02 2026-1208 严格 DNS 启动重试与 Mihomo v1.19.32 正式包验收
 
 - 重新核实基线为 `ab7c04d2b6cbab8b6e1cbf942a33c4a892e4bdd7`，本轮修复提交为
