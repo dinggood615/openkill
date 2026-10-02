@@ -1,12 +1,18 @@
 # Current status
 
-## 2026-10-02 插件设置页面顺序、来源规则主题与等高布局（2026-2006，发布进行中）
+## 2026-10-02 插件设置页面顺序、来源规则主题与等高布局（2026-2006，正式发布完成）
 
 - 本轮范围限定为 LuCI UI：网络与分流卡片顺序、兼容与辅助卡片顺序、来源流量规则子区域主题/排版，以及同一桌面网格行内的自然等高；不改变 DNS、NaiveProxy、服务生命周期、WAN、防火墙、路由、TUN 或全网代理策略。
 - `settings_theme.htm` 将网络卡片固定为 DNS 与本地解析、流量转发、IPv6 与 TUN、局域网设备访问控制，保留 WAN 访问控制为后续卡片；兼容页将 OpenVPN 精确兼容置于远程访问绕过之前。DOM 定义顺序与键盘顺序一致，字段、UCI 键、依赖、校验和保存行为保持不变。
 - `flat.css` 的终端布局层使用 Grid/Flex 自然伸展：同一桌面行并列卡片等高，网格行仍按内容高度增长，窄屏恢复单列自适应；来源流量规则沿用原生 CBI 控件和提交钩子，统一 OpenKill 表面、边框、字体和双列/单列字段布局，并保留延迟挂载的祖先保护。
-- 回归覆盖：LuCI 合同 36 项、预览 2 项、交互检查、WSL 运行时 38 项、安装器 17 项及 `scripts/local-gate.sh` 均通过。首个 RC 的真实深色主题检查发现 Argon 的 `!important` 背景覆盖来源规则，已补页面范围内的优先级修复，需以修复后的精确提交重新完成 Development CI、RC 安装验收和 Formal Release。
+- 回归覆盖：LuCI 合同 36 项、预览 2 项、交互检查、WSL 运行时 38 项、安装器 17 项及 `scripts/local-gate.sh` 均通过。首个 RC 的真实深色主题检查发现 Argon 的 `!important` 背景覆盖来源规则，已补页面范围内的优先级修复；同版本候选/正式安装另增加设置页资源缓存标识，避免浏览器复用旧候选 CSS。
 - 当前源版本已同步为 `2026-2006`，发布说明为 `docs/release/notes/2026-2006.md`；无默认配置、设备数据或用户敏感数据变更。
+- 最终源提交为 `3f96f49cb39575ae6ae64b0d9e4c0d2fef402e90`，Development CI `36999591619` 成功： https://github.com/dinggood615/openkill/actions/runs/36999591619 。本地门禁在该精确提交通过。
+- 修复后 RC Build `36999800230` 成功： https://github.com/dinggood615/openkill/actions/runs/36999800230 。最终候选 IPK `luci-app-openkill_2026-2006_all.ipk` 为 7,733,795 字节，SHA256 `d8823f2d3e5d77fe569b0895198ed4b3944699c97b556d84587b66bfa3d478c6`；包元数据、conffile 保留、维护脚本删除审计及运行时敏感数据审计通过。候选包以 `--force-reinstall` 安装到授权测试机，opkg 返回码 0，版本为 `2026-2006`，服务仍由 procd 运行。
+- Formal Release `37000243118` 成功： https://github.com/dinggood615/openkill/actions/runs/37000243118 。正式标签/Release 为 `v2026-2006-ipk`： https://github.com/dinggood615/openkill/releases/tag/v2026-2006-ipk ，源提交为 `3f96f49cb39575ae6ae64b0d9e4c0d2fef402e90`。正式 IPK 为 7,930,774 字节，SHA256 `cece865c19b085bb4b42078f1d04fd6c25eed2e446eedcde77af61fcbacd0bd5`；RC 与正式包哈希分别记录，未将二者声称为相同。
+- 正式包已在 `192.168.1.103` 通过 `opkg install --force-reinstall` 实际替换，返回码 0；安装前后 `/etc/config/openkill` SHA256 均为 `d5c247bf379d28483cde7df1b34f314f776234bc0e2481ca31439fe46ee56680`，配置保留，服务实例 `openkill` running，Mihomo Meta 为 v1.19.32。受保护备份为 `/root/openkill-backup-20261002-ui/openkill-state.tar.gz`，目录 700、归档 600，SHA256 `9b4e11e9027029dab855a7b984deb12080daeba3347840596cd0793a1f16c42e`。
+- 正式包真实 LuCI 验收：点击“网络与分流”后，DNS 与本地解析、流量转发位于第一行，IPv6 与 TUN、局域网设备访问控制位于第二行；当前桌面布局两行卡片宽度约 606.4px，同一行高度分别约 1611.4px 与 1181.8px，边缘对齐。来源规则仅有 1 个 section 且位于流量转发卡片内，规则编辑行 `display:grid`、宽度约 572.8px、高度约 526.9px，来源 section 背景透明、规则卡片使用统一表面色；兼容页顺序为 `vpn-policy → openvpn-compatibility → remote-service → zerotier`。资源 URL 带 `ui=2026-2006-2` 缓存标识，页面错误日志为 0，保存配置/应用配置控件仍存在。精确 80%/100%/125%/150% 浏览器缩放无法由当前 CUA 接口控制，保留为未覆盖项；响应式合同及窄屏 CSS 检查通过。
+- 本轮只改变 LuCI 页面顺序、来源规则主题/排版、卡片等高和资源缓存键；未改变 DNS、NaiveProxy、服务生命周期、WAN、防火墙、路由、TUN 或全网代理策略。正式包安装后的核心服务与用户配置保持正常，截图中的其他运行故障不属于本轮 UI 范围。
 
 ## 2026-10-02 来源规则重复挂载保护（2026-2005，正式发布与设备验收完成）
 
