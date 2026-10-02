@@ -18,7 +18,7 @@
 
 - 根因：`scripts/install-openkill.sh` 的精确版本路径虽然在依赖检查阶段允许使用 OpenWrt `jsonfilter`，但 `resolve_requested_package()` 仍无条件调用 `ruby -rjson` 解析 GitHub Release API；缺少 `ruby-json` 的精简固件因此把存在的历史 Release 误报为“版本不存在”。
 - 修复：精确版本解析现在优先使用系统 `jsonfilter` 提取 tag、草稿/预发布状态、目标资产 digest 和下载地址；仅在 `jsonfilter` 不可用时回退 Ruby JSON，并对目标 tag 没有对应 IPK/APK 资产给出明确错误。下载仍要求 HTTPS、Release 资产 URL 完全匹配及 SHA256 校验。
-- 回归覆盖：新增无 Ruby JSON、模拟 `2026-1206` IPK Release 元数据的解析测试；`bash -n scripts/install-openkill.sh`、`scripts/test-installer.py`（18 项）及 `sh scripts/local-gate.sh` 均通过。本次仅更新安装器和测试/执行记录，不改变 OpenKill 包版本或设备配置；推送后需核对精确源提交的 Development CI。
+- 回归覆盖：新增无 Ruby JSON、模拟 `2026-1206` IPK Release 元数据的解析测试；`bash -n scripts/install-openkill.sh`、`scripts/test-installer.py`（18 项）及 `sh scripts/local-gate.sh` 均通过。修复提交为 `9eec02563dd6e20f9ac210e27de34b27a897d7f5`，精确 Development CI `37022804301` 成功：https://github.com/dinggood615/openkill/actions/runs/37022804301 。本次仅更新安装器和测试/执行记录，不改变 OpenKill 包版本或设备配置；由于安装器从 `master` 获取，用户重新执行原命令即可获得修复。
 
 ## 2026-10-02 插件设置页面顺序、来源规则主题与等高布局（2026-2006，正式发布完成）
 
