@@ -1,5 +1,54 @@
 # Current status
 
+## 2026-10-02 2026-1208 严格 DNS 启动重试与 Mihomo v1.19.32 正式包验收
+
+- 重新核实基线为 `ab7c04d2b6cbab8b6e1cbf942a33c4a892e4bdd7`，本轮修复提交为
+  `b1d771dbbed9566583031aa2cf67d81e3de04cb9`；工作区仍只保留既有未跟踪的
+  `.rc-*` 审计目录，未修改或纳入提交。
+- 复现根因：核心、控制器和 DNS 监听已经就绪时，严格 DNS 的只读运行查询只有一次机会；
+  代理链瞬时不可达会写入 `startup-failed` 并停止服务。分流模式能启动，严格模式在上游
+  不可达时按设计闭锁，未观察到核心架构或 mips/BBR3 配置错误。
+- 修复 `luci-app-openkill/root/etc/init.d/openkill`：增加三次、间隔 2 秒的有界严格
+  DNS 运行证据重试；持续失败仍拒绝报告服务就绪，不生成配置、不分配端口、不回退到
+  明文 DNS 或 `DIRECT`。`scripts/test-runtime.py` 增加对应回归契约。
+- 版本同步为 `2026-1208`（Makefile、安装器、README），新增
+  `docs/release/notes/2026-1208.md`。核心 profile 迁移标记仍为 `2026-1207`，避免
+  在每次重装时重复迁移用户配置。
+- 本地 WSL 运行时测试 35 项、DNS 语义 6 项/10 assertions、LuCI 合同 32 项、安装器
+  15 项及 `scripts/local-gate.sh` 均通过；Windows 直接调用 Linux shell 的失败未计入，
+  已在 WSL 同等环境复验。
+- 精确提交 Development CI `36959035974` 成功：
+  https://github.com/dinggood615/openkill/actions/runs/36959035974 。RC Build
+  `36959151891` 成功：
+  https://github.com/dinggood615/openkill/actions/runs/36959151891 。候选 IPK
+  `luci-app-openkill_2026-1208_all.ipk` 大小 7,722,229 bytes，SHA256
+  `48004f7a74b7d0c43c6552eb109b838d2ce4758bf61815ddbc2f5898622d22c2`；包内容、维护
+  脚本、conffile 保留及敏感数据审计通过。
+- Formal Release `36959986012` 成功：
+  https://github.com/dinggood615/openkill/actions/runs/36959986012 。正式标签与 Release
+  为 `v2026-1208-ipk`：
+  https://github.com/dinggood615/openkill/releases/tag/v2026-1208-ipk ，源提交为
+  `b1d771dbbed9566583031aa2cf67d81e3de04cb9`。正式 IPK 大小 7,924,954 bytes，SHA256
+  `95cc200be4bb5a5cae1ac0dc1083b89f67cbbbe8815835725a8e521675515718`；package channel
+  `master/latest-ipk.json` 同步到该版本、提交和哈希。
+- 授权测试机 192.168.1.103 已使用 `opkg --force-reinstall` 实际替换正式包，`opkg`
+  显示 2026-1208；设备 `/etc/init.d/openkill` 与严格 DNS 运行检查脚本的 SHA256
+  与正式 IPK 解包文件一致。用户 conffile、独立 Naive 数据和既有 YAML 均保留。正式
+  安装后的最终状态为 `running`，Mihomo Meta v1.19.32，运行配置加载 `mips` TUN 与
+  `bbr3`，严格 DNS state 为 `runtime_verified=1`。
+- 正式包安装后重复启停出现过严格 DNS 上游不可达导致的 `startup-failed`，随后重试在
+  同一包、同一配置下成功；这证明新增重试改善了瞬时竞态，但不能消除远端代理不可用。
+  分流模式下核心可稳定运行；独立 Naive SOCKS5 经两个 HTTPS 目标返回成功（一个目标
+  返回 200，另一个返回正常重定向）。当前设备源 YAML 中的本地 SOCKS5 节点没有被任何
+  Mihomo 代理组引用，且现有 Mihomo 远端组的 HTTPS 请求失败；这是用户配置/远端可用性
+  限制，不是本轮 v1.19.32 适配代码的凭据或启动缺陷。未擅自改写用户 YAML 或默认代理组。
+- Chrome 用户会话在当前工具环境不可见，因此真实 LuCI 视觉逐页验收（七个设置页、缩放、
+  主题）仍标记为未验证；SSH/HTTP 检查未替代该项。已完成设备进程、加载配置、核心版本、
+  DNS 运行状态、正式包真实安装及独立 Naive 网络冒烟。
+- 受保护备份继续保留在 `/root/openkill-mihomo-backup-20261002`（目录 700、敏感文件
+  600），包含重装前后配置、核心/包状态、运行日志和恢复材料；回滚可安装
+  `v2026-1207-ipk` 并恢复该备份。未授权整机重启、WAN/DNS 防火墙策略或其他插件配置。
+
 ## 2026-10-02 2026-1207 Mihomo v1.19.32 适配（发布门禁进行中）
 
 - 基线重新核实为 `dad7c329a6825cf4f2b48398da7c65dfe74c508e`，源版本为
