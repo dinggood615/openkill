@@ -299,25 +299,17 @@ case "$ipv6_dns" in
     *) uci -q set openkill.config.ipv6_dns=0; changed=1 ;;
 esac
 
-# Firewall-direct DNS sends LAN packets straight to the Mihomo DNS port.  The
-# stable TUN profile deliberately keeps that port on loopback and relies on
-# dnsmasq as its LAN-facing relay.  Do not leave a newly installed or upgraded
-# router in a combination which blackholes DNS, especially on IPv6 LANs.
+# Firewall-forward DNS redirects client UDP/TCP 53 traffic to the Mihomo DNS
+# listener.  REDIRECT terminates on the local host even when the listener is
+# bound to loopback, so TUN, IPv6 and the default loopback bind are supported.
+# The service performs the listener/firmware readiness check before reporting
+# success; normalization must preserve the user's selected mode instead of
+# silently changing it to dnsmasq and hiding an apply failure.
 dns_redirect_mode="$(uci -q get openkill.config.enable_redirect_dns 2>/dev/null || echo 1)"
-en_mode_value="$(uci -q get openkill.config.en_mode 2>/dev/null || echo fake-ip-tun)"
-if [ "$dns_redirect_mode" = "2" ]; then
-    dns_direct_safe=1
-    case "$en_mode_value" in
-        *tun*) dns_direct_safe=0 ;;
-    esac
-    [ "$ipv6_enable" = "1" ] && dns_direct_safe=0
-    [ "$ipv6_dns" = "1" ] && dns_direct_safe=0
-    [ "$dns_bind" = "127.0.0.1" ] && dns_direct_safe=0
-    if [ "$dns_direct_safe" != "1" ]; then
-        uci -q set openkill.config.enable_redirect_dns=1
-        changed=1
-    fi
-fi
+case "$dns_redirect_mode" in
+    0|1|2) ;;
+    *) uci -q set openkill.config.enable_redirect_dns=1; changed=1 ;;
+esac
 
 # A deleted panel must never remain selected.  Pick the first installed panel
 # so the status page can always provide a valid dashboard URL.

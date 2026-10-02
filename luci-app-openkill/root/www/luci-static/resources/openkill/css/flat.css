@@ -833,6 +833,25 @@ body[data-page="admin-services-openkill-client"] .openkill-myip-page .myip-conte
     max-width: 100%;
 }
 
+/* The source-traffic TypedSection is moved into the network tab by the
+ * settings view.  Keep it a first-class full-width card instead of inheriting
+ * the native CBI black table surface. */
+#cbi-openkill.openkill-settings .openkill-network-only-section[data-openkill-network-card="source-traffic"] {
+    box-sizing: border-box;
+    min-width: 0;
+    overflow: hidden;
+}
+
+#cbi-openkill.openkill-settings .openkill-network-only-section[data-openkill-network-card="source-traffic"] .cbi-section-title {
+    font-size: var(--ok-type-title, 1rem);
+    font-weight: 700;
+}
+
+#cbi-openkill.openkill-settings .openkill-network-only-section[data-openkill-network-card="source-traffic"] .cbi-section-descr {
+    max-width: 72rem;
+    line-height: 1.55;
+}
+
 #cbi-openkill.openkill-settings .openkill-settings-card-body {
     min-width: 0;
     flex: 1 1 auto;

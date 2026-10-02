@@ -1074,12 +1074,24 @@ openkill_resolve_node_domains()
     while IFS= read -r domain; do
         [ -n "$domain" ] || continue
         domain_resolved=0
-        if command -v nslookup >/dev/null 2>&1; then
+        dns_query_usable=0
+        if command -v nslookup >/dev/null 2>&1 && [ -n "$dns_servers" ]; then
+            # Once an explicit native resolver was queried, do not fall back
+            # to getent/resolv.conf after all of its answers were rejected as
+            # Fake-IP.  That would silently bypass the configured bootstrap
+            # path and turn a synthetic answer into a real underlay endpoint.
             for server in $dns_servers; do
-                v4_result=$(timeout "${OPENKILL_NODE_RESOLVE_TIMEOUT:-5}" nslookup -type=A "$domain" "$server" 2>/dev/null |
+                v4_output=$(timeout "${OPENKILL_NODE_RESOLVE_TIMEOUT:-5}" nslookup -type=A "$domain" "$server" 2>/dev/null)
+                v4_status=$?
+                v4_result=$(printf '%s\n' "$v4_output" |
                     awk 'seen {for (i=1;i<=NF;i++) if ($i ~ /^[0-9]+(\.[0-9]+){3}$/) print $i} /^Name:/{seen=1}')
-                v6_result=$(timeout "${OPENKILL_NODE_RESOLVE_TIMEOUT:-5}" nslookup -type=AAAA "$domain" "$server" 2>/dev/null |
+                v6_output=$(timeout "${OPENKILL_NODE_RESOLVE_TIMEOUT:-5}" nslookup -type=AAAA "$domain" "$server" 2>/dev/null)
+                v6_status=$?
+                v6_result=$(printf '%s\n' "$v6_output" |
                     awk 'seen {for (i=1;i<=NF;i++) if ($i ~ /^[0-9A-Fa-f:]+$/ && $i ~ /:/) print $i} /^Name:/{seen=1}')
+                if [ "$v4_status" -eq 0 ] || [ "$v6_status" -eq 0 ]; then
+                    dns_query_usable=1
+                fi
                 for node_address in $v4_result; do
                     openkill_append_node4 "$node_address" && domain_resolved=1
                 done
@@ -1094,7 +1106,7 @@ openkill_resolve_node_domains()
         fi
         # resolveip is present on a number of BusyBox/OpenWrt images and is a
         # safer native fallback than routing through client Fake-IP DNS.
-        if [ "$domain_resolved" -eq 0 ] && [ -n "$dns_servers" ] && command -v resolveip >/dev/null 2>&1; then
+        if [ "$domain_resolved" -eq 0 ] && [ "$dns_query_usable" -eq 0 ] && [ -n "$dns_servers" ] && command -v resolveip >/dev/null 2>&1; then
             v4_result=$(timeout "${OPENKILL_NODE_RESOLVE_TIMEOUT:-5}" resolveip -4 "$domain" 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i ~ /^[0-9]+(\.[0-9]+){3}$/) print $i}')
             v6_result=$(timeout "${OPENKILL_NODE_RESOLVE_TIMEOUT:-5}" resolveip -6 "$domain" 2>/dev/null | awk '{for (i=1;i<=NF;i++) if ($i ~ /^[0-9A-Fa-f:]+$/ && $i ~ /:/) print $i}')
             for node_address in $v4_result; do
@@ -1106,7 +1118,7 @@ openkill_resolve_node_domains()
         fi
         # getent is optional: retain compatibility where it exists, but never
         # make it a hard dependency on BusyBox systems that omit it.
-        if [ "$domain_resolved" -eq 0 ] && [ -n "$dns_servers" ] && command -v getent >/dev/null 2>&1; then
+        if [ "$domain_resolved" -eq 0 ] && [ "$dns_query_usable" -eq 0 ] && [ -n "$dns_servers" ] && command -v getent >/dev/null 2>&1; then
             v4_result=$(timeout "${OPENKILL_NODE_RESOLVE_TIMEOUT:-5}" getent ahostsv4 "$domain" 2>/dev/null | awk '$1 ~ /^[0-9]+(\.[0-9]+){3}$/ {print $1}')
             v6_result=$(timeout "${OPENKILL_NODE_RESOLVE_TIMEOUT:-5}" getent ahostsv6 "$domain" 2>/dev/null | awk '$1 ~ /^[0-9A-Fa-f:]+$/ && $1 ~ /:/ {print $1}')
             for node_address in $v4_result; do

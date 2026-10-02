@@ -37,11 +37,13 @@
                 'local_network6_pass', 'chnroute6_pass',
                 'china_ip6_route'
             ]},
-            {id: 'lan-wan', title: '<%:LAN / WAN Access%>', keys: [
+            {id: 'lan-wan', title: '局域网设备访问控制', keys: [
                 'lan_ac_mode', 'lan_ac_black_ips', 'lan_ac_black_macs',
-                'lan_ac_white_ips', 'lan_ac_white_macs', 'wan_ac_black_ips',
-                'wan_ac_black_ports', 'lan_interface_name', 'intranet_allowed',
+                'lan_ac_white_ips', 'lan_ac_white_macs', 'lan_interface_name', 'intranet_allowed',
                 'intranet_allowed_wan_name', 'local_network_pass'
+            ]},
+            {id: 'wan-ac', title: 'WAN 访问控制', keys: [
+                'wan_ac_black_ips', 'wan_ac_black_ports'
             ]},
             {id: 'traffic-routing', title: '<%:Traffic Routing%>', keys: [
                 'router_self_proxy', 'disable_udp_quic', 'skip_proxy_address',
@@ -385,7 +387,7 @@
         if (id.indexOf('lan_ac_traffic') !== -1 || sectionType === 'lan_ac_traffic') return true;
         var title = section.querySelector('.cbi-section-title, .cbi-section-descr, h3, legend');
         var text = title ? (title.textContent || '') : '';
-        return /来源流量访问控制|lan traffic access list/i.test(text);
+        return /来源流量规则|来源流量访问控制|lan traffic access list/i.test(text);
     }
 
     function keepSourceTrafficInNetwork(map, tabItems) {
@@ -411,6 +413,7 @@
         var destination = panelContent(networkPanel);
         if (destination && target.parentNode !== destination) destination.appendChild(target);
         target.classList.add('openkill-network-only-section');
+        target.setAttribute('data-openkill-network-card', 'source-traffic');
         target.hidden = false;
         target.removeAttribute('aria-hidden');
 

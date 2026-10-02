@@ -4974,14 +4974,9 @@ msgstr "所有接口（高级）"
 msgid "All LAN interfaces (advanced)"
 msgstr "所有 LAN 接口（高级）"
 
-msgid "Dnsmasq forwarding is the recommended dual-stack mode: firewall intercepts LAN DNS on port 53, dnsmasq then forwards it to Mihomo's local listener. Firewall-direct mode is advanced, skips dnsmasq-assisted mainland IP sets, and is unavailable with TUN or IPv6 DNS."
-msgstr "dnsmasq 转发是推荐的双栈模式：防火墙接管 LAN 的 53 端口 DNS 请求，再由 dnsmasq 转发到 Mihomo 本地监听器。防火墙直转属于高级模式，不使用 dnsmasq 辅助的大陆 IP 集合，并且不能与 TUN 或 IPv6 DNS 同时使用。"
+msgid "Dnsmasq forwarding lets dnsmasq relay local queries to Mihomo. Firewall forwarding redirects client UDP/TCP 53 traffic to Mihomo's verified local DNS listener and supports TUN and dual-stack profiles."
+msgstr "Dnsmasq 转发由 dnsmasq 将本地查询转发到 Mihomo；防火墙转发将客户端 UDP/TCP 53 请求重定向到已验证的 Mihomo 本地 DNS 监听器，支持 TUN 与双栈配置。"
 
-msgid "Firewall Redirect (Advanced: IPv4 non-TUN only)"
-msgstr "防火墙转发（高级：仅 IPv4 非 TUN）"
-
-msgid "Firewall-direct DNS is only available for an IPv4 non-TUN profile with a LAN-facing Mihomo DNS listener. Use Dnsmasq forwarding for the current profile."
-msgstr "防火墙直转 DNS 仅适用于 IPv4 非 TUN 且 Mihomo DNS 监听面向 LAN 的配置。当前配置请使用 dnsmasq 转发。"
 
 msgid "GEOIP Update"
 msgstr "更新 GeoIP"

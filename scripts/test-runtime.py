@@ -170,7 +170,7 @@ class FirewallShellCompatibilityTests(unittest.TestCase):
         for line in rules:
             self.assertRegex(
                 line,
-                r'^\s*nft ".*comment \\"OpenKill DNS Hijack\\""$',
+                r'^\s*nft ".*comment \\"OpenKill DNS Hijack\\""(?: \|\| return 1)?$',
                 f'nft DNS rule must be a single quoted expression: {line}',
             )
 
@@ -392,10 +392,31 @@ class DualStackRoutingTests(unittest.TestCase):
         normalize = (SHARE / 'openkill_config_normalize.sh').read_text(encoding='utf-8')
         settings = (ROOT / 'luci-app-openkill/luasrc/model/cbi/openkill/settings.lua').read_text(encoding='utf-8')
         self.assertIn("option enable_redirect_dns '1'", config)
-        self.assertIn('dns_direct_safe=0', normalize)
-        self.assertIn('*tun*) dns_direct_safe=0', normalize)
-        self.assertIn('Firewall Redirect (Advanced: IPv4 non-TUN only)', settings)
-        self.assertIn('Firewall-direct DNS is only available for an IPv4 non-TUN profile', settings)
+        self.assertIn('0|1|2)', normalize)
+        self.assertNotIn('dns_direct_safe', normalize)
+        self.assertIn('o:value("2", translate("Firewall Redirect"))', settings)
+        self.assertNotIn('Advanced: IPv4 non-TUN only', settings)
+        self.assertNotIn('Firewall-direct DNS is only available', settings)
+
+    def test_firewall_redirect_supports_tun_dual_stack_and_scoped_lists(self):
+        init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        self.assertIn('if [ "$enable_redirect_dns" -eq 2 ] ||', init)
+        self.assertIn('openkill_legacy_ipv6_dns_hijack()', init)
+        self.assertIn('meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53', init)
+        self.assertIn('meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53', init)
+        self.assertIn('ip6tables -t nat -A openkill_dns_redirect -p udp --dport 53', init)
+        self.assertIn('ip6tables -t nat -A openkill_dns_redirect -p tcp --dport 53', init)
+        self.assertIn('ip6tables -t nat -C PREROUTING -p udp --dport 53 -j openkill_dns_redirect', init)
+        self.assertIn('ip6tables -t nat -C PREROUTING -p tcp --dport 53 -j openkill_dns_redirect', init)
+        self.assertIn('white_rule=0', init)
+
+    def test_network_settings_group_dns_lan_and_source_traffic(self):
+        theme = (ROOT / 'luci-app-openkill/luasrc/view/openkill/settings_theme.htm').read_text(encoding='utf-8')
+        self.assertIn("title: '局域网设备访问控制'", theme)
+        self.assertIn("id: 'wan-ac'", theme)
+        self.assertIn("'lan_ac_white_ips', 'lan_ac_white_macs', 'lan_interface_name'", theme)
+        self.assertIn("target.setAttribute('data-openkill-network-card', 'source-traffic')", theme)
+        self.assertIn('/来源流量规则|来源流量访问控制|lan traffic access list/i', theme)
 
     def test_fw4_include_defers_openkill_rule_rebuild_after_interface_change(self):
         init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
