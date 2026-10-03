@@ -9,6 +9,10 @@
 - `runtime.sh` 现在按 `/proc/net/{udp,tcp,udp6,tcp6}` 检查指定地址族的 UDP 与 TCP 监听；就绪必须同时通过规则入口、精确重定向端口、对应子链和双协议监听。UI 的防火墙转发说明同步为实际双栈前端边界。
 - 已补回归及隔离合同：真实 shell/awk 监听探测夹具、fw4 入口/目标/监听组合（缺 IPv6 跳转、缺 TCP 监听、IPv4-only 数据路径）、legacy ip6tables 能力缺失；测试使用虚构端口/地址和受控函数，不读取设备或用户配置。当前本地结果为：运行时 50、DNS 意图 10、生产影子 12、NFT IR 16、NFT 语法 18、LuCI 合同 36、安装器 18、UCI 生命周期 19、UI 预览 2、数据面语义 10 项通过，`scripts/local-gate.sh` 通过；UI 交互测试仅因本机无 Node 运行时跳过。NFT 语法门禁明确报告本环境没有 `nft`，因此未安装或伪造真实内核检查；设备解析器测试在 WSL 临时路径映射下无法打开 `/mnt//tmp/.../runner.sh`，保留为环境限制。语法降级器另补上 IPv6 mode-2 必须使用 `firewall_dns_port` 的回归，避免把正确执行记录重新落成 Mihomo IPv4 端口。
 - 版本目标提升为 `2026-2012`，默认 profile 标记、安装器、README 和发布说明同步；默认值不含节点、订阅、凭据、设备数据或用户 YAML。正式交付范围仅限代码、本地及隔离环境和发布产物；不得把本轮结果描述为测试机/iPhone DNS 泄漏已解决或“绝对零泄漏”。
+- Development CI 已在精确源提交 `dc9c3b4e22385036badcb161cfa3caee80a69e93` 成功： https://github.com/dinggood615/openkill/actions/runs/37083633189 。RC Build `37083734625` 成功： https://github.com/dinggood615/openkill/actions/runs/37083734625 ；候选 IPK `luci-app-openkill_2026-2012_all.ipk` 大小 7,734,119 字节，SHA256 `de1293e01e2265dfe298821790313f8834c117ad28cae8a9a54859c5614e658d`。候选审计确认包元数据、`/etc/config/openkill` conffile 保留、维护脚本持久化删除审计、归档属主/权限及测试机敏感数据扫描通过。
+- Formal Release `37084110617` 成功： https://github.com/dinggood615/openkill/actions/runs/37084110617 。正式标签/Release 为 `v2026-2012-ipk`： https://github.com/dinggood615/openkill/releases/tag/v2026-2012-ipk ，源提交仍为 `dc9c3b4e22385036badcb161cfa3caee80a69e93`。正式 IPK 大小 7,941,001 字节，SHA256 `41c34e4992cd5532cfbadfb04592b3bec0f3e96065a6992e4ad53d809019893a`；正式包由 HTTPS Release 资产下载并在隔离目录完成数据/控制归档解包、版本/默认 profile/关键文件冒烟，归档文件无 world-writable 或 setuid 项，关键路径归档属主为 root，未匹配设备地址或本轮提供的密码。
+- 本轮未连接测试平台、路由器或 iPhone，未执行实机安装、真实服务操作、内核 nft/ip6tables 数据面测试或实机抓包。当前环境没有 `nft`、`ip6tables`、`opkg`、Ruby 和 BusyBox；因此真实内核规则和 OpenWrt 包管理器行为不能标为通过。现有隔离回归、真实 shell/awk 监听探测、规则 IR/语法渲染、生产影子、DNS 意图、LuCI 合同、安装器、UCI 生命周期和数据面语义测试均通过；UI 交互测试因本机无 Node 运行时跳过，设备解析器测试因 WSL 临时路径映射无法打开 `/mnt//tmp/.../runner.sh` 保留为环境限制。正式包只在本地隔离目录解包验证，未写入任何设备。
+- 回滚范围：本轮未改变设备配置。隔离环境可删除 `.formal-2012-audit/isolation-root`；实际 OpenWrt 回滚需在另行授权的设备维护窗口中使用既有受保护备份和上一已验证正式包，不能将本轮隔离解包当作设备备份或实机回滚证据。
 
 ## 2026-10-03 严格 DNS 受管组故障转移与国内分流复验（2026-2011）
 
