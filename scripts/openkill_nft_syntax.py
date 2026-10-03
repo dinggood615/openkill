@@ -997,7 +997,14 @@ def _lower_action_ir(
         tproxy_port=int(execution.get("tproxy_port", tproxy_port)),
         redirect_port=int(
             execution.get(
-                "dns_port" if execution.get("kind") == "DNS" else "redirect_port",
+                # DNS has two distinct ports in the dual-stack contract:
+                # ``dns_port`` is Mihomo's listener, while
+                # ``firewall_dns_port`` is the address-family-compatible
+                # frontend that REDIRECT must reach (dnsmasq for IPv6 when
+                # Mihomo remains on IPv4 loopback).  Using dns_port here
+                # silently recreated the IPv6 takeover gap in the isolated
+                # renderer even though the execution record was correct.
+                "firewall_dns_port" if execution.get("kind") == "DNS" else "redirect_port",
                 redirect_port,
             )
         ),

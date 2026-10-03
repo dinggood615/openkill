@@ -138,11 +138,43 @@ openkill_core_ready() {
 
 openkill_dns_listener_present() {
     local port="$1" table
-    for table in /proc/net/udp /proc/net/udp6; do
+    for table in "${OPENKILL_PROC_ROOT:-/proc}/net/udp" "${OPENKILL_PROC_ROOT:-/proc}/net/udp6"; do
         [ -r "$table" ] || continue
         if awk -v port="$port" 'BEGIN {p=sprintf(":%04X", port)} $2 ~ p"$" {found=1} END {exit !found}' "$table"; then
             return 0
         fi
     done
     return 1
+}
+
+# A DNS takeover is only ready when both transports are actually bound for
+# the requested address family.  Checking only a port number or only UDP lets
+# IPv6 TCP/53 escape on small dnsmasq builds and lets an IPv4-only Mihomo
+# listener masquerade as a dual-stack endpoint.  OPENKILL_PROC_ROOT is used by
+# the isolated contract tests and defaults to the real procfs on OpenWrt.
+openkill_dns_listener_transport_present() {
+    local port="$1" family="$2" transport="$3" table file
+    case "$port" in ''|*[!0-9]*) return 1 ;; esac
+    [ "$port" -ge 1 ] 2>/dev/null && [ "$port" -le 65535 ] 2>/dev/null || return 1
+    case "$family:$transport" in
+        ipv4:udp) table=udp ;;
+        ipv4:tcp) table=tcp ;;
+        ipv6:udp) table=udp6 ;;
+        ipv6:tcp) table=tcp6 ;;
+        *) return 1 ;;
+    esac
+    file="${OPENKILL_PROC_ROOT:-/proc}/net/$table"
+    [ -r "$file" ] || return 1
+    awk -v port="$port" -v transport="$transport" '
+        BEGIN { p = sprintf(":%04X", port) }
+        NR > 1 && $2 ~ p "$" && (transport != "tcp" || $4 == "0A") { found = 1 }
+        END { exit !found }
+    ' "$file"
+}
+
+openkill_dns_listener_family_ready() {
+    local port="$1" family="$2"
+    openkill_dns_listener_transport_present "$port" "$family" udp || return 1
+    openkill_dns_listener_transport_present "$port" "$family" tcp || return 1
+    return 0
 }

@@ -19,7 +19,7 @@ set_default() {
 # fields identify the profile only; all user-selected values remain untouched
 # on upgrade, reinstall and migration.
 set_default default_profile performance-dual-stack
-set_default default_profile_version 2026-2011
+set_default default_profile_version 2026-2012
 default_profile="$(uci -q get openkill.config.default_profile 2>/dev/null || true)"
 case "$default_profile" in
     performance-dual-stack) ;;

@@ -4974,8 +4974,8 @@ msgstr "所有接口（高级）"
 msgid "All LAN interfaces (advanced)"
 msgstr "所有 LAN 接口（高级）"
 
-msgid "Dnsmasq forwarding lets dnsmasq relay local queries to Mihomo. Firewall forwarding redirects client UDP/TCP 53 traffic to Mihomo's verified local DNS listener and supports TUN and dual-stack profiles."
-msgstr "Dnsmasq 转发由 dnsmasq 将本地查询转发到 Mihomo；防火墙转发将客户端 UDP/TCP 53 请求重定向到已验证的 Mihomo 本地 DNS 监听器，支持 TUN 与双栈配置。"
+msgid "Dnsmasq forwarding relays local IPv4/IPv6 UDP and TCP DNS queries to Mihomo. Firewall forwarding intercepts LAN DNS on port 53; IPv4 is redirected to Mihomo, while IPv6 uses the verified local dnsmasq UDP/TCP frontend when Mihomo is bound only to IPv4 loopback. The path is installed only when an IPv6 data plane and matching firewall capability are present; it never exposes the listener on WAN."
+msgstr "Dnsmasq 转发会将本地 IPv4/IPv6 的 UDP 和 TCP DNS 查询转发到 Mihomo。防火墙转发接管 LAN 的 53 端口 DNS 请求：IPv4 重定向到 Mihomo；当 Mihomo 仅绑定 IPv4 回环地址时，IPv6 使用已验证的本地 dnsmasq UDP/TCP 前端。只有检测到 IPv6 数据路径和匹配的防火墙能力时才会安装该路径，且不会将监听器暴露到 WAN。"
 
 
 msgid "GEOIP Update"

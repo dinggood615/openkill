@@ -44,6 +44,50 @@ openkill_controller_host() {''' + helper + '\n}\n' +
         self.assertEqual(result.stdout, '127.0.0.1|::1')
 
 
+class DnsListenerTests(unittest.TestCase):
+    def _listener_probe(self, missing=''):
+        with tempfile.TemporaryDirectory() as directory:
+            proc = pathlib.Path(directory) / 'net'
+            proc.mkdir()
+            headers = {
+                'udp': 'sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt uid timeout inode',
+                'tcp': 'sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt uid timeout inode',
+                'udp6': 'sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt uid timeout inode',
+                'tcp6': 'sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt uid timeout inode',
+            }
+            rows = {
+                'udp': '  0: 0100007F:14E9 00000000:0000 07 00000000:00000000 00:00000000 00000000 0 0 100 2 0000000000000000 0',
+                'tcp': '  0: 0100007F:14E9 00000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 101 1 0000000000000000 0',
+                'udp6': '  0: 00000000000000000000000000000000:14E9 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000 0 0 102 2 0000000000000000 0',
+                'tcp6': '  0: 00000000000000000000000000000000:14E9 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 103 1 0000000000000000 0',
+            }
+            for name, header in headers.items():
+                content = header + '\n'
+                if name != missing:
+                    content += rows[name] + '\n'
+                (proc / name).write_text(content, encoding='utf-8')
+            source = (SHARE / 'runtime.sh').read_text(encoding='utf-8')
+            command = (
+                source
+                + f'\nOPENKILL_PROC_ROOT="{pathlib.Path(directory).as_posix()}"\n'
+                + 'printf "%s|%s|%s" '
+                + '"$(openkill_dns_listener_family_ready 5353 ipv4 && echo yes || echo no)" '
+                + '"$(openkill_dns_listener_family_ready 5353 ipv6 && echo yes || echo no)" '
+                + '"$(openkill_dns_listener_present 5353 && echo yes || echo no)"\n'
+            )
+            return run_shell(command)
+
+    def test_listener_probe_requires_udp_and_tcp_for_each_family(self):
+        result = self._listener_probe()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, 'yes|yes|yes')
+
+    def test_listener_probe_reports_missing_ipv6_tcp(self):
+        result = self._listener_probe('tcp6')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, 'yes|no|yes')
+
+
 @unittest.skipUnless(RUBY, 'Ruby required; mandatory in Linux CI')
 class ContextTests(unittest.TestCase):
     def context(self, contents):
@@ -173,6 +217,110 @@ class FirewallShellCompatibilityTests(unittest.TestCase):
                 r'^\s*nft ".*comment \\"OpenKill DNS Hijack\\""(?: \|\| return 1)?$',
                 f'nft DNS rule must be a single quoted expression: {line}',
             )
+
+
+class DnsReadinessIsolationTests(unittest.TestCase):
+    def _run_fw4_readiness(self, ipv6_rules=True, ipv6_jump=True, ipv6_tcp=True,
+                           ipv6_path=True, ipv6_target=53):
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            proc = root / 'proc' / 'net'
+            proc.mkdir(parents=True)
+            headers = 'sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt uid timeout inode\n'
+            rows = {
+                'udp': '  0: 0100007F:1ED2 00000000:0000 07 00000000:00000000 00:00000000 00000000 0 0 100 2 0000000000000000 0\n',
+                'tcp': '  0: 0100007F:1ED2 00000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 101 1 0000000000000000 0\n',
+                'udp6': '  0: 00000000000000000000000000000000:0035 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000 0 0 102 2 0000000000000000 0\n',
+                'tcp6': '  0: 00000000000000000000000000000000:0035 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 103 1 0000000000000000 0\n',
+            }
+            for name, row in rows.items():
+                (proc / name).write_text(headers + ('' if name == 'tcp6' and not ipv6_tcp else row), encoding='utf-8')
+            source = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+            helper = source.split('# Return the local dnsmasq port', 1)[1].split(
+                '# A dnsmasq or firewall configuration change', 1)[0]
+            runtime = (SHARE / 'runtime.sh').read_text(encoding='utf-8')
+            ipv6_rule = ('OpenKill DNS Hijack meta nfproto ipv6 meta l4proto {tcp,udp} '
+                         f'th dport 53 redirect to :{ipv6_target}\n') if ipv6_rules else ''
+            jump = ('meta nfproto ipv6 meta l4proto {tcp,udp} th dport 53 '
+                    'jump openkill_dns_redirect\n') if ipv6_jump else ''
+            harness = f'''
+set -u
+OPENKILL_PROC_ROOT='{root / 'proc'}'
+FW4=yes
+enable_redirect_dns=2
+ipv6_enable=0
+ipv6_mode=0
+dns_port=7890
+DNSPORT=53
+DNSMASQ_UCI=dhcp.test
+lan_ac_mode=0
+router_self_proxy=0
+uci() {{ [ "$*" = "-q get dhcp.test.port" ] && echo 53; }}
+uci_get_config() {{ [ "$1" = dns_privacy_mode ] && echo split; }}
+ip() {{
+  if [ "$1" = -6 ] && [ "$2" = addr ] && [ "$3" = show ] && [ "$4" = scope ] && [ "$5" = global ]; then
+    {'echo "inet6 2001:db8::1/64 scope global"' if ipv6_path else ':'}
+  fi
+}}
+nft() {{
+  case "$*" in
+    *"list chain inet fw4 openkill_dns_redirect"*)
+      printf '%s\\n' 'OpenKill DNS Hijack meta nfproto ipv4 meta l4proto {{tcp,udp}} th dport 53 redirect to :7890'
+      printf '%s' '{ipv6_rule}' ;;
+    *"list chain inet fw4 dstnat"*)
+      printf '%s\\n' 'meta nfproto ipv4 meta l4proto {{tcp,udp}} th dport 53 jump openkill_dns_redirect'
+      printf '%s' '{jump}' ;;
+  esac
+}}
+'''
+            result = run_shell(runtime + '\n' + helper + '\n' + harness +
+                               'fw4_dns_hijack_ready && echo ready || echo not-ready\n')
+            return result
+
+    def test_isolation_requires_ipv6_jump_and_listener(self):
+        result = self._run_fw4_readiness()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), 'ready')
+        self.assertEqual(self._run_fw4_readiness(ipv6_jump=False).stdout.strip(), 'not-ready')
+        self.assertEqual(self._run_fw4_readiness(ipv6_tcp=False).stdout.strip(), 'not-ready')
+
+    def test_isolation_does_not_combine_family_rule_fragments(self):
+        result = self._run_fw4_readiness(ipv6_target=7890)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), 'not-ready')
+
+    def test_ipv4_only_path_does_not_require_ipv6_rules(self):
+        result = self._run_fw4_readiness(ipv6_rules=False, ipv6_jump=False,
+                                         ipv6_tcp=False, ipv6_path=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), 'ready')
+
+    def test_legacy_ipv6_nat_capability_failure_is_not_reported_ready(self):
+        source = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        helper = source.split('# Return the local dnsmasq port', 1)[1].split(
+            'firewall_lan_ac_traffic()', 1)[0]
+        harness = '''
+set -u
+FW4=''
+enable_redirect_dns=2
+ipv6_enable=0
+ipv6_mode=0
+DNSPORT=53
+DNSMASQ_UCI=dhcp.test
+lan_ac_mode=0
+router_self_proxy=0
+uci() { [ "$*" = "-q get dhcp.test.port" ] && echo 53; }
+uci_get_config() { [ "$1" = dns_privacy_mode ] && echo split; }
+ip() { [ "$1" = -6 ] && [ "$2" = addr ] && echo 'inet6 2001:db8::1/64 scope global'; }
+ip6tables() { return 1; }
+LOG_ERROR() { printf '%s\\n' "$*"; }
+openkill_legacy_ipv6_dns_hijack
+printf 'rc=%s\\n' "$?"
+'''
+        result = run_shell(helper + '\n' + harness)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('IPv6 DNS forwarding requires an ip6tables NAT PREROUTING chain', result.stdout)
+        self.assertIn('rc=1', result.stdout)
 
 
 class DualStackRoutingTests(unittest.TestCase):
@@ -466,7 +614,7 @@ class DualStackRoutingTests(unittest.TestCase):
 
     def test_firewall_redirect_supports_tun_dual_stack_and_scoped_lists(self):
         init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
-        self.assertIn('if [ "$enable_redirect_dns" -eq 2 ] ||', init)
+        self.assertIn('if [ "$ipv6_enable" -eq 1 ] || {', init)
         self.assertIn('openkill_legacy_ipv6_dns_hijack()', init)
         self.assertIn('meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53', init)
         self.assertIn('meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53', init)
@@ -475,6 +623,25 @@ class DualStackRoutingTests(unittest.TestCase):
         self.assertIn('ip6tables -t nat -C PREROUTING -p udp --dport 53 -j openkill_dns_redirect', init)
         self.assertIn('ip6tables -t nat -C PREROUTING -p tcp --dport 53 -j openkill_dns_redirect', init)
         self.assertIn('white_rule=0', init)
+
+    def test_ipv6_dns_path_requires_frontend_listener_and_entry_jump(self):
+        init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        self.assertIn('openkill_dns_listener_family_ready', init)
+        self.assertIn('openkill_ipv6_data_path_present', init)
+        self.assertIn('IPV6_DNSPORT="$(openkill_dnsmasq_port)"', init)
+        self.assertIn('fw4_dns_jump_ready ipv6', init)
+        self.assertIn('meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 counter jump openkill_dns_redirect', init)
+        self.assertIn('IPv6 DNS forwarding requires ip6tables and an IPv6 NAT table', init)
+        self.assertIn('IPv6 DNS forwarding requires an ip6tables NAT PREROUTING chain', init)
+        self.assertNotIn('command -v ip6tables >/dev/null 2>&1 || return 0', init)
+        self.assertNotIn('ip6tables -t nat -L PREROUTING >/dev/null 2>&1 || return 0', init)
+
+    def test_ipv6_dns_readiness_does_not_accept_separate_rule_fragments(self):
+        init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        readiness = init.split('fw4_dns_hijack_ready()', 1)[1].split('\n}\n\n# A dnsmasq', 1)[0]
+        self.assertIn('fw4_dns_rule_target_ready', readiness)
+        self.assertIn('fw4_dns_jump_ready ipv6', readiness)
+        self.assertIn('openkill_dns_listener_family_ready "$target_v6" ipv6', readiness)
 
     def test_network_settings_group_dns_lan_and_source_traffic(self):
         theme = (ROOT / 'luci-app-openkill/luasrc/view/openkill/settings_theme.htm').read_text(encoding='utf-8')

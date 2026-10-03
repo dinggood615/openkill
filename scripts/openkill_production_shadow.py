@@ -451,6 +451,11 @@ def _stub_header(values: Mapping[str, Any], sandbox: str, *, node_apply: bool = 
         "sleep(){ return 0; }",
         "dnsmasq(){ record dnsmasq \"$@\"; return 1; }",
         "netstat(){ record netstat \"$@\"; return 1; }",
+        # The production firewall path resolves the dnsmasq frontend through
+        # this helper before emitting any IPv4/IPv6 redirect.  Keep the
+        # isolated harness on the same three-layer contract without invoking
+        # host UCI or netstat state.
+        "openkill_dnsmasq_port(){ printf '%s\\n' \"$DNSPORT\"; }",
         "nslookup(){ record nslookup \"$@\"; return 1; }",
         "mktemp(){ local p=\"$SANDBOX/mktemp.$RANDOM\"; : > \"$p\"; printf '%s\\n' \"$p\"; }",
         "dirname(){ printf '%s\\n' \"$SANDBOX\"; }",

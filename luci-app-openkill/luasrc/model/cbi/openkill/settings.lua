@@ -342,7 +342,7 @@ switch_mode.template = "openkill/switch_mode"
 
 ---- DNS Settings
 o = s:taboption("dns", ListValue, "enable_redirect_dns", font_red..bold_on..translate("Redirect Local DNS Setting")..bold_off..font_off)
-o.description = translate("Dnsmasq forwarding lets dnsmasq relay local queries to Mihomo. Firewall forwarding: firewall intercepts LAN DNS on port 53 and redirects client UDP/TCP 53 traffic to Mihomo's verified local DNS listener; it supports TUN and dual-stack profiles.")
+o.description = translate("Dnsmasq forwarding relays local IPv4/IPv6 UDP and TCP DNS queries to Mihomo. Firewall forwarding intercepts LAN DNS on port 53; IPv4 is redirected to Mihomo, while IPv6 uses the verified local dnsmasq UDP/TCP frontend when Mihomo is bound only to IPv4 loopback. The path is installed only when an IPv6 data plane and matching firewall capability are present; it never exposes the listener on WAN.")
 o.default = 2
 o:value("0", translate("Disable"))
 o:value("1", translate("Dnsmasq Redirect"))

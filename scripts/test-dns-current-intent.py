@@ -132,7 +132,17 @@ class CurrentDnsIntentTests(unittest.TestCase):
                 parsed = parse_nft_command_records(capture["command_records"])
                 dns_rules = [rule for rule in parsed["rules"] if rule.get("reason") == "DNS"]
                 self.assertTrue(dns_rules)
-                self.assertTrue(all("redirect to 53" in rule.get("expression", "") for rule in dns_rules))
+                # The legacy firewall path resolves the local dnsmasq frontend
+                # independently from Mihomo's listener.  Keep this assertion
+                # tied to the intended target rather than the old literal
+                # command shape.
+                self.assertTrue(
+                    all(
+                        "redirect to 53" in rule.get("expression", "")
+                        or "--to-ports 53" in rule.get("expression", "")
+                        for rule in dns_rules
+                    )
+                )
 
     def test_checked_in_sources_preserve_three_layer_dns_contract(self):
         init = (ROOT / "luci-app-openkill/root/etc/init.d/openkill").read_text(encoding="utf-8")
@@ -143,8 +153,9 @@ class CurrentDnsIntentTests(unittest.TestCase):
         self.assertIn('option dns_port \'7874\'', config)
         self.assertIn('add_list "$DNSMASQ_UCI.server"=127.0.0.1#"$dns_port"', init)
         self.assertIn('redirect to ${DNSPORT}', init)
-        self.assertIn('DNSPORT=$(uci -q get "$DNSMASQ_UCI.port")', init)
-        self.assertIn("firewall intercepts LAN DNS on port 53", settings)
+        self.assertIn('DNSPORT="$(openkill_dnsmasq_port)"', init)
+        self.assertIn('openkill_dnsmasq_port()', init)
+        self.assertIn("Firewall forwarding intercepts LAN DNS on port 53", settings)
         self.assertIn("DNS_PORT) openkill_shadow_auto_value", shadow)
         self.assertIn('DNSMASQ_UCI="dhcp.${DNSMASQ_SECTION}"', watchdog)
         self.assertIn("uci -q -X show dhcp", watchdog)

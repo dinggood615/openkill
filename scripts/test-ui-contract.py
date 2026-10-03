@@ -225,12 +225,12 @@ class LuCIContractTests(unittest.TestCase):
         self.assertIn("flex: 1 1 auto;", css)
         self.assertIn("height: auto;", css)
         self.assertIn("option default_profile 'performance-dual-stack'", config)
-        self.assertIn("option default_profile_version '2026-2011'", config)
+        self.assertIn("option default_profile_version '2026-2012'", config)
         self.assertIn("option enable_custom_dns '0'", config)
         self.assertIn("option dns_privacy_mode 'strict'", config)
         self.assertIn("option dns_privacy_group 'OpenKill-DNS'", config)
         self.assertIn("set_default default_profile performance-dual-stack", normalizer)
-        self.assertIn("set_default default_profile_version 2026-2011", normalizer)
+        self.assertIn("set_default default_profile_version 2026-2012", normalizer)
         self.assertIn("dns_privacy_mode=strict", normalizer)
 
     def test_security_cards_use_binary_states_and_no_unresolved_banner(self) -> None:

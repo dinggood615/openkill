@@ -1574,6 +1574,91 @@ fw4_has_dns_hijack_rule()
    esac
 }
 
+# Return the local dnsmasq port used as the IPv6 frontend when Mihomo keeps
+# its existing IPv4 loopback listener.  Keep the result numeric so malformed
+# UCI values cannot become nft redirect targets.
+openkill_dnsmasq_port()
+{
+   local port=""
+   port="$(uci -q get "${DNSMASQ_UCI:-dhcp.@dnsmasq[0]}.port" 2>/dev/null || true)"
+   case "$port" in ''|*[!0-9]*) port="" ;; esac
+   if [ -z "$port" ] && [ -n "${DNSPORT:-}" ]; then
+      case "$DNSPORT" in ''|*[!0-9]*) ;; *) port="$DNSPORT" ;; esac
+   fi
+   if [ -z "$port" ]; then
+      port="$(netstat -nlp 2>/dev/null |grep -E '127\.0\.0\.1:.*dnsmasq' |awk -F '127\.0\.0\.1:' '{print $2}' |awk '{print $1}' |head -1 || true)"
+      case "$port" in ''|*[!0-9]*) port="" ;; esac
+   fi
+   if [ -z "$port" ] || [ "$port" -lt 1 ] 2>/dev/null || [ "$port" -gt 65535 ] 2>/dev/null; then
+      port=53
+   fi
+   printf '%s\n' "$port"
+}
+
+# Only require IPv6 DNS interception when the device has an IPv6 data path.
+# An IPv4-only device must still start, while a dual-stack device must never
+# report a partial IPv6 DNS takeover as ready.
+openkill_ipv6_data_path_present()
+{
+   command -v ip >/dev/null 2>&1 || return 1
+   ip -6 addr show scope global 2>/dev/null |grep -q 'inet6 ' && return 0
+   ip -6 route show default 2>/dev/null |grep -q '^default' && return 0
+   return 1
+}
+
+openkill_ipv6_dns_path_needed()
+{
+   local dns_privacy_mode_current
+   [ "${enable_redirect_dns:-0}" -ne 0 ] || return 1
+   openkill_ipv6_data_path_present || return 1
+   if [ "${enable_redirect_dns:-0}" -eq 2 ]; then
+      return 0
+   fi
+   if [ "${ipv6_enable:-0}" -eq 1 ] &&
+      { [ "${ipv6_mode:-0}" -eq 1 ] || [ "${ipv6_mode:-0}" -eq 3 ]; }; then
+      return 0
+   fi
+   dns_privacy_mode_current="$(uci_get_config "dns_privacy_mode" || echo split)"
+   [ "$dns_privacy_mode_current" = strict ] &&
+      [ "${ipv6_enable:-0}" -ne 1 ]
+}
+
+fw4_dns_rule_target_ready()
+{
+   local chain="$1" family="$2" port="$3" rules
+   case "$port" in ''|*[!0-9]*) return 1 ;; esac
+   [ "$port" -ge 1 ] 2>/dev/null && [ "$port" -le 65535 ] 2>/dev/null || return 1
+   rules="$(nft list chain inet fw4 "$chain" 2>/dev/null || true)"
+   case "$family" in ipv4|ipv6) ;; *) return 1 ;; esac
+   # Match the address family and redirect target on the same nft rule.  Two
+   # independent grep checks can otherwise combine a stale IPv4 target with a
+   # valid IPv6 rule (or the reverse) and report a partial path as ready.
+   printf '%s\n' "$rules" |awk -v family="$family" -v port="$port" '
+      /OpenKill DNS Hijack/ {
+         is_v6 = ($0 ~ /meta nfproto[[:space:]]+\{[[:space:]]*ipv6[[:space:]]*\}/ ||
+                  $0 ~ /meta nfproto[[:space:]]+ipv6/ || $0 ~ /ip6 nexthdr/)
+         target = ($0 ~ ("redirect[[:space:]]+to[[:space:]]+:?" port "([[:space:]]|$)"))
+         if (target && ((family == "ipv6" && is_v6) || (family == "ipv4" && !is_v6))) found = 1
+      }
+      END { exit !found }
+   '
+}
+
+fw4_dns_jump_ready()
+{
+   local family="$1" rules
+   rules="$(nft list chain inet fw4 dstnat 2>/dev/null || true)"
+   case "$family" in ipv4|ipv6) ;; *) return 1 ;; esac
+   printf '%s\n' "$rules" |awk -v family="$family" '
+      /jump openkill_dns_redirect/ {
+         is_v6 = ($0 ~ /meta nfproto[[:space:]]+\{[[:space:]]*ipv6[[:space:]]*\}/ ||
+                  $0 ~ /meta nfproto[[:space:]]+ipv6/ || $0 ~ /ip6 nexthdr/)
+         if ((family == "ipv6" && is_v6) || (family == "ipv4" && !is_v6)) found = 1
+      }
+      END { exit !found }
+   '
+}
+
 # Verify the rule that actually performs DNS redirection, not merely the
 # parent chain or the jump into it.  On systems whose /bin/sh points to bash,
 # an unquoted nft set can fail during startup while leaving the chain behind;
@@ -1585,34 +1670,26 @@ fw4_dns_hijack_ready()
    [ -n "$FW4" ] || return 0
    [ "$enable_redirect_dns" -eq 0 ] && return 0
 
-   local rules jump
+   local target_v4 target_v6 chain_v6
+   target_v4="${dns_port:-}"
+   [ "$enable_redirect_dns" -eq 1 ] && target_v4="$(openkill_dnsmasq_port)"
+   case "$target_v4" in ''|*[!0-9]*) return 1 ;; esac
    if [ "$enable_redirect_dns" -eq 2 ]; then
-      rules="$(nft list chain inet fw4 openkill_dns_redirect 2>/dev/null || true)"
-      printf '%s\n' "$rules" | grep -Eq 'redirect[[:space:]]+to[[:space:]]+(:)?[0-9]+' || return 1
-      jump="$(nft list chain inet fw4 dstnat 2>/dev/null || true)"
-      printf '%s\n' "$jump" | grep -q 'jump openkill_dns_redirect' || return 1
+      fw4_dns_rule_target_ready openkill_dns_redirect ipv4 "$target_v4" || return 1
+      fw4_dns_jump_ready ipv4 || return 1
    else
-      rules="$(nft list chain inet fw4 dstnat 2>/dev/null || true)"
-      printf '%s\n' "$rules" | grep -q 'OpenKill DNS Hijack' || return 1
-      printf '%s\n' "$rules" | grep -Eq 'redirect[[:space:]]+to[[:space:]]+(:)?[0-9]+' || return 1
+      fw4_dns_rule_target_ready dstnat ipv4 "$target_v4" || return 1
    fi
+   openkill_dns_listener_family_ready "$target_v4" ipv4 || return 1
 
-   # IPv6 DNS hijacking is required for IPv6 proxy modes, for firewall
-   # forwarding (mode 2) on a dual-stack LAN, and for strict DNS privacy even
-   # when IPv6 traffic proxying is disabled.  The latter closes the
-   # TCP/IPv6 DNS escape hatch while the dnsmasq filter suppresses direct AAAA
-   # answers on an IPv4-only strict profile.
-   dns_privacy_mode_current="$(uci_get_config "dns_privacy_mode" || echo split)"
-   if [ "$enable_redirect_dns" -eq 2 ] ||
-      { [ "$ipv6_enable" -eq 1 ] && { [ "$ipv6_mode" -eq 1 ] || [ "$ipv6_mode" -eq 3 ]; }; } ||
-      { [ "$dns_privacy_mode_current" = "strict" ] && [ "$enable_redirect_dns" -ne 0 ] && [ "$ipv6_enable" -ne 1 ]; }; then
+   if openkill_ipv6_dns_path_needed; then
+      chain_v6=dstnat
+      [ "$enable_redirect_dns" -eq 2 ] && chain_v6=openkill_dns_redirect
+      target_v6="$(openkill_dnsmasq_port)"
+      fw4_dns_rule_target_ready "$chain_v6" ipv6 "$target_v6" || return 1
+      openkill_dns_listener_family_ready "$target_v6" ipv6 || return 1
       if [ "$enable_redirect_dns" -eq 2 ]; then
-         printf '%s\n' "$rules" | grep -Eq 'meta nfproto[[:space:]]+\{?ipv6\}?|ip6 nexthdr' || {
-            rules="$(nft list chain inet fw4 openkill_dns_redirect 2>/dev/null || true)"
-            printf '%s\n' "$rules" | grep -Eq 'meta nfproto[[:space:]]+\{?ipv6\}?|ip6 nexthdr' || return 1
-         }
-      else
-         printf '%s\n' "$rules" | grep -Eq 'meta nfproto[[:space:]]+\{?ipv6\}?|ip6 nexthdr' || return 1
+         fw4_dns_jump_ready ipv6 || return 1
       fi
    fi
    return 0
@@ -1661,22 +1738,23 @@ openkill_strict_ipv6_dns_hijack()
 {
    [ -n "$FW4" ] || return 0
    [ "$enable_redirect_dns" -ne 0 ] || return 0
-   if [ "$enable_redirect_dns" -ne 2 ]; then
-      [ "$(uci_get_config "dns_privacy_mode" || echo split)" = "strict" ] || return 0
-      [ "$ipv6_enable" -eq 1 ] && return 0
-   fi
-   if [ "$enable_redirect_dns" -eq 2 ]; then
-      fw4_has_dns_hijack_rule openkill_dns_redirect ipv6 && return 0
-   else
-      fw4_has_dns_hijack_rule dstnat ipv6 && return 0
-   fi
+   openkill_ipv6_dns_path_needed || return 0
 
    local redirect_port dns_filter dns_chain
    redirect_port="${DNSPORT:-}"
-   [ "$enable_redirect_dns" -eq 2 ] && redirect_port="${dns_port:-}"
+   [ "$enable_redirect_dns" -eq 2 ] && redirect_port="$(openkill_dnsmasq_port)"
    [ -n "$redirect_port" ] || return 1
    dns_chain=dstnat
    [ "$enable_redirect_dns" -eq 2 ] && dns_chain=openkill_dns_redirect
+
+   # set_firewall() normally creates both pieces.  Repair a fw4 reload race
+   # here without treating a child chain alone as a complete IPv6 path.
+   if fw4_dns_rule_target_ready "$dns_chain" ipv6 "$redirect_port"; then
+      if [ "$enable_redirect_dns" -eq 2 ] && ! fw4_dns_jump_ready ipv6; then
+         nft 'insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 counter jump openkill_dns_redirect' || return 1
+      fi
+      return 0
+   fi
 
    dns_filter=""
    if [ "$lan_ac_mode" != "1" ]; then
@@ -1704,6 +1782,9 @@ openkill_strict_ipv6_dns_hijack()
       nft 'add chain inet fw4 nat_output { type nat hook output priority -1; }'
       nft "insert rule inet fw4 nat_output position 0 skgid != 65534 meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ip6 daddr {::1} counter redirect to $redirect_port comment \"OpenKill DNS Hijack\""
       [ $? -eq 0 ] || return 1
+   fi
+   if [ "$enable_redirect_dns" -eq 2 ] && ! fw4_dns_jump_ready ipv6; then
+      nft 'insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 counter jump openkill_dns_redirect' || return 1
    fi
    return 0
 }
@@ -1738,17 +1819,65 @@ ensure_fw4_dns_hijack()
 # Firewall3/ip6tables builds do not enter the normal IPv6 block when IPv6
 # proxying is disabled.  Firewall forwarding is still a DNS interception mode,
 # so install only its UDP/TCP 53 redirect in that case.  A device without an
-# IPv6 firewall table simply has no IPv6 path to configure; IPv4 readiness is
-# still checked normally and the diagnostic keeps the limitation explicit.
+# IPv6 firewall table cannot safely claim the IPv6 path is protected; fail the
+# required operation with an explicit capability diagnostic instead of
+# silently accepting an IPv4-only setup.
 openkill_legacy_ipv6_dns_hijack()
 {
    [ -z "$FW4" ] || return 0
-   [ "$enable_redirect_dns" -eq 2 ] || return 0
-   command -v ip6tables >/dev/null 2>&1 || return 0
-   ip6tables -t nat -L PREROUTING >/dev/null 2>&1 || return 0
+   if [ "$enable_redirect_dns" -ne 2 ]; then
+      [ "$(uci_get_config "dns_privacy_mode" || echo split)" = strict ] || return 0
+      [ "${ipv6_enable:-0}" -eq 1 ] && return 0
+   fi
+   openkill_ipv6_dns_path_needed || return 0
+   if ! command -v ip6tables >/dev/null 2>&1; then
+      LOG_ERROR "IPv6 DNS forwarding requires ip6tables and an IPv6 NAT table; capability is missing."
+      return 1
+   fi
+   if ! ip6tables -t nat -L PREROUTING >/dev/null 2>&1; then
+      LOG_ERROR "IPv6 DNS forwarding requires an ip6tables NAT PREROUTING chain; capability is missing."
+      return 1
+   fi
 
    local redirect_port="${dns_port:-}" filter="" white_rule=0
+   [ "$enable_redirect_dns" -eq 1 ] && redirect_port="${DNSPORT:-}"
+   [ "$enable_redirect_dns" -eq 2 ] && redirect_port="$(openkill_dnsmasq_port)"
    [ -n "$redirect_port" ] || return 1
+
+   if [ "$enable_redirect_dns" -eq 1 ]; then
+      local existing_rules
+      existing_rules="$(ip6tables -t nat -nL PREROUTING 2>/dev/null || true)"
+      if printf '%s\n' "$existing_rules" |grep -Eq 'udp.*53.*OpenKill DNS Hijack' &&
+         printf '%s\n' "$existing_rules" |grep -Eq 'tcp.*53.*OpenKill DNS Hijack'; then
+         return 0
+      fi
+      if [ "$lan_ac_mode" != "1" ]; then
+         if [ "$lan_ac_mode" = "0" ]; then
+            [ -n "$(uci_get_config "lan_ac_black_ips")" ] && filter="$filter -m set ! --match-set lan_ac_black_ipv6s src"
+            [ -n "$(uci_get_config "lan_ac_black_macs")" ] && filter="$filter -m set ! --match-set lan_ac_black_macs src"
+         fi
+         ip6tables -t nat -I PREROUTING -p udp --dport 53 $filter -j REDIRECT --to-ports "$redirect_port" -m comment --comment "OpenKill DNS Hijack" || return 1
+         ip6tables -t nat -I PREROUTING -p tcp --dport 53 $filter -j REDIRECT --to-ports "$redirect_port" -m comment --comment "OpenKill DNS Hijack" || return 1
+      else
+         if [ -n "$(uci_get_config "lan_ac_white_ips")" ]; then
+            ip6tables -t nat -I PREROUTING -p udp --dport 53 -m set --match-set lan_ac_white_ipv6s src -j REDIRECT --to-ports "$redirect_port" -m comment --comment "OpenKill DNS Hijack" || return 1
+            ip6tables -t nat -I PREROUTING -p tcp --dport 53 -m set --match-set lan_ac_white_ipv6s src -j REDIRECT --to-ports "$redirect_port" -m comment --comment "OpenKill DNS Hijack" || return 1
+            white_rule=1
+         fi
+         if [ -n "$(uci_get_config "lan_ac_white_macs")" ]; then
+            ip6tables -t nat -I PREROUTING -p udp --dport 53 -m set --match-set lan_ac_white_macs src -j REDIRECT --to-ports "$redirect_port" -m comment --comment "OpenKill DNS Hijack" || return 1
+            ip6tables -t nat -I PREROUTING -p tcp --dport 53 -m set --match-set lan_ac_white_macs src -j REDIRECT --to-ports "$redirect_port" -m comment --comment "OpenKill DNS Hijack" || return 1
+            white_rule=1
+         fi
+         [ "$white_rule" -eq 1 ] || return 1
+      fi
+      if [ "$router_self_proxy" = 1 ]; then
+         ip6tables -t nat -I OUTPUT -p udp --dport 53 -d ::1 $noowner -j REDIRECT --to-ports "$redirect_port" -m comment --comment "OpenKill DNS Hijack" || return 1
+         ip6tables -t nat -I OUTPUT -p tcp --dport 53 -d ::1 $noowner -j REDIRECT --to-ports "$redirect_port" -m comment --comment "OpenKill DNS Hijack" || return 1
+      fi
+      return 0
+   fi
+
    ip6tables -t nat -N openkill_dns_redirect 2>/dev/null || :
    ip6tables -t nat -F openkill_dns_redirect || return 1
 
@@ -2420,13 +2549,14 @@ if [ -n "$FW4" ]; then
       fi
    fi
 
-   DNSPORT=$(uci -q get "$DNSMASQ_UCI.port")
-   if [ -z "$DNSPORT" ]; then
-      DNSPORT=$(netstat -nlp |grep -E '127.0.0.1:.*dnsmasq' |awk -F '127.0.0.1:' '{print $2}' |awk '{print $1}' |head -1 || echo 53)
-   fi
+   DNSPORT="$(openkill_dnsmasq_port)"
 
    if [ "$enable_redirect_dns" -eq 1 ]; then
-      if ! fw4_has_dns_hijack_rule dstnat ipv4; then
+      # Do not accept a stale rule merely because it has the right comment
+      # and address family.  The redirect target must match the current
+      # dnsmasq frontend, otherwise a port change leaves DNS silently
+      # bypassing the intended listener.
+      if ! fw4_dns_rule_target_ready dstnat ipv4 "$DNSPORT"; then
          if [ "$lan_ac_mode" != "1" ]; then
             ACBLACKDNSFILTER=""
             if [ "$lan_ac_mode" = "0" ]; then
@@ -2789,7 +2919,15 @@ if [ -n "$FW4" ]; then
    fi
 
    #ipv6
-   if [ "$ipv6_enable" -eq 1 ]; then
+   IPV6_DNSPORT="$DNSPORT"
+   if [ "$enable_redirect_dns" -eq 2 ]; then
+      # Mihomo remains on its configured IPv4 loopback listener; dnsmasq is
+      # the verified IPv6 UDP/TCP frontend for firewall-forwarded DNS.
+      IPV6_DNSPORT="$(openkill_dnsmasq_port)"
+   fi
+   if [ "$ipv6_enable" -eq 1 ] || {
+      [ "$enable_redirect_dns" -eq 2 ] && openkill_ipv6_data_path_present
+   }; then
       #china ip route
       if [ "$china_ip6_route" != "0" ] || [ "$disable_udp_quic" = "1" ]; then
          apply_nft_set_file 6 china_ip6_route "$route6_file" || {
@@ -2808,7 +2946,10 @@ if [ -n "$FW4" ]; then
          fi
       fi
 
-      if ! fw4_has_dns_hijack_rule dstnat ipv6; then
+      # The same exact-target check is required for IPv6.  In particular,
+      # an old IPv6 rule pointing at Mihomo's IPv4-only loopback port must not
+      # be treated as healthy after the dual-stack frontend is selected.
+      if ! fw4_dns_rule_target_ready dstnat ipv6 "$DNSPORT"; then
          if [ "$enable_redirect_dns" -eq 1 ]; then
             if [ "$lan_ac_mode" != "1" ]; then
                ACBLACKDNSFILTER=""
@@ -2848,15 +2989,15 @@ if [ -n "$FW4" ]; then
                      ACBLACKDNSFILTER="$ACBLACKDNSFILTER ether saddr != @lan_ac_black_macs"
                   fi
                fi
-                nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ${ACBLACKDNSFILTER} counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\"" || return 1
+                nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ${ACBLACKDNSFILTER} counter redirect to ${IPV6_DNSPORT} comment \"OpenKill DNS Hijack\"" || return 1
              else
                 white_rule=0
                 if [ -n "$(uci_get_config "lan_ac_white_ips")" ]; then
-                   nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ip6 saddr @lan_ac_white_ipv6s counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\"" || return 1
+                   nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ip6 saddr @lan_ac_white_ipv6s counter redirect to ${IPV6_DNSPORT} comment \"OpenKill DNS Hijack\"" || return 1
                    white_rule=1
                 fi
                 if [ -n "$(uci_get_config "lan_ac_white_macs")" ]; then
-                   nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ether saddr @lan_ac_white_macs counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\"" || return 1
+                   nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ether saddr @lan_ac_white_macs counter redirect to ${IPV6_DNSPORT} comment \"OpenKill DNS Hijack\"" || return 1
                    white_rule=1
                 fi
                 [ "$white_rule" -eq 1 ] || return 1
@@ -2864,7 +3005,7 @@ if [ -n "$FW4" ]; then
              nft 'insert rule inet fw4 dstnat position 0 meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 counter jump openkill_dns_redirect' || return 1
             if [ "$router_self_proxy" = 1 ]; then
                nft 'add chain inet fw4 nat_output { type nat hook output priority -1; }'
-               nft "insert rule inet fw4 nat_output position 0 meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ip6 daddr {::1} meta skgid != 65534 counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\""
+               nft "insert rule inet fw4 nat_output position 0 meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 ip6 daddr {::1} meta skgid != 65534 counter redirect to ${IPV6_DNSPORT} comment \"OpenKill DNS Hijack\""
             fi
          fi
       fi
@@ -3331,10 +3472,7 @@ if [ -z "$FW4" ]; then
       fi
    fi
 
-   DNSPORT=$(uci -q get "$DNSMASQ_UCI.port")
-   if [ -z "$DNSPORT" ]; then
-      DNSPORT=$(netstat -nlp |grep -E '127.0.0.1:.*dnsmasq' |awk -F '127.0.0.1:' '{print $2}' |awk '{print $1}' |head -1 || echo 53)
-   fi
+   DNSPORT="$(openkill_dnsmasq_port)"
 
    if [ "$enable_redirect_dns" -eq 1 ]; then
       if [ -z "$(iptables -t nat -nL PREROUTING --line-number |grep 'OpenKill DNS Hijack')" ]; then
@@ -3726,18 +3864,18 @@ if [ -z "$FW4" ]; then
                      ACBLACKDNSFILTER="$ACBLACKDNSFILTER -m set ! --match-set lan_ac_black_macs src"
                   fi
                fi
-               ip6tables -t nat -A openkill_dns_redirect -p udp --dport 53 ${ACBLACKDNSFILTER} -j REDIRECT --to-ports "$dns_port" -m comment --comment "OpenKill DNS Hijack"
-               ip6tables -t nat -A openkill_dns_redirect -p tcp --dport 53 ${ACBLACKDNSFILTER} -j REDIRECT --to-ports "$dns_port" -m comment --comment "OpenKill DNS Hijack"
+               ip6tables -t nat -A openkill_dns_redirect -p udp --dport 53 ${ACBLACKDNSFILTER} -j REDIRECT --to-ports "$DNSPORT" -m comment --comment "OpenKill DNS Hijack"
+               ip6tables -t nat -A openkill_dns_redirect -p tcp --dport 53 ${ACBLACKDNSFILTER} -j REDIRECT --to-ports "$DNSPORT" -m comment --comment "OpenKill DNS Hijack"
             else
                 white_rule=0
                 if [ -n "$(uci_get_config "lan_ac_white_ips")" ]; then
-                   ip6tables -t nat -A openkill_dns_redirect -p udp --dport 53 -m set --match-set lan_ac_white_ipv6s src -j REDIRECT --to-ports "$dns_port" -m comment --comment "OpenKill DNS Hijack"
-                   ip6tables -t nat -A openkill_dns_redirect -p tcp --dport 53 -m set --match-set lan_ac_white_ipv6s src -j REDIRECT --to-ports "$dns_port" -m comment --comment "OpenKill DNS Hijack"
+                   ip6tables -t nat -A openkill_dns_redirect -p udp --dport 53 -m set --match-set lan_ac_white_ipv6s src -j REDIRECT --to-ports "$DNSPORT" -m comment --comment "OpenKill DNS Hijack"
+                   ip6tables -t nat -A openkill_dns_redirect -p tcp --dport 53 -m set --match-set lan_ac_white_ipv6s src -j REDIRECT --to-ports "$DNSPORT" -m comment --comment "OpenKill DNS Hijack"
                    white_rule=1
                 fi
                 if [ -n "$(uci_get_config "lan_ac_white_macs")" ]; then
-                   ip6tables -t nat -A openkill_dns_redirect -p udp --dport 53 -m set --match-set lan_ac_white_macs src -j REDIRECT --to-ports "$dns_port" -m comment --comment "OpenKill DNS Hijack"
-                   ip6tables -t nat -A openkill_dns_redirect -p tcp --dport 53 -m set --match-set lan_ac_white_macs src -j REDIRECT --to-ports "$dns_port" -m comment --comment "OpenKill DNS Hijack"
+                   ip6tables -t nat -A openkill_dns_redirect -p udp --dport 53 -m set --match-set lan_ac_white_macs src -j REDIRECT --to-ports "$DNSPORT" -m comment --comment "OpenKill DNS Hijack"
+                   ip6tables -t nat -A openkill_dns_redirect -p tcp --dport 53 -m set --match-set lan_ac_white_macs src -j REDIRECT --to-ports "$DNSPORT" -m comment --comment "OpenKill DNS Hijack"
                    white_rule=1
                 fi
                 [ "$white_rule" -eq 1 ] || return 1
@@ -3745,8 +3883,8 @@ if [ -z "$FW4" ]; then
              ip6tables -t nat -C PREROUTING -p udp --dport 53 -j openkill_dns_redirect 2>/dev/null || ip6tables -t nat -I PREROUTING -p udp --dport 53 -j openkill_dns_redirect
              ip6tables -t nat -C PREROUTING -p tcp --dport 53 -j openkill_dns_redirect 2>/dev/null || ip6tables -t nat -I PREROUTING -p tcp --dport 53 -j openkill_dns_redirect
             if [ "$router_self_proxy" = 1 ]; then
-               ip6tables -t nat -I OUTPUT -p udp --dport 53 -d ::1 $noowner -j REDIRECT --to-ports "$dns_port" -m comment --comment "OpenKill DNS Hijack"
-               ip6tables -t nat -I OUTPUT -p tcp --dport 53 -d ::1 $noowner -j REDIRECT --to-ports "$dns_port" -m comment --comment "OpenKill DNS Hijack"
+               ip6tables -t nat -I OUTPUT -p udp --dport 53 -d ::1 $noowner -j REDIRECT --to-ports "$DNSPORT" -m comment --comment "OpenKill DNS Hijack"
+               ip6tables -t nat -I OUTPUT -p tcp --dport 53 -d ::1 $noowner -j REDIRECT --to-ports "$DNSPORT" -m comment --comment "OpenKill DNS Hijack"
             fi
          fi
       fi

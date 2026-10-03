@@ -947,14 +947,17 @@ def _current_backend_execution(
     redirect_port = int(ports.get("redirect", default_redirect))
     tproxy_port = int(ports.get("tproxy", default_tproxy))
     dns_port = int(ports.get("dns", default_dns))
-    # A context-only DNS render retains the historical mode-2 chain form.
-    # State-backed mode-1 renders model the production path: firewall ->
-    # dnsmasq :53 -> Mihomo :7874.  Keeping this as a distinct execution
-    # field prevents the listener/upstream value from being reused as the
-    # firewall redirect target.
+    # A context-only DNS render retains the historical mode-2 chain form, but
+    # its IPv6 firewall target follows the production dual-stack contract:
+    # Mihomo remains on its IPv4 loopback listener and dnsmasq is the local
+    # IPv6 UDP/TCP frontend.  Mode 1 uses dnsmasq for both families. Keeping
+    # this as a distinct execution field prevents the listener/upstream value
+    # from being reused as the firewall redirect target.
     dns_mode = str((state or {}).get("dns_mode", "2" if state is None else "0"))
     firewall_dns_port = (
-        DEFAULT_DNSMASQ_LISTEN_PORT if dns_mode == "1" else dns_port
+        DEFAULT_DNSMASQ_LISTEN_PORT
+        if dns_mode == "1" or (dns_mode == "2" and family == "IPV6")
+        else dns_port
     )
 
     base: Dict[str, Any] = {
