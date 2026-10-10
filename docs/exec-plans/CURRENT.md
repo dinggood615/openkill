@@ -1,12 +1,16 @@
 # Current status
 
-## 2026-10-10 Metacubexd 日本自动组延迟探测（2026-2014，修复进行中）
+## 2026-10-10 Metacubexd 日本自动组延迟探测（2026-2014，设备修复验证完成；正式发布受认证阻塞）
 
 - 只读基线已在授权设备 `192.168.1.1` 完成：OpenWrt x86/64、Mihomo Meta v1.19.32、OpenKill 2026-2013；服务进程、控制器和面板端口均在运行。未修改设备配置、代理组选择、网络策略或服务状态。
 - 根因已由控制器 API 分层确认：日本自动组为 URLTest，两个成员均有真实历史但最后延迟为 0；对项目当前 gstatic 204 探测的组/成员请求均超时并返回控制器 504，而同一组及成员对 Cloudflare 204、Google 204、Apple 成功目标均取得非零延迟。自动组仍有当前选择且业务请求可用，因此“可联网”与“探测无延迟”是两个独立结果，问题不在节点失效或组选择。
 - 设备写入前已建立受保护备份 `/root/openkill-delay-backup-20261010-2159`：目录 700、文件 600，包含脱敏外的完整恢复材料但不进入仓库；设备内 SHA256 校验通过。回滚使用该备份恢复 OpenKill 配置/资源后，再按原服务状态恢复，不删除历史备份。
 - 修复方案：统一 OpenKill 管理的默认健康端点为 HTTPS Cloudflare 204；对现有精确旧 gstatic 默认元组做幂等迁移，保留用户自定义 URL、返回码、频率及显式 URL-Test 覆写；同步迁移 provider health-check、严格 DNS 受管组、样例配置及延迟辅助回退。未改业务分流、节点、订阅、DNS 隐私、防火墙、WAN、TUN 或 Naive 数据。
-- 回归覆盖新增默认端点、旧元组迁移、显式覆写保留、provider health-check 同步；本地 Ruby 结果：health defaults 7 runs/15 assertions，DNS privacy 17 runs/44 assertions，均通过。完整 `scripts/local-gate.sh`、Development CI、RC、Formal Release 和正式包安装复验待完成。
+- 回归覆盖新增默认端点、旧元组迁移、显式覆写保留、provider health-check 同步；本地 Ruby 结果：health defaults 7 runs/15 assertions，DNS privacy 17 runs/44 assertions，完整 `scripts/local-gate.sh` 通过。精确源码提交 `260dca81ceaa8de1565838252f678496b4bbcb6e` 的 Development CI `38058378759` 成功。
+- 由于当前环境没有仓库写权限令牌，RC 工作流的无认证 API dispatch 明确返回 HTTP 401；GitHub 页面也处于未登录状态，因此不能合法触发 RC 或 Formal Release，未伪造发布链接、标签、哈希或正式包。为完成设备行为复验，使用受保护临时包（基于上一正式包仅叠加已审计源文件，未进入 Git/Release）安装到授权设备，设备包版本显示 `2026-2014`，安装返回码 0；安装时用户 conffile 保留，候选默认文件单独落为 `.opkg`，没有覆盖用户配置。
+- 临时包安装后源/运行 YAML 中自动组探测 URL 均为 Cloudflare HTTPS 204、expected-status=204、interval=180；核心进程与服务管理均运行。控制器 API 复验：日本自动组 `URLTest`、2 个成员、组 alive、2 个成员均有历史；组探测连续三轮 HTTP 200，延迟约 88/89/392 ms；重启后再次 HTTP 200、约 92 ms。两个成员独立探测均 HTTP 200，约 90/196 ms。原 gstatic 目标导致的 504/零延迟已不再出现。
+- `/etc/init.d/openkill restart` 返回码为 1 但随后服务、核心进程和控制器均运行；安装维护输出含既有 `Command failed: Not found` 噪声，未伴随新的启动失败或配置歧义。该维护脚本返回码问题应在后续独立门禁中处理，不能把“服务实际运行”描述成重启命令无条件成功。
+- 真实 Metacubexd 页面仍要求控制器 secret，浏览器安全脱敏且未取得 GitHub 登录；本轮使用设备控制器 API 验证延迟数据链路，未伪造面板登录或视觉验收。正式 RC/Release、正式资产安装和面板直接验收均待外部认证/会话解除后完成。
 
 ## 2026-10-10 延迟检测、严格 DNS、双栈兼容与组件更新（2026-2013，正式发布；本地/隔离验收）
 
