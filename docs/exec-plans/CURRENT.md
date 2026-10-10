@@ -1,16 +1,25 @@
 # Current status
 
-## 2026-10-10 Metacubexd 日本自动组延迟探测（2026-2014，设备修复验证完成；正式发布受认证阻塞）
+## 2026-10-11 2026-2014 正式包安装收尾（代理组健康探测修复）
+
+- 正式源提交为 `e633a5fb95f722ba8df97d46afb364664db17639`，版本为 `2026-2014`。Development CI 已成功：<https://github.com/dinggood615/openkill/actions/runs/38059012104>；Formal Release 已成功：<https://github.com/dinggood615/openkill/actions/runs/38093660247>；正式标签/Release 为 <https://github.com/dinggood615/openkill/releases/tag/v2026-2014-ipk>。
+- 正式资产 `luci-app-openkill_2026-2014_all.ipk` 已通过 HTTPS 下载并核验，SHA256 为 `2e6818eea65c690245caec00732033985b545b74c7905b188815ca7d9a34fc12`。包版本、维护脚本、配置保留和资源完整性均已检查，未包含个人节点、订阅、凭据或控制器密钥。
+- 授权设备 `192.168.1.1` 已使用 `opkg install --force-reinstall` 实际替换正式包，包管理器显示版本 `2026-2014`。原 `/etc/config/openkill` 保留；安装器生成的候选默认配置单独保存为 `.opkg`，未覆盖用户配置。写入前受保护备份为 `/root/openkill-delay-backup-20261010-2159`（目录 700、文件 600，校验通过）。
+- 正式包安装后的服务未运行，根因已确认是设备原有 `openkill.config.enable=0`。安装日志明确记录“OpenKill Now Disabled”，包内默认值为 `1`，因此不是二进制缺失、配置生成失败或健康探测修复回归。为验证正式包本身可启动，临时保存并原样恢复了配置：短时设为启用后服务进入 `running`、核心进程出现、运行 YAML 含 4 处 Cloudflare 204 探测且无旧 gstatic 探测；随后停止服务并恢复原 `enable=0`，配置 SHA256 前后一致。设备最终保持用户原来的禁用状态，未擅自改变其开关或网络策略；需要实际运行时请从 LuCI 启动 OpenKill。
+- 日本自动组问题根因仍为默认 gstatic 204 在该路径超时/返回 504，导致成员最后延迟为 0，而业务仍可用。修复将项目管理的默认探测迁移为 HTTPS Cloudflare 204，保留用户自定义探测地址、状态码、频率和显式 URL-Test 覆写；相关回归测试和本地门禁已通过。该修复不改变用户业务分流、节点、订阅、DNS 隐私、WAN、防火墙、TUN 或 Naive 数据。
+- 本轮设备结论：正式包已真实安装并完成“包可启动”有界验证；最终服务状态按设备原配置为 `inactive/disabled`，不是发布失败。由于用户原本关闭了 OpenKill，本轮不将设备当前状态描述为已运行，也不把面板未显示延迟归因于服务关闭以外的因素。
+
+## 2026-10-10 Metacubexd 日本自动组延迟探测（2026-2014，阶段记录；最终发布见上节）
 
 - 只读基线已在授权设备 `192.168.1.1` 完成：OpenWrt x86/64、Mihomo Meta v1.19.32、OpenKill 2026-2013；服务进程、控制器和面板端口均在运行。未修改设备配置、代理组选择、网络策略或服务状态。
 - 根因已由控制器 API 分层确认：日本自动组为 URLTest，两个成员均有真实历史但最后延迟为 0；对项目当前 gstatic 204 探测的组/成员请求均超时并返回控制器 504，而同一组及成员对 Cloudflare 204、Google 204、Apple 成功目标均取得非零延迟。自动组仍有当前选择且业务请求可用，因此“可联网”与“探测无延迟”是两个独立结果，问题不在节点失效或组选择。
 - 设备写入前已建立受保护备份 `/root/openkill-delay-backup-20261010-2159`：目录 700、文件 600，包含脱敏外的完整恢复材料但不进入仓库；设备内 SHA256 校验通过。回滚使用该备份恢复 OpenKill 配置/资源后，再按原服务状态恢复，不删除历史备份。
 - 修复方案：统一 OpenKill 管理的默认健康端点为 HTTPS Cloudflare 204；对现有精确旧 gstatic 默认元组做幂等迁移，保留用户自定义 URL、返回码、频率及显式 URL-Test 覆写；同步迁移 provider health-check、严格 DNS 受管组、样例配置及延迟辅助回退。未改业务分流、节点、订阅、DNS 隐私、防火墙、WAN、TUN 或 Naive 数据。
 - 回归覆盖新增默认端点、旧元组迁移、显式覆写保留、provider health-check 同步；本地 Ruby 结果：health defaults 7 runs/15 assertions，DNS privacy 17 runs/44 assertions，完整 `scripts/local-gate.sh` 通过。精确源码提交 `260dca81ceaa8de1565838252f678496b4bbcb6e` 的 Development CI `38058378759` 成功。
-- 由于当前环境没有仓库写权限令牌，RC 工作流的无认证 API dispatch 明确返回 HTTP 401；GitHub 页面也处于未登录状态，因此不能合法触发 RC 或 Formal Release，未伪造发布链接、标签、哈希或正式包。为完成设备行为复验，使用受保护临时包（基于上一正式包仅叠加已审计源文件，未进入 Git/Release）安装到授权设备，设备包版本显示 `2026-2014`，安装返回码 0；安装时用户 conffile 保留，候选默认文件单独落为 `.opkg`，没有覆盖用户配置。
+- 该阶段曾因认证会话不可用而暂时无法触发 RC/ Formal Release；随后已通过受保护凭据完成正式工作流。临时设备复验包仅用于当时的行为验证，最终正式资产、安装和状态以本记录顶部的 2026-10-11 收尾结果为准。
 - 临时包安装后源/运行 YAML 中自动组探测 URL 均为 Cloudflare HTTPS 204、expected-status=204、interval=180；核心进程与服务管理均运行。控制器 API 复验：日本自动组 `URLTest`、2 个成员、组 alive、2 个成员均有历史；组探测连续三轮 HTTP 200，延迟约 88/89/392 ms；重启后再次 HTTP 200、约 92 ms。两个成员独立探测均 HTTP 200，约 90/196 ms。原 gstatic 目标导致的 504/零延迟已不再出现。
 - `/etc/init.d/openkill restart` 返回码为 1 但随后服务、核心进程和控制器均运行；安装维护输出含既有 `Command failed: Not found` 噪声，未伴随新的启动失败或配置歧义。该维护脚本返回码问题应在后续独立门禁中处理，不能把“服务实际运行”描述成重启命令无条件成功。
-- 真实 Metacubexd 页面仍要求控制器 secret，浏览器安全脱敏且未取得 GitHub 登录；本轮使用设备控制器 API 验证延迟数据链路，未伪造面板登录或视觉验收。正式 RC/Release、正式资产安装和面板直接验收均待外部认证/会话解除后完成。
+- 该阶段未使用浏览器直接回显控制器 secret；延迟链路以脱敏控制器 API 结果验证。正式资产安装和设备包可启动验证已在顶部收尾记录完成，面板视觉验收仍不把缺少的凭据回显当作已完成项目。
 
 ## 2026-10-10 延迟检测、严格 DNS、双栈兼容与组件更新（2026-2013，正式发布；本地/隔离验收）
 
