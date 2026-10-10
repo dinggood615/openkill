@@ -38,13 +38,14 @@ cache_dir=/etc/openkill/cache
 cache_file="$cache_dir/anti-ad-domains.txt"
 raw_file="${cache_file}.raw.$$"
 normalized_file="${cache_file}.normalized.$$"
+merged_file="${cache_file}.merged.$$"
 allow_file=/etc/openkill/custom/openkill_adblock_allow.list
 block_file=/etc/openkill/custom/openkill_adblock_block.list
 policy_allow="/tmp/openkill-adblock-allow.$$"
 policy_block="/tmp/openkill-adblock-block.$$"
 tmp_conf="${conf_file}.new.$$"
 tmp_provider="${provider_file}.new.$$"
-cleanup() { rm -f "$raw_file" "$normalized_file" "$policy_allow" "$policy_block" "$tmp_conf" "$tmp_provider"; }
+cleanup() { rm -f "$raw_file" "$normalized_file" "$merged_file" "$policy_allow" "$policy_block" "$tmp_conf" "$tmp_provider"; }
 trap cleanup 0 1 2 3 15
 
 url="$(uci_get_config adblock_rule_url 2>/dev/null || true)"
@@ -53,8 +54,10 @@ url="$(uci_get_config adblock_rule_url 2>/dev/null || true)"
 case "$url" in https://*) ;; *) LOG_WARN "Adblock URL is not HTTPS; keeping the last valid list."; url="" ;; esac
 
 mkdir -p "$cache_dir" "$conf_dir" "$provider_dir" 2>/dev/null || exit 1
+source_id=$(printf '%s' "$url" | sha256sum | awk '{print $1}')
+cached_source_id=$(cat "$cache_file.source" 2>/dev/null || true)
 refresh=1
-if [ -s "$cache_file" ]; then
+if [ -s "$cache_file" ] && [ "$source_id" = "$cached_source_id" ]; then
    now=$(date +%s 2>/dev/null || echo 0)
    interval="$(uci_get_config adblock_update_interval 2>/dev/null || echo 86400)"
    case "$interval" in ''|*[!0-9]*|0) interval=86400 ;; esac
@@ -89,14 +92,23 @@ normalize_domains() {
 }
 
 validate_download() {
-   local candidate="$1"
+   local candidate="$1" destination="${2:-$cache_file}" bytes count
    [ -n "$candidate" ] || return 1
    rm -f "$raw_file" "$normalized_file"
-   DOWNLOAD_FILE_CURL "$candidate" "$raw_file" "$cache_file" >/dev/null 2>&1 || return 1
+   DOWNLOAD_FILE_CURL "$candidate" "$raw_file" "$destination" >/dev/null 2>&1
+   case "$?" in
+      0) ;;
+      2) [ -s "$destination" ] && return 0 || return 1 ;;
+      *) return 1 ;;
+   esac
+   bytes=$(wc -c < "$raw_file" 2>/dev/null || echo 0)
+   [ "$bytes" -gt 0 ] && [ "$bytes" -le 33554432 ] || return 1
    ! grep -Eiq '<html|<!doctype|^[[:space:]]*error([[:space:]]|$)' "$raw_file" 2>/dev/null || return 1
    normalize_domains "$raw_file" > "$normalized_file" 2>/dev/null || return 1
-   [ "$(wc -l < "$normalized_file" 2>/dev/null || echo 0)" -ge 10 ] || return 1
-   mv -f "$normalized_file" "$cache_file"
+   count=$(wc -l < "$normalized_file" 2>/dev/null || echo 0)
+   [ "$count" -ge 10 ] && [ "$count" -le 400000 ] || return 1
+   mv -f "$normalized_file" "$destination" || return 1
+   printf '%s' "$candidate" | sha256sum | awk '{print $1}' > "$destination.source.new.$$" && mv -f "$destination.source.new.$$" "$destination.source"
 }
 
 if [ "$refresh" -eq 1 ] && [ -n "$url" ]; then
@@ -119,6 +131,27 @@ fi
    printf '%s\n' "mode=$mode" "state=failed" "generated=0" "effective=0" "provider_effective=0" "dns_loaded=unknown" "core_loaded=unknown" "verified=0" "reason=no-valid-list" > "$state_file"
    exit 0
 }
+
+# Optional maintained supplement: keep each source's own last valid cache,
+# then merge once. Do not re-download overlapping lists for each consumer.
+extra_source="$(uci_get_config adblock_extra_source 2>/dev/null || echo none)"
+extra_url=""
+if [ "$mode" = enhanced ]; then
+   case "$extra_source" in
+      hagezi-light) extra_url=https://raw.githubusercontent.com/hagezi/dns-blocklists/main/domains/light.txt ;;
+      hagezi-normal) extra_url=https://raw.githubusercontent.com/hagezi/dns-blocklists/main/domains/multi.txt ;;
+   esac
+fi
+cat "$cache_file" > "$merged_file" || exit 1
+if [ -n "$extra_url" ] && [ "$extra_url" != "$url" ]; then
+   extra_cache="$cache_dir/extra-${extra_source}.txt"
+   if [ "$refresh" = 1 ] || [ ! -s "$extra_cache" ]; then
+      validate_download "$extra_url" "$extra_cache" || LOG_WARN "Adblock supplement unavailable; retaining its previous valid cache."
+   fi
+   [ ! -s "$extra_cache" ] || cat "$extra_cache" >> "$merged_file"
+fi
+sort -u "$merged_file" -o "$merged_file" || exit 1
+[ "$(wc -l < "$merged_file")" -le 500000 ] || { LOG_WARN "Adblock merged list exceeds resource limit; retaining existing views."; exit 1; }
 
 # Build the same allow/block sets for dnsmasq and the core. RustDesk domains
 # are only added here when its scoped compatibility switch is enabled; this
@@ -151,7 +184,7 @@ awk -v allow="$policy_allow" -v block="$policy_block" '
    }
    BEGIN { read_list(allow, ok); read_list(block, deny) }
    { domain=tolower($0); if (domain ~ /^([a-z0-9_-]+\.)+[a-z]{2,}$/ && !listed(domain, ok) && !listed(domain, deny) && !seen[domain]) { print "local=/" domain "/"; seen[domain]=1 } }
-' "$cache_file" > "$tmp_conf" || exit 1
+' "$merged_file" > "$tmp_conf" || exit 1
 awk '!/^([[:space:]]*#|[[:space:]]*$)/ { gsub(/[[:space:]]/, "", $0); if ($0 ~ /^([A-Za-z0-9_-]+\.)+[A-Za-z]{2,}$/) print "local=/" tolower($0) "/" }' "$policy_block" | sort -u >> "$tmp_conf"
 
 if [ -s "$tmp_conf" ]; then
@@ -176,11 +209,11 @@ fi
       }
       BEGIN { read_list(allow, ok); read_list(block, deny) }
       { domain=tolower($0); if (domain ~ /^([a-z0-9_-]+\.)+[a-z]{2,}$/ && !listed(domain, ok) && !listed(domain, deny)) printf "  - %s\n", domain }
-   ' "$cache_file"
+   ' "$merged_file"
 } > "$tmp_provider" || exit 1
 mv -f "$tmp_provider" "$provider_file"
 chmod 0644 "$provider_file" "$conf_file" 2>/dev/null || true
 
-source_hash="$(sha256sum "$cache_file" 2>/dev/null | awk '{print $1}')"
-printf '%s\n' "mode=$mode" "state=generated" "generated=1" "effective=1" "provider_effective=1" "dns_loaded=unknown" "core_loaded=unknown" "verified=0" "domains=$(wc -l < "$cache_file" 2>/dev/null || echo 0)" "source_sha256=$source_hash" "updated=$(date +%s 2>/dev/null || echo 0)" > "$state_file"
+source_hash="$(sha256sum "$merged_file" 2>/dev/null | awk '{print $1}')"
+printf '%s\n' "mode=$mode" "state=generated" "generated=1" "effective=1" "provider_effective=1" "dns_loaded=unknown" "core_loaded=unknown" "verified=0" "domains=$(wc -l < "$merged_file" 2>/dev/null || echo 0)" "source_sha256=$source_hash" "updated=$(date +%s 2>/dev/null || echo 0)" > "$state_file"
 exit 0

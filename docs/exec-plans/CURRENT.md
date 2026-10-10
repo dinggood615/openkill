@@ -1,5 +1,16 @@
 # Current status
 
+## 2026-10-10 延迟检测、严格 DNS、双栈兼容与组件更新（2026-2013，发布前）
+
+- 观察基线为 `3afbb3d4cf3c2337a46a57b32aae9bd5ac55faec` / 2026-2012；本轮仅本地和隔离验证，禁止连接路由器及测试平台。既有未跟踪审计目录保留。
+- 受影响契约：自动组探测参数归一化、严格 DNS 受管组/加密上游与用户业务路由分离、广告标准/增强加载条件和规则源更新、OpenVPN 双栈端点解析与失败恢复、Naive 二进制/元数据配套回滚；保留原 UCI 键与已有值，防火墙转发缺省值仍为 2。
+- 初查发现：生成器对用户自定义探测 URL 无条件补 `expected-status: 204`，可造成业务可用而探测判失败；广告运行验证要求 DNS 与核心两端同时加载，而标准档核心未必引用 provider；Naive 更新只保留旧二进制，没有匹配元数据和运行实例切换验证；OpenVPN `getent ahosts` 不保证返回 IPv6，且 legacy 多 set swap 失败缺少逆序恢复。
+- 验证计划：先加入针对上述真实逻辑的失败回归，再修复；真实核心/控制器使用回环隔离服务验证，网络接管仅使用受控规则事务测试，不启用 CENTRAL_ACTIVE、不执行真实包路径测试。能力不足项如实保留，发布说明须披露设备及手机验证缺口。
+- 已实现：自动组使用可配置的 `url-test`/`fallback` 策略，默认探测仅对内置 204 端点补 `expected-status`，保留用户自定义探测返回码；严格 DNS 通过单一生成器保留业务规则、低延迟探测和惰性 fallback 查询；广告标准档以 dnsmasq 真实加载为证，增强档同时要求核心 provider，HaGeZi 补充源按 HTTPS、大小、域名数量校验后去重合并；OpenVPN 端点同时收集 IPv4/IPv6，legacy ipset 多集合事务失败逆序恢复；Naive 更新检查空间、锁定实例、配套保存二进制/元数据并在激活或回滚记录失败时恢复。
+- 默认值：全新安装继续使用 `performance-dual-stack`、防火墙 DNS 转发、严格 DNS；新增 `dns_privacy_strategy=url-test` 和 `adblock_extra_source=none`。升级及同版本重装保留用户值；默认不含节点、订阅、凭据、设备地址或用户 YAML。
+- 本地/隔离回归：`scripts/local-gate.sh`、DNS 隐私 17 runs/44 assertions、运行时 50 tests（3 skipped）、LuCI 合同 36、UI 预览 2、UCI 生命周期 19、安装器 18、OpenVPN 合同、广告状态 2、Naive 集成/独立 fixture、Mihomo v1.19.32 核心 12 项均通过；UI 交互在 WSL 因 Node 不可用跳过。没有连接路由器、测试平台、iPhone，也未执行真实设备安装、实机抓包或现场 fw4/ip6tables 数据面验证。
+
+
 ## 2026-10-03 IPv6 DNS 接管缺口修复（2026-2012，本地/隔离验证）
 
 - 基线为源码文档提交 `e9774c7272d4cf4dc6f34cb7ac92a7590e9c023a`，当前工作只涉及 IPv6 DNS 接管、就绪检查、诊断说明、回归测试和版本同步；既有未跟踪 RC/正式审计目录保持不变。本轮明确不连接测试平台、不访问路由器、不执行设备安装、实机抓包、服务操作或 iPhone 验收。

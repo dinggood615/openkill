@@ -76,6 +76,8 @@ def main() -> int:
     assert "mode == 'rule' && (china_ip_route || china_ip6_route)" in yml
     assert "provider_effective=1" in adblock and "source_sha256=" in adblock
     assert 'DEFAULT_ADBLOCK_URL="https://anti-ad.net/domains.txt"' in adblock
+    assert "hagezi-light" in adblock and "hagezi-normal" in adblock
+    assert "sort -u \"$merged_file\"" in adblock
     assert "validate_download \"$DEFAULT_ADBLOCK_URL\"" in adblock
     assert "Configured adblock source failed; used the maintained built-in source." in adblock
     assert "https://anti-ad.net/domains.txt" in yml

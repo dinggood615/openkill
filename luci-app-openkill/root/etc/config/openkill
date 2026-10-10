@@ -4,7 +4,7 @@ config openkill 'config'
 	# marker is informational and lets migrations distinguish the fresh-install
 	# profile from a user's explicit settings.
 	option default_profile 'performance-dual-stack'
-	option default_profile_version '2026-2012'
+	option default_profile_version '2026-2013'
 	option remote_service_bypass '0'
 	# Fresh installs use the audited dual-stack performance profile. Existing
 	# conffiles keep their explicit profile during upgrades.
@@ -52,6 +52,8 @@ config openkill 'config'
 	# source, cache and failure behaviour have been validated. No personal
 	# rules or domains are included.
 	option adblock_mode 'enhanced'
+	option adblock_extra_source 'none'
+	option dns_privacy_strategy 'url-test'
 	option adblock_rule_url 'https://anti-ad.net/domains.txt'
 	option adblock_rule_format 'yaml'
 	option adblock_dns_url 'https://anti-ad.net/domains.txt'

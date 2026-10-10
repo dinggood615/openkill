@@ -79,7 +79,7 @@ module OpenKillDnsPrivacy
     value
   end
 
-  def self.apply(value, mode, group)
+  def self.apply(value, mode, group, selection = 'url-test')
     dns = value.fetch('dns')
     if mode == 'strict'
       raise ArgumentError, 'Invalid DNS group name' unless group.match?(/\A[A-Za-z0-9_-]{1,64}\z/)
@@ -99,13 +99,12 @@ module OpenKillDnsPrivacy
       end.map { |p| p['name'] }.uniq
       providers = value['proxy-providers'].is_a?(Hash) ? value['proxy-providers'].keys.map(&:to_s).reject(&:empty?).uniq : []
       raise ArgumentError, 'Strict DNS requires at least one concrete proxy node or proxy provider' if nodes.empty? && providers.empty?
-      # A manual select group can remain pinned to a dead node. That makes
-      # every strict-DNS query fail even when another managed member is
-      # healthy. Keep the group private to DNS, but let Mihomo perform a
-      # bounded health check and fail over without adding DIRECT.
+      raise ArgumentError, 'Unsupported DNS selection strategy' unless %w[url-test fallback].include?(selection)
+      # A fallback follows member order, not latency. Offer a measured
+      # lowest-delay strategy without changing any business proxy group.
       managed = {
         'name' => group,
-        'type' => 'fallback',
+        'type' => selection,
         'url' => 'https://www.gstatic.com/generate_204',
         'interval' => 180,
         'timeout' => 5000,
@@ -113,6 +112,7 @@ module OpenKillDnsPrivacy
         'lazy' => false,
         'expected-status' => 204
       }
+      managed['tolerance'] = 25 if selection == 'url-test'
       managed['proxies'] = nodes unless nodes.empty?
       managed['use'] = providers unless providers.empty?
       groups << managed
@@ -132,6 +132,9 @@ module OpenKillDnsPrivacy
         dns['nameserver-policy'].transform_values! { |v| Array(v).map { |s| upstream(s,group) }.uniq }
       end
       dns['respect-rules'] = false
+      # Avoid eager parallel fallback lookups when the primary encrypted
+      # answer is usable. Preserve an explicit user choice.
+      dns['fallback-lazy-query'] = true unless dns.key?('fallback-lazy-query')
     end
     # Direct, IP-literal, certificate-verified bootstrap avoids proxy recursion.
     dns['default-nameserver'] = BOOTSTRAP.dup

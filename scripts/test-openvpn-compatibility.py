@@ -13,10 +13,18 @@ HELPER = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_openvpn.sh"
 INIT = ROOT / "luci-app-openkill/root/etc/init.d/openkill"
 
 
+def wsl_path(path: Path) -> str:
+    """Convert the current checkout path instead of assuming a drive root."""
+    value = path.resolve().as_posix()
+    if len(value) >= 3 and value[1:3] == ":/":
+        return "/mnt/" + value[0].lower() + value[2:]
+    return value
+
+
 def run(script: str) -> str:
     if os.name == "nt":
-        script = script.replace("D:/openkill", "/mnt/d/openkill")
-        command = ["wsl.exe", "--cd", "/mnt/d/openkill", "--exec", "sh", "-c", script]
+        script = script.replace(ROOT.as_posix(), wsl_path(ROOT))
+        command = ["wsl.exe", "--cd", wsl_path(ROOT), "--exec", "sh", "-c", script]
         result = subprocess.run(command, text=True, capture_output=True, encoding="utf-8", errors="replace")
     else:
         result = subprocess.run(["sh", "-c", script], cwd=ROOT, text=True, capture_output=True, encoding="utf-8", errors="replace")
@@ -79,6 +87,30 @@ def main() -> None:
         """
     )
     assert valid.strip() == "ok"
+
+    # ahosts can suppress AAAA when AI_ADDRCONFIG sees no global IPv6.
+    # Resolve the explicit IPv6 family and discard nslookup's DNS-server
+    # address, which must never become an OpenVPN transport exception.
+    resolved = run(f"""
+        . '{HELPER.as_posix()}'
+        getent() {{
+            case "$1" in
+                ahosts|ahostsv4) printf '198.51.100.10 STREAM fixture.example.test\\n' ;;
+                ahostsv6) printf '2001:db8::10 STREAM fixture.example.test\\n' ;;
+            esac
+        }}
+        openkill_openvpn_resolve_host fixture.example.test
+    """)
+    assert '198.51.100.10' in resolved and '2001:db8::10' in resolved
+
+    fallback = run(f"""
+        . '{HELPER.as_posix()}'
+        getent() {{ return 1; }}
+        nslookup() {{ printf '%s\\n' 'Server: 192.0.2.53' 'Address: 192.0.2.53#53' '' 'Name: fixture.example.test' 'Address: 198.51.100.10' 'Address: 2001:db8::10'; }}
+        openkill_openvpn_resolve_host fixture.example.test
+    """)
+    assert '192.0.2.53' not in fallback
+    assert '198.51.100.10' in fallback and '2001:db8::10' in fallback
 
     generated = prepare_fixture(
         {

@@ -9,7 +9,8 @@ import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SHARE = ROOT / 'luci-app-openkill/root/usr/share/openkill'
-BASH = shutil.which('bash') or 'C:/Program Files/Git/bin/bash.exe'
+BASH = ('C:/Program Files/Git/bin/bash.exe' if os.name == 'nt' and
+        pathlib.Path('C:/Program Files/Git/bin/bash.exe').exists() else shutil.which('bash') or 'bash')
 RUBY = shutil.which('ruby')
 
 

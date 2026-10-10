@@ -322,7 +322,15 @@ o:value("split", "分流隐私（推荐）")
 o:value("strict", "严格隐私（失败不明文回退）")
 o.default = "split"
 o.rmempty = false
-o.description = "严格档将普通加密 DNS 绑定独立代理组；节点与解析器引导使用证书校验的直接加密解析，不静默补入明文 DNS。停止服务后的系统解析、客户端自建 DoH 和旁路不属于此模式的保护范围。仅含订阅 provider 的配置须先提供具体代理节点。"
+o.description = "严格档的公网解析加密经专用组，国内业务仍按原规则直连。远端解析出口可能影响国内 CDN 与首次访问延迟。节点与解析器引导保留直接加密例外；停止服务后的系统解析、客户端自建 DoH 和旁路不在保护范围。支持具体节点及订阅 provider。"
+
+o = s:taboption("dns", ListValue, "dns_privacy_strategy", "DNS 出站选择")
+o:value("url-test", "优先低延迟（自动测速）")
+o:value("fallback", "按顺序故障转移")
+o.default = "url-test"
+o.rmempty = false
+o:depends("dns_privacy_mode", "strict")
+o.description = "仅影响独立 DNS 组，不切换业务代理组。测速反映探测目标延迟，具体 DNS/CDN 效果请查看诊断。两种方式均不加入 DIRECT。"
 
 o = s:taboption("compatibility", Flag, "bypass_gateway_compatible", translate("Bypass Gateway Compatible"))
 o.description = translate("If The Network Cannot be Connected in Bypass Gateway Mode, Please Try to Enable.")..font_red..bold_on..translate("Suggestion: If The Device Does Not Have WLAN, Please Disable The Lan Interface's Bridge Option")..bold_off..font_off
@@ -418,17 +426,29 @@ o:depends{enable_redirect_dns = "1", enable_custom_domain_dns_server = "1"}
 
 o = s:taboption("dns", ListValue, "adblock_mode", "广告屏蔽档位")
 o:value("off", "关闭（保留 DNS 隐私与代理策略）")
-o:value("standard", "标准（推荐，anti-AD 域名规则）")
-o:value("enhanced", "增强（同源核心规则，用户阻止更严格）")
+o:value("standard", "标准（DNS 域名拦截）")
+o:value("enhanced", "增强（DNS 与核心连接拦截）")
 o.default = "enhanced"
 o.rmempty = false
-o.description = "两个档位都使用同一份经校验的 anti-AD 域名生成 DNS 与 Mihomo 规则；增强档只提高用户阻止策略的显示级别，不宣称额外来源或重复下载。硬编码 IP、自建 DoH、第一方共域名广告和 HTTPS 内容不会被此功能完整识别。"
+o.description = "标准与增强均属于开启状态；标准验证 DNS 加载，增强验证 DNS 与核心加载。共享经校验域名缓存，允许列表不改变业务出站。硬编码 IP、自建 DoH、同域广告和 HTTPS 内容不保证屏蔽。"
 
 o = s:taboption("dns", Value, "adblock_rule_url", "广告规则源")
 o.default = "https://anti-ad.net/domains.txt"
+o:value("https://anti-ad.net/domains.txt", "anti-AD（中文场景）")
+o:value("https://raw.githubusercontent.com/hagezi/dns-blocklists/main/domains/light.txt", "HaGeZi Light（精简）")
+o:value("https://raw.githubusercontent.com/hagezi/dns-blocklists/main/domains/multi.txt", "HaGeZi Normal（综合）")
 o.description = "只接受 HTTPS。建议使用 anti-AD 域名列表；系统会把它规范化为 dnsmasq 与 Mihomo 共用的本地 YAML。下载失败保留最后有效版本。"
 o:depends("adblock_mode", "standard")
 o:depends("adblock_mode", "enhanced")
+
+o = s:taboption("dns", ListValue, "adblock_extra_source", "增强补充规则源")
+o:value("none", "不额外下载（默认）")
+o:value("hagezi-light", "HaGeZi Light")
+o:value("hagezi-normal", "HaGeZi Normal")
+o.default = "none"
+o.rmempty = false
+o:depends("adblock_mode", "enhanced")
+o.description = "按需选择一个补充源，合并去重后同时生成 DNS 与核心规则。大集合增加内存和加载时间；失败保留该源上次有效版本。"
 
 o = s:taboption("dns", ListValue, "adblock_rule_format", "规则源格式")
 o:value("yaml", "YAML（anti-AD 默认）")

@@ -135,11 +135,22 @@ openkill_openvpn_resolve_host()
 {
    local host output
    host="$1"
+   output=""
    if command -v getent >/dev/null 2>&1; then
-      getent ahosts "$host" 2>/dev/null | awk '{print $1}'
+      output=$({ getent ahosts "$host" 2>/dev/null; getent ahostsv6 "$host" 2>/dev/null; } | awk '{print $1}' | sort -u)
+   fi
+   if [ -n "$output" ]; then
+      printf '%s\n' "$output"
    elif command -v nslookup >/dev/null 2>&1; then
-      output=$(nslookup "$host" 2>/dev/null || true)
-      printf '%s\n' "$output" | awk '/^Address([0-9]+)?:[[:space:]]/ {print $NF} /^Address:[[:space:]]/ {print $2}'
+      # The server header contains the resolver address, not a VPN endpoint.
+      # BusyBox prints answers after Name:, while bind also uses an answer
+      # section. Keep only address records belonging to the answer.
+      nslookup "$host" 2>/dev/null | awk '
+         /^Name:|^Non-authoritative answer:|^Authoritative answers/ { answer=1 }
+         answer && /^Address([[:space:]]+[0-9]+|[0-9]+)?:[[:space:]]/ { print $NF }
+         answer && / has AAAA address / { print $NF }
+         answer && / has address / { print $NF }
+      ' | sort -u
    fi
 }
 
@@ -327,7 +338,7 @@ openkill_openvpn_cleanup_temp_ipsets()
 openkill_openvpn_apply_runtime()
 {
    local batch source4 source6 clients4 clients6 ports value rc
-   local temp4 temp6 tempc4 tempc6 tempp temp
+   local temp4 temp6 tempc4 tempc6 tempp temp swapped pair live
    if [ "${OPENKILL_OPENVPN_retained:-0}" = 1 ]; then
       source4="$OPENKILL_OPENVPN_DIR/endpoints4.new"
       source6="$OPENKILL_OPENVPN_DIR/endpoints6.new"
@@ -392,12 +403,25 @@ openkill_openvpn_apply_runtime()
          [ -n "$value" ] || continue
          ipset add "$tempp" "$value" || { openkill_openvpn_cleanup_temp_ipsets "$temp4" "$temp6" "$tempc4" "$tempc6" "$tempp"; return 1; }
       done < "$ports"
-      ipset swap "$temp4" openkill_openvpn_endpoints4 && \
-      ipset swap "$temp6" openkill_openvpn_endpoints6 && \
-      ipset swap "$tempc4" openkill_openvpn_clients4 && \
-      ipset swap "$tempc6" openkill_openvpn_clients6 && \
-      ipset swap "$tempp" openkill_openvpn_ports
-      rc=$?
+      swapped=""; rc=0
+      for pair in "$temp4:openkill_openvpn_endpoints4" "$temp6:openkill_openvpn_endpoints6" "$tempc4:openkill_openvpn_clients4" "$tempc6:openkill_openvpn_clients6" "$tempp:openkill_openvpn_ports"; do
+         temp=${pair%%:*}; live=${pair#*:}
+         if ipset swap "$temp" "$live"; then
+            swapped="$pair $swapped"
+         else
+            rc=1
+            # Keep old contents until the whole generation is committed.
+            # Restore successful swaps in reverse order on a later failure.
+            for pair in $swapped; do
+               ipset swap "${pair%%:*}" "${pair#*:}" || {
+                  OPENKILL_OPENVPN_reason=rollback-failed
+                  openkill_openvpn_write_state || true
+                  return 1
+               }
+            done
+            break
+         fi
+      done
       # After a successful swap the temporary names refer to the old sets;
       # after a failed swap they are safe to remove as best effort cleanup.
       openkill_openvpn_cleanup_temp_ipsets "$temp4" "$temp6" "$tempc4" "$tempc6" "$tempp"
@@ -474,7 +498,7 @@ openkill_openvpn_add_nft_rules()
          esac
          if [ "$family" = 4 ]; then target=openkill_openvpn_endpoints4; clientset=openkill_openvpn_clients4; else target=openkill_openvpn_endpoints6; clientset=openkill_openvpn_clients6; fi
          if [ "$OPENKILL_OPENVPN_ROLE" = lan-client ]; then
-            [ "$family" = 4 ] && [ "$OPENKILL_OPENVPN_client4" -gt 0 ] || [ "$family" = 6 ] && [ "$OPENKILL_OPENVPN_client6" -gt 0 ] || continue
+            { [ "$family" = 4 ] && [ "$OPENKILL_OPENVPN_client4" -gt 0 ]; } || { [ "$family" = 6 ] && [ "$OPENKILL_OPENVPN_client6" -gt 0 ]; } || continue
             if [ "$family" = 4 ]; then
                rule="insert rule inet fw4 $chain position 0 meta l4proto $l4proto ip saddr @${clientset} ip daddr @${target} th dport @openkill_openvpn_ports counter return comment \"OpenKill OpenVPN Scoped Transport\""
             else

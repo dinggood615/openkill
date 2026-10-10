@@ -27,7 +27,8 @@ class DnsPrivacyTest < Minitest::Test
     v=profile
     OpenKillDnsPrivacy.apply(v, 'strict', 'OpenKill-DNS')
     managed = v['proxy-groups'].last
-    assert_equal 'fallback', managed['type']
+    assert_equal 'url-test', managed['type']
+    assert_equal 25, managed['tolerance']
     assert_equal ['fixture'], managed['proxies']
     assert_equal 'https://www.gstatic.com/generate_204', managed['url']
     assert_equal 180, managed['interval']
@@ -42,6 +43,24 @@ class DnsPrivacyTest < Minitest::Test
   def test_collision_rejected
     v=profile
     assert_raises(ArgumentError) { OpenKillDnsPrivacy.apply(v,'strict','existing') }
+  end
+  def test_ordered_fallback_remains_available_without_direct
+    v = profile
+    OpenKillDnsPrivacy.apply(v, 'strict', 'OpenKill-DNS', 'fallback')
+    managed = v['proxy-groups'].last
+    assert_equal 'fallback', managed['type']
+    refute managed.key?('tolerance')
+    assert_equal ['fixture'], managed['proxies']
+  end
+
+  def test_strict_lazy_fallback_preserves_explicit_choice
+    v = profile
+    OpenKillDnsPrivacy.apply(v, 'strict', 'OpenKill-DNS')
+    assert_equal true, v['dns']['fallback-lazy-query']
+    v = profile
+    v['dns']['fallback-lazy-query'] = false
+    OpenKillDnsPrivacy.apply(v, 'strict', 'OpenKill-DNS')
+    assert_equal false, v['dns']['fallback-lazy-query']
   end
   def test_no_proxy_rejected
     v=profile; v['proxies']=[]

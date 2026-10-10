@@ -15,6 +15,7 @@ NP_CONFIG_DIR="$NP_RUN/config"
 NP_STATE_DIR="$NP_RUN/state"
 NP_PORT_MAP="$NP_ROOT/ports"
 NP_BIN="${NAIVEPROXY_BIN:-$NP_ROOT/naive}"
+NP_SERVICE_SCRIPT="${NAIVEPROXY_SERVICE_SCRIPT:-/etc/init.d/naiveproxy-bridge}"
 NP_TARGET="${NAIVEPROXY_HEALTH_TARGET:-https://www.gstatic.com/generate_204}"
 NP_TIMEOUT="${NAIVEPROXY_HEALTH_TIMEOUT:-8}"
 NP_PORT_BASE="${NAIVEPROXY_PORT_BASE:-11080}"
@@ -382,8 +383,42 @@ np_elf_arch_ok() {
     [ "$em" -eq "$expected" ]
 }
 
+np_component_resume() {
+    local id failed=0
+    for id in $1; do
+        "$NP_SERVICE_SCRIPT" start_node "$id" </dev/null >/dev/null 2>&1 || failed=1
+    done
+    [ "$failed" = 0 ]
+}
+
+np_component_restore() {
+    local backup="$1" ids="$2" id failed=0
+    for id in $ids; do
+        # The caller may already have stopped the instance before the
+        # replacement failed.  Only ask the bridge to stop a process that is
+        # still proven to own this node; a harmlessly absent process must not
+        # turn a recoverable rollback into a second failure.
+        if np_pid_for_config "$NP_CONFIG_DIR/$id.json" >/dev/null 2>&1; then
+            "$NP_SERVICE_SCRIPT" stop_node "$id" </dev/null >/dev/null 2>&1 || failed=1
+        fi
+    done
+    [ "$failed" = 0 ] || return 1
+    if [ -f "$backup/naive" ]; then
+        cp "$backup/naive" "$NP_BIN.restore.$$" && chmod 755 "$NP_BIN.restore.$$" && mv -f "$NP_BIN.restore.$$" "$NP_BIN" || return 1
+    else
+        rm -f "$NP_BIN" || return 1
+    fi
+    if [ -f "$backup/component.meta" ]; then
+        cp "$backup/component.meta" "$NP_ROOT/component.meta.restore.$$" && chmod 600 "$NP_ROOT/component.meta.restore.$$" && mv -f "$NP_ROOT/component.meta.restore.$$" "$NP_ROOT/component.meta" || return 1
+    else
+        rm -f "$NP_ROOT/component.meta" || return 1
+    fi
+    np_component_resume "$ids"
+}
+
 np_component_install() {
     local url="$1" expected="$2" expected_size="${3:-}" tmp archive extract candidate size actual binary_sha256 magic previous
+    local free_kb required_kb backup active_ids id stopped_ids
     NP_INSTALL_ERROR=""
     case "$url" in
         https://github.com/klzgrad/naiveproxy/releases/download/*) ;;
@@ -395,6 +430,15 @@ np_component_install() {
     np_dirs || { np_install_error runtime-directory-failed; return 1; }
     command -v sha256sum >/dev/null 2>&1 || { np_install_error sha256sum-missing; return 3; }
     command -v tar >/dev/null 2>&1 || { np_install_error tar-missing; return 3; }
+    free_kb=$(df -Pk "$NP_ROOT" 2>/dev/null | awk 'END {print $4}')
+    case "$free_kb" in ''|*[!0-9]*) np_install_error free-space-unknown; return 3 ;; esac
+    # Keep enough room for the download, extraction and one rollback copy
+    # without imposing a fixed 512 MiB requirement on small OpenWrt flashes.
+    # The floor leaves room for metadata and temporary files; a large asset
+    # scales the requirement to four copies of its size plus that floor.
+    required_kb=32768
+    if [ -n "$expected_size" ]; then required_kb=$((expected_size / 1024 * 4 + 32768)); fi
+    [ "$free_kb" -ge "$required_kb" ] || { np_install_error insufficient-space; return 3; }
     tmp="$NP_ROOT/.component-download.$$"; archive="$tmp"; extract="$NP_ROOT/.component-extract.$$"
     rm -f "$tmp" "$tmp.tar"; rm -rf "$extract"
     if command -v curl >/dev/null 2>&1; then
@@ -450,19 +494,47 @@ np_component_install() {
         printf 'installed_at=%s\n' "$(date +%s)"
     } > "$NP_ROOT/component.meta.new.$$" || { rm -f "$NP_BIN.new" "$NP_ROOT/component.meta.new.$$"; np_install_error metadata-write-failed; return 10; }
     chmod 600 "$NP_ROOT/component.meta.new.$$" || { rm -f "$NP_BIN.new" "$NP_ROOT/component.meta.new.$$"; np_install_error metadata-permission-failed; return 10; }
-    previous="$NP_BIN.previous"
-    rm -f "$previous"
-    if [ -e "$NP_BIN" ]; then mv -f "$NP_BIN" "$previous" || { rm -f "$NP_BIN.new" "$NP_ROOT/component.meta.new.$$"; np_install_error preserve-old-failed; return 9; }; fi
+    # Preserve the executable and its matching metadata together. Recovery
+    # generations are never discarded by an ordinary update.
+    backup="$NP_ROOT/component-backups/$(date +%s).$$"
+    mkdir -p "$backup" && chmod 700 "$NP_ROOT/component-backups" "$backup" || { np_install_error backup-directory-failed; return 9; }
+    if [ -e "$NP_BIN" ]; then cp "$NP_BIN" "$backup/naive" && chmod 755 "$backup/naive" || { np_install_error preserve-old-failed; return 9; }; fi
+    if [ -e "$NP_ROOT/component.meta" ]; then cp "$NP_ROOT/component.meta" "$backup/component.meta" && chmod 600 "$backup/component.meta" || { np_install_error preserve-metadata-failed; return 9; }; fi
+    active_ids=""; stopped_ids=""
+    for id in $(np_ids); do
+        if np_pid_for_config "$NP_CONFIG_DIR/$id.json" >/dev/null 2>&1; then active_ids="$active_ids $id"; fi
+    done
+    for id in $active_ids; do
+        if "$NP_SERVICE_SCRIPT" stop_node "$id" </dev/null >/dev/null 2>&1; then
+            stopped_ids="$stopped_ids $id"
+        else
+            np_component_resume "$stopped_ids" || true
+            rm -f "$NP_BIN.new" "$NP_ROOT/component.meta.new.$$"
+            np_install_error instance-stop-failed; return 9
+        fi
+    done
     if ! mv -f "$NP_BIN.new" "$NP_BIN"; then
-        [ -e "$previous" ] && mv -f "$previous" "$NP_BIN" || true
+        np_component_resume "$active_ids" || true
         rm -f "$NP_ROOT/component.meta.new.$$"
         np_install_error replace-failed; return 9
     fi
     chown root:root "$NP_BIN" 2>/dev/null || true; chmod 755 "$NP_BIN"
     if ! mv -f "$NP_ROOT/component.meta.new.$$" "$NP_ROOT/component.meta"; then
-        rm -f "$NP_BIN"
-        [ -e "$previous" ] && mv -f "$previous" "$NP_BIN" || true
-        np_install_error metadata-replace-failed; return 10
+        np_component_restore "$backup" "$active_ids" || { np_install_error rollback-failed; return 10; }
+        np_install_error metadata-replace-failed-restored; return 10
+    fi
+    for id in $(np_ids); do rm -f "$NP_STATE_DIR/health.$id"; done
+    if ! np_component_resume "$active_ids"; then
+        np_component_restore "$backup" "$active_ids" || { np_install_error rollback-failed; return 11; }
+        np_install_error instance-start-failed-restored; return 11
+    fi
+    if ! printf '%s\n' "$backup" > "$NP_ROOT/component.rollback.new.$$" ||
+       ! chmod 600 "$NP_ROOT/component.rollback.new.$$" ||
+       ! mv -f "$NP_ROOT/component.rollback.new.$$" "$NP_ROOT/component.rollback"; then
+        rm -f "$NP_ROOT/component.rollback.new.$$"
+        np_component_restore "$backup" "$active_ids" || { np_install_error rollback-failed; return 10; }
+        np_install_error rollback-record-failed-restored
+        return 10
     fi
     return 0
 }
@@ -512,12 +584,16 @@ np_listener_owner() {
 }
 
 np_pid_for_config() {
-    local config="$1" proc cmd
+    local config="$1" proc exe
     case "$(uname -s 2>/dev/null || true)" in Linux*) ;; *) return 1 ;; esac
     for proc in /proc/[0-9]*; do
         [ -r "$proc/cmdline" ] || continue
-        cmd=$(tr '\000' ' ' < "$proc/cmdline" 2>/dev/null || true)
-        case "$cmd" in *"$config"*) printf '%s\n' "${proc##*/}"; return 0 ;; esac
+        exe=$(readlink "$proc/exe" 2>/dev/null || true)
+        case "$exe" in "$NP_BIN"|"$NP_BIN (deleted)") ;; *) continue ;; esac
+        # Exact argv item and executable identity prevent the diagnostic
+        # shell, a substring match or another program being taken for Naive.
+        tr '\000' '\n' < "$proc/cmdline" 2>/dev/null | grep -Fxq -- "$config" || continue
+        printf '%s\n' "${proc##*/}"; return 0
     done
     return 1
 }
@@ -1155,8 +1231,10 @@ np_dispatch() {
         component) np_probe_component; exit $? ;;
         component-status) np_component_status_refresh; exit $? ;;
         install)
+            np_component_lock_begin || { printf 'reason=component-task-busy\n' >&2; exit 39; }
             np_component_install "$2" "$3" "${4:-}"
             rc=$?
+            np_component_lock_end
             if [ "$rc" -eq 0 ]; then
                 np_manifest >/dev/null 2>&1 || true
             else

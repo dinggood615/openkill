@@ -7,7 +7,8 @@ import yaml
 import re
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-BASH = shutil.which("bash") or "C:/Program Files/Git/bin/bash.exe"
+BASH = ("C:/Program Files/Git/bin/bash.exe" if pathlib.Path("C:/Program Files/Git/bin/bash.exe").exists()
+        else shutil.which("bash") or "bash")
 SOURCE = (ROOT / "scripts/install-openkill.sh").read_text(encoding="utf-8")
 CORE_SOURCE = (ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_core.sh").read_text(encoding="utf-8")
 RENDERER_PATH = ROOT / "luci-app-openkill/root/usr/share/openkill/openkill_nft_renderer.sh"

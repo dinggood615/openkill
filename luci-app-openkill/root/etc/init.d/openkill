@@ -1269,7 +1269,10 @@ openkill_adblock_runtime_verify()
       core_loaded=1
    fi
 
-   if [ "$dns_loaded" -eq 1 ] && [ "$core_loaded" -eq 1 ]; then
+   # Standard filters at the DNS frontend; enhanced additionally requires
+   # the core provider.  Do not make the standard state depend on a provider
+   # that its mode does not load.
+   if [ "$dns_loaded" -eq 1 ] && { [ "$mode" = standard ] || [ "$core_loaded" -eq 1 ]; }; then
       verified=1
       effective=1
       reason=runtime-loaded

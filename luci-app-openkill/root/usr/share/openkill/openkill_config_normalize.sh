@@ -19,7 +19,7 @@ set_default() {
 # fields identify the profile only; all user-selected values remain untouched
 # on upgrade, reinstall and migration.
 set_default default_profile performance-dual-stack
-set_default default_profile_version 2026-2012
+set_default default_profile_version 2026-2013
 default_profile="$(uci -q get openkill.config.default_profile 2>/dev/null || true)"
 case "$default_profile" in
     performance-dual-stack) ;;
@@ -37,6 +37,8 @@ set_default ipv6_mode 2
 set_default stack_type mips
 set_default stack_type_v6 mips
 set_default tun_congestion_controller bbr3
+set_default dns_privacy_strategy url-test
+set_default adblock_extra_source none
 # Older conffiles can predate the log_level option.  An empty value is passed
 # to yml_change.sh as an explicit YAML scalar and Mihomo rejects it as an
 # invalid log level, so repair both missing and stale values before rendering.

@@ -18,6 +18,8 @@ append_wan_dns=$(uci_get_config "append_wan_dns" || echo 0)
 dns_privacy_mode=$(uci_get_config "dns_privacy_mode" || echo split)
 case "$dns_privacy_mode" in split|strict) ;; *) dns_privacy_mode=split ;; esac
 dns_privacy_group=$(uci_get_config "dns_privacy_group" || echo OpenKill-DNS)
+dns_privacy_strategy=$(uci_get_config "dns_privacy_strategy" || echo url-test)
+case "$dns_privacy_strategy" in url-test|fallback) ;; *) dns_privacy_strategy=url-test ;; esac
 case "$dns_privacy_group" in ''|*[!A-Za-z0-9_-]*) dns_privacy_group=OpenKill-DNS ;; esac
 adblock_mode=$(uci_get_config "adblock_mode" || echo enhanced)
 case "$adblock_mode" in off|standard|enhanced) ;; *) adblock_mode=enhanced ;; esac
@@ -559,13 +561,16 @@ begin
          group['interval'] = 180 unless group.key?('interval') && group['interval'].to_i > 0
          group['timeout'] = 3500 unless group.key?('timeout') && group['timeout'].to_i > 0
          group['max-failed-times'] = 2 unless group.key?('max-failed-times') && group['max-failed-times'].to_i > 0
-         group['expected-status'] = 204 unless group.key?('expected-status')
+         # A user endpoint may legitimately return 200.  Bind the default
+         # status only to our own 204 endpoint, otherwise preserve the core's
+         # general successful-response semantics and any explicit range.
+         group['expected-status'] = 204 if group['url'] == 'https://www.gstatic.com/generate_204' && !group.key?('expected-status')
          group['lazy'] = false unless group.key?('lazy')
          group['tolerance'] = 50 if group['type'].to_s == 'url-test' && !group.key?('tolerance')
          # 2026-1115 wrote the old 300/5000/3/lazy defaults into generated
          # profiles.  Treat that exact tuple as managed state and migrate it
          # once; any other explicit user values remain untouched.
-         if group['interval'].to_i == 300 && group['timeout'].to_i == 5000 &&
+         if group['url'] == 'https://www.gstatic.com/generate_204' && group['interval'].to_i == 300 && group['timeout'].to_i == 5000 &&
             group['max-failed-times'].to_i == 3 && group['lazy'] == true
             group['interval'] = 180
             group['timeout'] = 3500
@@ -1120,7 +1125,7 @@ begin
    end
 
       require '/usr/share/openkill/dns_privacy'
-      OpenKillDnsPrivacy.apply(Value, dns_privacy_mode, '$dns_privacy_group')
+      OpenKillDnsPrivacy.apply(Value, dns_privacy_mode, '$dns_privacy_group', '$dns_privacy_strategy')
       # Strict DNS transport must not turn domestic business connections into
       # proxy connections.  Add canonical CN domain/IP direct decisions only
       # when the rule profile has no explicit decision of its own; the user's
