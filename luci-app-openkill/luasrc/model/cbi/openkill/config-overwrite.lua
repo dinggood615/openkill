@@ -67,9 +67,10 @@ o.default = "0"
 o = s:taboption("settings", Value, "urltest_address_mod", translate("URL-Test Address Modify"))
 o.description = translate("Modify The URL-Test Address In The Config")
 o:value("0", translate("Disable"))
-o:value("http://www.gstatic.com/generate_204")
-o:value("http://cp.cloudflare.com/generate_204")
 o:value("https://cp.cloudflare.com/generate_204")
+o:value("http://cp.cloudflare.com/generate_204")
+o:value("http://www.gstatic.com/generate_204")
+o:value("https://www.gstatic.com/generate_204")
 o:value("http://captive.apple.com/generate_204")
 o.default = "0"
 

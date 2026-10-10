@@ -1,5 +1,13 @@
 # Current status
 
+## 2026-10-10 Metacubexd 日本自动组延迟探测（2026-2014，修复进行中）
+
+- 只读基线已在授权设备 `192.168.1.1` 完成：OpenWrt x86/64、Mihomo Meta v1.19.32、OpenKill 2026-2013；服务进程、控制器和面板端口均在运行。未修改设备配置、代理组选择、网络策略或服务状态。
+- 根因已由控制器 API 分层确认：日本自动组为 URLTest，两个成员均有真实历史但最后延迟为 0；对项目当前 gstatic 204 探测的组/成员请求均超时并返回控制器 504，而同一组及成员对 Cloudflare 204、Google 204、Apple 成功目标均取得非零延迟。自动组仍有当前选择且业务请求可用，因此“可联网”与“探测无延迟”是两个独立结果，问题不在节点失效或组选择。
+- 设备写入前已建立受保护备份 `/root/openkill-delay-backup-20261010-2159`：目录 700、文件 600，包含脱敏外的完整恢复材料但不进入仓库；设备内 SHA256 校验通过。回滚使用该备份恢复 OpenKill 配置/资源后，再按原服务状态恢复，不删除历史备份。
+- 修复方案：统一 OpenKill 管理的默认健康端点为 HTTPS Cloudflare 204；对现有精确旧 gstatic 默认元组做幂等迁移，保留用户自定义 URL、返回码、频率及显式 URL-Test 覆写；同步迁移 provider health-check、严格 DNS 受管组、样例配置及延迟辅助回退。未改业务分流、节点、订阅、DNS 隐私、防火墙、WAN、TUN 或 Naive 数据。
+- 回归覆盖新增默认端点、旧元组迁移、显式覆写保留、provider health-check 同步；本地 Ruby 结果：health defaults 7 runs/15 assertions，DNS privacy 17 runs/44 assertions，均通过。完整 `scripts/local-gate.sh`、Development CI、RC、Formal Release 和正式包安装复验待完成。
+
 ## 2026-10-10 延迟检测、严格 DNS、双栈兼容与组件更新（2026-2013，正式发布；本地/隔离验收）
 
 - 观察基线为 `3afbb3d4cf3c2337a46a57b32aae9bd5ac55faec` / 2026-2012；本轮精确发布源提交为 `482a31dcb9e28855564627ecb080c64120ea7d22` / 2026-2013。仅使用本地和隔离环境，未连接路由器、测试平台或手机；既有未跟踪审计目录保留。

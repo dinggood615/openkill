@@ -65,9 +65,10 @@ o.default = "false"
 o.rmempty = true
 
 o = s:option(Value, "test_url", translate("Test URL"))
+o:value("https://cp.cloudflare.com/generate_204")
 o:value("http://cp.cloudflare.com/generate_204")
 o:value("http://www.gstatic.com/generate_204")
-o:value("https://cp.cloudflare.com/generate_204")
+o:value("https://www.gstatic.com/generate_204")
 o.rmempty = true
 o:depends("type", "url-test")
 o:depends("type", "fallback")
@@ -120,7 +121,7 @@ function o.cfgvalue(self, section)
 		"#      use:\n"..
 		"#      - provider1\n"..
 		"#      - provider1\n"..
-		"#      url: 'https://www.gstatic.com/generate_204'\n"..
+		"#      url: 'https://cp.cloudflare.com/generate_204'\n"..
 		"#      interval: 300\n"..
 		"#      lazy: true\n"..
 		"#      timeout: 5000\n"..

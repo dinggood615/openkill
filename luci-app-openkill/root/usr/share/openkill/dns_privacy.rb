@@ -105,7 +105,7 @@ module OpenKillDnsPrivacy
       managed = {
         'name' => group,
         'type' => selection,
-        'url' => 'https://www.gstatic.com/generate_204',
+        'url' => 'https://cp.cloudflare.com/generate_204',
         'interval' => 180,
         'timeout' => 5000,
         'max-failed-times' => 2,

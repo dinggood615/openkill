@@ -30,7 +30,7 @@ class DnsPrivacyTest < Minitest::Test
     assert_equal 'url-test', managed['type']
     assert_equal 25, managed['tolerance']
     assert_equal ['fixture'], managed['proxies']
-    assert_equal 'https://www.gstatic.com/generate_204', managed['url']
+    assert_equal 'https://cp.cloudflare.com/generate_204', managed['url']
     assert_equal 180, managed['interval']
     assert_equal 5000, managed['timeout']
     assert_equal 2, managed['max-failed-times']

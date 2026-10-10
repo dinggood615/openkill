@@ -1447,7 +1447,7 @@ proxy-groups:
     timeout: 5000
     max-failed-times: 3
     expected-status: 204 # 当健康检查返回状态码与期望值不符时，认为节点不可用
-    url: "https://www.gstatic.com/generate_204"
+    url: "https://cp.cloudflare.com/generate_204"
     interval: 300
 
   # fallback 将按照 url 测试结果按照节点顺序选择
@@ -1461,7 +1461,7 @@ proxy-groups:
     timeout: 5000
     max-failed-times: 3
     expected-status: 204
-    url: "https://www.gstatic.com/generate_204"
+    url: "https://cp.cloudflare.com/generate_204"
     interval: 300
 
   # load-balance 将按照算法随机选择节点
@@ -1475,7 +1475,7 @@ proxy-groups:
     timeout: 5000
     max-failed-times: 3
     expected-status: 204
-    url: "https://www.gstatic.com/generate_204"
+    url: "https://cp.cloudflare.com/generate_204"
     interval: 300
   # strategy: consistent-hashing # 可选 round-robin 和 sticky-sessions
 

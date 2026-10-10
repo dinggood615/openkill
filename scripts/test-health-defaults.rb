@@ -1,11 +1,15 @@
 require 'minitest/autorun'
 
 class HealthDefaultsTest < Minitest::Test
-  def normalize(group)
+  def normalize(group, urltest_override = false)
     source = File.read(File.join(__dir__, '../luci-app-openkill/root/usr/share/openkill/yml_change.sh'))
     start = source.index("         group['url'] =")
-    finish = source.index("\n      end\n   end\n   threads", start)
-    eval(source[start...finish], binding)
+    finish = source.index("\n      end\n   end\n   # Provider-backed", start)
+    urltest_address_override = urltest_override
+    managed_probe_url = 'https://cp.cloudflare.com/generate_204'
+    legacy_probe_url = 'https://www.gstatic.com/generate_204'
+    snippet = source[start...finish]
+    eval(snippet, binding)
     group
   end
 
@@ -16,7 +20,7 @@ class HealthDefaultsTest < Minitest::Test
 
   def test_default_probe_uses_matching_204
     group = normalize({'type'=>'url-test'})
-    assert_equal 'https://www.gstatic.com/generate_204', group['url']
+    assert_equal 'https://cp.cloudflare.com/generate_204', group['url']
     assert_equal 204, group['expected-status']
     assert_equal false, group['lazy']
   end
@@ -31,5 +35,24 @@ class HealthDefaultsTest < Minitest::Test
     group = normalize({'type'=>'url-test', 'url'=>'https://fixture.example/health', 'interval'=>300, 'timeout'=>5000, 'max-failed-times'=>3, 'lazy'=>true})
     assert_equal 300, group['interval']
     assert_equal true, group['lazy']
+  end
+
+  def test_legacy_openkill_probe_tuple_migrates_to_current_endpoint
+    group = normalize({'type'=>'url-test', 'url'=>'https://www.gstatic.com/generate_204', 'expected-status'=>204,
+                       'interval'=>180, 'timeout'=>3500, 'max-failed-times'=>2, 'lazy'=>false})
+    assert_equal 'https://cp.cloudflare.com/generate_204', group['url']
+    assert_equal 204, group['expected-status']
+  end
+
+  def test_explicit_legacy_endpoint_is_preserved_when_override_is_enabled
+    group = normalize({'type'=>'url-test', 'url'=>'https://www.gstatic.com/generate_204', 'expected-status'=>204,
+                       'interval'=>180, 'timeout'=>3500, 'max-failed-times'=>2, 'lazy'=>false}, true)
+    assert_equal 'https://www.gstatic.com/generate_204', group['url']
+  end
+
+  def test_provider_health_migration_is_present_in_the_generator
+    source = File.read(File.join(__dir__, '../luci-app-openkill/root/usr/share/openkill/yml_change.sh'))
+    assert_includes source, "Value['proxy-providers'].is_a?(Hash)"
+    assert_includes source, "health['url'] = managed_probe_url"
   end
 end

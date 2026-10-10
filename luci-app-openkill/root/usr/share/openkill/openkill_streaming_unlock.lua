@@ -664,7 +664,7 @@ function table_sort_by_urltest(t, d)
 				if FS.uci_get_config("config", "urltest_address_mod") and FS.uci_get_config("config", "urltest_address_mod") ~= "0" then
 					delay_url = FS.uci_get_config("config", "urltest_address_mod")
 				else
-					delay_url = "http://www.gstatic.com/generate_204"
+                    delay_url = "https://cp.cloudflare.com/generate_204"
 				end
 				group_delay = SYS.exec(string.format('curl -sL -m 60 --retry 2 -H "Content-Type: application/json" -H "Authorization: Bearer %s" -XGET "http://%s:%s/proxies/%s/delay?timeout=5000&url=%s"', passwd, ip, port, urlencode(t[n]), urlencode(delay_url)))
 				if group_delay then

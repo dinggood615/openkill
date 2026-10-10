@@ -48,6 +48,17 @@ default_dashboard=$(uci_get_config "default_dashboard" || echo "metacubexd")
 yacd_type=$(uci_get_config "yacd_type" || echo "Official")
 dashboard_type=$(uci_get_config "dashboard_type" || echo "Official")
 
+# A failed health endpoint must not make a usable proxy group look dead.  The
+# project-managed default is deliberately a small HTTPS 204 endpoint that is
+# reachable on more underlays than the legacy gstatic endpoint.  A non-zero
+# URL-Test override is applied later by yml_rules_change.sh and therefore
+# remains user-owned.
+urltest_address_mod=$(uci_get_config "urltest_address_mod" || echo 0)
+case "$urltest_address_mod" in
+   ''|0) urltest_address_override=0 ;;
+   *) urltest_address_override=1 ;;
+esac
+
 # Resolve the physical WAN interface once while generating the profile. DNS
 # bootstrap and proxy-node resolution must not be sent through the TUN device;
 # binding them to the actual WAN interface avoids Mihomo's auto-detection
@@ -488,6 +499,7 @@ begin
    dashboard_type = '$dashboard_type'
    dashboard_bind_address = '$dashboard_bind_address'
    dns_listen_address = '$dns_listen_address'
+   urltest_address_override = '$urltest_address_override' == '1'
    tun_owner = '$tun_owner'
    tun_auto_route = '$tun_auto_route'
    tun_auto_redirect = '$tun_auto_redirect'
@@ -540,6 +552,8 @@ begin
    # user's explicit endpoint or cadence.  This avoids the very long default
    # probe timeout that can make the dashboard report no delay for a usable
    # node and keeps all groups on the same 204 probe semantics.
+   managed_probe_url = 'https://cp.cloudflare.com/generate_204'
+   legacy_probe_url = 'https://www.gstatic.com/generate_204'
    if Value['proxy-groups'].is_a?(Array)
       Value['proxy-groups'].each do |group|
          next unless group.is_a?(Hash)
@@ -554,7 +568,7 @@ begin
                YAML.LOG_WARN('IPv6 underlay is unavailable; IPv6-only nodes were excluded from【%s】.' % group['name'])
             end
          end
-         group['url'] = 'https://www.gstatic.com/generate_204' unless group.key?('url') && !group['url'].to_s.empty?
+         group['url'] = managed_probe_url unless group.key?('url') && !group['url'].to_s.empty?
          # Keep probes frequent enough to evict a dead node before it causes a
          # burst of user-facing timeouts, while retaining conservative values
          # for low-power OpenWrt devices.
@@ -564,18 +578,48 @@ begin
          # A user endpoint may legitimately return 200.  Bind the default
          # status only to our own 204 endpoint, otherwise preserve the core's
          # general successful-response semantics and any explicit range.
-         group['expected-status'] = 204 if group['url'] == 'https://www.gstatic.com/generate_204' && !group.key?('expected-status')
+         group['expected-status'] = 204 if group['url'] == managed_probe_url && !group.key?('expected-status')
          group['lazy'] = false unless group.key?('lazy')
          group['tolerance'] = 50 if group['type'].to_s == 'url-test' && !group.key?('tolerance')
-         # 2026-1115 wrote the old 300/5000/3/lazy defaults into generated
-         # profiles.  Treat that exact tuple as managed state and migrate it
-         # once; any other explicit user values remain untouched.
-         if group['url'] == 'https://www.gstatic.com/generate_204' && group['interval'].to_i == 300 && group['timeout'].to_i == 5000 &&
-            group['max-failed-times'].to_i == 3 && group['lazy'] == true
-            group['interval'] = 180
-            group['timeout'] = 3500
-            group['max-failed-times'] = 2
-            group['lazy'] = false
+         # Migrate the exact probe tuples previously emitted by OpenKill.  The
+         # URL-Test override is user-owned and is applied by the later rules
+         # pass; when it is disabled these legacy managed values are safe to
+         # move to the current endpoint.  Other explicit URLs/cadences remain
+         # untouched so a custom health target is never silently replaced.
+         legacy_managed_tuple = !urltest_address_override &&
+            group['url'] == legacy_probe_url &&
+            (group['expected-status'].nil? || group['expected-status'].to_i == 204) &&
+            ((group['interval'].to_i == 180 && group['timeout'].to_i == 3500 &&
+              group['max-failed-times'].to_i == 2 && group['lazy'] == false) ||
+             (group['interval'].to_i == 300 && group['timeout'].to_i == 5000 &&
+              group['max-failed-times'].to_i == 3 && group['lazy'] == true))
+         if legacy_managed_tuple
+            group['url'] = managed_probe_url
+            group['expected-status'] = 204
+            if group['interval'].to_i == 300 && group['timeout'].to_i == 5000 &&
+               group['max-failed-times'].to_i == 3 && group['lazy'] == true
+               group['interval'] = 180
+               group['timeout'] = 3500
+               group['max-failed-times'] = 2
+               group['lazy'] = false
+            end
+         end
+      end
+   end
+   # Provider-backed members have their own health-check URL.  Keep it aligned
+   # with the managed group probe so the controller does not show usable
+   # provider members with a zero/unknown delay while the group itself works.
+   if Value['proxy-providers'].is_a?(Hash)
+      Value['proxy-providers'].each_value do |provider|
+         next unless provider.is_a?(Hash) && provider['health-check'].is_a?(Hash)
+         health = provider['health-check']
+         next if health['enable'] == false
+         health['url'] = managed_probe_url unless health.key?('url') && !health['url'].to_s.empty?
+         health['expected-status'] = 204 if health['url'] == managed_probe_url && !health.key?('expected-status')
+         if !urltest_address_override && health['url'] == legacy_probe_url &&
+            (health['expected-status'].nil? || health['expected-status'].to_i == 204)
+            health['url'] = managed_probe_url
+            health['expected-status'] = 204
          end
       end
    end
