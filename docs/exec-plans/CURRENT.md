@@ -1,14 +1,17 @@
 # Current status
 
-## 2026-10-10 延迟检测、严格 DNS、双栈兼容与组件更新（2026-2013，发布前）
+## 2026-10-10 延迟检测、严格 DNS、双栈兼容与组件更新（2026-2013，正式发布；本地/隔离验收）
 
-- 观察基线为 `3afbb3d4cf3c2337a46a57b32aae9bd5ac55faec` / 2026-2012；本轮仅本地和隔离验证，禁止连接路由器及测试平台。既有未跟踪审计目录保留。
+- 观察基线为 `3afbb3d4cf3c2337a46a57b32aae9bd5ac55faec` / 2026-2012；本轮精确发布源提交为 `482a31dcb9e28855564627ecb080c64120ea7d22` / 2026-2013。仅使用本地和隔离环境，未连接路由器、测试平台或手机；既有未跟踪审计目录保留。
 - 受影响契约：自动组探测参数归一化、严格 DNS 受管组/加密上游与用户业务路由分离、广告标准/增强加载条件和规则源更新、OpenVPN 双栈端点解析与失败恢复、Naive 二进制/元数据配套回滚；保留原 UCI 键与已有值，防火墙转发缺省值仍为 2。
 - 初查发现：生成器对用户自定义探测 URL 无条件补 `expected-status: 204`，可造成业务可用而探测判失败；广告运行验证要求 DNS 与核心两端同时加载，而标准档核心未必引用 provider；Naive 更新只保留旧二进制，没有匹配元数据和运行实例切换验证；OpenVPN `getent ahosts` 不保证返回 IPv6，且 legacy 多 set swap 失败缺少逆序恢复。
 - 验证计划：先加入针对上述真实逻辑的失败回归，再修复；真实核心/控制器使用回环隔离服务验证，网络接管仅使用受控规则事务测试，不启用 CENTRAL_ACTIVE、不执行真实包路径测试。能力不足项如实保留，发布说明须披露设备及手机验证缺口。
 - 已实现：自动组使用可配置的 `url-test`/`fallback` 策略，默认探测仅对内置 204 端点补 `expected-status`，保留用户自定义探测返回码；严格 DNS 通过单一生成器保留业务规则、低延迟探测和惰性 fallback 查询；广告标准档以 dnsmasq 真实加载为证，增强档同时要求核心 provider，HaGeZi 补充源按 HTTPS、大小、域名数量校验后去重合并；OpenVPN 端点同时收集 IPv4/IPv6，legacy ipset 多集合事务失败逆序恢复；Naive 更新检查空间、锁定实例、配套保存二进制/元数据并在激活或回滚记录失败时恢复。
 - 默认值：全新安装继续使用 `performance-dual-stack`、防火墙 DNS 转发、严格 DNS；新增 `dns_privacy_strategy=url-test` 和 `adblock_extra_source=none`。升级及同版本重装保留用户值；默认不含节点、订阅、凭据、设备地址或用户 YAML。
 - 本地/隔离回归：`scripts/local-gate.sh`、DNS 隐私 17 runs/44 assertions、运行时 50 tests（3 skipped）、LuCI 合同 36、UI 预览 2、UCI 生命周期 19、安装器 18、OpenVPN 合同、广告状态 2、Naive 集成/独立 fixture、Mihomo v1.19.32 核心 12 项均通过；UI 交互在 WSL 因 Node 不可用跳过。没有连接路由器、测试平台、iPhone，也未执行真实设备安装、实机抓包或现场 fw4/ip6tables 数据面验证。
+- Development CI 在精确源提交上成功： https://github.com/dinggood615/openkill/actions/runs/38053362927 。RC Build 成功： https://github.com/dinggood615/openkill/actions/runs/38053449036 ；候选 IPK `luci-app-openkill_2026-2013_all.ipk` 为 7,738,205 字节，SHA256 `8c0df6d408ea4fb88c440f53ce5633d0c1006015218208341b50098a848c519a`。候选包审计确认版本、`/etc/config/openkill` conffile、维护脚本持久化删除、页面资源、归档元数据及测试机敏感数据检查通过。
+- Formal Release 成功： https://github.com/dinggood615/openkill/actions/runs/38053610333 。正式标签/Release 为 `v2026-2013-ipk`： https://github.com/dinggood615/openkill/releases/tag/v2026-2013-ipk ，标签指向上述精确源提交。正式 IPK `luci-app-openkill_2026-2013_all.ipk` 为 7,995,000 字节，SHA256 `9af6784b5758a6cf1b120b5fc668633e0587d681f79e0f2991f638d38acae6a5`；包由 HTTPS Release 资产下载并完成控制/数据归档解包、版本、依赖、权限和敏感数据审计。包渠道清单已同步到 `https://raw.githubusercontent.com/dinggood615/openkill/package/master/latest-ipk.json`，清单提交与哈希一致。
+- 正式包未安装到真实设备，这是本轮“本地及隔离环境”授权边界的明确结果。正式产物在隔离目录解包并完成静态冒烟；真实路由器上的 DNS 数据面、OpenVPN 双栈、Naive 更新回滚、代理组延迟显示及 iPhone DNS 泄漏仍未验证，不能将本轮结论扩展为实机通过或绝对零泄漏。若后续授权实机验收，需使用受保护备份并重新验证这些项目。
 
 
 ## 2026-10-03 IPv6 DNS 接管缺口修复（2026-2012，本地/隔离验证）
