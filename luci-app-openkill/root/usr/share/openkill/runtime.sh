@@ -178,3 +178,24 @@ openkill_dns_listener_family_ready() {
     openkill_dns_listener_transport_present "$port" "$family" tcp || return 1
     return 0
 }
+
+# A socket table alone proves only that something owns the port.  Firewall
+# REDIRECT must terminate at the dnsmasq front end, not at a stale listener
+# left by another service.  netstat -p is available on the supported OpenWrt
+# images; retain the proc-only check as a compatibility fallback when a
+# minimal image omits process names.
+openkill_dns_listener_process_ready() {
+    local port="$1" family="$2" line
+    command -v netstat >/dev/null 2>&1 || return 0
+    line="$(netstat -nlp 2>/dev/null || true)"
+    [ -n "$line" ] || return 0
+    printf '%s\n' "$line" | awk -v port="$port" -v family="$family" '
+        $1 ~ /^(udp|tcp)/ && $4 ~ (":" port "$") && $NF ~ /\/dnsmasq$/ {
+            is_v6 = ($1 ~ /6$/ || $4 ~ /^\[?::/ || $4 ~ /^:::/)
+            if ((family == "ipv6" && !is_v6) || (family == "ipv4" && is_v6)) next
+            if ($1 ~ /^udp/) udp = 1
+            if ($1 ~ /^tcp/) tcp = 1
+        }
+        END { exit !(udp && tcp) }
+    '
+}

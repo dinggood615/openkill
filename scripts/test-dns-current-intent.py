@@ -85,7 +85,7 @@ class CurrentDnsIntentTests(unittest.TestCase):
                 self.assertEqual(execution_ir["dns_mode"], "1")
                 self.assertEqual(lower_nft_ir(ir)["metadata"]["renderer_profile"], "current")
 
-    def test_mode2_keeps_direct_mihomo_listener(self):
+    def test_mode2_uses_dual_stack_dnsmasq_frontend(self):
         state = self.state_by_id["STATE-09-SELF-PROXY"]
         packet = {
             "schema": "OPENKILL_SHADOW_PACKET_V1",
@@ -104,11 +104,25 @@ class CurrentDnsIntentTests(unittest.TestCase):
         }
         rendered = normalize_new_context_intent(state, packet)
         self.assertIn("jump openkill_dns_redirect", rendered["rendered_text"])
-        self.assertIn("redirect to :7874", rendered["rendered_text"])
+        self.assertIn("redirect to :53", rendered["rendered_text"])
+        self.assertNotIn("redirect to :7874", rendered["rendered_text"])
         ir = render_context(rendered["context"], profile="current", state=state)
         self.assertEqual(ir["context_execution"]["dns_mode"], "2")
         self.assertEqual(ir["context_execution"]["dns_port"], 7874)
-        self.assertEqual(ir["context_execution"]["firewall_dns_port"], 7874)
+        self.assertEqual(ir["context_execution"]["firewall_dns_port"], 53)
+
+    def test_firewall_mode_carries_openvpn_dns_through_the_same_frontend(self):
+        """VPN ingress must not be sent to Mihomo's loopback listener."""
+        init = (ROOT / "luci-app-openkill/root/etc/init.d/openkill").read_text(encoding="utf-8")
+        settings = (ROOT / "luci-app-openkill/luasrc/model/cbi/openkill/settings.lua").read_text(encoding="utf-8")
+        mode2 = init.split('elif [ "$enable_redirect_dns" -eq 2 ]; then', 1)[1].split(
+            'if [ -z "$en_mode_tun" ]', 1
+        )[0]
+        self.assertIn('openkill_dns_redirect', mode2)
+        self.assertIn('redirect to ${DNSPORT}', mode2)
+        self.assertNotIn('redirect to ${dns_port}', mode2)
+        self.assertIn("authorized LAN/OpenVPN DNS on port 53", settings)
+        self.assertIn("dnsmasq 双栈入口承接授权隧道内 DNS", settings)
 
     def test_mode1_keeps_custom_mihomo_port_separate(self):
         state = copy.deepcopy(self.state_by_id["STATE-CASE-053"])
@@ -155,7 +169,7 @@ class CurrentDnsIntentTests(unittest.TestCase):
         self.assertIn('redirect to ${DNSPORT}', init)
         self.assertIn('DNSPORT="$(openkill_dnsmasq_port)"', init)
         self.assertIn('openkill_dnsmasq_port()', init)
-        self.assertIn("Firewall forwarding intercepts LAN DNS on port 53", settings)
+        self.assertIn("Firewall forwarding intercepts authorized LAN/OpenVPN DNS on port 53", settings)
         self.assertIn("DNS_PORT) openkill_shadow_auto_value", shadow)
         self.assertIn('DNSMASQ_UCI="dhcp.${DNSMASQ_SECTION}"', watchdog)
         self.assertIn("uci -q -X show dhcp", watchdog)

@@ -27,10 +27,13 @@ closed or is reported as a model gap.
 ## DNS layers
 
 Firewall interception, dnsmasq listening, dnsmasq upstream, and the Mihomo
-listener are separate fields. The stable mode-1 path is firewall and dnsmasq
-on port 53, forwarding to the committed Mihomo listener at 127.0.0.1:7874.
-Direct mode-2 DNS is a separate advanced path. Port values are never equated
-transitively.
+listener are separate fields. Both redirect modes use the local dnsmasq
+frontend on port 53 for LAN and OpenVPN ingress, forwarding to the committed
+Mihomo listener at 127.0.0.1:7874. Mode 1 and mode 2 retain separate
+ownership/ACL chains, but neither redirects ingress packets directly to
+Mihomo's loopback port. This keeps REDIRECT reachable from tunnel interfaces
+and provides one IPv4/IPv6 front door. Port values are still tracked
+independently; the firewall target is not inferred from the Mihomo listener.
 
 ## Safety boundaries
 

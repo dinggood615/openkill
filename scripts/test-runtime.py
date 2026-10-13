@@ -88,6 +88,25 @@ class DnsListenerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout, 'yes|no|yes')
 
+    def test_listener_process_probe_requires_dnsmasq_for_both_transports(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = (SHARE / 'runtime.sh').read_text(encoding='utf-8')
+            command = (source + '''
+netstat() {
+  printf '%s\\n' "tcp 0 0 0.0.0.0:5353 0.0.0.0:* LISTEN 10/dnsmasq"
+  printf '%s\\n' "udp 0 0 0.0.0.0:5353 0.0.0.0:* 10/dnsmasq"
+  printf '%s\\n' "tcp6 0 0 :::5353 :::* LISTEN 10/dnsmasq"
+  printf '%s\\n' "udp6 0 0 :::5353 :::* 10/dnsmasq"
+}
+''' +
+                       '\nprintf "%s|%s|%s" ' +
+                       '"$(openkill_dns_listener_process_ready 5353 ipv4 && echo yes || echo no)" '
+                       '"$(openkill_dns_listener_process_ready 5353 ipv6 && echo yes || echo no)" '
+                       '"$(openkill_dns_listener_process_ready 5354 ipv4 && echo yes || echo no)"\n')
+            result = run_shell(command)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, 'yes|yes|no')
+
 
 @unittest.skipUnless(RUBY, 'Ruby required; mandatory in Linux CI')
 class ContextTests(unittest.TestCase):
@@ -157,8 +176,8 @@ ensure_fw4_dns_hijack() { :; }
 fw4_dns_hijack_ready() { :; }
 nft() {
   case "$*" in
-    *"list chain inet fw4 dstnat"*) echo 'OpenKill DNS Hijack redirect to :7874' ;;
-    *"list chain inet fw4 openkill_dns_redirect"*) echo 'redirect to :7874' ;;
+    *"list chain inet fw4 dstnat"*) echo 'OpenKill DNS Hijack redirect to :53' ;;
+    *"list chain inet fw4 openkill_dns_redirect"*) echo 'redirect to :53' ;;
     *) echo openkill ;;
   esac
 }
@@ -229,8 +248,8 @@ class DnsReadinessIsolationTests(unittest.TestCase):
             proc.mkdir(parents=True)
             headers = 'sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt uid timeout inode\n'
             rows = {
-                'udp': '  0: 0100007F:1ED2 00000000:0000 07 00000000:00000000 00:00000000 00000000 0 0 100 2 0000000000000000 0\n',
-                'tcp': '  0: 0100007F:1ED2 00000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 101 1 0000000000000000 0\n',
+                'udp': '  0: 0100007F:0035 00000000:0000 07 0000000000000000 00:00000000 00000000 0 0 100 2 0000000000000000 0\n',
+                'tcp': '  0: 0100007F:0035 00000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 101 1 0000000000000000 0\n',
                 'udp6': '  0: 00000000000000000000000000000000:0035 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000 0 0 102 2 0000000000000000 0\n',
                 'tcp6': '  0: 00000000000000000000000000000000:0035 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 103 1 0000000000000000 0\n',
             }
@@ -266,7 +285,7 @@ ip() {{
 nft() {{
   case "$*" in
     *"list chain inet fw4 openkill_dns_redirect"*)
-      printf '%s\\n' 'OpenKill DNS Hijack meta nfproto ipv4 meta l4proto {{tcp,udp}} th dport 53 redirect to :7890'
+      printf '%s\\n' 'OpenKill DNS Hijack meta nfproto ipv4 meta l4proto {{tcp,udp}} th dport 53 redirect to :53'
       printf '%s' '{ipv6_rule}' ;;
     *"list chain inet fw4 dstnat"*)
       printf '%s\\n' 'meta nfproto ipv4 meta l4proto {{tcp,udp}} th dport 53 jump openkill_dns_redirect'

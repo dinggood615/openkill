@@ -187,7 +187,7 @@ o:value("conditional", "仅配置的内部域名条件转发")
 o.default = "inherit"
 o.rmempty = false
 o:depends("openvpn_compatibility", "1")
-o.description = "不会自动接受 OpenVPN 推送的全局 DNS；内部域名条件转发接口仍需明确配置。"
+o.description = "不会自动接受 OpenVPN 推送的全局 DNS；inherit 会沿用当前隐私策略，并通过 dnsmasq 双栈入口承接授权隧道内 DNS。内部域名条件转发接口仍需明确配置。"
 
 o = s:taboption("compatibility", DummyValue, "_openvpn_status_contract", "OpenVPN 验证状态")
 o.default = "请求 → 端点集合 → 规则应用 → 隧道 → 隧道业务 → DNS/IPv6"
@@ -350,7 +350,7 @@ switch_mode.template = "openkill/switch_mode"
 
 ---- DNS Settings
 o = s:taboption("dns", ListValue, "enable_redirect_dns", font_red..bold_on..translate("Redirect Local DNS Setting")..bold_off..font_off)
-o.description = translate("Dnsmasq forwarding relays local IPv4/IPv6 UDP and TCP DNS queries to Mihomo. Firewall forwarding intercepts LAN DNS on port 53; IPv4 is redirected to Mihomo, while IPv6 uses the verified local dnsmasq UDP/TCP frontend when Mihomo is bound only to IPv4 loopback. The path is installed only when an IPv6 data plane and matching firewall capability are present; it never exposes the listener on WAN.")
+o.description = translate("Dnsmasq forwarding relays local IPv4/IPv6 UDP and TCP DNS queries to Mihomo. Firewall forwarding intercepts authorized LAN/OpenVPN DNS on port 53 and sends both address families through the local dnsmasq frontend, which forwards to Mihomo's protected loopback listener. The path validates the actual entry, target, listener and process before reporting ready; it never exposes the Mihomo listener on WAN.")
 o.default = 2
 o:value("0", translate("Disable"))
 o:value("1", translate("Dnsmasq Redirect"))

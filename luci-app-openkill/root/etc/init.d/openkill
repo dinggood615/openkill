@@ -1674,8 +1674,12 @@ fw4_dns_hijack_ready()
    [ "$enable_redirect_dns" -eq 0 ] && return 0
 
    local target_v4 target_v6 chain_v6
-   target_v4="${dns_port:-}"
-   [ "$enable_redirect_dns" -eq 1 ] && target_v4="$(openkill_dnsmasq_port)"
+   # Both redirect modes use the local dnsmasq frontend as the firewall
+   # target. Mihomo stays on its protected loopback listener; redirecting an
+   # ingress VPN/LAN packet directly to that listener can select the tunnel
+   # address, which the core does not bind. dnsmasq is the dual-stack,
+   # interface-facing frontend and forwards to Mihomo's DNS port.
+   target_v4="$(openkill_dnsmasq_port)"
    case "$target_v4" in ''|*[!0-9]*) return 1 ;; esac
    if [ "$enable_redirect_dns" -eq 2 ]; then
       fw4_dns_rule_target_ready openkill_dns_redirect ipv4 "$target_v4" || return 1
@@ -1684,6 +1688,7 @@ fw4_dns_hijack_ready()
       fw4_dns_rule_target_ready dstnat ipv4 "$target_v4" || return 1
    fi
    openkill_dns_listener_family_ready "$target_v4" ipv4 || return 1
+   openkill_dns_listener_process_ready "$target_v4" ipv4 || return 1
 
    if openkill_ipv6_dns_path_needed; then
       chain_v6=dstnat
@@ -1691,6 +1696,7 @@ fw4_dns_hijack_ready()
       target_v6="$(openkill_dnsmasq_port)"
       fw4_dns_rule_target_ready "$chain_v6" ipv6 "$target_v6" || return 1
       openkill_dns_listener_family_ready "$target_v6" ipv6 || return 1
+      openkill_dns_listener_process_ready "$target_v6" ipv6 || return 1
       if [ "$enable_redirect_dns" -eq 2 ]; then
          fw4_dns_jump_ready ipv6 || return 1
       fi
@@ -2601,15 +2607,15 @@ if [ -n "$FW4" ]; then
                ACBLACKDNSFILTER="$ACBLACKDNSFILTER ether saddr != @lan_ac_black_macs"
             fi
          fi
-         nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ${ACBLACKDNSFILTER} counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\"" || return 1
+         nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ${ACBLACKDNSFILTER} counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\"" || return 1
       else
          white_rule=0
          if [ -n "$(uci_get_config "lan_ac_white_ips")" ]; then
-            nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ip saddr @lan_ac_white_ips counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\"" || return 1
+            nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ip saddr @lan_ac_white_ips counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\"" || return 1
             white_rule=1
          fi
          if [ -n "$(uci_get_config "lan_ac_white_macs")" ]; then
-            nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ether saddr @lan_ac_white_macs counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\"" || return 1
+            nft "add rule inet fw4 openkill_dns_redirect meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ether saddr @lan_ac_white_macs counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\"" || return 1
             white_rule=1
          fi
          [ "$white_rule" -eq 1 ] || return 1
@@ -2617,7 +2623,7 @@ if [ -n "$FW4" ]; then
       nft 'insert rule inet fw4 dstnat position 0 meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 counter jump openkill_dns_redirect' || return 1
       if [ "$router_self_proxy" = 1 ]; then
          nft 'add chain inet fw4 nat_output { type nat hook output priority -1; }'
-         nft "insert rule inet fw4 nat_output position 0 meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ip daddr {127.0.0.1} meta skgid != 65534 counter redirect to ${dns_port} comment \"OpenKill DNS Hijack\""
+         nft "insert rule inet fw4 nat_output position 0 meta nfproto {ipv4} meta l4proto {tcp,udp} th dport 53 ip daddr {127.0.0.1} meta skgid != 65534 counter redirect to ${DNSPORT} comment \"OpenKill DNS Hijack\""
       fi
    fi
 
@@ -2950,9 +2956,11 @@ if [ -n "$FW4" ]; then
       fi
 
       # The same exact-target check is required for IPv6.  In particular,
-      # an old IPv6 rule pointing at Mihomo's IPv4-only loopback port must not
-      # be treated as healthy after the dual-stack frontend is selected.
-      if ! fw4_dns_rule_target_ready dstnat ipv6 "$DNSPORT"; then
+      # an old rule pointing at Mihomo's loopback port must not be treated as
+      # healthy after the dual-stack frontend is selected.
+      dns_chain=dstnat
+      [ "$enable_redirect_dns" -eq 2 ] && dns_chain=openkill_dns_redirect
+      if ! fw4_dns_rule_target_ready "$dns_chain" ipv6 "$DNSPORT"; then
          if [ "$enable_redirect_dns" -eq 1 ]; then
             if [ "$lan_ac_mode" != "1" ]; then
                ACBLACKDNSFILTER=""
@@ -3515,17 +3523,17 @@ if [ -z "$FW4" ]; then
                ACBLACKDNSFILTER="$ACBLACKDNSFILTER -m set ! --match-set lan_ac_black_macs src"
             fi
          fi
-          iptables -t nat -A openkill_dns_redirect -p udp --dport 53 ${ACBLACKDNSFILTER} -j REDIRECT --to-ports "$dns_port" -m comment --comment "OpenKill DNS Hijack"
-          iptables -t nat -A openkill_dns_redirect -p tcp --dport 53 ${ACBLACKDNSFILTER} -j REDIRECT --to-ports "$dns_port" -m comment --comment "OpenKill DNS Hijack"
+          iptables -t nat -A openkill_dns_redirect -p udp --dport 53 ${ACBLACKDNSFILTER} -j REDIRECT --to-ports "$DNSPORT" -m comment --comment "OpenKill DNS Hijack"
+          iptables -t nat -A openkill_dns_redirect -p tcp --dport 53 ${ACBLACKDNSFILTER} -j REDIRECT --to-ports "$DNSPORT" -m comment --comment "OpenKill DNS Hijack"
       else
           if [ -n "$(uci_get_config "lan_ac_white_ips")" ]; then
-             iptables -t nat -A openkill_dns_redirect -p udp --dport 53 -m set --match-set lan_ac_white_ips src -j REDIRECT --to-ports "$dns_port" -m comment --comment "OpenKill DNS Hijack"
-             iptables -t nat -A openkill_dns_redirect -p tcp --dport 53 -m set --match-set lan_ac_white_ips src -j REDIRECT --to-ports "$dns_port" -m comment --comment "OpenKill DNS Hijack"
+             iptables -t nat -A openkill_dns_redirect -p udp --dport 53 -m set --match-set lan_ac_white_ips src -j REDIRECT --to-ports "$DNSPORT" -m comment --comment "OpenKill DNS Hijack"
+             iptables -t nat -A openkill_dns_redirect -p tcp --dport 53 -m set --match-set lan_ac_white_ips src -j REDIRECT --to-ports "$DNSPORT" -m comment --comment "OpenKill DNS Hijack"
              white_rule=1
           fi
           if [ -n "$(uci_get_config "lan_ac_white_macs")" ]; then
-             iptables -t nat -A openkill_dns_redirect -p udp --dport 53 -m set --match-set lan_ac_white_macs src -j REDIRECT --to-ports "$dns_port" -m comment --comment "OpenKill DNS Hijack"
-             iptables -t nat -A openkill_dns_redirect -p tcp --dport 53 -m set --match-set lan_ac_white_macs src -j REDIRECT --to-ports "$dns_port" -m comment --comment "OpenKill DNS Hijack"
+             iptables -t nat -A openkill_dns_redirect -p udp --dport 53 -m set --match-set lan_ac_white_macs src -j REDIRECT --to-ports "$DNSPORT" -m comment --comment "OpenKill DNS Hijack"
+             iptables -t nat -A openkill_dns_redirect -p tcp --dport 53 -m set --match-set lan_ac_white_macs src -j REDIRECT --to-ports "$DNSPORT" -m comment --comment "OpenKill DNS Hijack"
              white_rule=1
           fi
           [ "${white_rule:-0}" -eq 1 ] || return 1
@@ -3533,8 +3541,8 @@ if [ -z "$FW4" ]; then
       iptables -t nat -C PREROUTING -p udp --dport 53 -j openkill_dns_redirect 2>/dev/null || iptables -t nat -I PREROUTING -p udp --dport 53 -j openkill_dns_redirect
       iptables -t nat -C PREROUTING -p tcp --dport 53 -j openkill_dns_redirect 2>/dev/null || iptables -t nat -I PREROUTING -p tcp --dport 53 -j openkill_dns_redirect
       if [ "$router_self_proxy" = 1 ]; then
-         iptables -t nat -I OUTPUT -p udp --dport 53 -d 127.0.0.1 $noowner -j REDIRECT --to-ports "$dns_port" -m comment --comment "OpenKill DNS Hijack"
-         iptables -t nat -I OUTPUT -p tcp --dport 53 -d 127.0.0.1 $noowner -j REDIRECT --to-ports "$dns_port" -m comment --comment "OpenKill DNS Hijack"
+         iptables -t nat -I OUTPUT -p udp --dport 53 -d 127.0.0.1 $noowner -j REDIRECT --to-ports "$DNSPORT" -m comment --comment "OpenKill DNS Hijack"
+         iptables -t nat -I OUTPUT -p tcp --dport 53 -d 127.0.0.1 $noowner -j REDIRECT --to-ports "$DNSPORT" -m comment --comment "OpenKill DNS Hijack"
       fi
    fi
 

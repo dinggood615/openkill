@@ -1161,9 +1161,9 @@ def _lower_context_attachments(
     if kind == "DNS":
         protocol_match = "meta l4proto {tcp,udp} th dport 53"
         family_match = "meta nfproto {}".format("ipv4" if family == "IPv4" else "ipv6")
-        # Mode 1 enters dnsmasq on its LAN-facing listener.  ``dns_port`` is
-        # Mihomo's listener/upstream port and is intentionally retained for
-        # mode-2 direct DNS only; never alias the two fields here.
+        # Both firewall redirect modes enter dnsmasq on its LAN/VPN-facing
+        # listener. ``dns_port`` remains Mihomo's listener/upstream port and
+        # must never be reused as the REDIRECT target.
         firewall_dns_port = int(execution.get("firewall_dns_port", execution["dns_port"]))
         if execution.get("dns_scope") == "DNS_LAN":
             source = _physical_chain("FW4_DSTNAT", chains, external)
