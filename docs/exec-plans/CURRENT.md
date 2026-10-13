@@ -1,6 +1,6 @@
 # Current status
 
-## 2026-10-13 2026-2018 DNS 转发分离启动修复（候选设备验收通过，待正式发布）
+## 2026-10-13 2026-2018 DNS 转发分离启动修复（正式发布完成）
 
 - 本轮在 2026-2017 候选的授权设备复现到真实生成错误：直接模式自定义域名策略的 Ruby 源码被 shell 双引号截断，生成器报 `SyntaxError`，随后旧检查点缺少前端元数据而恢复失败。该错误与节点、Mihomo 核心缺失无关；生成失败时活动配置保持不替换。
 - 修复 `luci-app-openkill/root/usr/share/openkill/yml_change.sh`，以不触发 shell 引号解释的 Ruby 表达式写入策略键，并保留受保护日志中的真实生成诊断；新增 `scripts/test-dns-current-intent.py` 回归断言，防止该类源码破坏再次出现。
@@ -10,6 +10,8 @@
 - 设备范围仍仅为授权 `192.168.1.1`。受保护备份 `/root/openkill-dns-direct-backup-20261013-1945` 保留。2026-2018 RC 实际安装后包版本为 `2026-2018`，配置哈希安装前后保持 `ce86258bda0d65a2cdb610d99e21a05aa566f220bbc8eaed02226a1daac5576a`；严格模式生成、核心启动和就绪检查通过，Mihomo 真实双栈 UDP/TCP 7874 由同一进程监听，防火墙 IPv4/IPv6 入口和 UDP/TCP 规则均指向 7874，dnsmasq 在直接模式未作为上游中间层。
 - 模式对比已完成并恢复原值：模式 1 重启成功，Mihomo 仅回环监听，dnsmasq 上游为本地 7874；模式 2 重启成功，Mihomo wildcard 双栈监听，防火墙规则目标为 7874，dnsmasq 本地上游计数为 0。两种模式均记录 readiness passed；设备本机 IPv4/IPv6 有效域名查询返回成功。设备无活动 OpenVPN 客户端时不把接口存在替代隧道业务验收；TCP 查询、真实 LAN/VPN 客户端数据面和浏览器 LuCI 视觉验收仍单独标记限制。
 - 诊断输出只记录错误阶段、退出码、监听/规则分类和配置哈希；不输出节点、订阅、凭据或完整 YAML。模式对比结束后恢复设备原始模式及用户配置。
+- Formal Release 已成功：Development CI #438（<https://github.com/dinggood615/openkill/actions/runs/38397926859>）、RC Build #167（<https://github.com/dinggood615/openkill/actions/runs/38398106480>）、Formal Release #232（<https://github.com/dinggood615/openkill/actions/runs/38398789031>）；正式标签/Release 为 <https://github.com/dinggood615/openkill/releases/tag/v2026-2018-ipk>，源提交为 `853e497e5f6dc15c5a649a7e46d0e3c934576f9c`。正式 IPK `luci-app-openkill_2026-2018_all.ipk` 大小 8,016,180 字节，SHA256 `2c1976447fe3cfb24afb355d91ad42ec2b211be08678e3cef465694c8b458e24`，通过 HTTPS 下载并核验；正式包重新安装返回码 0、版本为 `2026-2018`、配置哈希保持不变。已知维护脚本中的历史“服务不存在/独立组件不存在”提示计为非致命噪声，未影响包替换或服务启动。
+- 正式包安装后最终运行证据：`enable_redirect_dns=2`、`dns_privacy_mode=strict`；`/etc/openkill/clash` 进程真实运行并监听 wildcard 双栈 TCP/UDP 7874，fw4 `dstnat` 的 IPv4/IPv6 入口各 1 条并跳转至受管 `openkill_dns_redirect`，子链含双协议端口重定向且已有计数，直接模式 dnsmasq 上游引用为 0；就绪日志显示 OpenKill readiness passed，本机 A/AAAA 查询均返回答案。当前没有活动 OpenVPN 客户端，因此隧道内业务联网未宣称通过；系统未安装独立 TCP DNS 查询工具，TCP 数据面以规则和监听证据覆盖，作为明确限制记录。
 
 ## 2026-10-13 2026-2016 DNS 转发模式分离（实现中）
 
