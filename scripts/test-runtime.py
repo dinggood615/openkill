@@ -277,6 +277,7 @@ lan_ac_mode=0
 router_self_proxy=0
 uci() {{ [ "$*" = "-q get dhcp.test.port" ] && echo 53; }}
 uci_get_config() {{ [ "$1" = dns_privacy_mode ] && echo split; }}
+netstat() {{ :; }}
 ip() {{
   if [ "$1" = -6 ] && [ "$2" = addr ] && [ "$3" = show ] && [ "$4" = scope ] && [ "$5" = global ]; then
     {'echo "inet6 2001:db8::1/64 scope global"' if ipv6_path else ':'}
