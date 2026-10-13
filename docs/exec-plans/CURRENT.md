@@ -1,5 +1,18 @@
 # Current status
 
+## 2026-10-13 2026-2015 正式包安装收尾（防火墙 DNS 转发与 OpenVPN 入口修复）
+
+- 本轮精确源提交为 `44467637c3eebcaf8ba3d6b099f37d3a6d0c3c51`，版本 `2026-2015`。Development CI 已成功：<https://github.com/dinggood615/openkill/actions/runs/38383346351>；RC Build 已成功：<https://github.com/dinggood615/openkill/actions/runs/38383504874>；Formal Release 已成功：<https://github.com/dinggood615/openkill/actions/runs/38385063589>；正式标签/Release 为 <https://github.com/dinggood615/openkill/releases/tag/v2026-2015-ipk>。
+- 正式资产 `luci-app-openkill_2026-2015_all.ipk` 已通过 HTTPS 下载并核验，大小 8,013,633 字节，SHA256 `7a8d709ad24a79a4d0174214d2e34b016d9fc624e83e8a2bf5ba667744064ba3`。包控制信息、依赖、维护脚本、conffiles、权限和数据归档已审计，未发现个人节点、订阅、凭据或控制器密钥。
+- 根因：防火墙转发模式的 IPv4 TCP/UDP 53 原先直接 REDIRECT 到 Mihomo 的 `127.0.0.1:7874`，而 OpenVPN 隧道客户端从 `tun0` 进入时不能把该回环监听当作可达 DNS 前端；IPv6 分支已走 53，造成双栈行为不一致。dnsmasq 才是同时覆盖 LAN、OpenVPN 隧道和 IPv6 地址的入口，并将请求转发至受保护的 Mihomo DNS。
+- 修复文件：`luci-app-openkill/root/etc/init.d/openkill`、`luci-app-openkill/root/usr/share/openkill/runtime.sh`、`scripts/openkill_nft_ir.py`、`scripts/openkill_nft_syntax.py`、`luci-app-openkill/luasrc/model/cbi/openkill/settings.lua` 及对应 DNS/OpenVPN 回归测试和架构说明。防火墙模式的 IPv4/IPv6 TCP/UDP 统一进入 dnsmasq 53；就绪检查现在关联入口、目标端口、地址族及 dnsmasq 进程归属；重复应用保持幂等，Mihomo 仍由 dnsmasq 转发到回环 7874。
+- 本地门禁通过：DNS 当前意图 11 项、运行时 51 项（3 skipped）、OpenVPN 兼容、LuCI 合同 36 项、nft IR 16 项、nft 语法 18 项（本机未安装 nft，仅静态/隔离检查）、生产 shadow 12 项、shadow 语义 21 项及 `scripts/local-gate.sh` 全部通过。精确提交的 RC 包 SHA256 为 `84877380963c9a368cfc8a36254ea4b294d3723ad95156d24824920c6326b274`。
+- 授权设备 `192.168.1.1` 已在写入前建立受保护备份 `/root/openkill-openvpn-dns-backup-20261013-1835`（目录 700，归档/校验文件 600，归档 SHA256 `5eedb0457523e046d189722cd4511d0873c8e69fd36e31de6b2bea914984b0f8`）。RC 和正式包均使用 `opkg install --force-reinstall` 实际替换；正式包安装后版本 `2026-2015`，`/etc/config/openkill` SHA256 前后均为 `2e158a9a980ab3a058fe17a71c828a003ece821335a49cd53446f443b019885f`，`enable=1`、`enable_redirect_dns=2` 保留。
+- 正式包安装后服务为 `running`，Mihomo v1.19.32 进程和控制器端口在，dnsmasq 在 `10.8.0.1:53`、LAN IPv4、IPv6 及本机地址同时监听，Mihomo DNS 由本地 dnsmasq 上游指向 `127.0.0.1#7874`。fw4 `dstnat` 对 IPv4/IPv6 均跳转 `openkill_dns_redirect`，该链的 TCP/UDP 53 均为 `redirect to :53`，规则计数有命中。授权 LAN 客户端 UDP A、TCP 虚电路查询以及设备本机 `127.0.0.1`、LAN、`10.8.0.1`、`::1` 查询均返回成功。
+- OpenVPN 业务边界：设备当前运行的是服务端实例，状态目录显示活动客户端数为 0；因此本轮没有可安全复现的“隧道内客户端 HTTPS 代理请求”，不能把握手/接口存在替代真实业务证据。已确认隧道地址 `10.8.0.1` 被 dnsmasq 双栈监听且规则入口存在；待有真实客户端会话时再补充隧道内 DNS 与业务链路验收。路由器代理端口要求已有认证，未使用或输出任何凭据，也未改变用户认证配置。
+- 浏览器 LuCI 会话未登录，本轮未重新输入凭据；页面视觉验收保留为未完成项，不以 HTTP 200、端口存在或配置校验冒充浏览器/隧道业务验收。没有修改 WAN、TUN、用户节点、订阅、代理组选择、其他插件或无关防火墙规则，也未执行整机重启。
+- 回滚：停止 OpenKill 后，按备份中的恢复清单恢复 `/etc/config/openkill`、运行/源 YAML、OpenKill 自有规则和相关资源，校验归档哈希，再安装历史 `v2026-2014` 正式包并启动；恢复后复核 dnsmasq、fw4 及原服务状态。备份不在 Git 或发布附件中。
+
 ## 2026-10-11 2026-2014 正式包安装收尾（代理组健康探测修复）
 
 - 正式源提交为 `e633a5fb95f722ba8df97d46afb364664db17639`，版本为 `2026-2014`。Development CI 已成功：<https://github.com/dinggood615/openkill/actions/runs/38059012104>；Formal Release 已成功：<https://github.com/dinggood615/openkill/actions/runs/38093660247>；正式标签/Release 为 <https://github.com/dinggood615/openkill/releases/tag/v2026-2014-ipk>。
