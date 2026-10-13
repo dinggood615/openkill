@@ -952,7 +952,7 @@ begin
                   domain = line.to_s.strip.downcase
                   domain = domain.sub(/^\+\./, '').sub(/^\*\./, '')
                   next unless domain.match?(/\A(?:[a-z0-9_]+\.)+[a-z]{2,}\z/)
-                  policy["+.#{domain}"] = [server]
+                  policy['+.' + domain] = [server]
                end
             end
             unless policy.empty?

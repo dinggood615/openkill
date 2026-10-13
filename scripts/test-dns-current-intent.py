@@ -124,6 +124,14 @@ class CurrentDnsIntentTests(unittest.TestCase):
         self.assertIn("authorized LAN/OpenVPN DNS on port 53", settings)
         self.assertIn("direct client-to-Mihomo", settings)
 
+    def test_direct_custom_domain_policy_is_safe_inside_shell_ruby_source(self):
+        """The shell-wrapped Ruby generator must keep the policy key quoted."""
+        yml_change = (
+            ROOT / "luci-app-openkill/root/usr/share/openkill/yml_change.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn("policy['+.' + domain] = [server]", yml_change)
+        self.assertNotIn('policy["+.#{domain}"]', yml_change)
+
     def test_mode1_keeps_custom_mihomo_port_separate(self):
         state = copy.deepcopy(self.state_by_id["STATE-CASE-053"])
         state["proxy_ports"]["dns"] = 7999

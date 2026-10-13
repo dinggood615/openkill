@@ -1,5 +1,15 @@
 # Current status
 
+## 2026-10-13 2026-2018 DNS 转发分离启动修复（候选验收中）
+
+- 本轮在 2026-2017 候选的授权设备复现到真实生成错误：直接模式自定义域名策略的 Ruby 源码被 shell 双引号截断，生成器报 `SyntaxError`，随后旧检查点缺少前端元数据而恢复失败。该错误与节点、Mihomo 核心缺失无关；生成失败时活动配置保持不替换。
+- 修复 `luci-app-openkill/root/usr/share/openkill/yml_change.sh`，以不触发 shell 引号解释的 Ruby 表达式写入策略键，并保留受保护日志中的真实生成诊断；新增 `scripts/test-dns-current-intent.py` 回归断言，防止该类源码破坏再次出现。
+- 2026-2018 延续两种明确链路：模式 1 为“授权客户端 → dnsmasq:53 → Mihomo:7874”；模式 2 为“授权客户端 → OpenKill 防火墙 → Mihomo DNS 监听”，模式 2不再把 dnsmasq 作为中间转发器。直接模式仍要求双栈 UDP/TCP 监听、入口/子链/端口/进程归属一致，失败不静默降级。
+- 版本同步：`luci-app-openkill/Makefile`、安装器、默认 profile、归一化脚本、README、UI 合同测试和发布说明均为 `2026-2018`。2026-2017 候选包不作为发布依据。
+- 本地已通过 DNS 意图 12 项、运行时 51 项（3 skipped）、`git diff --check`；待本提交 Development CI、RC 构建、授权设备两模式重验及 Formal Release 完成后再宣称闭环。
+- 设备范围仍仅为授权 `192.168.1.1`。已有受保护备份 `/root/openkill-dns-direct-backup-20261013-1945` 保留；设备当前直接模式候选重启曾停止，待 2026-2018 候选修复包安装后确认生成、监听、规则和服务状态。设备无活动 OpenVPN 客户端时不把接口存在替代隧道业务验收。
+- 诊断输出只记录错误阶段、退出码、监听/规则分类和配置哈希；不输出节点、订阅、凭据或完整 YAML。模式对比结束后恢复设备原始模式及用户配置。
+
 ## 2026-10-13 2026-2016 DNS 转发模式分离（实现中）
 
 - 本轮目标是把两种本地 DNS 劫持路径明确拆开：`enable_redirect_dns=1` 继续由 dnsmasq 接收授权客户端的 UDP/TCP 53 并转发到 Mihomo；`enable_redirect_dns=2` 由 OpenKill 防火墙直接将授权客户端的 UDP/TCP 53 REDIRECT 到 Mihomo DNS 监听，不再把 dnsmasq 作为中间转发器。仅改 OpenKill 自有 DNS 接管、生成、校验、诊断及对应 UI 说明，不改变 WAN、用户代理组、节点、订阅、TUN 或其他插件规则。
