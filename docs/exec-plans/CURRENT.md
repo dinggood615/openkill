@@ -1,13 +1,14 @@
 # Current status
 
-## 2026-10-13 2026-2018 DNS 转发分离启动修复（候选验收中）
+## 2026-10-13 2026-2018 DNS 转发分离启动修复（候选设备验收通过，待正式发布）
 
 - 本轮在 2026-2017 候选的授权设备复现到真实生成错误：直接模式自定义域名策略的 Ruby 源码被 shell 双引号截断，生成器报 `SyntaxError`，随后旧检查点缺少前端元数据而恢复失败。该错误与节点、Mihomo 核心缺失无关；生成失败时活动配置保持不替换。
 - 修复 `luci-app-openkill/root/usr/share/openkill/yml_change.sh`，以不触发 shell 引号解释的 Ruby 表达式写入策略键，并保留受保护日志中的真实生成诊断；新增 `scripts/test-dns-current-intent.py` 回归断言，防止该类源码破坏再次出现。
 - 2026-2018 延续两种明确链路：模式 1 为“授权客户端 → dnsmasq:53 → Mihomo:7874”；模式 2 为“授权客户端 → OpenKill 防火墙 → Mihomo DNS 监听”，模式 2不再把 dnsmasq 作为中间转发器。直接模式仍要求双栈 UDP/TCP 监听、入口/子链/端口/进程归属一致，失败不静默降级。
 - 版本同步：`luci-app-openkill/Makefile`、安装器、默认 profile、归一化脚本、README、UI 合同测试和发布说明均为 `2026-2018`。2026-2017 候选包不作为发布依据。
-- 本地已通过 DNS 意图 12 项、运行时 51 项（3 skipped）、`git diff --check`；待本提交 Development CI、RC 构建、授权设备两模式重验及 Formal Release 完成后再宣称闭环。
-- 设备范围仍仅为授权 `192.168.1.1`。已有受保护备份 `/root/openkill-dns-direct-backup-20261013-1945` 保留；设备当前直接模式候选重启曾停止，待 2026-2018 候选修复包安装后确认生成、监听、规则和服务状态。设备无活动 OpenVPN 客户端时不把接口存在替代隧道业务验收。
+- 本地已通过 DNS 意图 12 项、运行时 51 项（3 skipped）、完整 `scripts/local-gate.sh`、`git diff --check`；Development CI #437 成功（<https://github.com/dinggood615/openkill/actions/runs/38396596243>），RC Build #166 成功（<https://github.com/dinggood615/openkill/actions/runs/38396810821>）。候选 IPK `luci-app-openkill_2026-2018_all.ipk` SHA256 `f6de64d0d69b10a777e1f550c036ac3b3cd7561502cfee8558b41a39b8894864`，包审计未发现设备敏感内容。
+- 设备范围仍仅为授权 `192.168.1.1`。受保护备份 `/root/openkill-dns-direct-backup-20261013-1945` 保留。2026-2018 RC 实际安装后包版本为 `2026-2018`，配置哈希安装前后保持 `ce86258bda0d65a2cdb610d99e21a05aa566f220bbc8eaed02226a1daac5576a`；严格模式生成、核心启动和就绪检查通过，Mihomo 真实双栈 UDP/TCP 7874 由同一进程监听，防火墙 IPv4/IPv6 入口和 UDP/TCP 规则均指向 7874，dnsmasq 在直接模式未作为上游中间层。
+- 模式对比已完成并恢复原值：模式 1 重启成功，Mihomo 仅回环监听，dnsmasq 上游为本地 7874；模式 2 重启成功，Mihomo wildcard 双栈监听，防火墙规则目标为 7874，dnsmasq 本地上游计数为 0。两种模式均记录 readiness passed；设备本机 IPv4/IPv6 有效域名查询返回成功。设备无活动 OpenVPN 客户端时不把接口存在替代隧道业务验收；TCP 查询、真实 LAN/VPN 客户端数据面和浏览器 LuCI 视觉验收仍单独标记限制。
 - 诊断输出只记录错误阶段、退出码、监听/规则分类和配置哈希；不输出节点、订阅、凭据或完整 YAML。模式对比结束后恢复设备原始模式及用户配置。
 
 ## 2026-10-13 2026-2016 DNS 转发模式分离（实现中）
