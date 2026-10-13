@@ -43,6 +43,15 @@ custom_fallback_filter=$(uci_get_config "custom_fallback_filter" || echo 0)
 china_ip_route=$(uci_get_config "china_ip_route" || echo 0)
 china_ip6_route=$(uci_get_config "china_ip6_route" || echo 0)
 enable_redirect_dns=$(uci_get_config "enable_redirect_dns" || echo 1)
+enable_custom_domain_dns_server=$(uci_get_config "enable_custom_domain_dns_server" || echo 0)
+custom_domain_dns_server=$(uci_get_config "custom_domain_dns_server" || echo "")
+# Keep user-provided DNS values out of the Ruby source string.  Besides
+# avoiding quote/newline breakage, the private temporary file makes concurrent
+# config generations independent and is removed when this process exits.
+custom_domain_dns_server_file="/tmp/openkill-custom-domain-dns-server.$$"
+umask 077
+printf '%s\n' "$custom_domain_dns_server" > "$custom_domain_dns_server_file"
+trap 'rm -f "$custom_domain_dns_server_file"' EXIT
 fake_ip_filter_mode=${34}
 default_dashboard=$(uci_get_config "default_dashboard" || echo "metacubexd")
 yacd_type=$(uci_get_config "yacd_type" || echo "Official")
@@ -76,6 +85,14 @@ normalize_bind_address()
 
 dashboard_bind_address=$(normalize_bind_address "$(uci_get_config "dashboard_bind_address" || echo lan)")
 dns_listen_address=$(normalize_bind_address "$(uci_get_config "dns_listen_address" || echo 127.0.0.1)")
+# Firewall forwarding is a direct client -> Mihomo path.  A loopback-only
+# listener can never receive a REDIRECTed LAN/VPN packet, so mode 2 promotes
+# the legacy loopback default to a dual-stack wildcard listener.  Keep an
+# explicit user wildcard unchanged; only the unsafe loopback default is
+# migrated for this mode.
+case "$enable_redirect_dns:$dns_listen_address" in
+   2:127.0.0.1|2:localhost|2:::1|2:) dns_listen_address="::" ;;
+esac
 # Keep direct callers and older init scripts safe as well: an invalid legacy
 # cn_port must never be interpolated into external-controller or CORS origins.
 controller_port="${3:-}"
@@ -914,6 +931,36 @@ begin
          end
       rescue Exception => e
          YAML.LOG_ERROR('Set Nameserver-Policy Failed,【%s】' % [e.message])
+      end
+   end
+
+   # In direct firewall mode dnsmasq is intentionally not in the data path.
+   # Preserve the existing custom-domain DNS feature by translating its
+   # domain list into Mihomo nameserver-policy entries.  The list is read
+   # only during generation; malformed lines are ignored and the server
+   # value is constrained by the shell-side allow-list above.
+   threads << Thread.new do
+      begin
+         server = File.read('$custom_domain_dns_server_file').to_s.strip
+         if '$enable_redirect_dns' == '2' && '$enable_custom_domain_dns_server' == '1' && !server.empty?
+            unless server.match?(/\A(?:https?|tls|quic|h3):\/\//i) || server.match?(/\A(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?\z/) || server.match?(/\A\[[0-9A-Fa-f:]+\](?::\d+)?\z/)
+               raise ArgumentError, 'Custom DNS server must be an IP or authenticated encrypted URI'
+            end
+            policy = {}
+            if File.file?('/etc/openkill/custom/openkill_custom_domain_dns.list')
+               File.foreach('/etc/openkill/custom/openkill_custom_domain_dns.list') do |line|
+                  domain = line.to_s.strip.downcase
+                  domain = domain.sub(/^\+\./, '').sub(/^\*\./, '')
+                  next unless domain.match?(/\A(?:[a-z0-9_]+\.)+[a-z]{2,}\z/)
+                  policy["+.#{domain}"] = [server]
+               end
+            end
+            unless policy.empty?
+               (Value['dns']['nameserver-policy'] ||= {}).merge!(policy)
+            end
+         end
+      rescue Exception => e
+         YAML.LOG_ERROR('Set direct custom DNS policy failed,【%s】' % [e.message])
       end
    end
 

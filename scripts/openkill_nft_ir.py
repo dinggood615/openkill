@@ -947,16 +947,16 @@ def _current_backend_execution(
     redirect_port = int(ports.get("redirect", default_redirect))
     tproxy_port = int(ports.get("tproxy", default_tproxy))
     dns_port = int(ports.get("dns", default_dns))
-    # A context-only DNS render retains the historical mode-2 chain form. Both
-    # firewall modes now use the dual-stack dnsmasq frontend for IPv4 and
-    # IPv6; dnsmasq forwards to Mihomo's protected loopback listener. Keeping
-    # this as a distinct execution field prevents the listener/upstream value
-    # from being reused as a firewall redirect target (especially for VPN
-    # ingress, where REDIRECT can select the tunnel address).
+    # A context-only DNS render retains the historical mode-2 chain form. Mode
+    # 1 uses the dual-stack dnsmasq frontend; mode 2 is a direct firewall
+    # redirect to Mihomo's dual-stack DNS listener. Keeping this as a distinct
+    # execution field prevents the dnsmasq listener from being reused as a
+    # direct target (which would silently create the very second hop mode 2 is
+    # intended to avoid).
     dns_mode = str((state or {}).get("dns_mode", "2" if state is None else "0"))
     firewall_dns_port = (
         DEFAULT_DNSMASQ_LISTEN_PORT
-        if dns_mode in {"1", "2"}
+        if dns_mode == "1"
         else dns_port
     )
 

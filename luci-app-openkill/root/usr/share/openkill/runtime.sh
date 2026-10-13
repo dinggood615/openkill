@@ -180,17 +180,21 @@ openkill_dns_listener_family_ready() {
 }
 
 # A socket table alone proves only that something owns the port.  Firewall
-# REDIRECT must terminate at the dnsmasq front end, not at a stale listener
+# REDIRECT must terminate at the selected frontend, not at a stale listener
 # left by another service.  netstat -p is available on the supported OpenWrt
 # images; retain the proc-only check as a compatibility fallback when a
-# minimal image omits process names.
+# minimal image omits process names.  The optional owner allows direct mode
+# to require Mihomo rather than dnsmasq; family=any is useful for a dual-stack
+# Go listener exposed as :::port (which may accept IPv4-mapped traffic).
 openkill_dns_listener_process_ready() {
-    local port="$1" family="$2" line
+    local port="$1" family="$2" owner="${3:-dnsmasq}" line
     command -v netstat >/dev/null 2>&1 || return 0
     line="$(netstat -nlp 2>/dev/null || true)"
     [ -n "$line" ] || return 0
-    printf '%s\n' "$line" | awk -v port="$port" -v family="$family" '
-        $1 ~ /^(udp|tcp)/ && $4 ~ (":" port "$") && $NF ~ /\/dnsmasq$/ {
+    printf '%s\n' "$line" | awk -v port="$port" -v family="$family" -v owner="$owner" '
+        $1 ~ /^(udp|tcp)/ && $4 ~ (":" port "$") &&
+        ((owner == "dnsmasq" && $NF ~ /\/dnsmasq$/) ||
+         (owner == "mihomo" && $NF ~ /\/(clash|clash_meta|mihomo)([-_.]|$)/)) {
             is_v6 = ($1 ~ /6$/ || $4 ~ /^\[?::/ || $4 ~ /^:::/)
             if ((family == "ipv6" && !is_v6) || (family == "ipv4" && is_v6)) next
             if ($1 ~ /^udp/) udp = 1

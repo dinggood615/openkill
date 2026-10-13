@@ -1,5 +1,14 @@
 # Current status
 
+## 2026-10-13 2026-2016 DNS 转发模式分离（实现中）
+
+- 本轮目标是把两种本地 DNS 劫持路径明确拆开：`enable_redirect_dns=1` 继续由 dnsmasq 接收授权客户端的 UDP/TCP 53 并转发到 Mihomo；`enable_redirect_dns=2` 由 OpenKill 防火墙直接将授权客户端的 UDP/TCP 53 REDIRECT 到 Mihomo DNS 监听，不再把 dnsmasq 作为中间转发器。仅改 OpenKill 自有 DNS 接管、生成、校验、诊断及对应 UI 说明，不改变 WAN、用户代理组、节点、订阅、TUN 或其他插件规则。
+- 当前基线为上一正式版本 `2026-2015`，源提交 `44467637c3eebcaf8ba3d6b099f37d3a6d0c3c51`；版本目标为未使用的 `2026-2016`。工作区原有未跟踪审计目录均保留。写入设备前必须建立新的权限受保护备份。
+- 代码变化：`yml_change.sh` 在直接模式将默认回环 DNS 监听提升为双栈 wildcard，并把自定义域名 DNS 列表生成为 Mihomo `nameserver-policy`；`openkill`/`runtime.sh` 按模式选择 dnsmasq 或 Mihomo 目标，检查完整入口、跳转、端口、地址族和进程归属；adblock/custom-domain 仅在模式 1生成 dnsmasq include，模式 2不进入 dnsmasq 数据路径；nft IR、LuCI 提示和回归夹具已同步。
+- 本地已通过：`test-dns-current-intent.py` 11 项、`test-runtime.py` 51 项（3 skipped）、`test-nft-ir.py` 16 项、`test-ui-contract.py` 36 项、`test-adblock-loading.py` 2 项、优化测试；shell 语法和 `git diff --check` 通过。完整 `scripts/local-gate.sh`、Development CI、RC、正式包及授权设备对比验收仍待完成。
+- 设备验收计划：仅访问授权 `192.168.1.1`，先只读核对 OpenWrt/架构/核心/监听/规则，再在写入前建立不进入 Git 或产物的 700/600 备份。候选阶段将对比模式 1（dnsmasq → Mihomo）和模式 2（防火墙 → Mihomo），验证 IPv4/IPv6、UDP/TCP 53、规则计数、服务状态及配置保留；设备当前无活动 OpenVPN 客户端时不把接口存在替代隧道业务验收。
+- 该记录不把端口存在或配置文本当作数据面证明；浏览器未登录、没有真实 OpenVPN 客户端、客户端自建 DoH 及服务停止后的系统 DNS 均单独记录限制。
+
 ## 2026-10-13 2026-2015 正式包安装收尾（防火墙 DNS 转发与 OpenVPN 入口修复）
 
 - 本轮精确源提交为 `44467637c3eebcaf8ba3d6b099f37d3a6d0c3c51`，版本 `2026-2015`。Development CI 已成功：<https://github.com/dinggood615/openkill/actions/runs/38383346351>；RC Build 已成功：<https://github.com/dinggood615/openkill/actions/runs/38383504874>；Formal Release 已成功：<https://github.com/dinggood615/openkill/actions/runs/38385063589>；正式标签/Release 为 <https://github.com/dinggood615/openkill/releases/tag/v2026-2015-ipk>。

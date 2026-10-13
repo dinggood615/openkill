@@ -311,9 +311,10 @@ o.default = "lan"
 o.rmempty = false
 
 o = s:taboption("dns", ListValue, "dns_listen_address", translate("DNS Listen Address"))
-o.description = translate("Keep the Mihomo DNS listener on loopback when dnsmasq redirects local queries.")
+o.description = translate("Dnsmasq Redirect keeps Mihomo on loopback. Firewall Redirect is a direct client-to-Mihomo path and automatically uses a dual-stack listener; the configured address is promoted from loopback only for that mode.")
 o:value("127.0.0.1", translate("Local device only (recommended)"))
 o:value("0.0.0.0", translate("All LAN interfaces (advanced)"))
+o:value("::", translate("All IPv4/IPv6 interfaces (firewall mode)"))
 o.default = "127.0.0.1"
 o.rmempty = false
 
@@ -350,7 +351,7 @@ switch_mode.template = "openkill/switch_mode"
 
 ---- DNS Settings
 o = s:taboption("dns", ListValue, "enable_redirect_dns", font_red..bold_on..translate("Redirect Local DNS Setting")..bold_off..font_off)
-o.description = translate("Dnsmasq forwarding relays local IPv4/IPv6 UDP and TCP DNS queries to Mihomo. Firewall forwarding intercepts authorized LAN/OpenVPN DNS on port 53 and sends both address families through the local dnsmasq frontend, which forwards to Mihomo's protected loopback listener. The path validates the actual entry, target, listener and process before reporting ready; it never exposes the Mihomo listener on WAN.")
+o.description = translate("Dnsmasq Redirect sends local IPv4/IPv6 UDP and TCP DNS to dnsmasq, which forwards to Mihomo. Firewall Redirect intercepts only authorized LAN/OpenVPN DNS on port 53 and sends it directly to Mihomo's dual-stack listener, bypassing dnsmasq. OpenKill validates the complete entry, target, listener and process path; WAN exposure remains blocked.")
 o.default = 2
 o:value("0", translate("Disable"))
 o:value("1", translate("Dnsmasq Redirect"))
@@ -416,6 +417,7 @@ end
 o = s:taboption("dns", Flag, "enable_custom_domain_dns_server", translate("Enable Specify DNS Server"))
 o.default = 0
 o:depends("enable_redirect_dns", "1")
+o:depends("enable_redirect_dns", "2")
 o:depends("enable_redirect_dns", "0")
 
 o = s:taboption("dns", Value, "custom_domain_dns_server", translate("Specify DNS Server"))
@@ -423,6 +425,7 @@ o.description = translate("Specify DNS Server For List, Only One IP Server Addre
 o.default = "114.114.114.114"
 o.placeholder = translate("114.114.114.114 or 127.0.0.1#5300")
 o:depends{enable_redirect_dns = "1", enable_custom_domain_dns_server = "1"}
+o:depends{enable_redirect_dns = "2", enable_custom_domain_dns_server = "1"}
 
 o = s:taboption("dns", ListValue, "adblock_mode", "广告屏蔽档位")
 o:value("off", "关闭（保留 DNS 隐私与代理策略）")
@@ -498,10 +501,11 @@ end
 
 custom_domain_dns = s:taboption("dns", Value, "custom_domain_dns")
 custom_domain_dns.template = "cbi/tvalue"
-custom_domain_dns.description = translate("Domain Names In The List Do Not Return Fake-IP, One rule per line, Depend on Dnsmasq")
+custom_domain_dns.description = translate("One domain per line. Dnsmasq Redirect emits a dnsmasq exception; Firewall Redirect emits an equivalent Mihomo nameserver-policy entry without using dnsmasq.")
 custom_domain_dns.rows = 20
 custom_domain_dns.wrap = "off"
 custom_domain_dns:depends{enable_redirect_dns = "1", enable_custom_domain_dns_server = "1"}
+custom_domain_dns:depends{enable_redirect_dns = "2", enable_custom_domain_dns_server = "1"}
 
 function custom_domain_dns.cfgvalue(self, section)
 	return fs.readfile("/etc/openkill/custom/openkill_custom_domain_dns.list") or ""

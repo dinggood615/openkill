@@ -241,17 +241,18 @@ class FirewallShellCompatibilityTests(unittest.TestCase):
 
 class DnsReadinessIsolationTests(unittest.TestCase):
     def _run_fw4_readiness(self, ipv6_rules=True, ipv6_jump=True, ipv6_tcp=True,
-                           ipv6_path=True, ipv6_target=53):
+                           ipv6_path=True, ipv6_target=7890):
         with tempfile.TemporaryDirectory() as directory:
             root = pathlib.Path(directory)
             proc = root / 'proc' / 'net'
             proc.mkdir(parents=True)
             headers = 'sl local_address rem_address st tx_queue rx_queue tr tm->when retrnsmt uid timeout inode\n'
+            port_hex = f"{7890:04X}"
             rows = {
-                'udp': '  0: 0100007F:0035 00000000:0000 07 0000000000000000 00:00000000 00000000 0 0 100 2 0000000000000000 0\n',
-                'tcp': '  0: 0100007F:0035 00000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 101 1 0000000000000000 0\n',
-                'udp6': '  0: 00000000000000000000000000000000:0035 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000 0 0 102 2 0000000000000000 0\n',
-                'tcp6': '  0: 00000000000000000000000000000000:0035 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 103 1 0000000000000000 0\n',
+                'udp': f'  0: 0100007F:{port_hex} 00000000:0000 07 0000000000000000 00:00000000 00000000 0 0 100 2 0000000000000000 0\n',
+                'tcp': f'  0: 0100007F:{port_hex} 00000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 101 1 0000000000000000 0\n',
+                'udp6': f'  0: 00000000000000000000000000000000:{port_hex} 00000000000000000000000000000000:0000 07 00000000:00000000 00:00000000 00000000 0 0 102 2 0000000000000000 0\n',
+                'tcp6': f'  0: 00000000000000000000000000000000:{port_hex} 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000 0 0 103 1 0000000000000000 0\n',
             }
             for name, row in rows.items():
                 (proc / name).write_text(headers + ('' if name == 'tcp6' and not ipv6_tcp else row), encoding='utf-8')
@@ -271,7 +272,7 @@ enable_redirect_dns=2
 ipv6_enable=0
 ipv6_mode=0
 dns_port=7890
-DNSPORT=53
+      DNSPORT=7890
 DNSMASQ_UCI=dhcp.test
 lan_ac_mode=0
 router_self_proxy=0
@@ -286,7 +287,7 @@ ip() {{
 nft() {{
   case "$*" in
     *"list chain inet fw4 openkill_dns_redirect"*)
-      printf '%s\\n' 'OpenKill DNS Hijack meta nfproto ipv4 meta l4proto {{tcp,udp}} th dport 53 redirect to :53'
+       printf '%s\\n' 'OpenKill DNS Hijack meta nfproto ipv4 meta l4proto {{tcp,udp}} th dport 53 redirect to :7890'
       printf '%s' '{ipv6_rule}' ;;
     *"list chain inet fw4 dstnat"*)
       printf '%s\\n' 'meta nfproto ipv4 meta l4proto {{tcp,udp}} th dport 53 jump openkill_dns_redirect'
@@ -306,7 +307,7 @@ nft() {{
         self.assertEqual(self._run_fw4_readiness(ipv6_tcp=False).stdout.strip(), 'not-ready')
 
     def test_isolation_does_not_combine_family_rule_fragments(self):
-        result = self._run_fw4_readiness(ipv6_target=7890)
+        result = self._run_fw4_readiness(ipv6_target=7891)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.strip(), 'not-ready')
 
@@ -649,7 +650,7 @@ class DualStackRoutingTests(unittest.TestCase):
         init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
         self.assertIn('openkill_dns_listener_family_ready', init)
         self.assertIn('openkill_ipv6_data_path_present', init)
-        self.assertIn('IPV6_DNSPORT="$(openkill_dnsmasq_port)"', init)
+        self.assertIn('IPV6_DNSPORT="$DNSPORT"', init)
         self.assertIn('fw4_dns_jump_ready ipv6', init)
         self.assertIn('meta nfproto {ipv6} meta l4proto {tcp,udp} th dport 53 counter jump openkill_dns_redirect', init)
         self.assertIn('IPv6 DNS forwarding requires ip6tables and an IPv6 NAT table', init)

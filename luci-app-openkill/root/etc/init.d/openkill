@@ -329,17 +329,32 @@ change_dnsmasq() {
    # 区域绕过黑名单
    load_ip_route_pass
 
+   # Mode 2 is a true direct firewall -> Mihomo path.  Do not leave the
+   # dnsmasq upstream rewrite from an earlier mode-1 run in place: restore the
+   # user's saved dnsmasq state first, then only generate the core provider
+   # view.  Calling the existing restoration transaction keeps upgrade and
+   # mode-switch behavior identical to an explicit stop.
+   if [ "$1" -eq 2 ]; then
+      if [ "$(uci_get_config "redirect_dns")" = "1" ]; then
+         revert_dnsmasq
+      else
+         rm -f "${DNSMASQ_CONF_DIR}/dnsmasq_openkill_custom_domain.conf" \
+               "${DNSMASQ_CONF_DIR}/dnsmasq_openkill_adblock.conf"
+      fi
+      /usr/share/openkill/openkill_custom_domain_dns.sh
+      /usr/share/openkill/openkill_adblock.sh
+      return 0
+   fi
+
    # 第二 DNS 服务
    /usr/share/openkill/openkill_custom_domain_dns.sh
    # Optional anti-AD dnsmasq filter.  This is independent from DNS privacy
    # and is rebuilt atomically before dnsmasq reloads.
    /usr/share/openkill/openkill_adblock.sh
 
-   # Both the legacy redirect mode (1) and the fw4 firewall mode (2)
-   # must feed the router's own dnsmasq queries into Mihomo.  Mode 2
-   # redirects LAN DNS packets with nftables, but dnsmasq itself is a
-   # local process and never traverses that LAN redirect chain.
-   if [ "$1" -eq 1 ] || [ "$1" -eq 2 ]; then
+   # Mode 1 is the only mode that rewrites dnsmasq to forward to Mihomo.
+   # Mode 2 returned above after restoring the native dnsmasq configuration.
+   if [ "$1" -eq 1 ]; then
       if [ "$(uci_get_config "redirect_dns")" != "1" ]; then
          uci -q del openkill.config.dnsmasq_server
          config_load "dhcp"
@@ -1221,7 +1236,7 @@ openkill_dns_privacy_runtime_check()
 # file atomically.
 openkill_adblock_runtime_verify()
 {
-   local state_file=/tmp/openkill-adblock.state mode state generated domains source_sha256 updated
+   local state_file=/tmp/openkill-adblock.state mode state generated domains source_sha256 updated dns_redirect_mode
    local dns_loaded=0 core_loaded=0 verified=0 effective=0 reason
    local conf include_seen cfg
 
@@ -1238,6 +1253,7 @@ openkill_adblock_runtime_verify()
    [ -n "$generated" ] || generated=0
    [ -n "$domains" ] || domains=0
    [ -n "$updated" ] || updated=0
+   dns_redirect_mode="$(uci_get_config enable_redirect_dns 2>/dev/null || echo 0)"
 
    conf="${DNSMASQ_CONF_DIR:-/tmp/dnsmasq.d}/dnsmasq_openkill_adblock.conf"
    # dnsmasq reads every file in its configured conf-dir.  Require a running
@@ -1269,10 +1285,18 @@ openkill_adblock_runtime_verify()
       core_loaded=1
    fi
 
-   # Standard filters at the DNS frontend; enhanced additionally requires
-   # the core provider.  Do not make the standard state depend on a provider
-   # that its mode does not load.
-   if [ "$dns_loaded" -eq 1 ] && { [ "$mode" = standard ] || [ "$core_loaded" -eq 1 ]; }; then
+   # Standard filters use dnsmasq only in mode 1.  In direct firewall mode
+   # the canonical provider must be loaded by Mihomo for both profiles; a
+   # stale dnsmasq include is deliberately ignored.
+   if [ "$dns_redirect_mode" = "2" ]; then
+      if [ "$core_loaded" -eq 1 ]; then
+         verified=1
+         effective=1
+         reason=runtime-loaded-direct
+      else
+         reason=core-not-loaded-direct
+      fi
+   elif [ "$dns_loaded" -eq 1 ] && { [ "$mode" = standard ] || [ "$core_loaded" -eq 1 ]; }; then
       verified=1
       effective=1
       reason=runtime-loaded
@@ -1673,13 +1697,17 @@ fw4_dns_hijack_ready()
    [ -n "$FW4" ] || return 0
    [ "$enable_redirect_dns" -eq 0 ] && return 0
 
-   local target_v4 target_v6 chain_v6
-   # Both redirect modes use the local dnsmasq frontend as the firewall
-   # target. Mihomo stays on its protected loopback listener; redirecting an
-   # ingress VPN/LAN packet directly to that listener can select the tunnel
-   # address, which the core does not bind. dnsmasq is the dual-stack,
-   # interface-facing frontend and forwards to Mihomo's DNS port.
-   target_v4="$(openkill_dnsmasq_port)"
+   local target_v4 target_v6 chain_v6 listener_owner
+   # Mode 1 terminates at dnsmasq; mode 2 terminates at Mihomo itself.  The
+   # listener owner is part of readiness so a stale dnsmasq socket cannot make
+   # direct firewall forwarding look healthy.
+   if [ "$enable_redirect_dns" -eq 2 ]; then
+      target_v4="${dns_port:-7874}"
+      listener_owner=mihomo
+   else
+      target_v4="$(openkill_dnsmasq_port)"
+      listener_owner=dnsmasq
+   fi
    case "$target_v4" in ''|*[!0-9]*) return 1 ;; esac
    if [ "$enable_redirect_dns" -eq 2 ]; then
       fw4_dns_rule_target_ready openkill_dns_redirect ipv4 "$target_v4" || return 1
@@ -1687,16 +1715,27 @@ fw4_dns_hijack_ready()
    else
       fw4_dns_rule_target_ready dstnat ipv4 "$target_v4" || return 1
    fi
-   openkill_dns_listener_family_ready "$target_v4" ipv4 || return 1
-   openkill_dns_listener_process_ready "$target_v4" ipv4 || return 1
+   if [ "$enable_redirect_dns" -eq 2 ]; then
+      # A Go dual-stack listener commonly appears only in udp6/tcp6 as
+      # :::port while accepting IPv4-mapped connections.  Prefer a native v4
+      # socket, but accept that verified mapped form and always require v6
+      # when the device has an IPv6 data path.
+      if ! openkill_dns_listener_family_ready "$target_v4" ipv4; then
+         openkill_dns_listener_family_ready "$target_v4" ipv6 || return 1
+      fi
+      openkill_dns_listener_process_ready "$target_v4" any "$listener_owner" || return 1
+   else
+      openkill_dns_listener_family_ready "$target_v4" ipv4 || return 1
+      openkill_dns_listener_process_ready "$target_v4" ipv4 "$listener_owner" || return 1
+   fi
 
    if openkill_ipv6_dns_path_needed; then
       chain_v6=dstnat
       [ "$enable_redirect_dns" -eq 2 ] && chain_v6=openkill_dns_redirect
-      target_v6="$(openkill_dnsmasq_port)"
+      target_v6="$target_v4"
       fw4_dns_rule_target_ready "$chain_v6" ipv6 "$target_v6" || return 1
       openkill_dns_listener_family_ready "$target_v6" ipv6 || return 1
-      openkill_dns_listener_process_ready "$target_v6" ipv6 || return 1
+      openkill_dns_listener_process_ready "$target_v6" ipv6 "$listener_owner" || return 1
       if [ "$enable_redirect_dns" -eq 2 ]; then
          fw4_dns_jump_ready ipv6 || return 1
       fi
@@ -1751,7 +1790,7 @@ openkill_strict_ipv6_dns_hijack()
 
    local redirect_port dns_filter dns_chain
    redirect_port="${DNSPORT:-}"
-   [ "$enable_redirect_dns" -eq 2 ] && redirect_port="$(openkill_dnsmasq_port)"
+   [ "$enable_redirect_dns" -eq 2 ] && redirect_port="${dns_port:-7874}"
    [ -n "$redirect_port" ] || return 1
    dns_chain=dstnat
    [ "$enable_redirect_dns" -eq 2 ] && dns_chain=openkill_dns_redirect
@@ -1850,7 +1889,7 @@ openkill_legacy_ipv6_dns_hijack()
 
    local redirect_port="${dns_port:-}" filter="" white_rule=0
    [ "$enable_redirect_dns" -eq 1 ] && redirect_port="${DNSPORT:-}"
-   [ "$enable_redirect_dns" -eq 2 ] && redirect_port="$(openkill_dnsmasq_port)"
+   [ "$enable_redirect_dns" -eq 2 ] && redirect_port="${dns_port:-7874}"
    [ -n "$redirect_port" ] || return 1
 
    if [ "$enable_redirect_dns" -eq 1 ]; then
@@ -2558,7 +2597,15 @@ if [ -n "$FW4" ]; then
       fi
    fi
 
-   DNSPORT="$(openkill_dnsmasq_port)"
+   # Firewall mode terminates the REDIRECT at Mihomo itself.  The legacy
+   # dnsmasq mode keeps the dual-stack dnsmasq frontend on port 53 (or its
+   # configured listener).  Keep this decision in one variable so every
+   # address-family branch and readiness check observes the same target.
+   if [ "$enable_redirect_dns" -eq 2 ]; then
+      DNSPORT="${dns_port:-7874}"
+   else
+      DNSPORT="$(openkill_dnsmasq_port)"
+   fi
 
    if [ "$enable_redirect_dns" -eq 1 ]; then
       # Do not accept a stale rule merely because it has the right comment
@@ -2927,13 +2974,8 @@ if [ -n "$FW4" ]; then
       fi
    fi
 
-   #ipv6
+   #ipv6: DNSPORT is already the address-family-neutral target selected above.
    IPV6_DNSPORT="$DNSPORT"
-   if [ "$enable_redirect_dns" -eq 2 ]; then
-      # Mihomo remains on its configured IPv4 loopback listener; dnsmasq is
-      # the verified IPv6 UDP/TCP frontend for firewall-forwarded DNS.
-      IPV6_DNSPORT="$(openkill_dnsmasq_port)"
-   fi
    if [ "$ipv6_enable" -eq 1 ] || {
       [ "$enable_redirect_dns" -eq 2 ] && openkill_ipv6_data_path_present
    }; then
@@ -3483,7 +3525,13 @@ if [ -z "$FW4" ]; then
       fi
    fi
 
-   DNSPORT="$(openkill_dnsmasq_port)"
+   # Keep legacy firewall3/ip6tables behavior aligned with fw4: direct
+   # firewall mode targets Mihomo, while mode 1 targets dnsmasq.
+   if [ "$enable_redirect_dns" -eq 2 ]; then
+      DNSPORT="${dns_port:-7874}"
+   else
+      DNSPORT="$(openkill_dnsmasq_port)"
+   fi
 
    if [ "$enable_redirect_dns" -eq 1 ]; then
       if [ -z "$(iptables -t nat -nL PREROUTING --line-number |grep 'OpenKill DNS Hijack')" ]; then

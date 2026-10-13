@@ -7,6 +7,7 @@
 . /usr/share/openkill/uci.sh
 
 mode="$(uci_get_config adblock_mode 2>/dev/null || echo off)"
+dns_redirect_mode="$(uci_get_config enable_redirect_dns 2>/dev/null || echo 0)"
 state_file=/tmp/openkill-adblock.state
 provider_dir=/etc/openkill/rule_provider
 provider_file="$provider_dir/openkill-anti-ad.yaml"
@@ -187,10 +188,17 @@ awk -v allow="$policy_allow" -v block="$policy_block" '
 ' "$merged_file" > "$tmp_conf" || exit 1
 awk '!/^([[:space:]]*#|[[:space:]]*$)/ { gsub(/[[:space:]]/, "", $0); if ($0 ~ /^([A-Za-z0-9_-]+\.)+[A-Za-z]{2,}$/) print "local=/" tolower($0) "/" }' "$policy_block" | sort -u >> "$tmp_conf"
 
-if [ -s "$tmp_conf" ]; then
-   mv -f "$tmp_conf" "$conf_file"
+# Dnsmasq is a consumer only in mode 1.  Firewall forwarding (mode 2) sends
+# the intercepted packet directly to Mihomo, so retaining an include here
+# would create a second, hidden DNS path and make diagnostics misleading.
+if [ "$dns_redirect_mode" = "1" ]; then
+   if [ -s "$tmp_conf" ]; then
+      mv -f "$tmp_conf" "$conf_file"
+   else
+      rm -f "$conf_file"
+   fi
 else
-   rm -f "$conf_file"
+   rm -f "$tmp_conf" "$conf_file"
 fi
 
 {
@@ -212,7 +220,8 @@ fi
    ' "$merged_file"
 } > "$tmp_provider" || exit 1
 mv -f "$tmp_provider" "$provider_file"
-chmod 0644 "$provider_file" "$conf_file" 2>/dev/null || true
+chmod 0644 "$provider_file" 2>/dev/null || true
+[ "$dns_redirect_mode" = "1" ] && chmod 0644 "$conf_file" 2>/dev/null || true
 
 source_hash="$(sha256sum "$merged_file" 2>/dev/null | awk '{print $1}')"
 printf '%s\n' "mode=$mode" "state=generated" "generated=1" "effective=1" "provider_effective=1" "dns_loaded=unknown" "core_loaded=unknown" "verified=0" "domains=$(wc -l < "$merged_file" 2>/dev/null || echo 0)" "source_sha256=$source_hash" "updated=$(date +%s 2>/dev/null || echo 0)" > "$state_file"
