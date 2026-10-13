@@ -20,10 +20,18 @@ case "${1:-}" in
     file="$2"
     [ -s "$file" ] && [ -s /etc/config/openkill ] || exit 1
     stage=$(mktemp -d /etc/openkill/.checkpoint.XXXXXX)
-    trap 'rm -f "$stage/config.yaml" "$stage/config.uci" "$stage/core.sha256"; rmdir "$stage" 2>/dev/null || true' EXIT
+    trap 'rm -f "$stage/config.yaml" "$stage/config.uci" "$stage/core.sha256" "$stage/metadata"; rmdir "$stage" 2>/dev/null || true' EXIT
     cp "$file" "$stage/config.yaml"
     cp /etc/config/openkill "$stage/config.uci"
     sha256sum /etc/openkill/clash | awk '{print $1}' > "$stage/core.sha256"
+    dns_redirect_mode=$(uci -q get openkill.config.enable_redirect_dns 2>/dev/null || echo 1)
+    dns_listen_address=$(uci -q get openkill.config.dns_listen_address 2>/dev/null || echo 127.0.0.1)
+    dns_port=$(uci -q get openkill.config.dns_port 2>/dev/null || echo 7874)
+    case "$dns_redirect_mode:$dns_listen_address" in
+      2:127.0.0.1|2:localhost|2:::1|2:) dns_listen_address="::" ;;
+    esac
+    printf 'dns_redirect_mode=%s\ndns_listen=%s:%s\n' \
+      "$dns_redirect_mode" "$dns_listen_address" "$dns_port" > "$stage/metadata"
     old=$(readlink "$checkpoint" 2>/dev/null || true)
     ln -s "$stage" "$checkpoint.new.$$"
     mv -Tf "$checkpoint.new.$$" "$checkpoint"
@@ -32,6 +40,7 @@ case "${1:-}" in
       /etc/openkill/.checkpoint.*)
         [ "$old" = "$stage" ] || {
           rm -f "$old/config.yaml" "$old/config.uci" "$old/core.sha256"
+          rm -f "$old/metadata"
           rmdir "$old" 2>/dev/null || true
         } ;;
     esac
@@ -42,6 +51,7 @@ case "${1:-}" in
     sleep 2
     [ "$(cat "$token_file" 2>/dev/null)" = "$expected" ] || exit 0
     [ -s "$checkpoint/config.yaml" ] && [ -s "$checkpoint/config.uci" ] || recover_fail checkpoint-missing
+    [ -s "$checkpoint/metadata" ] || recover_fail checkpoint-frontend-metadata-missing
     # Cleared only by an explicit fresh start, never by an automatic retry.
     mkdir /tmp/openkill-recovery.once 2>/dev/null || recover_fail recovery-already-attempted
     # A partial checkpoint must be reported as such.  With `set -e`, an

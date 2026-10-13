@@ -5144,8 +5144,30 @@ start_service()
       esac
 
       if [ "${OPENKILL_RECOVERY:-0}" = 1 ]; then
-         cp /etc/openkill/.last-good/config.yaml "$CONFIG_FILE" || start_fail
-         QUICK_START=true
+         # A checkpoint generated for dnsmasq mode cannot be reused as the
+         # direct-Mihomo frontend (and vice versa): its listener and firewall
+         # target describe a different DNS data path.  Reject the snapshot
+         # before quick-start so recovery falls back to a fresh generation
+         # instead of launching a stale profile and failing readiness later.
+         recovery_mode="$(sed -n 's/^dns_redirect_mode=//p' /etc/openkill/.last-good/metadata 2>/dev/null | head -n 1)"
+         recovery_listen="$(sed -n 's/^dns_listen=//p' /etc/openkill/.last-good/metadata 2>/dev/null | head -n 1)"
+         current_mode="${enable_redirect_dns:-1}"
+         current_listen_address="${dns_listen_address:-127.0.0.1}"
+         case "$current_mode:$current_listen_address" in
+            2:127.0.0.1|2:localhost|2:::1|2:) current_listen_address="::" ;;
+         esac
+         current_listen="${current_listen_address}:${dns_port:-7874}"
+         recovery_compatible=1
+         [ -n "$recovery_mode" ] && [ "$recovery_mode" = "$current_mode" ] || recovery_compatible=0
+         [ -z "$recovery_listen" ] || [ "$recovery_listen" = "$current_listen" ] || recovery_compatible=0
+         if [ "$recovery_compatible" = 1 ] && [ -f /etc/openkill/.last-good/config.yaml ]; then
+            cp /etc/openkill/.last-good/config.yaml "$CONFIG_FILE" || start_fail
+            QUICK_START=true
+         else
+            LOG_WARN "Verified checkpoint is incompatible with the requested DNS frontend; regenerating the profile."
+            OPENKILL_RECOVERY=0
+            QUICK_START=false
+         fi
       fi
 
       if ! $QUICK_START; then

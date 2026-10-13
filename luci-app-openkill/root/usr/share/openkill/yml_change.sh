@@ -1351,4 +1351,4 @@ ensure
    File.delete('/tmp/yaml_change_marshal') rescue nil
 end
 exit(write_config ? 0 : 1)
-" 2>/dev/null >> $LOG_FILE
+" >> "$LOG_FILE" 2>&1
