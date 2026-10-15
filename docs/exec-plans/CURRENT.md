@@ -1,5 +1,15 @@
 # Current status
 
+## 2026-10-15 2026-2019 Redir-Host 管理访问保护（正式发布完成）
+
+- 本轮针对授权设备 `192.168.1.1` 复现了 `fake-ip-tun`、`redir-host` 与 `redir-host-tun`。在当前设备、当前客户端和同一业务配置下，Redir-Host 两种接管形态均保持路由器 LuCI HTTP 200、控制器端口可达（未带鉴权时返回预期 401）以及受控 HTTPS 请求成功；因此没有证据证明 Redir-Host 在该设备上必然导致管理入口失联。Windows 客户端仍存在 Clash Meta TUN 与 VMware/WLAN 重叠 `192.168.1.0/24` 路由，该变量未修改，不能归因给路由器修复。
+- 重新核对后确认三个真实的代码风险并完成最小修复：自定义 `localnetwork` 文件此前会替换而非补充 OpenKill 内置管理/私网集合；原生 Mihomo 自动路由/自动重定向时未生成管理网段排除项；Redir-Host 的空 `common_ports` 仍可能生成无效集合引用。现在默认管理/私网范围始终存在，自定义文件以追加方式合并；仅在 Mihomo 自己负责自动路由和自动重定向时生成官方支持的 `route-exclude-address`，OpenKill 自己管理路由时不叠加另一套接管；空端口集合不再生成规则。重复应用与模式切换保持幂等，配置校验失败仍保留原可用配置。
+- 代码修改文件：`luci-app-openkill/root/etc/init.d/openkill`、`luci-app-openkill/root/usr/share/openkill/yml_change.sh`；新增/更新 `scripts/test-runtime.py` 规则保护回归。版本同步到 `2026-2019`，发布说明为 `docs/release/notes/2026-2019.md`。未修改 WAN、用户节点、订阅、DNS 隐私语义、默认代理组、Naive 数据或无关防火墙规则。
+- 本地门禁通过：`scripts/test-runtime.py` 53 项（3 skipped）、`scripts/test-dns-current-intent.py` 12 项、`scripts/local-gate.sh`、两份 shell 语法检查及 `git diff --check` 均通过。精确源提交 `279d57de11b3e34347e7d16f193630ae6af52642` 的 Development CI #`38740366127` 成功（<https://github.com/dinggood615/openkill/actions/runs/38740366127>）。RC Build #`38740675051` 成功（<https://github.com/dinggood615/openkill/actions/runs/38740675051>），候选 IPK SHA256 `eebc7102bfb23a87ac3a262736e74f8c384d0164ed8751ff108219254cc568c9`。
+- Formal Release #`38741422372` 成功（<https://github.com/dinggood615/openkill/actions/runs/38741422372>）；正式标签/Release 为 <https://github.com/dinggood615/openkill/releases/tag/v2026-2019-ipk>，指向上述精确源提交。正式资产 `luci-app-openkill_2026-2019_all.ipk` 通过 HTTPS 下载，大小 8,018,589 字节，SHA256 `cf76a947583bc43b46566ecb80d29639e93811df0730aaf7c2ba95fc1569b79d`。RC/正式包分别核验，未把不同构建的哈希混同；RC 审计通过包元数据、conffile 保留、维护脚本删除、权限和敏感/测试机数据检查。
+- 候选及正式包均在授权设备上使用 `opkg install --force-reinstall` 实际替换，返回码 0，包管理器显示 `2026-2019`；安装前后 `/etc/config/openkill` SHA256 均为 `f50f9e299518be2e3b1919b273b985909855e5aa2a89e8a37647f6d40a659e7c`，现有配置保留。正式包安装后短时切换 `redir-host-tun`，服务进程、LuCI（200）、控制器端口（401 未鉴权）和 HTTPS 均可达，受管 `openkill_mangle` 链存在管理网段返回规则且空 `common_ports` 未生成无效引用；随后取消自动恢复任务并恢复用户原始 `fake-ip-tun`/`fake-ip`，重启后 Mihomo、健康检查和 watchdog 进程均在，LuCI 仍返回 200。受保护备份为 `/root/openkill-redirhost-debug-20261015-2101`（目录/文件权限 700/600，配置哈希已核验）。
+- 未完成项/边界：当前环境未重新建立已登录的 LuCI 浏览器视觉会话，故不把 HTTP 200 代替页面视觉、浏览器控制台或缩放验收；未修改 Windows 的 Clash Meta、VMware 或重叠网段，也未执行整机重启。正式结论限定为管理连通性、模式切换清理/恢复、服务和配置保留已通过；客户端若继续存在重叠网段，应先在客户端侧排除该变量。回滚可停止 OpenKill 后按上述备份恢复 OpenKill 配置、YAML 与受管规则，再安装历史 `v2026-2018` 正式包并启动。
+
 ## 2026-10-13 2026-2018 DNS 转发分离启动修复（正式发布完成）
 
 - 本轮在 2026-2017 候选的授权设备复现到真实生成错误：直接模式自定义域名策略的 Ruby 源码被 shell 双引号截断，生成器报 `SyntaxError`，随后旧检查点缺少前端元数据而恢复失败。该错误与节点、Mihomo 核心缺失无关；生成失败时活动配置保持不替换。
