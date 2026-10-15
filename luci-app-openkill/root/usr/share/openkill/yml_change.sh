@@ -815,6 +815,24 @@ begin
                'auto-redirect' => (tun_auto_redirect == '1'),
                'strict-route' => tun_strict_route, 'disable-icmp-forwarding' => false
             }
+            # Native Mihomo route management must exclude the same private
+            # and management address families that OpenKill protects in its
+            # nftables path.  Without this, switching to redir-host while
+            # tun_owner=mihomo can route LuCI/controller/SSH replies back
+            # into utun before the local firewall rules get a chance to
+            # return them.  Only emit the option when Mihomo owns both
+            # auto-route and auto-redirect; OpenKill-owned routing remains
+            # governed by its managed localnetwork sets.
+            if tun_auto_route == '1' && tun_auto_redirect == '1'
+               Value['tun']['route-exclude-address'] = [
+                  '0.0.0.0/8', '10.0.0.0/8', '100.64.0.0/10',
+                  '127.0.0.0/8', '169.254.0.0/16', '172.16.0.0/12',
+                  '192.168.0.0/16', '224.0.0.0/4', '240.0.0.0/4',
+                  '::/128', '::1/128', 'fc00::/7', 'fe80::/10', 'ff00::/8'
+               ]
+            else
+               Value['tun'].delete('route-exclude-address')
+            end
             Value['tun']['congestion-controller'] = '$tun_congestion_controller' if ['mips', 'mixed'].include?(tun_stack)
             Value['tun'].delete('iproute2-table-index')
          else

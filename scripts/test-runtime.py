@@ -238,6 +238,25 @@ class FirewallShellCompatibilityTests(unittest.TestCase):
                 f'nft DNS rule must be a single quoted expression: {line}',
             )
 
+    def test_redir_host_management_guards_are_explicit_and_empty_ports_are_noop(self):
+        init = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        # A missing common_ports set must not be treated as "bypass every
+        # port".  Every Redir-Host exception is conditional on the set being
+        # configured, for both fw4 and the legacy iptables paths.
+        self.assertIn('common_ports_enabled=0', init)
+        self.assertIn('common_ports_enabled=1', init)
+        self.assertGreaterEqual(init.count('[ "$common_ports_enabled" -eq 1 ] &&'), 20)
+        self.assertIn('The custom file is an additive extension', init)
+        self.assertIn('Keep the IPv6 link-local/loopback/translation ranges', init)
+
+    def test_native_mihomo_tun_gets_private_route_exclusions_only_when_owned(self):
+        yml = (ROOT / 'luci-app-openkill/root/usr/share/openkill/yml_change.sh').read_text(encoding='utf-8')
+        self.assertIn("if tun_auto_route == '1' && tun_auto_redirect == '1'", yml)
+        self.assertIn("Value['tun']['route-exclude-address']", yml)
+        self.assertIn("Value['tun'].delete('route-exclude-address')", yml)
+        self.assertIn("'192.168.0.0/16'", yml)
+        self.assertIn("'fc00::/7'", yml)
+
 
 class DnsReadinessIsolationTests(unittest.TestCase):
     def _run_fw4_readiness(self, ipv6_rules=True, ipv6_jump=True, ipv6_tcp=True,
