@@ -1,5 +1,17 @@
 # Current status
 
+## 2026-10-18 2026-2020 Telegram TCP/UDP 分流修复（正式发布完成）
+
+- 实际根因：授权设备 `192.168.1.1` 的 YouTube/TikTok 成功仅证明 TCP/HTTPS 路径可用；Telegram 原有规则只覆盖用户选择的普通代理组，而该组当前选中成员报告 `udp=false`。设备 `disable_udp_quic=0`、`common_ports` 未设置，且没有 OpenKill 全局 UDP/443 拒绝规则，因此本轮没有把问题误判为全局 QUIC 禁用、DNS 泄漏或 Telegram 域名规则缺失。设备未运行活动 Telegram 客户端，应用层登录/消息/媒体/通话仍需真实客户端复验。
+- 修复文件：新增 `luci-app-openkill/root/usr/share/openkill/telegram_compat.rb`，由 `yml_rules_change.sh` 的唯一生成路径幂等建立受管 `OpenKill-Telegram-UDP` fallback 组；优先使用明确声明 `udp=true` 的节点，必要时安全复用不含 `DIRECT/REJECT` 且明确标识为 UDP 的现有代理组。为 Telegram 域名、IPv4/IPv6 CIDR 和规则集追加 `NETWORK,UDP` 专用匹配，保留原 TCP 规则、用户代理组选择和全局业务分流；无可用 UDP 路径时不生成 DIRECT 回退并记录失败原因。控制器和运行状态页只读展示受管组、规则数、节点数、原因和时间，未启动服务、测速或改变持久化配置。
+- 状态与 UI：成功状态明确写入 `reason=udp-policy-ready`，避免把已生成并加载的 UDP 路径误报为“未启动”；诊断区域区分“UDP 路径已准备”和“真实 Telegram 客户端业务验收”，正常功能卡片语义不变。样式限定在 OpenKill 页面，状态查询不读取凭据或敏感配置。
+- 自动验证：`scripts/test-telegram-compat.rb` 6 runs/17 assertions；`scripts/test-dns-current-intent.py` 12 tests；`scripts/test-ui-contract.py` 36 tests；`scripts/test-ui-preview.py` 2 tests；`scripts/test-runtime.py` 53 tests；`scripts/local-gate.sh`、`git diff --check` 均通过。Node.js 不在本地环境，未执行 Node 语法检查；UI 合同和预览测试通过。
+- 精确代码提交为 `2ab80c6e6ad7629f424d8dee4421d508acb5ef24`。Development CI：<https://github.com/dinggood615/openkill/actions/runs/39131047267>；RC Build：<https://github.com/dinggood615/openkill/actions/runs/39131174179>。RC2 IPK SHA256 为 `ae8683d49c7ccf11f4f1a663a7c09aec246b52d8ae21ac3115ee96f591b08eff`。
+- Formal Release：<https://github.com/dinggood615/openkill/actions/runs/39131492503>；正式标签/Release：<https://github.com/dinggood615/openkill/releases/tag/v2026-2020-ipk>。正式资产 `luci-app-openkill_2026-2020_all.ipk` 大小 8,037,890 字节，SHA256 `eaf35ead4dcfc6782ad0d98cd1824b5f1fb8ed8e88ac3b94ef928a7164e4bfbc`；通过 TLS 校验下载，Release 标签指向上述精确代码提交，保留历史标签和 Release。
+- 候选及正式包均在授权设备实际替换；正式包安装后设备包版本为 `2026-2020`，Mihomo v1.19.32 核心配置校验返回 0，启动日志出现 `OpenKill readiness passed`。当前运行状态为 `enabled=1`，受管 UDP 组为 `OpenKill-Telegram-UDP`，`udp_nodes=1`、`rules=21`、`reason=udp-policy-ready`；控制器代理组引用和延迟探测返回数值，生成 YAML 含 21 条 Telegram UDP 规则，未改变用户配置。安装前后 `/etc/config/openkill` 脱敏哈希保持 `33f28a7b5be0a59b883a99ece2879afa58beb1adfebdd6aa0f71270253ca4f81`。
+- 最终受保护备份为 `/root/openkill-backup-20261018-formal`（目录 700、文件 600、27 个恢复文件，配置哈希已核验），包含 OpenKill UCI、源/生成 YAML、OpenKill 自有覆写和规则、独立 Naive 运行材料；未进入 Git 或发布附件。回滚时停止 OpenKill，按备份清单恢复文件并校验，再安装历史正式包后启动和复核服务。
+- 验收边界：设备没有活动 Telegram 客户端会话，因此不能把控制器延迟、YAML 校验或核心就绪当作 Telegram 登录、文字消息、图片/文件、频道或语音视频通话已通过；这些仍是未验证项。浏览器状态接口验证了只读诊断字段，未将 HTTP/JSON 响应替代完整视觉、控制台和多终端客户端验收。正式发布结论限于已复现的 UDP 路径配置、核心加载、规则/代理组证据、设备就绪和既有配置保留。
+
 ## 2026-10-18 2026-2020 Telegram TCP/UDP 分流修复（候选前）
 
 - 现象与证据：授权设备 `192.168.1.1` 当前运行 OpenKill `2026-2019`、Mihomo Meta `v1.19.32`。YouTube/TikTok 的成功只能证明 TCP/HTTPS 路径可用；控制器只读取证显示 Telegram 规则已存在且可完成 HTTPS 延迟探测，但当前 Telegram 选择组选中的成员报告 `udp=false`。设备 `disable_udp_quic=0`、`common_ports` 未设置，当前没有 OpenKill 全局 UDP/443 拒绝规则，因此根因收窄为 Telegram UDP 流量沿用了 TCP-only 选择路径，而不是全局 QUIC 拒绝或缺少 Telegram 域名规则。设备当时没有活动 Telegram 客户端连接，登录、消息、媒体和通话仍待真实客户端复验。
