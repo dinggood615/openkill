@@ -1,6 +1,17 @@
 # Current status
 
-## 2026-10-18 2026-2021 Telegram regression rollback (in progress)
+## 2026-10-18 2026-2022 Telegram LAN bypass guard (formal release complete)
+
+- 实际根因：授权设备 `192.168.1.1` 上存在一个启用的 `lan_ac_traffic` 空规则（没有来源地址、端口、接口、用户或 DSCP 选择器）。旧生成逻辑把它扩展成所有非 Fake-IP 流量的早期 `RETURN`，跳过 OpenKill 的代理标记路径；Telegram 客户端因此只能建立 SYN，无法完成 TCP 连接。YouTube/TikTok 可用只证明部分 HTTPS 路径，不能排除该旁路。
+- 最小修复：`luci-app-openkill/root/etc/init.d/openkill` 现在对 `lan_ac_traffic` 计算显式来源范围；无选择器的启用行只记录脱敏诊断并跳过生成，带来源地址/端口/接口/用户/DSCP 的规则保持原语义。LuCI 帮助同步说明空规则不会绕过代理，新增 `scripts/test-runtime.py` 回归覆盖。未改变 WAN、DNS 隐私、用户代理组、节点、订阅或其他网络策略。
+- 版本同步文件：`luci-app-openkill/Makefile`、默认 UCI、归一化脚本、安装器、README、UI 合同测试及 `docs/release/notes/2026-2022.md`；版本为 `2026-2022`。
+- 本地门禁：`scripts/test-runtime.py` 54 tests/3 skipped、`scripts/test-ui-contract.py` 36 tests、`scripts/local-gate.sh`、`git diff --check` 均通过。Development CI #447 成功：<https://github.com/dinggood615/openkill/actions/runs/39136325284>；RC Build #172 成功：<https://github.com/dinggood615/openkill/actions/runs/39136458498>。
+- Formal Release #235 成功，release_gate 与 publish 均已启用：<https://github.com/dinggood615/openkill/actions/runs/39138213061>。正式标签/Release：<https://github.com/dinggood615/openkill/releases/tag/v2026-2022-ipk>；标签指向精确源提交 `906b6baf3989c9afaa0f1e286a5026d3d6c8786a`。正式 IPK `luci-app-openkill_2026-2022_all.ipk` SHA256 为 `698908208f05d0373e8c609af482e364bbeacf42401490954888e787e1e5576b`，通过 HTTPS 下载校验。
+- 正式包已实际安装到授权设备，`opkg` 版本为 `2026-2022`，Mihomo v1.19.32 进程运行；安装前后 `/etc/config/openkill` 脱敏哈希均为 `33f28a7b5be0a59b883a99ece2879afa58beb1adfebdd6aa0f71270253ca4f81`。恢复后的空 `lan_ac_traffic` UCI 行仍保留，但生成链输出 `unscoped rule skipped`，nft `openkill_mangle` 中不再出现该全局旁路规则。
+- 真实客户端验收：用户确认 Telegram 桌面窗口已完成登录并发送文字消息；正式包安装后 Windows Telegram 进程仍保持多个 Telegram TCP 80/443 `ESTABLISHED` 连接。YouTube/TikTok 既有路径未改动。正式包安装后的再次发送由用户手工触发尚未单独复述，因此应用层结论以用户确认和安装后传输保持为依据，不扩大为媒体、通话或所有客户端路径均已验证。
+- 受保护备份：`/root/openkill-backup-telegram-20261018140326`，以及安装前旧 init 备份 `openkill.init.2021`；均不在 Git 或发布附件中。回滚时停止服务，按备份清单恢复 OpenKill 配置/资源，校验后安装历史正式包并启动，复核核心、规则和 Telegram 连接。
+
+## 2026-10-18 2026-2021 Telegram regression rollback (superseded)
 
 - The current device is running 2026-2020. Its only Telegram-specific code change is the managed `OpenKill-Telegram-UDP` group and protocol-scoped UDP rules. The device has no active Telegram client session, so the exact application failure path is not yet proven.
 - A protected read-only backup was created on the authorized device at `/root/openkill-backup-telegram-20261018140326`; the UCI and generated YAML hashes were recorded without exposing secrets.
