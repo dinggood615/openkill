@@ -1965,7 +1965,7 @@ openkill_legacy_ipv6_dns_hijack()
 
 firewall_lan_ac_traffic()
 {
-   local src_port sport_rule dscp_rule sport_ipt dscp_ipt src_ip src_ip_v6 proto target target_ enabled family dscp rule output_rule comment
+   local src_port sport_rule dscp_rule sport_ipt dscp_ipt src_ip src_ip_v6 proto target target_ enabled family dscp rule output_rule comment explicit_scope raw_src_port
    config_get "src_port" "$section" "src_port" "0-65535"
    config_get "src_ip" "$section" "src_ip" ""
    config_get "proto" "$section" "proto" "both"
@@ -1976,6 +1976,23 @@ firewall_lan_ac_traffic()
    config_get "interface" "$section" "interface" ""
    config_get "user" "$section" "user" ""
    config_get "comment" "$section" "comment" "lan_ac_traffic"
+
+   # An enabled rule with no source selector is not a usable access-control
+   # entry.  Treating the default source-port range as an explicit selector
+   # turns an empty form row into a global RETURN rule, bypassing all proxy
+   # marking (including Telegram and other LAN clients).  Keep intentional
+   # broad rules possible by requiring the user to set at least one selector.
+   raw_src_port="$(uci -q get "openkill.${section}.src_port" 2>/dev/null || true)"
+   explicit_scope=0
+   [ -n "${src_ip}" ] && explicit_scope=1
+   [ -n "${raw_src_port}" ] && explicit_scope=1
+   [ -n "${interface}" ] && explicit_scope=1
+   [ -n "${user}" ] && explicit_scope=1
+   [ -n "${dscp}" ] && explicit_scope=1
+   if [ "${explicit_scope}" -eq 0 ]; then
+      logger -t openkill "skip unscoped lan_ac_traffic section ${section}"
+      return
+   fi
 
    if [ "${enabled}" == "0" ]; then
       return

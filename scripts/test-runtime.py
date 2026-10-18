@@ -39,6 +39,16 @@ openkill_controller_host() {''' + helper + '\n}\n' +
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout, f'{expected}|{expected}')
 
+
+class LanAccessRuleTests(unittest.TestCase):
+    def test_empty_source_rule_is_guarded(self):
+        source = (ROOT / 'luci-app-openkill/root/etc/init.d/openkill').read_text(encoding='utf-8')
+        function = source.split('firewall_lan_ac_traffic()', 1)[1].split('\n}\n', 1)[0]
+        self.assertIn('raw_src_port=', function)
+        self.assertIn('skip unscoped lan_ac_traffic', function)
+        self.assertIn('[ -n "${src_ip}" ] && explicit_scope=1', function)
+        self.assertIn('[ -n "${raw_src_port}" ] && explicit_scope=1', function)
+
     def test_wildcard_connects_to_loopback(self):
         result = run_shell((SHARE / 'address.sh').read_text(encoding='utf-8') +
                            '\nprintf "%s|%s" "$(openkill_local_address 0.0.0.0)" "$(openkill_local_address ::)"')

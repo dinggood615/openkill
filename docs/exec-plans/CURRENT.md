@@ -5385,3 +5385,9 @@ validation.  `NEXT=PHASE_3E2D2D_R3B_RETRY_SELF_CONTAINED_TYPED_CANDIDATE`.
 - The test device was only read for diagnosis: its binary is executable and
   the version probe succeeds.  Package deployment, node start, owned listener
   verification and SOCKS5 HTTPS/VPS verification remain pending.
+## 2026-10-18 2026-2022 Telegram LAN bypass regression (in progress)
+
+- Real client evidence is now available on the authorized workstation (`192.168.1.131`) through the authorized router (`192.168.1.1`): Telegram PID 19436 repeatedly opened TCP connections to Telegram DC address ranges on ports 80/443, but they stayed `SYN_SENT` while the active `lan_ac_traffic` rule was an enabled, unscoped `proto=both`, `family=both`, `target=return` row. The same row generated an early nftables return before OpenKill marking, so Telegram never entered the proxy path. This is the confirmed root cause; YouTube/TikTok traffic used the workstation's 198.18/16 virtual path and was not evidence against the router path.
+- For causal validation only, the backed-up device UCI row was disabled and OpenKill restarted. The rule disappeared, marked traffic routed through `utun`/table 354, and the same Telegram process established TCP sessions to two Telegram DC addresses. No credentials or message contents were read.
+- Candidate `2026-2021` remains installed and the protected backup is `/root/openkill-backup-telegram-20261018140326`. The next patch is `2026-2022`: runtime skips enabled source-traffic rows with no explicit selector (source address/port, interface, user, or DSCP), while explicitly scoped rows remain unchanged; LuCI help explains the requirement. Existing UCI values are preserved.
+- Hard gate remains real Telegram application confirmation (login and at least text/media), followed by candidate rebuild/install, exact CI, formal release, and formal-package reinstallation. If the user does not complete the client action, do not claim application-layer success.
