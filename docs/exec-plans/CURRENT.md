@@ -1,5 +1,14 @@
 # Current status
 
+## 2026-10-18 2026-2020 Telegram TCP/UDP 分流修复（候选前）
+
+- 现象与证据：授权设备 `192.168.1.1` 当前运行 OpenKill `2026-2019`、Mihomo Meta `v1.19.32`。YouTube/TikTok 的成功只能证明 TCP/HTTPS 路径可用；控制器只读取证显示 Telegram 规则已存在且可完成 HTTPS 延迟探测，但当前 Telegram 选择组选中的成员报告 `udp=false`。设备 `disable_udp_quic=0`、`common_ports` 未设置，当前没有 OpenKill 全局 UDP/443 拒绝规则，因此根因收窄为 Telegram UDP 流量沿用了 TCP-only 选择路径，而不是全局 QUIC 拒绝或缺少 Telegram 域名规则。设备当时没有活动 Telegram 客户端连接，登录、消息、媒体和通话仍待真实客户端复验。
+- 本轮写入前已建立受保护备份 `/etc/openkill/backup/telegram-fix-20261018210627`，覆盖 OpenKill UCI、源/运行配置、OpenKill 自有规则、覆写资源及独立 Naive 运行材料；目录/文件权限已收紧为 700/600，设备端文件计数和可读性已核对。备份未复制到仓库、日志或发布附件。
+- 修复实现：新增 `luci-app-openkill/root/usr/share/openkill/telegram_compat.rb`，在 `yml_rules_change.sh` 的权威规则生成路径中幂等创建 `OpenKill-Telegram-UDP` 受管 fallback 组。优先使用配置中明确声明的 UDP 节点；订阅展开未写入源 YAML 时，安全复用不含 DIRECT/REJECT 且明确命名的 UDP 代理组。为 Telegram 域名、IPv4/IPv6 CIDR 和规则集添加 `NETWORK,UDP` 组合规则，保留原 TCP 规则、用户组选择和全局业务分流；无可用 UDP 路径时不生成 DIRECT 回退并写出失败原因。
+- 新增只读运行诊断：控制器读取 `/tmp/openkill-telegram-udp.state` 的非敏感汇总，状态页显示 UDP 路径是否生成、入口数量和规则数；不会启动服务、测速、改变代理组或读取凭据。状态页增加了窄屏可换行的诊断区域，五张功能卡片契约保持不变。
+- 回归覆盖：WSL Ruby `scripts/test-telegram-compat.rb` 6 runs/15 assertions、DNS 隐私 17 runs/44 assertions、`scripts/local-gate.sh` 通过；真实设备用当前运行 YAML 做脱敏计数，确认 21 条 Telegram 规则可生成 1 个受管 UDP 目标和 21 条 UDP 规则，输出 YAML 可再次由 Ruby 解析。设备端临时脚本仅放在 `/tmp`，已清理。
+- 版本目标为未使用的 `2026-2020`，同步 Makefile、安装器、默认 profile、归一化脚本、README、UI 合同测试及发布说明。下一步是提交、Development CI、RC、授权设备安装复验和 Formal Release；在真实 Telegram 客户端未建立连接前，不把控制器探测或其他网站成功描述成 Telegram 应用层验收通过。
+
 ## 2026-10-15 2026-2019 Redir-Host 管理访问保护（正式发布完成）
 
 - 本轮针对授权设备 `192.168.1.1` 复现了 `fake-ip-tun`、`redir-host` 与 `redir-host-tun`。在当前设备、当前客户端和同一业务配置下，Redir-Host 两种接管形态均保持路由器 LuCI HTTP 200、控制器端口可达（未带鉴权时返回预期 401）以及受控 HTTPS 请求成功；因此没有证据证明 Redir-Host 在该设备上必然导致管理入口失联。Windows 客户端仍存在 Clash Meta TUN 与 VMware/WLAN 重叠 `192.168.1.0/24` 路由，该变量未修改，不能归因给路由器修复。

@@ -1522,6 +1522,12 @@ function action_status()
 	local function rustdesk_value(name, fallback)
 		return rustdesk_state:match(name .. "=([^\n]+)") or fallback
 	end
+	local telegram_udp_state = fs.readfile("/tmp/openkill-telegram-udp.state") or ""
+	local function telegram_udp_value(name, fallback)
+		return telegram_udp_state:match(name .. "=([^\n]+)") or fallback
+	end
+	local telegram_udp_generated = telegram_udp_value("enabled", "0") == "1"
+	local telegram_udp_runtime_reason = status_data.clash and telegram_udp_value("reason", "not-started") or "core-not-running"
 	-- NaiveProxy is an independent service.  Read only its redacted manifest;
 	-- do not inspect legacy UCI credentials or infer health from OpenKill state.
 	local naive_manifest = fs.readfile("/var/run/naiveproxy/manifest") or ""
@@ -1605,6 +1611,12 @@ function action_status()
 		rustdesk_verified = rustdesk_value("verified", "0"),
 		rustdesk_reason = rustdesk_value("reason", "not-started"),
 		rustdesk_updated = rustdesk_value("updated", "unknown"),
+		telegram_udp_enabled = telegram_udp_generated and status_data.clash,
+		telegram_udp_group = telegram_udp_value("group", ""),
+		telegram_udp_nodes = telegram_udp_value("udp_nodes", "0"),
+		telegram_udp_rules = telegram_udp_value("rules", "0"),
+		telegram_udp_reason = telegram_udp_runtime_reason,
+		telegram_udp_updated = telegram_udp_value("updated", "unknown"),
 		naive_enabled = naive_configured > 0,
 		naive_auto_start = false,
 		naive_component_path = naive_component_path,

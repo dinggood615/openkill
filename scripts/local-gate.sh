@@ -10,6 +10,7 @@ sh scripts/validate-openkill.sh
 sh scripts/ci-gate.sh
 if command -v ruby >/dev/null 2>&1; then
     ruby scripts/test-dns-privacy.rb
+    ruby scripts/test-telegram-compat.rb
 fi
 
 if command -v python3 >/dev/null 2>&1; then

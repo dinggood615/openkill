@@ -198,6 +198,11 @@
                                 </div>
                             </div>
                         </div>
+                        <div id="telegram-transport-diagnostic" class="telegram-transport-diagnostic oc-hidden" role="status" aria-live="polite" hidden>
+                            <span class="telegram-transport-label">Telegram 传输诊断</span>
+                            <span id="telegram-transport-status" class="security-status-value is-unknown">—</span>
+                            <span id="telegram-transport-detail" class="security-status-detail">等待核心配置生成</span>
+                        </div>
 
                         <!-- Row 4: Config File -->
                         <div class="card-row full-width dashboard-config-section">
@@ -466,7 +471,10 @@
         rustdesk_status: document.getElementById('rustdesk-status'),
         rustdesk_detail: document.getElementById('rustdesk-detail'),
         naiveproxy_status: document.getElementById('naiveproxy-status'),
-        naiveproxy_detail: document.getElementById('naiveproxy-detail')
+        naiveproxy_detail: document.getElementById('naiveproxy-detail'),
+        telegram_transport_diagnostic: document.getElementById('telegram-transport-diagnostic'),
+        telegram_transport_status: document.getElementById('telegram-transport-status'),
+        telegram_transport_detail: document.getElementById('telegram-transport-detail')
     };
 
     var openkillRuntimeState = 'loading';
@@ -1010,6 +1018,9 @@
                 setCard(name, 'unknown', '状态接口不可用');
             });
             setNotice(fetchFailed ? '状态获取失败，显示上次结果' : '正在读取状态');
+            if (DOMCache.telegram_transport_diagnostic) {
+                setStatusVisibility(DOMCache.telegram_transport_diagnostic, false, undefined, 'oc-hidden');
+            }
             return;
         }
 
@@ -1083,6 +1094,24 @@
             setCard('naiveproxy', 'disabled', naiveFailed ? 'NaiveProxy 实例异常' : 'NaiveProxy 实例尚未就绪');
         } else {
             setCard('naiveproxy', 'enabled', 'NaiveProxy 独立实例正在运行');
+        }
+
+        /* Telegram's UDP path is a diagnostic, not another user-facing
+         * feature toggle.  It tells the user whether the generated config
+         * found a usable UDP route without changing the five binary cards. */
+        if (DOMCache.telegram_transport_diagnostic && hasField('telegram_udp_enabled')) {
+            var telegramEnabled = asBool(status.telegram_udp_enabled);
+            var telegramReason = status.telegram_udp_reason || 'unknown';
+            var telegramNodes = status.telegram_udp_nodes || '0';
+            var telegramRules = status.telegram_udp_rules || '0';
+            setStatusVisibility(DOMCache.telegram_transport_diagnostic, true, undefined, 'oc-hidden');
+            DOMCache.telegram_transport_status.textContent = telegramEnabled ? 'UDP 路径可用' : 'UDP 路径不可用';
+            DOMCache.telegram_transport_status.className = 'security-status-value ' + (telegramEnabled ? 'is-success' : 'is-error');
+            DOMCache.telegram_transport_detail.textContent = telegramEnabled ?
+                ('已生成 ' + telegramNodes + ' 个可用入口 · UDP 规则 ' + telegramRules + ' 条') :
+                ('未生成协议专用路径 · ' + telegramReason);
+        } else if (DOMCache.telegram_transport_diagnostic) {
+            setStatusVisibility(DOMCache.telegram_transport_diagnostic, false, undefined, 'oc-hidden');
         }
 
         /* Keep the card contract binary once a response is available.  A
