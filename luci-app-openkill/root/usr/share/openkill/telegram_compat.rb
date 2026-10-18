@@ -54,7 +54,7 @@ module OpenKillTelegramCompat
       rewritten << rule
     end
     config['rules'] = rewritten.uniq
-    write_state(state_path, 'enabled=1', "group=#{managed_name}", "udp_nodes=#{candidates.length}",
+    write_state(state_path, 'enabled=1', 'reason=udp-policy-ready', "group=#{managed_name}", "udp_nodes=#{candidates.length}",
                 "rules=#{generated}", "updated=#{Time.now.utc.strftime('%Y-%m-%dT%H:%M:%SZ')}")
     log_tip('Telegram UDP path prepared with %d UDP-capable proxy nodes and %d protocol rules' %
       [candidates.length, generated])

@@ -19,10 +19,12 @@ class TelegramCompatTest < Minitest::Test
 
   def test_adds_managed_udp_group_and_protocol_rules_without_changing_tcp_rule
     value = fixture
-    OpenKillTelegramCompat.apply(value, '/tmp/openkill-telegram-compat-test.state')
+    state_path = '/tmp/openkill-telegram-compat-test.state'
+    OpenKillTelegramCompat.apply(value, state_path)
     managed = value['proxy-groups'].find { |group| group['name'] == 'OpenKill-Telegram-UDP' }
     refute_nil managed
     assert_equal ['udp-node'], managed['proxies']
+    assert_match(/^reason=udp-policy-ready$/, File.read(state_path).lines.map(&:chomp).find { |line| line.start_with?('reason=') })
     assert_includes value['rules'], 'DOMAIN-SUFFIX,telegram.org,Telegram'
     assert_includes value['rules'], 'AND,((NETWORK,UDP),(DOMAIN-SUFFIX,telegram.org)),OpenKill-Telegram-UDP'
     assert_includes value['rules'], 'AND,((NETWORK,UDP),(IP-CIDR,149.154.160.0/20,no-resolve)),OpenKill-Telegram-UDP'
