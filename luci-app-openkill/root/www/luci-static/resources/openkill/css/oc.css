@@ -9030,29 +9030,6 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
     line-height: 1.35;
 }
 
-.oc.openkill-status-page .telegram-transport-diagnostic {
-    display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
-    gap: 8px;
-    min-width: 0;
-    margin-top: 10px;
-    padding: 10px 12px;
-    border: 1px solid var(--oc-border, #40506a);
-    border-radius: 8px;
-    background: var(--oc-surface, rgba(30, 42, 60, .72));
-}
-
-.oc.openkill-status-page .telegram-transport-label {
-    color: var(--oc-text-primary, #f1f4f8);
-    font-weight: 600;
-}
-
-.oc.openkill-status-page .telegram-transport-diagnostic .security-status-detail {
-    flex: 1 1 220px;
-    color: var(--oc-text-secondary, #aeb8c8);
-}
-
 /* Security overview cards keep the default view to a project name and one
  * live status.  The longer explanation remains available through the status
  * title/accessible label and the detailed page controls. */

@@ -279,18 +279,6 @@ yml_other_set()
             YAML.LOG_ERROR('Set Custom Rules Failed,【' + e.message + '】');
          end;
 
-         # Telegram transport compatibility is protocol-scoped.  Keep the
-         # user's ordinary Telegram selector for TCP, but add an independently
-         # managed UDP path when the source configuration contains concrete
-         # UDP-capable proxies.  The helper is idempotent and never falls back
-         # to DIRECT when no such proxy exists.
-         begin
-            require 'telegram_compat';
-            OpenKillTelegramCompat.apply(Value);
-         rescue Exception => e
-            YAML.LOG_WARN('Telegram UDP compatibility preparation failed,【' + e.message + '】');
-         end;
-
          #Router Self Proxy Rule
          begin
             if $4 == 0 and $6 != 2 and '$7' == 'fake-ip' then

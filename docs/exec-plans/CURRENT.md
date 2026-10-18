@@ -1,5 +1,13 @@
 # Current status
 
+## 2026-10-18 2026-2021 Telegram regression rollback (in progress)
+
+- The current device is running 2026-2020. Its only Telegram-specific code change is the managed `OpenKill-Telegram-UDP` group and protocol-scoped UDP rules. The device has no active Telegram client session, so the exact application failure path is not yet proven.
+- A protected read-only backup was created on the authorized device at `/root/openkill-backup-telegram-20261018140326`; the UCI and generated YAML hashes were recorded without exposing secrets.
+- Controlled router probes showed the local proxy endpoint did not provide a valid router-self HTTP probe, while direct router requests succeeded; this is not a substitute for a client-side Telegram login test and is not used as the root-cause claim.
+- The minimal code change for 2026-2021 removes the automatic Telegram UDP group/rule injection and its diagnostic UI, returning Telegram to the pre-2020 user-selected rules. No WAN, DNS privacy, proxy-group choice, or unrelated routing behavior is changed.
+- Remaining gate: real Telegram client login, text/media path and actual rule/outbound evidence on the authorized device. Until that is completed, do not promote the candidate or describe the application issue as fully fixed.
+
 ## 2026-10-18 2026-2020 Telegram TCP/UDP 分流修复（正式发布完成）
 
 - 实际根因：授权设备 `192.168.1.1` 的 YouTube/TikTok 成功仅证明 TCP/HTTPS 路径可用；Telegram 原有规则只覆盖用户选择的普通代理组，而该组当前选中成员报告 `udp=false`。设备 `disable_udp_quic=0`、`common_ports` 未设置，且没有 OpenKill 全局 UDP/443 拒绝规则，因此本轮没有把问题误判为全局 QUIC 禁用、DNS 泄漏或 Telegram 域名规则缺失。设备未运行活动 Telegram 客户端，应用层登录/消息/媒体/通话仍需真实客户端复验。

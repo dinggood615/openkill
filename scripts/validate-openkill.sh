@@ -41,8 +41,6 @@ for file in \
   luci-app-openkill/root/usr/share/openkill/dependencies.conf \
   luci-app-openkill/root/usr/share/openkill/yml_proxys_get.sh \
   luci-app-openkill/root/usr/share/openkill/yml_proxys_set.sh \
-  luci-app-openkill/root/usr/share/openkill/telegram_compat.rb \
-  scripts/test-telegram-compat.rb \
   luci-app-openkill/luasrc/model/cbi/openkill/settings.lua \
   luci-app-openkill/luasrc/model/openkill/ui.lua \
   luci-app-openkill/luasrc/model/cbi/openkill/servers-config.lua \
