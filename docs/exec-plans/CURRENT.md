@@ -7,6 +7,10 @@
 - Controlled router probes showed the local proxy endpoint did not provide a valid router-self HTTP probe, while direct router requests succeeded; this is not a substitute for a client-side Telegram login test and is not used as the root-cause claim.
 - The minimal code change for 2026-2021 removes the automatic Telegram UDP group/rule injection and its diagnostic UI, returning Telegram to the pre-2020 user-selected rules. No WAN, DNS privacy, proxy-group choice, or unrelated routing behavior is changed.
 - Remaining gate: real Telegram client login, text/media path and actual rule/outbound evidence on the authorized device. Until that is completed, do not promote the candidate or describe the application issue as fully fixed.
+- Local gate passed on the resulting source commit `f657d43e2866ff2691f1593c182a37422dff845c`; Development CI #445 succeeded: <https://github.com/dinggood615/openkill/actions/runs/39134391252>.
+- RC Build #171 succeeded: <https://github.com/dinggood615/openkill/actions/runs/39134625555>. Candidate IPK `luci-app-openkill_2026-2021_all.ipk` was audited and its SHA256 is `21dc5bba62827daf7fb168582fb6ca632c2a5410c53fcf9efcb64ab1731bd553`.
+- The candidate was installed on `192.168.1.1` with `opkg --force-reinstall`; package version became `2026-2021`, the protected `/etc/config/openkill` hash stayed `33f28a7b5be0a59b883a99ece2879afa58beb1adfebdd6aa0f71270253ca4f81`, the core process restarted, and the generated configuration contained zero `OpenKill-Telegram` groups and zero injected Telegram UDP rules. The package installer preserved the modified conffile as expected.
+- Candidate runtime limitation: router-self HTTP proxy probes remained unavailable while direct router probes worked; this is not treated as a Telegram application result. The stale `/tmp/openkill-telegram-udp.state` from 2026-2020 is no longer read by the candidate UI/controller and will disappear on reboot; it must not be used as evidence.
 
 ## 2026-10-18 2026-2020 Telegram TCP/UDP 分流修复（正式发布完成）
 
