@@ -101,6 +101,32 @@ esac
         # covers the verified inode + SOCKS5 path.
         assert "node.n1.health=local-not-ready" in manifest, manifest
         assert "node.n1.reason=listener-ownership-unverified" in manifest, manifest
+        # A live process and a listener are insufficient if ownership cannot
+        # be proved; a verified listener with an old generation is not ready.
+        manifest_probe = '''
+NAIVEPROXY_STANDALONE_LIB=1 . "$1"
+np_pid_for_config() { printf '123\\n'; }
+np_listener() { return 0; }
+np_listener_owner() { printf '%s\\n' "$OWNER"; }
+np_manifest
+'''
+        for owner, generation, expected_state, expected_ready in (
+            ("unknown", "1", "unverified", "0"),
+            ("verified", "2", "running", "0"),
+            ("verified", "1", "running", "1"),
+        ):
+            (run_dir / "state" / "instance.n1").write_text(
+                f"generation={generation}\n", encoding="utf-8")
+            (run_dir / "state" / "health.n1").write_text(
+                "status=available\nlatency_ms=123\nexpires_at=4102444800\n", encoding="utf-8")
+            probe_env = dict(env, OWNER=owner)
+            subprocess.run([BASH, "-c", manifest_probe, "probe", git_path(SCRIPT)],
+                           env=probe_env, stdout=subprocess.DEVNULL,
+                           stderr=subprocess.DEVNULL, check=True)
+            observed = (run_dir / "manifest").read_text(encoding="utf-8")
+            assert f"node.n1.state={expected_state}" in observed, observed
+            assert f"node.n1.local_ready={expected_ready}" in observed, observed
+            assert f"node.n1.health={'available' if expected_ready == '1' else 'unknown'}" in observed, observed
         assert config_path.stat().st_mtime_ns == config_before, "health rewrote the active runtime config"
         assert config_path.is_file()
         if os.name != "nt":

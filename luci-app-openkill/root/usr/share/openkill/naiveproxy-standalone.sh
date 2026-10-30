@@ -788,14 +788,21 @@ np_manifest() {
                 [ -n "$listener_owner" ] || listener_owner=unknown
                 case "$listener_owner" in
                     external-or-unmatched) state=conflict ;;
-                    *) [ -n "$pid" ] && state=running ;;
+                    verified) [ -n "$pid" ] && state=running ;;
+                    *) [ -n "$pid" ] && state=unverified ;;
                 esac
             fi
             running_generation=$(sed -n 's/^generation=//p' "$NP_STATE_DIR/instance.$id" 2>/dev/null | head -n1)
             pending_apply=0
             [ "$state" = running ] && [ "$running_generation" != "$generation" ] && pending_apply=1
+            # A successful probe from a previous process or configuration is
+            # not evidence for the current node, even before its TTL expires.
+            if [ "$state" != running ] || [ "$pending_apply" = 1 ]; then
+                [ "$health_status" = available ] && health_status=unknown
+                latency=unknown
+            fi
             printf 'node.%s.name=%s\nnode.%s.enabled=%s\nnode.%s.transport=%s\nnode.%s.port=%s\nnode.%s.pid=%s\nnode.%s.state=%s\nnode.%s.listener_owner=%s\nnode.%s.local_ready=%s\nnode.%s.health=%s\nnode.%s.latency_ms=%s\nnode.%s.checked_at=%s\nnode.%s.expires_at=%s\nnode.%s.reason=%s\nnode.%s.generation=%s\nnode.%s.pending_apply=%s\n' \
-                "$id" "$(np_safe "$name")" "$id" "$(np_safe "$enabled")" "$id" "$(np_safe "$transport")" "$id" "$(np_safe "$port")" "$id" "$(np_safe "$pid")" "$id" "$state" "$id" "$(np_safe "$listener_owner")" "$id" "$( [ "$state" = running ] && printf 1 || printf 0 )" "$id" "$(np_safe "${health_status:-unknown}")" "$id" "$(np_safe "${latency:-unknown}")" "$id" "$(np_safe "${checked:-unknown}")" "$id" "$(np_safe "${expires:-unknown}")" "$id" "$(np_safe "${reason:-not-tested}")" "$id" "$(np_safe "$generation")" "$id" "$pending_apply"
+                "$id" "$(np_safe "$name")" "$id" "$(np_safe "$enabled")" "$id" "$(np_safe "$transport")" "$id" "$(np_safe "$port")" "$id" "$(np_safe "$pid")" "$id" "$state" "$id" "$(np_safe "$listener_owner")" "$id" "$( [ "$state" = running ] && [ "$pending_apply" = 0 ] && printf 1 || printf 0 )" "$id" "$(np_safe "${health_status:-unknown}")" "$id" "$(np_safe "${latency:-unknown}")" "$id" "$(np_safe "${checked:-unknown}")" "$id" "$(np_safe "${expires:-unknown}")" "$id" "$(np_safe "${reason:-not-tested}")" "$id" "$(np_safe "$generation")" "$id" "$pending_apply"
         done
     } > "$NP_RUN/manifest.new.$$" || return 1
     chmod 600 "$NP_RUN/manifest.new.$$"; mv -f "$NP_RUN/manifest.new.$$" "$NP_RUN/manifest"

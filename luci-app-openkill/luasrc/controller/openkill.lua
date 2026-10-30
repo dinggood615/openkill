@@ -1543,7 +1543,8 @@ function action_status()
 	end
 	for line in naive_manifest:gmatch("[^\r\n]+") do
 		if naive_truthy(naive_manifest_value(line, "enabled")) then naive_configured = naive_configured + 1 end
-		if naive_manifest_value(line, "state") == "running" then naive_generated = naive_generated + 1; naive_local_ready = naive_local_ready + 1 end
+		if naive_manifest_value(line, "state") == "running" then naive_generated = naive_generated + 1 end
+		if naive_truthy(naive_manifest_value(line, "local_ready")) then naive_local_ready = naive_local_ready + 1 end
 		if naive_manifest_value(line, "health") == "available" then naive_remote_verified = naive_remote_verified + 1 end
 		local health = naive_manifest_value(line, "health")
 		if health == "component-missing" or health == "config-invalid" or health == "local-not-ready" or health == "probe-failed" then naive_failed = true end
