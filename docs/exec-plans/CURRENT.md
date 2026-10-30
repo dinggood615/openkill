@@ -9,7 +9,7 @@
 - 已修复一处状态证据缺陷：有进程及监听但无法验证归属时不再标记运行就绪；进程代次与已保存节点不一致时不报告本地就绪，也不复用此前成功的远端检测结果。汇总状态依据 `local_ready` 而非单纯 `running`。虚构数据行为测试覆盖未知归属、旧代次与匹配代次。
 - 本地 `scripts/test-naiveproxy-standalone.py`、`scripts/test-naiveproxy-integration.py` 和 `scripts/local-gate.sh` 已通过。受管接入、引导解析方案、页面完善以及真实核心和多实例验收仍未完成，不能发布或宣称整体功能完成。
 - 继续实施：上一状态修复提交 `6e72d6f78a614c21ff8bc35476d15860d14c426a` 的 Development CI 已通过：<https://github.com/dinggood615/openkill/actions/runs/41080486653>。本阶段新增受管节点选择、独立端口映射核对和 staged YAML 合并，使用稳定 ID 名称，拒绝冲突并保留原代理组和规则；选择变更仅保存并要求后续应用，不自动重启服务。已选节点不得直接删除或禁用。手动 YAML 路径保留。
-- 本地行为测试覆盖多节点条目、冲突、缺失节点、端口漂移、未选中保持原样及选择/取消选择；`scripts/local-gate.sh`、独立服务和集成测试通过。浏览器测试提示 `PLAYWRIGHT_UNAVAILABLE`，真实浏览器和真实 Mihomo/Naive 多实例数据面均未验证。
+- 本地行为测试覆盖多节点条目、冲突、缺失节点、端口漂移、未选中保持原样及选择/取消选择；`scripts/local-gate.sh`、独立服务和集成测试通过。WSL 浏览器环境缺少 Playwright，但 Windows 本地浏览器模拟 LuCI 接口测试通过，包含受管接入/取消操作；真实 LuCI 和真实 Mihomo/Naive 多实例数据面均未验证。
 - 引导解析仍存在明文公共 DNS 查询路径；尚未改为可验证的加密引导，不能将现有实现描述为安全引导。后续需在明确允许的隔离环境验证 TLS/SNI、IPv4/IPv6、节点引导循环、失败不回退及升级保持。用户此前请求发布，但受管接入与引导尚未完成验收，本阶段不发布。
 
 ## 2026-10-18 2026-2022 Telegram LAN bypass guard (formal release complete)
