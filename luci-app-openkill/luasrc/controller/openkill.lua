@@ -1863,7 +1863,7 @@ end
 local function action_naive_bridge_control_impl()
 	local method = HTTP.getenv("REQUEST_METHOD") or "GET"
 	local operation = HTTP.formvalue("operation") or ""
-	local allowed = { add = true, import = true, get = true, edit = true, remove = true, start = true, stop = true, health = true, component = true, install = true, update = true, legacy_cleanup = true }
+	local allowed = { add = true, import = true, get = true, edit = true, remove = true, managed = true, start = true, stop = true, health = true, component = true, install = true, update = true, legacy_cleanup = true }
 	local result = { ok = false, operation = operation, stage = "request" }
 	if method ~= "POST" or not allowed[operation] then
 		result.error = "post-and-supported-operation-required"

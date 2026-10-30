@@ -71,6 +71,7 @@ esac
         env = os.environ.copy()
         env.update({"NAIVEPROXY_ROOT": git_path(root), "NAIVEPROXY_RUN": git_path(run_dir),
                     "NAIVEPROXY_BIN": git_path(root / "naive"),
+                    "NAIVEPROXY_QUICK_START_FILE": git_path(Path(temp) / "quick-start"),
                     "NAIVEPROXY_TEST_ALLOW_NON_ELF": "1",
                     "PATH": git_path(fake) + ":" + env.get("PATH", "")})
         bash_env = Path(temp) / "bash_env"
@@ -174,6 +175,21 @@ np_manifest
         assert 'server: "127.0.0.1"' in yaml and "port: 11080" in yaml
         assert "fixture-secret" not in yaml and "example.invalid" not in yaml
         assert not (root / "openkill.config").exists()
+        quick_marker = Path(temp) / "quick-start"
+        quick_marker.write_text("cached", encoding="utf-8")
+        selection = subprocess.run([BASH, git_path(SCRIPT), "control"], env=env, text=True,
+                                   input="operation=managed\nid=n1\nenabled=1\n", capture_output=True)
+        assert selection.returncode == 0, selection.stderr
+        assert (root / "managed-nodes").read_text(encoding="utf-8") == "n1 11080\n"
+        assert not quick_marker.exists()
+        assert "node.n1.managed=1" in (run_dir / "manifest").read_text(encoding="utf-8")
+        denied = subprocess.run([BASH, git_path(SCRIPT), "control"], env=env, text=True,
+                                input="operation=remove\nid=n1\n", capture_output=True)
+        assert denied.returncode == 25 and (root / "nodes" / "n1.json").exists()
+        unselect = subprocess.run([BASH, git_path(SCRIPT), "control"], env=env, text=True,
+                                  input="operation=managed\nid=n1\nenabled=0\n", capture_output=True)
+        assert unselect.returncode == 0
+        assert (root / "managed-nodes").read_text(encoding="utf-8") == ""
 
         imported = subprocess.run(
             [BASH, git_path(SCRIPT), "control"], env=env, text=True, input=(

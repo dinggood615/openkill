@@ -14,6 +14,7 @@ NP_RUN="${NAIVEPROXY_RUN:-/var/run/naiveproxy}"
 NP_CONFIG_DIR="$NP_RUN/config"
 NP_STATE_DIR="$NP_RUN/state"
 NP_PORT_MAP="$NP_ROOT/ports"
+NP_MANAGED="$NP_ROOT/managed-nodes"
 NP_BIN="${NAIVEPROXY_BIN:-$NP_ROOT/naive}"
 NP_SERVICE_SCRIPT="${NAIVEPROXY_SERVICE_SCRIPT:-/etc/init.d/naiveproxy-bridge}"
 NP_TARGET="${NAIVEPROXY_HEALTH_TARGET:-https://www.gstatic.com/generate_204}"
@@ -752,7 +753,7 @@ np_health_all() {
 }
 
 np_manifest() {
-    local now id file name enabled port config pid health_status latency checked expires reason state component_version component_reason component_asset component_machine generation running_generation pending_apply transport listener_owner manifest_component_status manifest_component_reason
+    local now id file name enabled port config pid health_status latency checked expires reason state component_version component_reason component_asset component_machine generation running_generation pending_apply transport listener_owner manifest_component_status manifest_component_reason managed
     np_dirs || return 1; now=$(date +%s)
     component_version=$(sed -n 's/^version=//p' "$NP_ROOT/component.meta" 2>/dev/null | head -n1)
     [ -n "$component_version" ] || component_version=unknown
@@ -780,6 +781,8 @@ np_manifest() {
             enabled=$(np_node_value "$file" enabled); port=$(np_mapped_port "$id" 2>/dev/null || true); config="$NP_CONFIG_DIR/$id.json"
             transport=$(np_node_value "$file" transport); [ -n "$transport" ] || transport=https
             generation=$(np_node_generation "$file")
+            managed=0
+            grep -q "^${id} " "$NP_MANAGED" 2>/dev/null && managed=1
             pid=$(np_pid_for_config "$config" 2>/dev/null || true); health_status=$(sed -n 's/^status=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); latency=$(sed -n 's/^latency_ms=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); checked=$(sed -n 's/^checked_at=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); expires=$(sed -n 's/^expires_at=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); reason=$(sed -n 's/^reason=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1)
             case "$expires" in ''|*[!0-9]*) ;; *) [ "$expires" -le "$now" ] && [ "$health_status" = available ] && health_status=expired ;; esac
             state=stopped; listener_owner=not-listening
@@ -801,6 +804,7 @@ np_manifest() {
                 [ "$health_status" = available ] && health_status=unknown
                 latency=unknown
             fi
+            printf 'node.%s.managed=%s\n' "$id" "$managed"
             printf 'node.%s.name=%s\nnode.%s.enabled=%s\nnode.%s.transport=%s\nnode.%s.port=%s\nnode.%s.pid=%s\nnode.%s.state=%s\nnode.%s.listener_owner=%s\nnode.%s.local_ready=%s\nnode.%s.health=%s\nnode.%s.latency_ms=%s\nnode.%s.checked_at=%s\nnode.%s.expires_at=%s\nnode.%s.reason=%s\nnode.%s.generation=%s\nnode.%s.pending_apply=%s\n' \
                 "$id" "$(np_safe "$name")" "$id" "$(np_safe "$enabled")" "$id" "$(np_safe "$transport")" "$id" "$(np_safe "$port")" "$id" "$(np_safe "$pid")" "$id" "$state" "$id" "$(np_safe "$listener_owner")" "$id" "$( [ "$state" = running ] && [ "$pending_apply" = 0 ] && printf 1 || printf 0 )" "$id" "$(np_safe "${health_status:-unknown}")" "$id" "$(np_safe "${latency:-unknown}")" "$id" "$(np_safe "${checked:-unknown}")" "$id" "$(np_safe "${expires:-unknown}")" "$id" "$(np_safe "${reason:-not-tested}")" "$id" "$(np_safe "$generation")" "$id" "$pending_apply"
         done
@@ -980,6 +984,7 @@ np_control_edit() {
     np_valid_id "$NP_CTL_id" || return 20
     file=$(np_node_file "$NP_CTL_id") || return 20
     [ -r "$file" ] || return 21
+    if ! np_enabled "$NP_CTL_enabled" && grep -q "^${NP_CTL_id} " "$NP_MANAGED" 2>/dev/null; then return 25; fi
     current_generation=$(np_node_generation "$file")
     [ "$NP_CTL_generation" = "$current_generation" ] || return 24
     [ -n "$NP_CTL_name" ] && [ -n "$NP_CTL_server" ] && [ -n "$NP_CTL_username" ] || return 10
@@ -1004,8 +1009,43 @@ np_control_remove() {
     np_valid_id "$NP_CTL_id" || return 20
     file=$(np_node_file "$NP_CTL_id") || return 20
     [ -f "$file" ] || return 21
+    # Do not silently invalidate a selected Mihomo endpoint.
+    grep -q "^${NP_CTL_id} " "$NP_MANAGED" 2>/dev/null && return 25
     rm -f "$file" "$NP_CONFIG_DIR/$NP_CTL_id.json" "$NP_STATE_DIR/health.$NP_CTL_id" "$NP_STATE_DIR/instance.$NP_CTL_id" || return 22
     np_manifest >/dev/null || return 23
+}
+
+np_control_managed() {
+    local file port tmp
+    np_valid_id "$NP_CTL_id" || return 20
+    [ "${#NP_CTL_id}" -le 80 ] || return 20
+    file=$(np_node_file "$NP_CTL_id") || return 20
+    [ -r "$file" ] || return 21
+    case "$NP_CTL_enabled" in 0|1) ;; *) return 10 ;; esac
+    port=$(np_mapped_port "$NP_CTL_id" 2>/dev/null || true)
+    if [ "$NP_CTL_enabled" = 1 ]; then
+        np_enabled "$(np_node_value "$file" enabled)" || return 10
+        np_valid_port "$port" || return 16
+    fi
+    np_port_lock_begin || return 39
+    tmp="$NP_MANAGED.new.$$"
+    if [ -r "$NP_MANAGED" ]; then
+        awk -v id="$NP_CTL_id" '$1 != id { print }' "$NP_MANAGED" > "$tmp" || { np_port_lock_end; return 15; }
+    else
+        : > "$tmp" || { np_port_lock_end; return 15; }
+    fi
+    if [ "$NP_CTL_enabled" = 1 ]; then
+        if awk -v port="$port" '$2 == port { found=1 } END { exit !found }' "$tmp"; then
+            rm -f "$tmp"; np_port_lock_end; return 16
+        fi
+        printf '%s %s\n' "$NP_CTL_id" "$port" >> "$tmp" || { rm -f "$tmp"; np_port_lock_end; return 15; }
+    fi
+    chmod 600 "$tmp" && mv -f "$tmp" "$NP_MANAGED" || { rm -f "$tmp"; np_port_lock_end; return 15; }
+    np_port_lock_end
+    # Selection affects the next generation; do not restart OpenKill here.
+    rm -f "${NAIVEPROXY_QUICK_START_FILE:-/tmp/openkill.change}"
+    NP_CTL_RESULT_ID="$NP_CTL_id"
+    np_manifest >/dev/null || return 17
 }
 
 # Explicit upgrade cleanup for retired OpenKill-owned Naive settings.  It is
@@ -1159,6 +1199,10 @@ np_control() {
         remove)
             np_control_remove; rc=$?
             [ "$rc" -eq 0 ] && stage=node-removed || stage=node-remove-failed
+            np_control_result "$rc" "$stage"; return "$rc" ;;
+        managed)
+            np_control_managed; rc=$?
+            [ "$rc" -eq 0 ] && stage=managed-selection-saved || stage=managed-selection-failed
             np_control_result "$rc" "$stage"; return "$rc" ;;
         start)
             rc=0

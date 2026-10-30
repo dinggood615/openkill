@@ -746,6 +746,8 @@ write_run_quick()
       add_quick_path /usr/share/openkill/yml_change.sh
       add_quick_path /usr/share/openkill/yml_rules_change.sh
       add_quick_path /usr/share/openkill/openkill_adblock.sh
+      add_quick_path /usr/share/openkill/naiveproxy-managed.rb
+      add_quick_path /etc/naiveproxy/managed-nodes
    } | while read -r file; do
       [ -n "$file" ] && [ -e "$file" ] && echo "$file #edited time# $(date -r "$file")" >> "/tmp/openkill.change"
    done
@@ -5315,6 +5317,15 @@ start_service()
                YAML.LOG_ERROR('Edit Provider Path Failed,【%s】' % [e.message])
             end
          " >> $LOG_FILE 2>&1
+
+         # Only explicitly selected local SOCKS endpoints are added; this
+         # never starts Naive, edits the source YAML or changes proxy groups.
+         if ! ruby /usr/share/openkill/naiveproxy-managed.rb "$TMP_CONFIG_FILE" /etc/naiveproxy/managed-nodes /etc/naiveproxy/ports /etc/naiveproxy/nodes >> "$LOG_FILE" 2>&1; then
+            rm -f "$TMP_CONFIG_FILE"
+            OPENKILL_START_FAILURE_REASON="naive-managed-config-invalid"
+            LOG_ERROR "Naive managed integration failed; active configuration was kept."
+            start_fail
+         fi
 
          # Validate the fully generated file (including overrides and provider
          # paths) before it can replace the active configuration.  A failed
