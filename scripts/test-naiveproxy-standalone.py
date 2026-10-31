@@ -57,6 +57,9 @@ case "$expr" in
   @.transport) printf '%s' 'https' ;;
   @.listen) printf '%s' 'socks://127.0.0.1:11080' ;;
   @.proxy) printf '%s' 'https://fixture-user:fixture-secret@example.invalid:443' ;;
+  @.Status) sed -n 's/.*"Status":\\([0-9][0-9]*\\).*/\\1/p' "$file" ;;
+  '@.Answer[0].type') sed -n 's/.*"type":\\([0-9][0-9]*\\).*/\\1/p' "$file" ;;
+  '@.Answer[0].data') sed -n 's/.*"data":"\\([^"]*\\)".*/\\1/p' "$file" ;;
   @.generation) sed -n 's/.*"generation":\\([0-9][0-9]*\\).*/\\1/p' "$file" ;;
 esac
 """, encoding="utf-8")
@@ -64,16 +67,47 @@ esac
         # Keep the fixture offline.  Git for Windows may expose the host
         # nslookup executable through PATH; invoking it would make prepare
         # depend on the host network and can leave a captured pipe open.
-        (fake / "nslookup").write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
-        (fake / "curl").write_text("#!/bin/sh\nprintf '204\\t0.123\\n'\n", encoding="utf-8")
+        (fake / "nslookup").write_text("#!/bin/sh\ntouch \"$NAIVE_TEST_NSLOOKUP_MARKER\"\nexit 1\n", encoding="utf-8")
+        (fake / "sleep").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+        (fake / "curl").write_text("""#!/bin/sh
+cfg=
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = --config ]; then cfg=$2; shift 2; else shift; fi
+done
+if [ -n "$cfg" ]; then
+  [ "${NAIVE_TEST_DOH_FAIL:-0}" = 1 ] && exit 22
+  cp "$cfg" "$NAIVE_TEST_DOH_CAPTURE"
+  body=$(sed -n 's/^output = "\\(.*\\)"/\\1/p' "$cfg")
+  response=$NAIVE_TEST_DOH_RESPONSE
+  grep -q 'type=AAAA' "$cfg" && response=$NAIVE_TEST_DOH_AAAA_RESPONSE
+  if [ "${NAIVE_TEST_DOH_A_NXDOMAIN:-0}" = 1 ] && ! grep -q 'type=AAAA' "$cfg"; then response=$NAIVE_TEST_DOH_NX_RESPONSE; fi
+  cp "$response" "$body"
+  exit 0
+fi
+printf '204\\t0.123\\n'
+""", encoding="utf-8")
         for path in fake.iterdir():
             os.chmod(path, 0o755)
         env = os.environ.copy()
+        doh_response = Path(temp) / "doh-response.json"
+        doh_aaaa_response = Path(temp) / "doh-aaaa-response.json"
+        doh_nx_response = Path(temp) / "doh-nx-response.json"
+        doh_capture = Path(temp) / "doh-request.conf"
         env.update({"NAIVEPROXY_ROOT": git_path(root), "NAIVEPROXY_RUN": git_path(run_dir),
                     "NAIVEPROXY_BIN": git_path(root / "naive"),
                     "NAIVEPROXY_QUICK_START_FILE": git_path(Path(temp) / "quick-start"),
                     "NAIVEPROXY_TEST_ALLOW_NON_ELF": "1",
+                    "NAIVE_TEST_DOH_RESPONSE": git_path(doh_response),
+                    "NAIVE_TEST_DOH_AAAA_RESPONSE": git_path(doh_aaaa_response),
+                    "NAIVE_TEST_DOH_NX_RESPONSE": git_path(doh_nx_response),
+                    "NAIVE_TEST_DOH_CAPTURE": git_path(doh_capture),
+                    "NAIVE_TEST_NSLOOKUP_MARKER": git_path(Path(temp) / "nslookup-called"),
                     "PATH": git_path(fake) + ":" + env.get("PATH", "")})
+        doh_response.write_text(
+            '{"Status":0,"Answer":[{"type":1,"data":"203.0.113.10"}]}\n', encoding="utf-8")
+        doh_aaaa_response.write_text(
+            '{"Status":0,"Answer":[{"type":28,"data":"2001:db8::10"}]}\n', encoding="utf-8")
+        doh_nx_response.write_text('{"Status":3}\n', encoding="utf-8")
         bash_env = Path(temp) / "bash_env"
         bash_env.write_text(f"export PATH={git_path(fake)}:$PATH\n", encoding="utf-8")
         env["BASH_ENV"] = git_path(bash_env)
@@ -82,15 +116,33 @@ esac
         assert probe.startswith(git_path(fake)), probe
         run(["prepare", "n1"], env)
         config_path = run_dir / "config" / "n1.json"
+        generated = config_path.read_text(encoding="utf-8")
+        assert '"host-resolver-rules": "MAP example.invalid 203.0.113.10"' in generated
+        doh_request = doh_capture.read_text(encoding="utf-8")
+        assert "https://cloudflare-dns.com/dns-query?name=example.invalid&type=A" in doh_request
+        assert "cloudflare-dns.com:443:1.1.1.1" in doh_request
+        assert "Accept: application/dns-json" in doh_request
+        assert "insecure" not in doh_request.lower()
+        assert not Path(env["NAIVE_TEST_NSLOOKUP_MARKER"]).exists(), "plaintext nslookup was called"
+        before_failed_prepare = config_path.read_bytes()
+        failed_prepare = subprocess.run([BASH, git_path(SCRIPT), "prepare", "n1"], env=dict(env, NAIVE_TEST_DOH_FAIL="1"),
+                                        text=True, capture_output=True, timeout=20)
+        assert failed_prepare.returncode != 0, "bootstrap failure must fail closed"
+        assert config_path.read_bytes() == before_failed_prepare, "failed bootstrap replaced the working config"
+        aaaa_prepare = subprocess.run([BASH, git_path(SCRIPT), "prepare", "n1"],
+                                      env=dict(env, NAIVE_TEST_DOH_A_NXDOMAIN="1"),
+                                      text=True, capture_output=True, timeout=20)
+        assert aaaa_prepare.returncode == 0, aaaa_prepare.stderr
+        assert '"host-resolver-rules": "MAP example.invalid [2001:db8::10]"' in config_path.read_text(encoding="utf-8")
         config_before = config_path.stat().st_mtime_ns
         # Git for Windows can keep a pipeline child attached to captured pipes
         # after the shell has exited (notably the fake ss/grep health probe).
         # Redirect these read-only status commands and inspect the manifest
         # file they atomically write, avoiding a false test hang on Windows.
         health_result = subprocess.run([BASH, git_path(SCRIPT), "health", "all"], env=env, text=True,
-                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
         manifest_result = subprocess.run([BASH, git_path(SCRIPT), "manifest"], env=env, text=True,
-                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20)
         if manifest_result.returncode:
             raise AssertionError(f"manifest rc={manifest_result.returncode}")
         manifest = (run_dir / "manifest").read_text(encoding="utf-8")
@@ -121,7 +173,7 @@ np_manifest
             (run_dir / "state" / "health.n1").write_text(
                 "status=available\nlatency_ms=123\nexpires_at=4102444800\n", encoding="utf-8")
             probe_env = dict(env, OWNER=owner)
-            subprocess.run([BASH, "-c", manifest_probe, "probe", git_path(SCRIPT)],
+            subprocess.run([BASH, "-c", manifest_probe, "probe", git_path(SCRIPT)], timeout=20,
                            env=probe_env, stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL, check=True)
             observed = (run_dir / "manifest").read_text(encoding="utf-8")
@@ -140,7 +192,7 @@ np_manifest
         os.chmod(fake_ss, 0o755)
         foreign_health = subprocess.run(
             [BASH, git_path(SCRIPT), "health", "n1"], env=env, text=True,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20,
         )
         assert foreign_health.returncode == 0
         foreign_manifest = (run_dir / "manifest").read_text(encoding="utf-8")
@@ -150,7 +202,7 @@ np_manifest
         os.chmod(fake_ss, 0o755)
         restored_health = subprocess.run(
             [BASH, git_path(SCRIPT), "health", "n1"], env=env, text=True,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20,
         )
         assert restored_health.returncode == 0
         manifest = (run_dir / "manifest").read_text(encoding="utf-8")
@@ -162,7 +214,7 @@ np_manifest
         ports_before = (root / "ports").read_text(encoding="utf-8")
         missing_config_health = subprocess.run(
             [BASH, git_path(SCRIPT), "health", "n1"], env=env, text=True,
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=20,
         )
         assert missing_config_health.returncode == 0
         missing_manifest = (run_dir / "manifest").read_text(encoding="utf-8")
@@ -178,9 +230,9 @@ np_manifest
         quick_marker = Path(temp) / "quick-start"
         quick_marker.write_text("cached", encoding="utf-8")
         selection = subprocess.run([BASH, git_path(SCRIPT), "control"], env=env, text=True,
-                                   input="operation=managed\nid=n1\nenabled=1\n", capture_output=True)
-        assert selection.returncode == 0, selection.stderr
-        assert (root / "managed-nodes").read_text(encoding="utf-8") == "n1 11080\n"
+                                   input="operation=managed\nid=n1\nenabled=1\ngroup=fixture-group\n", capture_output=True)
+        assert selection.returncode == 0, f"managed selection rc={selection.returncode}; stdout={selection.stdout!r}; stderr={selection.stderr!r}"
+        assert (root / "managed-nodes").read_text(encoding="utf-8") == "n1 11080 fixture-group\n"
         assert not quick_marker.exists()
         assert "node.n1.managed=1" in (run_dir / "manifest").read_text(encoding="utf-8")
         denied = subprocess.run([BASH, git_path(SCRIPT), "control"], env=env, text=True,

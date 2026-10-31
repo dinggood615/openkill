@@ -45,9 +45,11 @@ def main() -> None:
     require(STANDALONE, "start_node \"$start_id\"")
     require(STANDALONE, "procd's")
     require(STANDALONE, "NAIVEPROXY_CONTROL_RESULT:-")
-    require(STANDALONE, "np_public_resolver_ip")
+    require(STANDALONE, "np_doh_answer_ip")
+    require(STANDALONE, "np_secure_bootstrap_ip")
     require(STANDALONE, "host-resolver-rules")
-    require(STANDALONE, "198.18.*")
+    require(STANDALONE, "encrypted-bootstrap-unavailable")
+    require(STANDALONE, "198 && ($2 == 18 || $2 == 19)")
     require(CONTROLLER, "control.result.")
     require(BRIDGE_INIT, "signed installed component is intact")
     require(STANDALONE, "expires_at")
@@ -96,6 +98,8 @@ def main() -> None:
                     if line and not line.startswith("#")]
     assert catalog_rows and all(len(line.split("\t")) == 6 for line in catalog_rows)
     controller = require(CONTROLLER, "action_naive_standalone_status")
+    require(CONTROLLER, 'operation == "groups"')
+    require(controller, "naiveproxy-managed.rb --list-groups")
     # Status polling must remain read-only.  A non-empty runtime manifest is
     # authoritative; only the bootstrap fallback may invoke the fixed runner.
     require(CONTROLLER, "pcall(SYS.exec, command)")

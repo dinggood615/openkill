@@ -635,26 +635,78 @@ np_wait_for_ready() {
     return 1
 }
 
-np_public_resolver_ip() {
-    # Mihomo Fake-IP DNS can return 198.18.0.0/15 for an upstream hostname.
-    # Resolve the Naive endpoint through a bounded direct DNS query only while
-    # preparing its runtime config; this does not change the device resolver.
-    local server="$1" resolver answer
-    case "$server" in
-        ''|*[!A-Za-z0-9.-]*) return 1 ;;
-    esac
-    command -v nslookup >/dev/null 2>&1 || return 1
-    for resolver in 1.1.1.1 8.8.8.8 223.5.5.5; do
-        if command -v timeout >/dev/null 2>&1; then
-            answer=$(timeout 3 nslookup "$server" "$resolver" 2>/dev/null | awk '/^Name:/{seen=1; next} seen && /^Address:/{print $2; exit}')
-        else
-            answer=$(nslookup "$server" "$resolver" 2>/dev/null | awk '/^Name:/{seen=1; next} seen && /^Address:/{print $2; exit}')
-        fi
-        case "$answer" in
-            ''|198.18.*|198.19.*) continue ;;
-            *.*|*:*) printf '%s\n' "$answer"; return 0 ;;
+np_doh_answer_ip() {
+    # A direct encrypted bootstrap exception avoids the resolver -> Naive ->
+    # resolver cycle. Pin the DoH endpoint IP while keeping its HTTPS hostname,
+    # SNI and CA/name verification intact. No system resolver or plaintext
+    # fallback is permitted here. The node hostname is sent only inside DoH.
+    local server="$1" qtype="$2" tmpdir cfg body query status idx answer type
+    case "$server" in ''|*[!A-Za-z0-9.-]*|.*|*..*|*.) return 1 ;; esac
+    command -v curl >/dev/null 2>&1 || return 1
+    command -v jsonfilter >/dev/null 2>&1 || return 1
+    query=$(np_urlencode "$server") || return 1
+    tmpdir=$(mktemp -d "$NP_RUN/bootstrap.XXXXXX") || return 1
+    chmod 700 "$tmpdir" 2>/dev/null || { rm -rf "$tmpdir"; return 1; }
+    cfg="$tmpdir/request.conf"; body="$tmpdir/answer.json"
+    {
+        printf 'url = "https://cloudflare-dns.com/dns-query?name=%s&type=%s"\n' "$query" "$qtype"
+        printf 'resolve = "cloudflare-dns.com:443:1.1.1.1"\n'
+        printf 'header = "Accept: application/dns-json"\n'
+        printf 'connect-timeout = 3\nmax-time = 7\nmax-filesize = 65536\nmax-redirs = 0\n'
+        printf 'proto = "=https"\noutput = "%s"\n' "$body"
+    } > "$cfg" || { rm -rf "$tmpdir"; return 1; }
+    chmod 600 "$cfg" || { rm -rf "$tmpdir"; return 1; }
+    # --disable ignores user curlrc; --noproxy prevents inherited proxy vars
+    # from introducing an untracked resolver/proxy dependency.
+    if ! curl --disable --noproxy '*' --silent --show-error --fail --config "$cfg" >/dev/null 2>&1; then
+        rm -rf "$tmpdir"
+        return 1
+    fi
+    status=$(jsonfilter -i "$body" -e '@.Status' 2>/dev/null || true)
+    [ "$status" = 0 ] || { rm -rf "$tmpdir"; return 1; }
+    idx=0
+    while [ "$idx" -lt 16 ]; do
+        type=$(jsonfilter -i "$body" -e "@.Answer[$idx].type" 2>/dev/null || true)
+        answer=$(jsonfilter -i "$body" -e "@.Answer[$idx].data" 2>/dev/null || true)
+        [ -n "$type" ] || break
+        case "$qtype:$type" in
+            A:1)
+                if printf '%s\n' "$answer" | awk -F. 'NF != 4 { exit 1 } { for (i=1;i<=4;i++) if ($i !~ /^[0-9]+$/ || $i < 0 || $i > 255) exit 1; if ($1 == 198 && ($2 == 18 || $2 == 19)) exit 1 }'; then
+                    rm -rf "$tmpdir"; printf '%s\n' "$answer"; return 0
+                fi
+                ;;
+            AAAA:28)
+                if printf '%s\n' "$answer" | grep -Eq '^[0-9A-Fa-f:]+$' && printf '%s\n' "$answer" | grep -q ':'; then
+                    rm -rf "$tmpdir"; printf '[%s]\n' "$answer"; return 0
+                fi
+                ;;
         esac
+        idx=$((idx + 1))
     done
+    rm -rf "$tmpdir"
+    return 1
+}
+
+np_secure_bootstrap_ip() {
+    local server="$1" answer
+    # Literal node addresses need no DNS. Domain nodes are resolved with
+    # certificate-verified DoH; A is preferred, then AAAA, both bounded.
+    case "$server" in
+        *:*)
+            printf '%s\n' "$server" | grep -Eq '^[0-9A-Fa-f:]+$' || return 1
+            printf '%s\n' "$server"
+            return 0
+            ;;
+        *[!0-9.]*|'') ;;
+        *)
+            if printf '%s\n' "$server" | awk -F. 'NF == 4 { for (i=1;i<=4;i++) if ($i !~ /^[0-9]+$/ || $i < 0 || $i > 255) exit 1; exit 0 } { exit 1 }'; then
+                printf '%s\n' "$server"
+                return 0
+            fi
+            ;;
+    esac
+    answer=$(np_doh_answer_ip "$server" A 2>/dev/null) && { printf '%s\n' "$answer"; return 0; }
+    answer=$(np_doh_answer_ip "$server" AAAA 2>/dev/null) && { printf '%s\n' "$answer"; return 0; }
     return 1
 }
 
@@ -673,9 +725,14 @@ np_prepare() {
     host="$server"
     case "$host" in *:*|'['*) case "$host" in \[*\]) ;; *) host="[$host]" ;; esac ;; esac
     config="$NP_CONFIG_DIR/$id.json"; tmp="$config.new.$$"
-    resolver_ip=$(np_public_resolver_ip "$server" 2>/dev/null || true)
+    resolver_ip=$(np_secure_bootstrap_ip "$server" 2>/dev/null || true)
     resolver_rule=""
-    [ -n "$resolver_ip" ] && resolver_rule=$(np_json_quote "MAP $server $resolver_ip")
+    if [ -n "$resolver_ip" ] && [ "$resolver_ip" != "$server" ]; then
+        resolver_rule=$(np_json_quote "MAP $server $resolver_ip")
+    elif [ -z "$resolver_ip" ]; then
+        printf 'reason=encrypted-bootstrap-unavailable\n' >&2
+        return 1
+    fi
     if [ -n "$resolver_rule" ]; then
         printf '{\n  "listen": "socks://127.0.0.1:%s",\n  "proxy": "%s://%s:%s@%s:%s",\n  "host-resolver-rules": "%s"\n}\n' \
             "$port" "$transport" "$eu" "$ep" "$host" "$remote_port" "$resolver_rule" > "$tmp" || return 1
@@ -753,7 +810,7 @@ np_health_all() {
 }
 
 np_manifest() {
-    local now id file name enabled port config pid health_status latency checked expires reason state component_version component_reason component_asset component_machine generation running_generation pending_apply transport listener_owner manifest_component_status manifest_component_reason managed
+    local now id file name enabled port config pid health_status latency checked expires reason state component_version component_reason component_asset component_machine generation running_generation pending_apply transport listener_owner manifest_component_status manifest_component_reason managed managed_group
     np_dirs || return 1; now=$(date +%s)
     component_version=$(sed -n 's/^version=//p' "$NP_ROOT/component.meta" 2>/dev/null | head -n1)
     [ -n "$component_version" ] || component_version=unknown
@@ -783,6 +840,7 @@ np_manifest() {
             generation=$(np_node_generation "$file")
             managed=0
             grep -q "^${id} " "$NP_MANAGED" 2>/dev/null && managed=1
+            managed_group=$(awk -v id="$id" '$1 == id && NF >= 3 { sub("^[^ ]+ [^ ]+ ", ""); print; exit }' "$NP_MANAGED" 2>/dev/null || true)
             pid=$(np_pid_for_config "$config" 2>/dev/null || true); health_status=$(sed -n 's/^status=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); latency=$(sed -n 's/^latency_ms=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); checked=$(sed -n 's/^checked_at=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); expires=$(sed -n 's/^expires_at=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1); reason=$(sed -n 's/^reason=//p' "$NP_STATE_DIR/health.$id" 2>/dev/null | head -n1)
             case "$expires" in ''|*[!0-9]*) ;; *) [ "$expires" -le "$now" ] && [ "$health_status" = available ] && health_status=expired ;; esac
             state=stopped; listener_owner=not-listening
@@ -804,7 +862,7 @@ np_manifest() {
                 [ "$health_status" = available ] && health_status=unknown
                 latency=unknown
             fi
-            printf 'node.%s.managed=%s\n' "$id" "$managed"
+            printf 'node.%s.managed=%s\nnode.%s.managed_group=%s\n' "$id" "$managed" "$id" "$(np_urlencode "$managed_group")"
             printf 'node.%s.name=%s\nnode.%s.enabled=%s\nnode.%s.transport=%s\nnode.%s.port=%s\nnode.%s.pid=%s\nnode.%s.state=%s\nnode.%s.listener_owner=%s\nnode.%s.local_ready=%s\nnode.%s.health=%s\nnode.%s.latency_ms=%s\nnode.%s.checked_at=%s\nnode.%s.expires_at=%s\nnode.%s.reason=%s\nnode.%s.generation=%s\nnode.%s.pending_apply=%s\n' \
                 "$id" "$(np_safe "$name")" "$id" "$(np_safe "$enabled")" "$id" "$(np_safe "$transport")" "$id" "$(np_safe "$port")" "$id" "$(np_safe "$pid")" "$id" "$state" "$id" "$(np_safe "$listener_owner")" "$id" "$( [ "$state" = running ] && [ "$pending_apply" = 0 ] && printf 1 || printf 0 )" "$id" "$(np_safe "${health_status:-unknown}")" "$id" "$(np_safe "${latency:-unknown}")" "$id" "$(np_safe "${checked:-unknown}")" "$id" "$(np_safe "${expires:-unknown}")" "$id" "$(np_safe "${reason:-not-tested}")" "$id" "$(np_safe "$generation")" "$id" "$pending_apply"
         done
@@ -832,7 +890,7 @@ np_control_read() {
     NP_CTL_action=""; NP_CTL_id=""; NP_CTL_name=""; NP_CTL_server=""
     NP_CTL_port=""; NP_CTL_username=""; NP_CTL_password=""
     NP_CTL_transport="https"; NP_CTL_enabled="1"; NP_CTL_share=""
-    NP_CTL_generation=""; NP_CTL_password_mode="replace"
+    NP_CTL_generation=""; NP_CTL_password_mode="replace"; NP_CTL_group=""
     NP_CTL_RESULT_ID=""; NP_CTL_RESULT_REASON=""; NP_CTL_RESULT_ASSET=""
     NP_CTL_RESULT_VERSION=""; NP_CTL_RESULT_TASK_ID=""; NP_CTL_RESULT_NODE_NAME=""; NP_CTL_RESULT_NODE_SERVER=""
     NP_CTL_RESULT_NODE_PORT=""; NP_CTL_RESULT_NODE_USERNAME=""; NP_CTL_RESULT_NODE_TRANSPORT=""
@@ -849,6 +907,7 @@ np_control_read() {
             port) NP_CTL_port="$value" ;; username) NP_CTL_username="$value" ;;
             password) NP_CTL_password="$value" ;; transport) NP_CTL_transport="$value" ;;
             enabled) NP_CTL_enabled="$value" ;; share) NP_CTL_share="$value" ;;
+            group) NP_CTL_group="$value" ;;
             generation) NP_CTL_generation="$value" ;; password_mode) NP_CTL_password_mode="$value" ;;
         esac
         done
@@ -1026,6 +1085,7 @@ np_control_managed() {
     if [ "$NP_CTL_enabled" = 1 ]; then
         np_enabled "$(np_node_value "$file" enabled)" || return 10
         np_valid_port "$port" || return 16
+        np_valid_text "$NP_CTL_group" 160 || return 10
     fi
     np_port_lock_begin || return 39
     tmp="$NP_MANAGED.new.$$"
@@ -1038,7 +1098,7 @@ np_control_managed() {
         if awk -v port="$port" '$2 == port { found=1 } END { exit !found }' "$tmp"; then
             rm -f "$tmp"; np_port_lock_end; return 16
         fi
-        printf '%s %s\n' "$NP_CTL_id" "$port" >> "$tmp" || { rm -f "$tmp"; np_port_lock_end; return 15; }
+        printf '%s %s %s\n' "$NP_CTL_id" "$port" "$NP_CTL_group" >> "$tmp" || { rm -f "$tmp"; np_port_lock_end; return 15; }
     fi
     chmod 600 "$tmp" && mv -f "$tmp" "$NP_MANAGED" || { rm -f "$tmp"; np_port_lock_end; return 15; }
     np_port_lock_end

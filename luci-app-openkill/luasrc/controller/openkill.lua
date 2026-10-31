@@ -1704,6 +1704,25 @@ end
 function action_naive_standalone_status()
 	local operation = HTTP.formvalue("operation") or "status"
 	local output
+	if operation == "groups" then
+		local selected = config_path()
+		local groups = {}
+		if type(selected) == "string" and selected:match("^[%w_.%-]+$") then
+			local runtime_path = "/etc/openkill/" .. selected
+			if fs.access(runtime_path) then
+				local command = "ruby /usr/share/openkill/naiveproxy-managed.rb --list-groups '/etc/openkill/" .. selected .. "' 2>/dev/null"
+				local ok, listed = pcall(SYS.exec, command)
+				if ok and type(listed) == "string" then
+					for name in listed:gmatch("([^\r\n]+)") do
+						if #name <= 160 and not name:find("[%c]") then table.insert(groups, name) end
+					end
+				end
+			end
+		end
+		HTTP.prepare_content("application/json; charset=utf-8")
+		HTTP.write_json({ ok = true, groups = groups })
+		return
+	end
 	if operation == "yaml" then
 		output = fs.readfile("/var/run/naiveproxy/snippets.yaml") or ""
 		HTTP.prepare_content("text/plain")
@@ -1739,7 +1758,9 @@ function action_naive_standalone_status()
 				local sid, field = key:match("^node%.([%w_-]+)%.([%w_]+)$")
 				if sid and field then
 					result.nodes[sid] = result.nodes[sid] or { id = sid }
-					if field == "port" or field == "pid" or field == "latency_ms" or field == "checked_at" or field == "expires_at" or field == "generation" or field == "pending_apply" then
+					if field == "managed_group" then
+						result.nodes[sid][field] = value:gsub("%%(%x%x)", function(hex) return string.char(tonumber(hex, 16)) end)
+					elseif field == "port" or field == "pid" or field == "latency_ms" or field == "checked_at" or field == "expires_at" or field == "generation" or field == "pending_apply" then
 						-- Preserve an unknown value as unknown; converting a missing
 						-- field to zero makes the UI claim a port, PID or timestamp
 						-- that the standalone service never proved.
@@ -1877,7 +1898,7 @@ local function action_naive_bridge_control_impl()
 		return result, 403, "Forbidden"
 	end
 	local fields = {}
-	for _, key in ipairs({ "operation", "id", "name", "server", "port", "username", "password", "password_mode", "generation", "transport", "enabled", "share" }) do
+	for _, key in ipairs({ "operation", "id", "name", "server", "port", "username", "password", "password_mode", "generation", "transport", "enabled", "share", "group" }) do
 		local value = HTTP.formvalue(key)
 		if value ~= nil then
 			-- The browser parser intentionally trims a pasted share link before

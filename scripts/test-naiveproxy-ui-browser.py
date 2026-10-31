@@ -38,7 +38,7 @@ def main() -> int:
         print("OPENKILL_ENVIRONMENT_LIMIT=PLAYWRIGHT_UNAVAILABLE")
         return 0
 
-    state = {"name": "Fixture", "generation": 1, "managed": "0", "operations": []}
+    state = {"name": "Fixture", "generation": 1, "managed": "0", "managed_group": "", "operations": []}
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_args: object) -> None:
@@ -57,10 +57,13 @@ def main() -> int:
                 self.response(200, "text/html; charset=utf-8", rendered_view())
                 return
             if self.path.startswith("/naive-status"):
+                if "operation=groups" in self.path:
+                    self.response(200, "application/json; charset=utf-8", json.dumps({"ok": True, "groups": ["Main", "Backup auto"]}))
+                    return
                 if "operation=yaml" in self.path:
                     self.response(200, "text/plain; charset=utf-8", '- name: "Fixture"\n  type: socks5\n  server: 127.0.0.1\n  port: 11080\n  udp: false\n')
                     return
-                payload = {"updated": 1, "component_status": "available", "component_version": "fixture", "component": "/etc/naiveproxy/naive", "component_asset": "fixture", "component_machine": "x86_64", "component_reason": "available", "nodes": {"node-fixture": {"name": state["name"], "enabled": "1", "port": "11080", "state": "running", "local_ready": "1", "health": "available", "latency_ms": "123", "checked_at": "1", "generation": str(state["generation"]), "pending_apply": "0", "managed": state["managed"]}}}
+                payload = {"updated": 1, "component_status": "available", "component_version": "fixture", "component": "/etc/naiveproxy/naive", "component_asset": "fixture", "component_machine": "x86_64", "component_reason": "available", "groups": ["Main", "Backup auto"], "nodes": {"node-fixture": {"name": state["name"], "enabled": "1", "port": "11080", "state": "running", "local_ready": "1", "health": "available", "latency_ms": "123", "checked_at": "1", "generation": str(state["generation"]), "pending_apply": "0", "managed": state["managed"], "managed_group": state["managed_group"]}}}
                 self.response(200, "application/json; charset=utf-8", json.dumps(payload))
                 return
             self.response(404, "text/plain", "not found")
@@ -87,6 +90,7 @@ def main() -> int:
                 payload = {"ok": True, "stage": "node-saved", "id": "node-fixture"}
             elif operation == "managed":
                 state["managed"] = fields.get("enabled", "0")
+                state["managed_group"] = fields.get("group", "") if state["managed"] == "1" else ""
                 payload = {"ok": True, "stage": "managed-selection-saved", "id": "node-fixture"}
             elif operation in ("component", "install", "update"):
                 payload = {"ok": True, "stage": "component-candidate-ready", "candidate_version": "fixture", "asset": "fixture"}
@@ -137,10 +141,12 @@ def main() -> int:
                     page.locator('[data-naive-save]').click()
                     page.wait_for_timeout(50)
                     assert "import" in state["operations"] and "get" in state["operations"] and "edit" in state["operations"]
+                    page.locator('[data-naive-managed-group="node-fixture"]').select_option("Main")
                     page.locator('[data-naive-managed="node-fixture"]').click()
                     page.wait_for_function("() => document.querySelector('[data-naive-managed]')?.getAttribute('data-naive-managed-value') === '0'")
                     assert state["managed"] == "1"
-                    assert "OpenKill-Naive-node-fixture" in page.locator("[data-naive-standalone-rows]").inner_text()
+                    assert state["managed_group"] == "Main"
+                    assert "Main" in page.locator("[data-naive-standalone-rows]").inner_text()
                     page.locator('[data-naive-managed="node-fixture"]').click()
                     page.wait_for_function("() => document.querySelector('[data-naive-managed]')?.getAttribute('data-naive-managed-value') === '1'")
                     assert state["managed"] == "0"
