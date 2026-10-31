@@ -5320,6 +5320,12 @@ start_service()
 
          # Only explicitly selected local SOCKS endpoints are added; this
          # never starts Naive, edits the source YAML or changes proxy groups.
+         if ! ruby -rtempfile -e 'exit 0' >/dev/null 2>&1; then
+            rm -f "$TMP_CONFIG_FILE"
+            OPENKILL_START_FAILURE_REASON="runtime-dependency-ruby-tempfile-missing"
+            LOG_ERROR "Naive managed integration dependency missing: ruby-tempfile; active configuration was kept."
+            start_fail
+         fi
          if ! ruby /usr/share/openkill/naiveproxy-managed.rb "$TMP_CONFIG_FILE" /etc/naiveproxy/managed-nodes /etc/naiveproxy/ports /etc/naiveproxy/nodes >> "$LOG_FILE" 2>&1; then
             rm -f "$TMP_CONFIG_FILE"
             OPENKILL_START_FAILURE_REASON="naive-managed-config-invalid"

@@ -1,5 +1,17 @@
 # Current status
 
+## 2026-10-31 手动一键安装后启动失败与多 Naive 验收续接
+
+- 用户反馈刚以一键指令安装最新 OpenKill 后无法启动，并要求查因后继续第二节点保存和双通道验收。当前仓库 HEAD 为 `4c702f96932e6ed8950ddbf4fe9a51296bce943c`，分支 `master` 与 `origin/master` 同步；远端最新正式标签/Release 为 `v2026-2023-ipk`，版本 `2026-2023`。此前记录中较旧的 `2026-2022` 基线已过期。
+- 实机 LuCI 显示 OpenKill `v2026-2023`、Mihomo `v1.19.33`，服务启动失败。日志定位到 Naive 受管配置阶段的 Ruby `tempfile` 库缺失；后续“没有可用已验证检查点”是启动中止后的恢复结果，不是首要故障。设备 Ruby 为 3.4.9；其系统包源提供对应拆分包 `ruby-tempfile`。本轮没有更改 DNS、代理组、节点选择、WAN、路由或其他网络参数。
+- 备份旧记录路径 `/etc/openkill/backup/naive-multinode-20261031T051122Z/pre-change.tar.gz` 在设备上未找到。已在设备上创建 `/etc/openkill (copy)`，并通过 LuCI 核实目录权限为 `700`；当前 `/etc/config/openkill` 已复制到该目录，文件权限为 `600`。另有 `/etc/naiveproxy (copy)`，权限为 `700`，用于保护独立 Naive 数据副本。副本仍需后续逐项核验，不将缺失的旧归档当作可恢复备份。
+- 已复核用户一键安装所需运行时依赖漏项：Naive 受管生成器顶层加载 Ruby `tempfile`，但包依赖、安装器依赖清单和运行依赖清单均未声明 `ruby-tempfile`。本地待提交修复已补齐三处依赖契约，并在启动前检测该库；缺失时提供准确阶段错误且保留旧配置。另修复 YAML 生成脚本把 SOCKS 认证值写入日志的问题：日志只记配置存在，认证数据由权限受限的进程专属临时文件传递并在退出清理。相关回归检查已加入 installer/Naive 集成测试。
+- 本地已验证 `scripts/test-installer.py`（19 tests，1 skipped）、`scripts/test-naiveproxy-integration.py`、`scripts/test-naiveproxy-managed.rb`（5 runs/25 assertions）、POSIX shell 语法、`git diff --check` 与 `scripts/local-gate.sh` 均通过。最新本地门禁输出 `LOCAL_POLICY_GATE=PASS`；代码改动尚未提交、推送或发布；设备现有 OpenKill 包仍是 `2026-2023`。
+- 已通过设备软件包管理器安装并筛选确认 `ruby-tempfile 3.4.9-r1`。本轮未启动 OpenKill，也未提交第二节点或发起双通道请求；待带修复的候选包安装后再执行，避免旧生成脚本重复写出敏感认证日志。
+- 用户已明确授权清理旧 OpenKill 日志及遗留认证临时文件。经 LuCI 文件管理器清理了 `/tmp` 下 7 个 OpenKill 运行/安装/恢复日志；只核对文件名、大小和权限，没有打开或输出内容。旧版固定名 `/tmp/yaml_openkill_auth` 未发现，未删除其他状态、备份或安装脚本文件。
+- 临时认证文件现由 `mktemp` 创建唯一文件名，并受 `umask 077` 保护，退出时清理；日志不再记录认证值。相关依赖契约、启动前预检、脱敏日志与临时文件行为已有回归检查。设备保护副本仍在 `/etc/openkill (copy)`（目录 700，UCI 副本 600）和 `/etc/naiveproxy (copy)`（目录 700）；此前声称的旧归档路径实际不存在，不能用于回滚。
+- 下一步：提交并推送仅含本轮 8 个受控文件的修复，等待精确提交 Development CI；执行 RC Build 并审计后安装候选，确认服务启动，再通过真实 LuCI 保存用户已提供的第二节点，分别验收多实例、独立 SOCKS5 HTTPS、Mihomo 受管接入及指定策略路径。历史审计目录保持原样，不纳入提交。任何节点链接、凭据和敏感输出均不得进入日志、截图、仓库或发布包。
+
 ## 2026-10-31 多 Naive 节点接入（正式发布先行，双通道实机验收随后）
 
 - 用户已恢复 GitHub 连接并明确要求先更新发布、再进行第二节点保存和双通道验收。本轮按此顺序记录：发布不能代替双通道验收，发布说明会披露设备验证尚未完成。

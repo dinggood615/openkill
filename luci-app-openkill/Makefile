@@ -43,7 +43,7 @@ define Package/$(PKG_NAME)
 	TITLE:=LuCI support for OpenKill
 	PKGARCH:=all
 	DEPENDS:=+dnsmasq-full +bash +curl +ca-bundle +ip-full +lua +jsonfilter \
-	+ruby +ruby-yaml +luci-compat +kmod-tun +kmod-inet-diag +unzip +xz
+	+ruby +ruby-yaml +ruby-tempfile +luci-compat +kmod-tun +kmod-inet-diag +unzip +xz
 	MAINTAINER:=dinggood615
 endef
 

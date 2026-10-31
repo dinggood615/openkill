@@ -131,6 +131,12 @@ resolve_requested_package
         self.assertIn('local package mode does not need remote manifest parsing', SOURCE)
         self.assertIn('ruby -ryaml -e', SOURCE)
 
+    def test_naive_managed_generator_declares_tempfile_runtime_dependency(self):
+        dependency_manifest = (ROOT / "luci-app-openkill/root/usr/share/openkill/dependencies.conf").read_text(encoding="utf-8")
+        self.assertIn("+ruby-tempfile", MAKEFILE_SOURCE)
+        self.assertRegex(dependency_manifest, r"OPENKILL_REQUIRED_COMMON=.*\bruby-tempfile\b")
+        self.assertRegex(SOURCE, r"OPENKILL_REQUIRED_COMMON=.*\bruby-tempfile\b")
+
     def test_installer_refreshes_databases_with_mirror_fallbacks(self):
         self.assertIn('download_databases()', SOURCE)
         self.assertIn('Country.mmdb', SOURCE)

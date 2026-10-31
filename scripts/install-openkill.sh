@@ -254,7 +254,7 @@ install_dependencies(){
   # used as a small, dependency-free fallback when ruby-json is not shipped.
   # Keeping it required makes remote package/core resolution work on minimal
   # firmware without forcing the much larger Ruby JSON extension.
-  OPENKILL_REQUIRED_COMMON="bash curl ca-bundle ip-full jsonfilter ruby ruby-yaml lua kmod-tun unzip dnsmasq-full luci-compat"
+  OPENKILL_REQUIRED_COMMON="bash curl ca-bundle ip-full jsonfilter ruby ruby-yaml ruby-tempfile lua kmod-tun unzip dnsmasq-full luci-compat"
   OPENKILL_OPTIONAL_COMMON="ruby-json ruby-base64 ruby-psych ruby-pstore kmod-inet-diag"
   OPENKILL_REQUIRED_FW4="kmod-nft-tproxy"
   OPENKILL_REQUIRED_FW3="kmod-ipt-tproxy iptables-mod-tproxy ipset"

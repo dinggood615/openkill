@@ -8,6 +8,10 @@
 
 LOG_FILE="/tmp/openkill.log"
 CONFIG_FILE="$5"
+umask 077
+OPENKILL_AUTH_FILE=$(mktemp /tmp/yaml_openkill_auth.XXXXXX) || exit 1
+trap 'rm -f "$OPENKILL_AUTH_FILE"' EXIT
+export OPENKILL_AUTH_FILE
 
 custom_fakeip_filter=$(uci_get_config "custom_fakeip_filter" || echo 0)
 custom_name_policy=$(uci_get_config "custom_name_policy" || echo 0)
@@ -199,8 +203,8 @@ yml_auth_get()
    if [ -z "$username" ] || [ -z "$password" ]; then
       return
    else
-      LOG_TIP "You have seted the authentication of SOCKS5/HTTP(S) proxy with【$username:$password】..."
-      echo "  - $username:$password" >>/tmp/yaml_openkill_auth
+      LOG_TIP "SOCKS5/HTTP(S) proxy authentication is configured; credential values are omitted from logs."
+      echo "  - $username:$password" >>"$OPENKILL_AUTH_FILE"
    fi
 }
 
@@ -1059,9 +1063,11 @@ begin
    # Authentication
    threads << Thread.new do
       begin
-         if (auth_config = safe_load_yaml('/tmp/yaml_openkill_auth'))
+         auth_path = ENV.fetch('OPENKILL_AUTH_FILE')
+         if (auth_config = safe_load_yaml(auth_path))
             Value['authentication'] = auth_config
          end
+         File.delete(auth_path) if File.file?(auth_path)
       rescue Exception => e
          YAML.LOG_ERROR('Set authentication Failed,【%s】' % [e.message])
       end

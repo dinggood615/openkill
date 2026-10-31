@@ -81,8 +81,16 @@ def main() -> None:
     require(STANDALONE, "node-save-rollback-incomplete")
     assert "uci" not in bridge
     openkill = require(OPENKILL_INIT, "standalone")
+    require(OPENKILL_INIT, "runtime-dependency-ruby-tempfile-missing")
+    require(OPENKILL_INIT, "ruby-tempfile; active configuration was kept")
     yml_change = YML_CHANGE.read_text(encoding="utf-8")
     assert "`" not in yml_change, "embedded Ruby must not contain shell backtick substitution"
+    require(YML_CHANGE, "credential values are omitted from logs")
+    require(YML_CHANGE, "mktemp /tmp/yaml_openkill_auth.XXXXXX")
+    require(YML_CHANGE, "trap 'rm -f \"$OPENKILL_AUTH_FILE\"' EXIT")
+    assert '【$username:$password】' not in yml_change
+    assert "safe_load_yaml(auth_path)" in yml_change
+    assert "/tmp/yaml_openkill_auth'))" not in yml_change
     require(ROOT / "luci-app-openkill/Makefile", "chown -R root:root /usr/share/openkill")
     require(ROOT / "luci-app-openkill/Makefile", "/etc/init.d/naiveproxy-bridge")
     require(ROOT / ".github/workflows/compile_new_ipk.yml", "normalize-ipk-ownership.py")
