@@ -122,7 +122,7 @@ np_validate_query() {
 }
 
 np_port() {
-    local id="$1" line port tmp
+    local id="$1" line port tmp mapped_id mapped_port extra highest=0 seen_ports=""
     np_valid_id "$id" || return 1
     np_dirs || return 1
     np_port_lock_begin || return 1
@@ -136,32 +136,47 @@ np_port() {
             printf '%s\n' "$port"
             return 0
         fi
+        # Never silently replace a damaged stable mapping.
+        np_port_lock_end
+        return 1
     fi
-    port="$NP_PORT_BASE"
-    while [ "$port" -lt $((NP_PORT_BASE + NP_PORT_LIMIT)) ]; do
-        # The map is only a persistence record.  A stale record or another
-        # daemon may already own a port, so reserve only ports that are absent
-        # from both the map and the live listener table.
-        if ! grep -q " $port$" "$NP_PORT_MAP" 2>/dev/null && ! np_listener "$port"; then
-            tmp="$NP_PORT_MAP.new.$$"
-            awk -v id="$id" '$1 != id {print}' "$NP_PORT_MAP" > "$tmp" || {
-                rm -f "$tmp"; np_port_lock_end; return 1;
-            }
-            printf '%s %s\n' "$id" "$port" >> "$tmp" || {
-                rm -f "$tmp"; np_port_lock_end; return 1;
-            }
-            chmod 600 "$tmp" 2>/dev/null || true
-            mv -f "$tmp" "$NP_PORT_MAP" || {
-                rm -f "$tmp"; np_port_lock_end; return 1;
-            }
-            np_port_lock_end
-            printf '%s\n' "$port"
-            return 0
-        fi
-        port=$((port + 1))
-    done
+    # New mappings are monotonic (11080, 11081, ...): deleted gaps are not
+    # silently reused.  A foreign listener on the next port is a conflict,
+    # not a reason to skip ahead and make the mapping unpredictable.
+    while IFS=' ' read -r mapped_id mapped_port extra; do
+        [ -n "$mapped_id" ] || continue
+        [ -z "$extra" ] && np_valid_id "$mapped_id" && np_valid_port "$mapped_port" || {
+            np_port_lock_end; return 1;
+        }
+        case "$seen_ports" in *" $mapped_port "*) np_port_lock_end; return 1 ;; esac
+        seen_ports="$seen_ports $mapped_port "
+        [ "$mapped_port" -le "$highest" ] || highest="$mapped_port"
+    done < "$NP_PORT_MAP"
+    if [ "$highest" -lt "$NP_PORT_BASE" ]; then
+        port="$NP_PORT_BASE"
+    else
+        port=$((highest + 1))
+    fi
+    [ "$port" -lt $((NP_PORT_BASE + NP_PORT_LIMIT)) ] || {
+        np_port_lock_end; return 1;
+    }
+    if np_listener "$port"; then
+        np_port_lock_end
+        return 1
+    fi
+    tmp="$NP_PORT_MAP.new.$$"
+    awk -v id="$id" '$1 != id {print}' "$NP_PORT_MAP" > "$tmp" || {
+        rm -f "$tmp"; np_port_lock_end; return 1;
+    }
+    printf '%s %s\n' "$id" "$port" >> "$tmp" || {
+        rm -f "$tmp"; np_port_lock_end; return 1;
+    }
+    chmod 600 "$tmp" 2>/dev/null || true
+    mv -f "$tmp" "$NP_PORT_MAP" || {
+        rm -f "$tmp"; np_port_lock_end; return 1;
+    }
     np_port_lock_end
-    return 1
+    printf '%s\n' "$port"
 }
 
 np_port_lock_begin() {

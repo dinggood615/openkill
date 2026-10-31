@@ -12,6 +12,7 @@ if command -v ruby >/dev/null 2>&1; then
     ruby scripts/test-dns-privacy.rb
     ruby scripts/test-naiveproxy-managed.rb
 fi
+sh scripts/test-naiveproxy-ports.sh
 
 if command -v python3 >/dev/null 2>&1; then
     python3 -m compileall -q scripts
