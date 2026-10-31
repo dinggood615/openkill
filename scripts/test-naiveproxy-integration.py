@@ -146,14 +146,14 @@ def main() -> None:
     servers = require(SERVERS, 'o:value("naiveproxy", "NaiveProxy")')
     assert '"naive_username"' not in servers and '"naive_password"' not in servers
     view = require(VIEW, "NaiveProxy 独立服务")
-    require(VIEW, "刷新状态")
-    require(VIEW, "naiveproxy-standalone.sh health all")
-    require(VIEW, "生成 SOCKS5 YAML")
-    require(VIEW, "启动服务")
+    require(VIEW, "生成手动接入 YAML")
+    require(VIEW, "data-naive-action=\"update\"")
+    require(VIEW, "安装 / 更新组件")
     require(VIEW, "导入链接")
-    require(VIEW, "安装组件")
-    require(VIEW, "检查更新")
-    require(VIEW, "更新最新稳定版组件")
+    require(VIEW, "检查组件更新")
+    require(VIEW, "data-naive-node-toggle")
+    require(VIEW, "data-naive-node-restart")
+    require(VIEW, "更多")
     require(VIEW, "data-naive-node-edit")
     require(VIEW, "password_mode")
     require(VIEW, "node-edit-conflict")
@@ -164,7 +164,8 @@ def main() -> None:
     require(VIEW, "data-naive-node-remove")
     require(VIEW, "data-naive-standalone-flow")
     require(VIEW, 'role="group" aria-labelledby="openkill-naive-dialog-title" data-naive-node-form')
-    require(VIEW, "function submitNode(start)")
+    require(VIEW, "function submitNode()")
+    require(VIEW, "status.textContent='节点保存失败'")
     require(VIEW, "parsedImport=false")
     require(VIEW, "field('share').value='';parsedImport=true")
     require(VIEW, "operation:importing?'add'")
@@ -177,6 +178,8 @@ def main() -> None:
     assert '<form data-naive-node-form>' not in view
     assert "form.addEventListener('submit'" not in view
     assert "data-naive-node-action" not in view
+    assert "data-naive-save-start" not in view
+    assert "保存并启动" not in view
     assert "naive_username" not in view and "naive_password" not in view
     generator = require(GENERATOR, "independent service")
     assert "openkill_naive.sh" not in generator

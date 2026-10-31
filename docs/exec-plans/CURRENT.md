@@ -1,5 +1,16 @@
 # Current status
 
+## 2026-10-31 第二个 Naive 节点保存/启动与页面精简（进行中）
+
+- 当前基线重新核实为 `32d6a7a79dd17f7f2e913b0e887c370fdbed5a63`，`master` 与 `origin/master` 同步，已正式发布版本为 `2026-2023`。该基线的精确 Development CI #456 成功；此前 RC #175 来自基线提交，不含本节后续 UI 修改，不能作为最终候选。
+- 已复核设备 `192.168.1.1`：OpenWrt 25.12-SNAPSHOT，x86_64，已安装包 `2026-2023`，根分区可用空间约 2.3 GiB，Ruby Tempfile 可加载。当前 LuCI 能读取一个已保存节点及 16 个可用策略组；该节点显示未运行/本地入口未就绪，远端未验证。此页面证据说明“策略组列表为空”不是当前设备的已确认原因；第二节点保存/启动故障仍需候选包上复现并获取脱敏阶段码。
+- 写入前新建受保护设备备份 `/root/openkill-pre-naive-ui-20261031T085720Z/pre-change.tar.gz`，覆盖 OpenKill UCI、`/etc/openkill`、独立 Naive 数据及将替换的页面/CSS。归档完整性检查通过，共 71 个归档条目，模式为 600；校验摘要保存在同目录 `SHA256` 文件。已有 `/etc/openkill (copy)` 和 `/etc/naiveproxy (copy)` 目录均为 700，分别含 30 和 11 个文件；旧记录提及的 `/etc/openkill/backup/...` 归档不存在，不能作为恢复点。
+- 当前已在真实 LuCI 查看旧包页面：旧界面把整组启停、测试、组件检查/安装/更新和 YAML 操作都放在同一操作区，节点行无单独启停入口；一个节点的策略组读取成功。设备原有用户数据尚未更改。
+- 源码待提交修改为 `naive_compatibility.htm`、OpenKill 专属 `oc.css`、Naive 集成测试及真实浏览器行为测试。页面拟分为组件管理、节点列表、节点编辑：组件主操作为“安装/更新”；节点行显示单节点“启动/停止”“编辑”，测试/重启/删除归入“更多”；编辑对话框只有“保存/取消”，保存不启动节点。每节点控制继续使用现有受管 bridge API，不新增策略组或改动网络机制。
+- 本地已通过 `scripts/test-naiveproxy-integration.py`、`scripts/test-naiveproxy-ui-browser.py`、`scripts/test-installer.py`（19 项，1 跳过）及 `wsl sh scripts/local-gate.sh`（17/44 与 5/25，`LOCAL_POLICY_GATE=PASS`）。本地浏览器夹具覆盖保存不触发启动、每节点启停/重启、接入控件挂载和窄屏无溢出。
+- 尚未确认的根因：当前设备上第二节点未保存/未启动的确切 bridge 阶段、错误码及端口所有权尚无新证据；不能将已修复的 `ruby-tempfile` 启动依赖问题代替节点保存根因。也尚未完成真实第二节点导入、双实例、双通道 SOCKS5、Mihomo 实际选路和正式包验证。
+- 下一步：审查最终差异并同步版本为未使用的 `2026-2024`，提交推送，等待新精确提交 Development CI，再从该提交构建 RC；候选包安装后通过当前 LuCI 实际保存用户已提供的第二节点并诊断/修复 bridge 错误，完成双实例、双通道和页面验证后再触发 Formal Release。个人分享链接与凭据不进入 CURRENT、Git、日志、截图或包。
+
 ## 2026-10-31 手动一键安装后启动失败与多 Naive 验收续接
 
 - 用户反馈刚以一键指令安装最新 OpenKill 后无法启动，并要求查因后继续第二节点保存和双通道验收。当前仓库 HEAD 为 `4c702f96932e6ed8950ddbf4fe9a51296bce943c`，分支 `master` 与 `origin/master` 同步；远端最新正式标签/Release 为 `v2026-2023-ipk`，版本 `2026-2023`。此前记录中较旧的 `2026-2022` 基线已过期。

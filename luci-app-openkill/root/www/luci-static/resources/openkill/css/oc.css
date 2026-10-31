@@ -9459,6 +9459,65 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
     min-width: 0;
     white-space: nowrap;
 }
+#cbi-openkill.openkill-settings .openkill-naive-component-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--oc-border, #475569);
+    border-radius: 8px;
+    background: var(--oc-surface-subtle, rgba(15, 23, 42, .18));
+}
+#cbi-openkill.openkill-settings .openkill-naive-component-actions .openkill-naive-standalone-component { flex: 1 1 auto; margin: 0; }
+#cbi-openkill.openkill-settings .openkill-naive-component-actions button { flex: 0 0 auto; }
+#cbi-openkill.openkill-settings .openkill-naive-more-operations {
+    margin: 10px 0 14px;
+    padding: 9px 12px;
+    border: 1px solid var(--oc-border, #475569);
+    border-radius: 8px;
+    background: var(--oc-surface-subtle, rgba(15, 23, 42, .18));
+}
+#cbi-openkill.openkill-settings .openkill-naive-more-operations > summary,
+#cbi-openkill.openkill-settings .openkill-naive-row-more > summary {
+    color: var(--oc-text-secondary, #aeb8c8);
+    cursor: pointer;
+    font-weight: 600;
+}
+#cbi-openkill.openkill-settings .openkill-naive-row-more {
+    display: inline-block;
+    margin-inline-start: 6px;
+    vertical-align: middle;
+}
+#cbi-openkill.openkill-settings .openkill-naive-row-more[open] {
+    display: block;
+    margin: 6px 0;
+}
+#cbi-openkill.openkill-settings .openkill-naive-row-more button {
+    margin: 4px 4px 0 0;
+}
+#cbi-openkill.openkill-settings .openkill-naive-managed-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+}
+#cbi-openkill.openkill-settings .openkill-naive-managed-controls label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+}
+#cbi-openkill.openkill-settings .openkill-naive-managed-controls select {
+    max-width: 220px;
+}
+#cbi-openkill.openkill-settings .openkill-naive-more-operations summary:focus-visible,
+#cbi-openkill.openkill-settings .openkill-naive-row-more summary:focus-visible {
+    outline: 2px solid var(--oc-accent, #38bdf8);
+    outline-offset: 2px;
+}
 #cbi-openkill.openkill-settings .openkill-naive-standalone-component {
     margin: 8px 0;
     color: var(--oc-text-secondary, #aeb8c8);
@@ -9535,6 +9594,7 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
 #cbi-openkill.openkill-settings .openkill-naive-preview { margin-top: 12px; padding: 10px; border-radius: 6px; background: var(--oc-surface-subtle, rgba(15,23,42,.35)); color: var(--oc-text-secondary, #aeb8c8); overflow-wrap: anywhere; }
 #cbi-openkill.openkill-settings .openkill-naive-dialog-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 @media (max-width: 700px) {
+    #cbi-openkill.openkill-settings .openkill-naive-component-actions { align-items: stretch; flex-direction: column; }
     #cbi-openkill.openkill-settings .openkill-naive-standalone-table thead { display: none; }
     #cbi-openkill.openkill-settings .openkill-naive-standalone-table,
     #cbi-openkill.openkill-settings .openkill-naive-standalone-table tbody,

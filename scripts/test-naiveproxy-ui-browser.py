@@ -38,7 +38,7 @@ def main() -> int:
         print("OPENKILL_ENVIRONMENT_LIMIT=PLAYWRIGHT_UNAVAILABLE")
         return 0
 
-    state = {"name": "Fixture", "generation": 1, "managed": "0", "managed_group": "", "operations": [],
+    state = {"name": "Fixture", "generation": 1, "node_state": "running", "managed": "0", "managed_group": "", "operations": [],
              "groups_state": "available", "fail_add_reason": ""}
 
     class Handler(BaseHTTPRequestHandler):
@@ -71,7 +71,7 @@ def main() -> int:
                 if "operation=yaml" in self.path:
                     self.response(200, "text/plain; charset=utf-8", '- name: "Fixture"\n  type: socks5\n  server: 127.0.0.1\n  port: 11080\n  udp: false\n')
                     return
-                payload = {"updated": 1, "component_status": "available", "component_version": "fixture", "component": "/etc/naiveproxy/naive", "component_asset": "fixture", "component_machine": "x86_64", "component_reason": "available", "groups": ["Main", "Backup auto"], "nodes": {"node-fixture": {"name": state["name"], "enabled": "1", "port": "11080", "state": "running", "local_ready": "1", "health": "available", "latency_ms": "123", "checked_at": "1", "generation": str(state["generation"]), "pending_apply": "0", "managed": state["managed"], "managed_group": state["managed_group"]}}}
+                payload = {"updated": 1, "component_status": "available", "component_version": "fixture", "component": "/etc/naiveproxy/naive", "component_asset": "fixture", "component_machine": "x86_64", "component_reason": "available", "groups": ["Main", "Backup auto"], "nodes": {"node-fixture": {"name": state["name"], "enabled": "1", "port": "11080", "state": state["node_state"], "local_ready": "1", "health": "available", "latency_ms": "123", "checked_at": "1", "generation": str(state["generation"]), "pending_apply": "0", "managed": state["managed"], "managed_group": state["managed_group"]}}}
                 self.response(200, "application/json; charset=utf-8", json.dumps(payload))
                 return
             self.response(404, "text/plain", "not found")
@@ -106,6 +106,12 @@ def main() -> int:
                 state["managed"] = fields.get("enabled", "0")
                 state["managed_group"] = fields.get("group", "") if state["managed"] == "1" else ""
                 payload = {"ok": True, "stage": "managed-selection-saved", "id": "node-fixture"}
+            elif operation == "start":
+                state["node_state"] = "running"
+                payload = {"ok": True, "stage": "service-started", "id": fields.get("id", "")}
+            elif operation == "stop":
+                state["node_state"] = "stopped"
+                payload = {"ok": True, "stage": "service-stopped", "id": fields.get("id", "")}
             elif operation in ("component", "install", "update"):
                 payload = {"ok": True, "stage": "component-candidate-ready", "candidate_version": "fixture", "asset": "fixture"}
             else:
@@ -141,6 +147,12 @@ def main() -> int:
                     page.goto(f"http://127.0.0.1:{server.server_port}/index.html", wait_until="networkidle")
                     assert page.evaluate("document.getElementById('settings-cbi-form').checkValidity()"), "hidden Naive dialog blocked outer CBI form validation"
                     assert "2 个可用策略组" in page.locator('[data-naive-groups-status]').inner_text()
+                    assert page.locator('[data-naive-action="update"]').is_visible()
+                    assert page.locator('[data-naive-action="update"]').inner_text() == "安装 / 更新组件"
+                    assert page.locator('.openkill-naive-more-operations').evaluate('(element) => !element.open')
+                    assert page.locator('[data-naive-node-toggle="node-fixture"]').get_attribute('data-naive-operation') == "stop"
+                    assert page.locator('[data-naive-node-edit="node-fixture"]').is_visible()
+                    assert page.locator('[data-naive-save-start]').count() == 0
                     page.locator('[data-naive-action="import"]').click()
                     page.locator('[name="share"]').fill("naive+https://fixture-user:fixture-secret@fixture.example.test:443?security=tls&type=tcp&headerType=none#Imported")
                     page.locator('[data-naive-parse-link]').click()
@@ -150,9 +162,12 @@ def main() -> int:
                     state["fail_add_reason"] = "duplicate-node-endpoint"
                     page.locator('[data-naive-save]').click()
                     page.wait_for_function("() => document.querySelector('[data-naive-preview]')?.textContent.includes('该连接已保存')")
+                    page.wait_for_function("() => document.querySelector('[data-naive-standalone-status]')?.textContent.includes('节点保存失败')")
+                    assert "fixture-secret" not in page.locator('[data-naive-standalone-status]').inner_text()
                     state["fail_add_reason"] = ""
                     page.locator('[data-naive-save]').click()
                     page.wait_for_timeout(50)
+                    assert state["operations"].count("start") == 0, "saving a node must not start it implicitly"
                     page.locator('[data-naive-node-edit="node-fixture"]').click()
                     assert page.locator('[name="name"]').input_value() == "Imported"
                     page.wait_for_function("() => document.querySelector('[name=\\\"password_mode\\\"]') && document.querySelector('[name=\\\"password_mode\\\"]').checked")
@@ -163,6 +178,7 @@ def main() -> int:
                     page.wait_for_timeout(50)
                     assert state["operations"].count("add") >= 2 and "get" in state["operations"] and "edit" in state["operations"]
                     page.locator('[data-naive-managed-group="node-fixture"]').select_option("Main")
+                    assert page.locator('[data-naive-managed="node-fixture"]').locator('xpath=..').get_attribute('class') == "openkill-naive-managed-controls"
                     page.locator('[data-naive-managed="node-fixture"]').click()
                     page.wait_for_function("() => document.querySelector('[data-naive-managed]')?.getAttribute('data-naive-managed-value') === '0'")
                     assert state["managed"] == "1"
@@ -171,6 +187,17 @@ def main() -> int:
                     page.locator('[data-naive-managed="node-fixture"]').click()
                     page.wait_for_function("() => document.querySelector('[data-naive-managed]')?.getAttribute('data-naive-managed-value') === '1'")
                     assert state["managed"] == "0"
+                    page.locator('[data-naive-node-toggle="node-fixture"]').click()
+                    page.wait_for_function("() => document.querySelector('[data-naive-node-toggle]')?.getAttribute('data-naive-operation') === 'start'")
+                    assert state["node_state"] == "stopped"
+                    page.locator('[data-naive-node-toggle="node-fixture"]').click()
+                    page.wait_for_function("() => document.querySelector('[data-naive-node-toggle]')?.getAttribute('data-naive-operation') === 'stop'")
+                    assert state["node_state"] == "running"
+                    page.locator('.openkill-naive-row-more > summary').click()
+                    page.locator('[data-naive-node-restart="node-fixture"]').click()
+                    page.wait_for_timeout(50)
+                    assert state["node_state"] == "running"
+                    assert state["operations"].count("stop") >= 2 and state["operations"].count("start") >= 2
                     state["groups_state"] = "unavailable"
                     page.locator('[data-naive-action="refresh"]').click()
                     page.wait_for_function("() => document.querySelector('[data-naive-groups-status]')?.textContent.includes('无法解析')")
