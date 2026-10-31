@@ -99,7 +99,7 @@ def main() -> None:
     assert catalog_rows and all(len(line.split("\t")) == 6 for line in catalog_rows)
     controller = require(CONTROLLER, "action_naive_standalone_status")
     require(CONTROLLER, 'operation == "groups"')
-    require(controller, "naiveproxy-managed.rb --list-groups")
+    require(CONTROLLER, "naiveproxy-managed.rb --list-groups")
     # Status polling must remain read-only.  A non-empty runtime manifest is
     # authoritative; only the bootstrap fallback may invoke the fixed runner.
     require(CONTROLLER, "pcall(SYS.exec, command)")
