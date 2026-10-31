@@ -1707,20 +1707,41 @@ function action_naive_standalone_status()
 	if operation == "groups" then
 		local selected = config_path()
 		local groups = {}
+		local state, reason = "unavailable", "selected-config-unavailable"
 		if type(selected) == "string" and selected:match("^[%w_.%-]+$") then
 			local runtime_path = "/etc/openkill/" .. selected
-			if fs.access(runtime_path) then
-				local command = "ruby /usr/share/openkill/naiveproxy-managed.rb --list-groups '/etc/openkill/" .. selected .. "' 2>/dev/null"
-				local ok, listed = pcall(SYS.exec, command)
-				if ok and type(listed) == "string" then
-					for name in listed:gmatch("([^\r\n]+)") do
-						if #name <= 160 and not name:find("[%c]") then table.insert(groups, name) end
+			if not fs.access(runtime_path) then
+				reason = "runtime-config-missing"
+			elseif SYS.call("command -v ruby >/dev/null 2>&1") ~= 0 then
+				reason = "ruby-runtime-missing"
+			else
+				-- SYS.exec returns stdout rather than the child exit status. Carry a
+				-- fixed sentinel so a valid empty group list is distinguishable from
+				-- an unreadable or malformed runtime YAML.
+				local command = "ruby /usr/share/openkill/naiveproxy-managed.rb --list-groups '/etc/openkill/" .. selected .. "' 2>/dev/null; rc=$?; printf '\\n__OPENKILL_GROUPS_RC=%s\\n' \"$rc\""
+				local ok, output = pcall(SYS.exec, command)
+				if not ok or type(output) ~= "string" then
+					reason = "group-parser-unavailable"
+				else
+					local listed, rc = output:match("^(.-)\n__OPENKILL_GROUPS_RC=(%d+)%s*$")
+					if not rc then
+						reason = "group-parser-result-missing"
+					elseif tonumber(rc) ~= 0 then
+						reason = "runtime-yaml-invalid"
+					else
+						for name in (listed or ""):gmatch("([^\r\n]+)") do
+							if #name <= 160 and not name:find("[%c]") then table.insert(groups, name) end
+						end
+						if #groups > 0 then state = "available"; reason = "available"
+						else state = "empty"; reason = "no-supported-groups" end
 					end
 				end
 			end
+		else
+			reason = "selected-config-invalid"
 		end
 		HTTP.prepare_content("application/json; charset=utf-8")
-		HTTP.write_json({ ok = true, groups = groups })
+		HTTP.write_json({ ok = state ~= "unavailable", state = state, reason = reason, groups = groups })
 		return
 	end
 	if operation == "yaml" then

@@ -22,7 +22,7 @@ def git_path(path: Path) -> str:
 
 def run(args, env):
     return subprocess.run([BASH, git_path(SCRIPT), *args], env=env, text=True,
-                          capture_output=True, check=True)
+                          capture_output=True, check=True, timeout=30)
 
 
 def main():
@@ -336,6 +336,10 @@ np_manifest
                                     input=("operation=import\nshare=naive+https://fixture-user:fixture-secret@import.example.test:443?security=tls&type=tcp&headerType=none#Again\n"),
                                     capture_output=True)
         assert duplicate.returncode != 0
+        duplicate_result = (run_dir / "control.result").read_text(encoding="utf-8")
+        assert "stage=node-save-failed" in duplicate_result
+        assert "reason=duplicate-node-endpoint" in duplicate_result
+        assert "rc=13" in duplicate_result
         unknown = subprocess.run([BASH, git_path(SCRIPT), "control"], env=env, text=True,
                                  input=("operation=import\nshare=naive+https://fixture-user:fixture-secret@unknown.example.test:443?security=tls&unknown=x#Unknown\n"),
                                  capture_output=True)
@@ -344,6 +348,31 @@ np_manifest
                                    input=("operation=import\nshare=naive+https://fixture%ZZ:fixture-secret@example.test:443#Bad\n"),
                                    capture_output=True)
         assert malformed.returncode != 0
+
+        # If publishing the runtime manifest fails after the node file and
+        # port mapping have been staged, the failed add must leave neither
+        # artifact behind.  Override only that function in this isolated
+        # fixture; production files and network access are not involved.
+        request = Path(temp) / "manifest-failure.request"
+        request.write_text(
+            "operation=add\nname=Rollback fixture\nserver=rollback.example.test\n"
+            "port=443\nusername=rollback-user\npassword=rollback-pass\n"
+            "transport=https\nenabled=1\n", encoding="utf-8")
+        before_ports = (root / "ports").read_bytes()
+        before_nodes = sorted((root / "nodes").glob("*.json"))
+        fail_env = dict(env, NAIVEPROXY_STANDALONE_LIB="1",
+                        NAIVEPROXY_CONTROL_REQUEST=git_path(request))
+        failed_commit = subprocess.run(
+            [BASH, "-c", '. "$1"; np_manifest() { return 1; }; np_control',
+             "naive-rollback-fixture", git_path(SCRIPT)],
+            env=fail_env, text=True, capture_output=True, timeout=20)
+        assert failed_commit.returncode == 17
+        failed_result = (run_dir / "control.result").read_text(encoding="utf-8")
+        assert "stage=node-save-failed" in failed_result
+        assert "reason=manifest-update-failed" in failed_result
+        assert "rc=17" in failed_result
+        assert (root / "ports").read_bytes() == before_ports
+        assert sorted((root / "nodes").glob("*.json")) == before_nodes
 
     # Exercise the independent installer with an offline, locally staged
     # official-shaped asset.  The fake downloader exists only in this fixture.

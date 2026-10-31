@@ -9464,6 +9464,22 @@ body[data-page="admin-services-openkill-config"] #cbi-upload .cbi-button {
     color: var(--oc-text-secondary, #aeb8c8);
     overflow-wrap: anywhere;
 }
+#cbi-openkill.openkill-settings .openkill-naive-groups-status {
+    margin: 8px 0;
+    padding: 8px 10px;
+    border: 1px solid var(--oc-border, #475569);
+    border-radius: 6px;
+    color: var(--oc-text-secondary, #aeb8c8);
+    background: var(--oc-surface-subtle, rgba(15, 23, 42, .25));
+    overflow-wrap: anywhere;
+}
+#cbi-openkill.openkill-settings .openkill-naive-groups-status[data-state="available"] {
+    border-color: var(--oc-success, #22c55e);
+}
+#cbi-openkill.openkill-settings .openkill-naive-groups-status[data-state="empty"],
+#cbi-openkill.openkill-settings .openkill-naive-groups-status[data-state="unavailable"] {
+    border-color: var(--oc-warning, #eab308);
+}
 #cbi-openkill.openkill-settings .openkill-naive-standalone-flow {
     margin: 8px 0 12px;
     padding: 9px 12px;

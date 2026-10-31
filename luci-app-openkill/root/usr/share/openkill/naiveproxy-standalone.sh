@@ -24,6 +24,7 @@ NP_PORT_LIMIT=100
 NP_HEALTH_LOCK="$NP_RUN/health.lock"
 NP_COMPONENT_LOCK="$NP_RUN/component.lock"
 NP_PORT_LOCK="$NP_RUN/ports.lock"
+NP_NODE_CONTROL_LOCK="$NP_RUN/node-control.lock"
 NP_CONTROL_RESULT="${NAIVEPROXY_CONTROL_RESULT:-$NP_RUN/control.result}"
 
 np_safe() { printf '%s' "$1" | tr '\r\n|=' '    ' | cut -c1-160; }
@@ -984,6 +985,37 @@ np_node_matches() {
     return 1
 }
 
+np_port_map_remove_id() {
+    local id="$1" tmp
+    np_valid_id "$id" || return 1
+    np_dirs || return 1
+    [ -r "$NP_PORT_MAP" ] || return 0
+    np_port_lock_begin || return 1
+    tmp="$NP_PORT_MAP.new.$$"
+    awk -v id="$id" '$1 != id { print }' "$NP_PORT_MAP" > "$tmp" || {
+        rm -f "$tmp"; np_port_lock_end; return 1;
+    }
+    chmod 600 "$tmp" 2>/dev/null || true
+    mv -f "$tmp" "$NP_PORT_MAP" || {
+        rm -f "$tmp"; np_port_lock_end; return 1;
+    }
+    np_port_lock_end
+}
+
+np_control_add_reason() {
+    case "$1" in
+        10) printf 'node-fields-invalid\n' ;;
+        11) printf 'node-port-invalid\n' ;;
+        12) printf 'node-transport-unsupported\n' ;;
+        13) printf 'duplicate-node-endpoint\n' ;;
+        14) printf 'node-id-conflict\n' ;;
+        15) printf 'node-persistence-failed\n' ;;
+        16) printf 'node-port-allocation-failed\n' ;;
+        17) printf 'manifest-update-failed\n' ;;
+        *) printf 'node-save-failed\n' ;;
+    esac
+}
+
 np_write_node() {
     local id="$1" generation="$2" password="$3" file tmp
     file=$(np_node_file "$id") || return 14
@@ -1001,21 +1033,89 @@ np_write_node() {
 }
 
 np_control_add() {
-    local id file duplicate
-    [ -n "$NP_CTL_name" ] && [ -n "$NP_CTL_server" ] && [ -n "$NP_CTL_username" ] && [ -n "$NP_CTL_password" ] || return 10
-    np_valid_text "$NP_CTL_name" 120 && np_valid_server "$NP_CTL_server" && np_valid_text "$NP_CTL_username" 512 && np_valid_text "$NP_CTL_password" 1024 || return 10
-    np_valid_port "$NP_CTL_port" || return 11
-    case "$NP_CTL_transport" in tls|https) NP_CTL_transport=https ;; quic) ;; *) return 12 ;; esac
+    local id file duplicate rc mapped_before="" requested_id="$NP_CTL_id" generated_id=0
+    [ -n "$NP_CTL_name" ] && [ -n "$NP_CTL_server" ] && [ -n "$NP_CTL_username" ] && [ -n "$NP_CTL_password" ] || { NP_CTL_RESULT_REASON=node-fields-invalid; return 10; }
+    np_valid_text "$NP_CTL_name" 120 && np_valid_server "$NP_CTL_server" && np_valid_text "$NP_CTL_username" 512 && np_valid_text "$NP_CTL_password" 1024 || { NP_CTL_RESULT_REASON=node-fields-invalid; return 10; }
+    np_valid_port "$NP_CTL_port" || { NP_CTL_RESULT_REASON=node-port-invalid; return 11; }
+    case "$NP_CTL_transport" in tls|https) NP_CTL_transport=https ;; quic) ;; *) NP_CTL_RESULT_REASON=node-transport-unsupported; return 12 ;; esac
     duplicate=$(np_node_matches 2>/dev/null || true)
-    [ -z "$duplicate" ] || { printf 'duplicate_id=%s\n' "$duplicate"; return 13; }
+    [ -z "$duplicate" ] || { NP_CTL_RESULT_REASON=duplicate-node-endpoint; return 13; }
     id="$NP_CTL_id"
-    np_valid_id "$id" || id=$(np_make_id "$NP_CTL_server|$NP_CTL_port|$NP_CTL_username")
-    np_valid_id "$id" || return 14
-    file=$(np_node_file "$id") || return 14
-    [ ! -e "$file" ] || return 13
-    np_write_node "$id" 1 "$NP_CTL_password" || return $?
-    np_manifest >/dev/null || return 17
+    if ! np_valid_id "$id"; then
+        id=$(np_make_id "$NP_CTL_server|$NP_CTL_port|$NP_CTL_username")
+        generated_id=1
+    fi
+    np_valid_id "$id" || { NP_CTL_RESULT_REASON=node-id-conflict; return 14; }
+    file=$(np_node_file "$id") || { NP_CTL_RESULT_REASON=node-id-conflict; return 14; }
+    [ ! -e "$file" ] || {
+        if [ "$generated_id" -eq 1 ] || [ -z "$requested_id" ]; then
+            NP_CTL_RESULT_REASON=duplicate-node-endpoint
+        else
+            NP_CTL_RESULT_REASON=node-id-conflict
+        fi
+        return 13
+    }
+    mapped_before=$(np_mapped_port "$id" 2>/dev/null || true)
+    np_write_node "$id" 1 "$NP_CTL_password"
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        rm -f "$file"
+        if [ -z "$mapped_before" ] && ! np_port_map_remove_id "$id"; then
+            NP_CTL_RESULT_REASON=node-save-rollback-incomplete
+        else
+            NP_CTL_RESULT_REASON=$(np_control_add_reason "$rc")
+        fi
+        return "$rc"
+    fi
+    np_manifest >/dev/null
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        rm -f "$file"
+        if [ -z "$mapped_before" ] && ! np_port_map_remove_id "$id"; then
+            NP_CTL_RESULT_REASON=node-save-rollback-incomplete
+        else
+            NP_CTL_RESULT_REASON=manifest-update-failed
+        fi
+        # Best-effort regeneration prevents a stale success record from
+        # claiming a node that this failed transaction has removed.
+        np_manifest >/dev/null 2>&1 || true
+        return 17
+    fi
     printf 'id=%s\n' "$id"
+}
+
+np_node_control_lock_begin() {
+    local owner
+    np_dirs || return 1
+    if mkdir "$NP_NODE_CONTROL_LOCK" 2>/dev/null; then
+        printf '%s\n' "$$" > "$NP_NODE_CONTROL_LOCK/pid" 2>/dev/null || true
+        chmod 700 "$NP_NODE_CONTROL_LOCK" 2>/dev/null || true
+        return 0
+    fi
+    owner=$(sed -n '1p' "$NP_NODE_CONTROL_LOCK/pid" 2>/dev/null || true)
+    case "$owner" in
+        ''|*[!0-9]*) return 1 ;;
+        *) kill -0 "$owner" 2>/dev/null && return 1 ;;
+    esac
+    rm -f "$NP_NODE_CONTROL_LOCK/pid" 2>/dev/null || true
+    rmdir "$NP_NODE_CONTROL_LOCK" 2>/dev/null || return 1
+    mkdir "$NP_NODE_CONTROL_LOCK" 2>/dev/null || return 1
+    printf '%s\n' "$$" > "$NP_NODE_CONTROL_LOCK/pid" 2>/dev/null || true
+    chmod 700 "$NP_NODE_CONTROL_LOCK" 2>/dev/null || true
+}
+
+np_node_control_lock_end() {
+    rm -f "$NP_NODE_CONTROL_LOCK/pid" 2>/dev/null || true
+    rmdir "$NP_NODE_CONTROL_LOCK" 2>/dev/null || true
+}
+
+np_control_add_transaction() {
+    local rc
+    np_node_control_lock_begin || { NP_CTL_RESULT_REASON=node-control-busy; return 39; }
+    np_control_add
+    rc=$?
+    np_node_control_lock_end
+    return "$rc"
 }
 
 np_control_get() {
@@ -1239,13 +1339,13 @@ np_control() {
     rm -f "$NP_CONTROL_RESULT" 2>/dev/null || true
     case "$NP_CTL_action" in
         add)
-            np_control_add; rc=$?
+            np_control_add_transaction; rc=$?
             [ "$rc" -eq 0 ] && stage=accepted || stage=node-save-failed
             np_control_result "$rc" "$stage"; return "$rc" ;;
         import)
             np_import_link; rc=$?
             if [ "$rc" -ne 0 ]; then np_control_result "$rc" import-parse-failed; return "$rc"; fi
-            np_control_add; rc=$?
+            np_control_add_transaction; rc=$?
             [ "$rc" -eq 0 ] && stage=accepted || stage=node-save-failed
             np_control_result "$rc" "$stage"; return "$rc" ;;
         get)

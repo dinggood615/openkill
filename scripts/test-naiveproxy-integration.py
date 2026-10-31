@@ -75,6 +75,10 @@ def main() -> None:
     require(BRIDGE_INIT, 'rm -f "$NP_STATE_DIR/instance.$id" "$NP_STATE_DIR/health.$id"')
     require(STANDALONE, "np_control")
     require(STANDALONE, "np_control_add")
+    require(STANDALONE, "np_control_add_transaction")
+    require(STANDALONE, "node-control-busy")
+    require(STANDALONE, "np_port_map_remove_id")
+    require(STANDALONE, "node-save-rollback-incomplete")
     assert "uci" not in bridge
     openkill = require(OPENKILL_INIT, "standalone")
     yml_change = YML_CHANGE.read_text(encoding="utf-8")
@@ -100,6 +104,12 @@ def main() -> None:
     controller = require(CONTROLLER, "action_naive_standalone_status")
     require(CONTROLLER, 'operation == "groups"')
     require(CONTROLLER, "naiveproxy-managed.rb --list-groups")
+    require(CONTROLLER, 'state, reason = "unavailable", "selected-config-unavailable"')
+    require(CONTROLLER, 'reason = "runtime-config-missing"')
+    require(CONTROLLER, 'reason = "ruby-runtime-missing"')
+    require(CONTROLLER, '__OPENKILL_GROUPS_RC=')
+    require(CONTROLLER, 'reason = "runtime-yaml-invalid"')
+    require(CONTROLLER, 'state = "empty"; reason = "no-supported-groups"')
     # Status polling must remain read-only.  A non-empty runtime manifest is
     # authoritative; only the bootstrap fallback may invoke the fixed runner.
     require(CONTROLLER, "pcall(SYS.exec, command)")
@@ -147,9 +157,14 @@ def main() -> None:
     require(VIEW, "data-naive-standalone-flow")
     require(VIEW, 'role="group" aria-labelledby="openkill-naive-dialog-title" data-naive-node-form')
     require(VIEW, "function submitNode(start)")
+    require(VIEW, "parsedImport=false")
+    require(VIEW, "field('share').value='';parsedImport=true")
+    require(VIEW, "operation:importing?'add'")
+    require(VIEW, "data-naive-groups-status")
     require(VIEW, "passwordRetain.style.display")
     require(VIEW, "if(editing)f.password_mode")
     require(OC_CSS, ".openkill-naive-form-check[hidden]")
+    require(OC_CSS, ".openkill-naive-groups-status[data-state=\"unavailable\"]")
     require(VIEW, 'document.querySelector(\'input[name="token"]\')')
     assert '<form data-naive-node-form>' not in view
     assert "form.addEventListener('submit'" not in view
@@ -204,7 +219,7 @@ def main() -> None:
     require(VIEW, "X-Requested-With")
     require(VIEW, "controller-html-response")
     require(VIEW, "invalid-json-response")
-    require(VIEW, "field('share').value=raw")
+    require(VIEW, "field('share').value='';parsedImport=true")
     require(ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css", "theme hand-off closeout")
     require(ROOT / "luci-app-openkill/root/www/luci-static/resources/openkill/css/flat.css", "#tab-header ul.oc-tabmenu")
     assert "zerotier = \"advanced\"" not in SETTINGS.read_text(encoding="utf-8")

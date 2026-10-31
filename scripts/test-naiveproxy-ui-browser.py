@@ -38,7 +38,8 @@ def main() -> int:
         print("OPENKILL_ENVIRONMENT_LIMIT=PLAYWRIGHT_UNAVAILABLE")
         return 0
 
-    state = {"name": "Fixture", "generation": 1, "managed": "0", "managed_group": "", "operations": []}
+    state = {"name": "Fixture", "generation": 1, "managed": "0", "managed_group": "", "operations": [],
+             "groups_state": "available", "fail_add_reason": ""}
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *_args: object) -> None:
@@ -58,7 +59,14 @@ def main() -> int:
                 return
             if self.path.startswith("/naive-status"):
                 if "operation=groups" in self.path:
-                    self.response(200, "application/json; charset=utf-8", json.dumps({"ok": True, "groups": ["Main", "Backup auto"]}))
+                    groups = ["Main", "Backup auto"] if state["groups_state"] == "available" else []
+                    self.response(200, "application/json; charset=utf-8", json.dumps({
+                        "ok": state["groups_state"] != "unavailable",
+                        "state": state["groups_state"],
+                        "reason": {"available": "available", "empty": "no-supported-groups",
+                                   "unavailable": "runtime-yaml-invalid"}[state["groups_state"]],
+                        "groups": groups,
+                    }))
                     return
                 if "operation=yaml" in self.path:
                     self.response(200, "text/plain; charset=utf-8", '- name: "Fixture"\n  type: socks5\n  server: 127.0.0.1\n  port: 11080\n  udp: false\n')
@@ -82,6 +90,12 @@ def main() -> int:
             if operation == "get":
                 payload = {"ok": True, "stage": "node-read", "id": "node-fixture", "node": {"name": state["name"], "server": "fixture.example.test", "port": 443, "username": "fixture-user", "transport": "https", "enabled": "1", "generation": state["generation"], "password_set": True}}
             elif operation in ("import", "add"):
+                if state["fail_add_reason"]:
+                    self.response(422, "application/json; charset=utf-8", json.dumps({
+                        "ok": False, "stage": "node-save-failed", "reason": state["fail_add_reason"],
+                        "rc": 13, "detail": "standalone-bridge-returned-nonzero",
+                    }))
+                    return
                 state["name"] = "Imported"
                 payload = {"ok": True, "stage": "accepted", "id": "node-fixture"}
             elif operation == "edit":
@@ -126,10 +140,17 @@ def main() -> int:
                     page = browser.new_page(viewport={"width": 1366, "height": 900})
                     page.goto(f"http://127.0.0.1:{server.server_port}/index.html", wait_until="networkidle")
                     assert page.evaluate("document.getElementById('settings-cbi-form').checkValidity()"), "hidden Naive dialog blocked outer CBI form validation"
+                    assert "2 个可用策略组" in page.locator('[data-naive-groups-status]').inner_text()
                     page.locator('[data-naive-action="import"]').click()
                     page.locator('[name="share"]').fill("naive+https://fixture-user:fixture-secret@fixture.example.test:443?security=tls&type=tcp&headerType=none#Imported")
                     page.locator('[data-naive-parse-link]').click()
                     assert page.locator('[name="name"]').input_value() == "Imported"
+                    assert page.locator('[name="share"]').input_value() == "", "parsed share text must be cleared"
+                    assert page.locator('[data-naive-import-start]').is_hidden(), "parsed share input should no longer be active"
+                    state["fail_add_reason"] = "duplicate-node-endpoint"
+                    page.locator('[data-naive-save]').click()
+                    page.wait_for_function("() => document.querySelector('[data-naive-preview]')?.textContent.includes('该连接已保存')")
+                    state["fail_add_reason"] = ""
                     page.locator('[data-naive-save]').click()
                     page.wait_for_timeout(50)
                     page.locator('[data-naive-node-edit="node-fixture"]').click()
@@ -140,7 +161,7 @@ def main() -> int:
                     page.locator('[name="name"]').fill("Renamed")
                     page.locator('[data-naive-save]').click()
                     page.wait_for_timeout(50)
-                    assert "import" in state["operations"] and "get" in state["operations"] and "edit" in state["operations"]
+                    assert state["operations"].count("add") >= 2 and "get" in state["operations"] and "edit" in state["operations"]
                     page.locator('[data-naive-managed-group="node-fixture"]').select_option("Main")
                     page.locator('[data-naive-managed="node-fixture"]').click()
                     page.wait_for_function("() => document.querySelector('[data-naive-managed]')?.getAttribute('data-naive-managed-value') === '0'")
@@ -150,6 +171,14 @@ def main() -> int:
                     page.locator('[data-naive-managed="node-fixture"]').click()
                     page.wait_for_function("() => document.querySelector('[data-naive-managed]')?.getAttribute('data-naive-managed-value') === '1'")
                     assert state["managed"] == "0"
+                    state["groups_state"] = "unavailable"
+                    page.locator('[data-naive-action="refresh"]').click()
+                    page.wait_for_function("() => document.querySelector('[data-naive-groups-status]')?.textContent.includes('无法解析')")
+                    assert page.locator('[data-naive-managed-group="node-fixture"]').is_disabled()
+                    state["groups_state"] = "empty"
+                    page.locator('[data-naive-action="refresh"]').click()
+                    page.wait_for_function("() => document.querySelector('[data-naive-groups-status]')?.textContent.includes('没有支持接入的策略组')")
+                    assert page.locator('[data-naive-managed-group="node-fixture"]').is_disabled()
                     overflow = page.evaluate("""() => [...document.querySelectorAll('*')].filter(e => e.getBoundingClientRect().right > window.innerWidth + 1).map(e => ({tag:e.tagName, cls:e.className, right:Math.round(e.getBoundingClientRect().right)})).slice(0, 8)""")
                     assert not overflow, overflow
                     page.set_viewport_size({"width": 390, "height": 844})
