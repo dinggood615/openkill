@@ -8,6 +8,7 @@
 - 用户要求新节点本地端口按 `11080, 11081, ...` 严格递增。已修改 `naiveproxy-standalone.sh`：新分配取现有映射最大端口加一；不填补较低空洞、不跳过被其他进程占用的下一个端口；遇到格式错误/重复映射或冲突时失败且保持映射不变；既有 ID/端口映射不变。新增 `scripts/test-naiveproxy-ports.sh` 并纳入 `scripts/local-gate.sh`，覆盖顺序、空洞、不相关监听冲突、稳定旧映射。
 - 新增端口行为测试及 `wsl sh scripts/local-gate.sh` 已通过，`LOCAL_POLICY_GATE=PASS`。原 Python 独立服务测试在 Windows Git Bash 环境卡在既有 `health n1` fixture 子进程，已中止；不能报告该测试通过。候选安装后暂存的真实重复请求未创建节点文件或端口，临时请求文件已删除。此前备份经重新校验：`/root/openkill-pre-naive-ui-20261031T085720Z/pre-change.tar.gz` SHA256 `7db66dcea70e5ba0a7894fed9104b08d517328b2f958993de526c48350d01af8`；本轮提交节点前另备份 `/root/openkill-pre-naive-ui-20261031T085720Z/pre-second-import.tar.gz`，权限 600。
 - 当前验收缺口：同一个已存节点无法作为两个不同通道；设备未提供另一条不同端点用于双实例验收。电脑控制工具在启动 Chrome 后因无法可靠确定浏览器当前 URL 而强制停止，候选包真实 LuCI 视觉/交互检查未完成。用户现明确要求不等待设备验收、直接更新发布；发布说明将披露这些限制，Formal Release 仍须通过仓库强制门禁。正式包安装后的一键卸载/最新安装器替换测试尚未执行。
+- 用户明确要求跳过后续设备验收并直接发布。Formal Release #237 已成功（`release_gate=true`、`publish=true`），源提交 `9e1bd57ef87ce90013203ffe66406753eee12f22`；版本 `2026-2024`，标签 [v2026-2024-ipk](https://github.com/dinggood615/openkill/releases/tag/v2026-2024-ipk)，工作流 [#237](https://github.com/dinggood615/openkill/actions/runs/41191256867)。正式 IPK `luci-app-openkill_2026-2024_all.ipk`，8,046,788 字节，SHA256 `cd387bac965f6270754a7ccd40d380761e6bfe8eba0f57c89eb638a13ce3abde`；从 Release 下载后与 `package/master/latest-ipk.json` 中的提交、版本、文件名、下载地址和哈希一致，包频道版本为 `v2026-2024`。正式包尚未在设备安装；按用户本轮要求未执行卸载/安装及设备验收。版本说明已披露没有第二独立节点和真实 LuCI 检查。
 
 ## 2026-10-31 第二个 Naive 节点保存/启动与页面精简（实施前起始记录；状态已由上节更新）
 
